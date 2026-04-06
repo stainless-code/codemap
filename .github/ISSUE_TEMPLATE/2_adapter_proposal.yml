@@ -1,0 +1,46 @@
+name: Adapter proposal
+description: Propose a new language, preprocessor, or pluggable extractor — keep core small.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Adapters** add language-specific parsing or indexing without bloating core. See [docs/roadmap.md](https://github.com/stainless-code/codemap/blob/main/docs/roadmap.md) (pluggable language adapters). Open an issue here first so we can agree on shape (extensions, API, packaging) before a large PR.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What codebase facts should Codemap capture that TS/JS/CSS/text don’t cover today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: File extensions, rough parse strategy (e.g. Tree-sitter, WASM, subprocess), and what rows you’d add (symbols, imports, etc.).
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: packaging
+    attributes:
+      label: Packaging preference
+      description: Future community adapters may live in separate packages with a peerDependency on `@stainless-code/codemap`.
+      options:
+        - label: In-repo implementation (starts in this monorepo)
+        - label: Separate npm package (I can help maintain)
+        - label: Not sure yet
+
+  - type: textarea
+    id: api
+    attributes:
+      label: API sketch (optional)
+      description: If you have ideas for a `LanguageAdapter`-style hook, outline it here.
+
+  - type: textarea
+    id: links
+    attributes:
+      label: Prior art
+      description: Links to parsers, similar tools, or example repos.

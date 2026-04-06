@@ -1,0 +1,68 @@
+name: Core bug
+description: Indexer, CLI, schema, SQLite, or programmatic API — something is wrong in core.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Core** means the shared pipeline: config, git-based incremental indexing, parsers bundled in this repo, SQLite schema, CLI, and `createCodemap` / `query`. For new languages or extractors, use **Adapter proposal** instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: Commands you ran, flags, and minimal example if possible.
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      description: Where you saw the bug.
+      options:
+        - Node.js
+        - Bun
+        - Both / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: e.g. `@stainless-code/codemap` version or commit, Node/Bun version, OS.
+      placeholder: codemap 0.x / bun 1.3 / macOS 14
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Logs or extra context
+      description: Optional stack traces, SQL snippet, or link to a minimal repo.

@@ -31,7 +31,7 @@ Do **not** add Codemap as a dependency to the bench repo. In **this** repo, copy
 
 Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — run **`bun run changeset`** when your PR should bump the version; see [docs/packaging.md § Releases](../docs/packaging.md#releases).
 
-Issue templates for **adapter proposals** vs **core bugs** are still TODO.
+**Issues:** use [GitHub issue templates](https://github.com/stainless-code/codemap/issues/new/choose) — **Core bug** vs **Adapter proposal** (see `.github/ISSUE_TEMPLATE/`).
 
 ## Agent rules and skills (`.agents/`)
 

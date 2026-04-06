@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Documentation
+    url: https://github.com/stainless-code/codemap/tree/main/docs
+    about: Architecture, packaging, roadmap, and benchmarks.
+
+  - name: Contributing
+    url: https://github.com/stainless-code/codemap/blob/main/.github/CONTRIBUTING.md
+    about: Core vs adapter boundaries, dev workflow, and releases.
