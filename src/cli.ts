@@ -39,6 +39,45 @@ export function printVersion(): void {
   console.log(CODEMAP_VERSION);
 }
 
+/**
+ * Reject unknown flags/args for index mode before config or DB access.
+ * Prevents typos like `--versiond` from falling through to incremental index.
+ */
+export function validateIndexModeArgs(rest: string[]): void {
+  if (rest.length === 0) return;
+  if (rest[0] === "query") return;
+
+  if (rest[0] === "agents") {
+    if (rest[1] === "init") return;
+    console.error(
+      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force]`,
+    );
+    process.exit(1);
+  }
+
+  let i = 0;
+  while (i < rest.length) {
+    const a = rest[i];
+    if (a === "--full") {
+      i++;
+      continue;
+    }
+    if (a === "--files") {
+      i++;
+      while (i < rest.length && !rest[i].startsWith("-")) i++;
+      continue;
+    }
+    if (a.startsWith("-")) {
+      console.error(`codemap: unknown option "${a}"`);
+      console.error("Run codemap --help for usage.");
+      process.exit(1);
+    }
+    console.error(`codemap: unexpected argument "${a}"`);
+    console.error("Run codemap --help for usage.");
+    process.exit(1);
+  }
+}
+
 export function parseBootstrapArgs(argv: string[]) {
   const envRoot = process.env.CODEMAP_ROOT ?? process.env.CODEMAP_TEST_BENCH;
   let root = envRoot ? resolve(envRoot) : undefined;
@@ -90,6 +129,8 @@ Use --force to overwrite an existing .agents/ directory.
     if (!ok) process.exit(1);
     return;
   }
+
+  validateIndexModeArgs(rest);
 
   const user = await loadUserConfig(root, configFile);
   initCodemap(resolveCodemapConfig(root, user));
