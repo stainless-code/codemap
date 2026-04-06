@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    "mikestead.dotenv",
+    "ms-vscode.vscode-json",
+    "oven.bun-vscode",
+    "oxc.oxc-vscode",
+    "redhat.vscode-yaml",
+    "TypeScriptTeam.native-preview",
+    "yoavbls.pretty-ts-errors"
+  ]
+}

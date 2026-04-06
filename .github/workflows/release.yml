@@ -1,0 +1,46 @@
+# [Changesets](https://github.com/changesets/changesets): open a "Version packages" PR when
+# `.changeset/*.md` files land on `main`, then publish to npm when that PR merges (requires `NPM_TOKEN`).
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Opens/updates the Version PR; after merge, publishes to npm and creates GitHub Releases
+      # (see https://github.com/changesets/action — createGithubReleases defaults to true).
+      - name: Create Release Pull Request or Publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: bun run release
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

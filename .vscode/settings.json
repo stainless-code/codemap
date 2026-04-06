@@ -1,0 +1,49 @@
+{
+  "[css]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "files.watcherExclude": {
+    "**/.codemap.db": true,
+    "**/.codemap.db-shm": true,
+    "**/.codemap.db-wal": true,
+    "**/node_modules/**": true
+  },
+  "oxc.fmt.configPath": ".oxfmtrc.json",
+  "search.exclude": {
+    "**/.codemap.db": true,
+    "**/.codemap.db-shm": true,
+    "**/.codemap.db-wal": true,
+    "**/node_modules": true,
+    "**/bun.lock": true
+  },
+  "typescript.experimental.useTsgo": true,
+  "typescript.preferences.importModuleSpecifier": "shortest",
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

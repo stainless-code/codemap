@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  format:
+    name: 💅 Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run format
+        run: bun run format:check
+
+  lint:
+    name: 🕵 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run lint
+        run: bun run lint:ci
+
+  typecheck:
+    name: ✅ Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run typecheck
+        run: bun run typecheck
+
+  test:
+    name: 🔬 Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run unit tests with coverage
+        run: bun run test:coverage
+
+  build:
+    name: 🧰 Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Run build
+        run: bun run build
+
+      # Deliberately `node`, not `bun`: many installs use npm + Node; this checks dist/ + better-sqlite3.
+      # Bun is already used for build/tests above.
+      - name: Node smoke (dist + better-sqlite3)
+        run: node dist/index.mjs query "SELECT 1 as ok"

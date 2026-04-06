@@ -1,0 +1,361 @@
+import { extname } from "node:path";
+
+import { parseSync, Visitor } from "oxc-parser";
+import type {
+  StaticImport,
+  StaticExportEntry,
+  ExportExportNameKind,
+  ImportNameKind,
+} from "oxc-parser";
+
+import type {
+  SymbolRow,
+  ImportRow,
+  ExportRow,
+  ComponentRow,
+  MarkerRow,
+} from "./db";
+import { extractMarkers } from "./markers";
+
+interface ExtractedData {
+  symbols: SymbolRow[];
+  imports: ImportRow[];
+  exports: ExportRow[];
+  components: ComponentRow[];
+  markers: MarkerRow[];
+}
+
+/**
+ * Compute line number from byte offset.
+ * Build a line-start-offsets array once, then binary search.
+ */
+function buildLineMap(source: string): number[] {
+  const offsets = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source.charCodeAt(i) === 10) {
+      offsets.push(i + 1);
+    }
+  }
+  return offsets;
+}
+
+function offsetToLine(lineMap: number[], offset: number): number {
+  let lo = 0;
+  let hi = lineMap.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (lineMap[mid] <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1; // 1-based
+}
+
+export function extractFileData(
+  filePath: string,
+  source: string,
+  relPath: string,
+): ExtractedData {
+  const ext = extname(filePath).toLowerCase();
+  const lang =
+    ext === ".tsx"
+      ? "tsx"
+      : ext === ".jsx"
+        ? "jsx"
+        : ext === ".ts" || ext === ".mts" || ext === ".cts"
+          ? "ts"
+          : "js";
+
+  const isTsx = ext === ".tsx" || ext === ".jsx";
+
+  const result = parseSync(filePath, source, { lang, preserveParens: false });
+  const lineMap = buildLineMap(source);
+  const mod = result.module;
+
+  const symbols: SymbolRow[] = [];
+  const imports: ImportRow[] = [];
+  const exports: ExportRow[] = [];
+  const components: ComponentRow[] = [];
+  const markers: MarkerRow[] = [];
+
+  const exportedNames = new Set<string>();
+  const defaultExportedNames = new Set<string>();
+
+  for (const exp of mod.staticExports) {
+    for (const entry of exp.entries) {
+      const exportName = entry.exportName;
+      if (exportName.kind === ("Default" as ExportExportNameKind)) {
+        const localName = entry.localName;
+        if (localName.name) defaultExportedNames.add(localName.name);
+        defaultExportedNames.add("default");
+      } else if (
+        exportName.kind === ("Name" as ExportExportNameKind) &&
+        exportName.name
+      ) {
+        exportedNames.add(exportName.name);
+      }
+
+      exports.push(exportEntryToRow(relPath, entry));
+    }
+  }
+
+  for (const imp of mod.staticImports) {
+    imports.push(staticImportToRow(relPath, imp, lineMap));
+  }
+
+  const hookCalls = new Map<string, Set<string>>(); // function scope name -> hook names
+  let currentFunctionScope: string | null = null;
+
+  const visitor = new Visitor({
+    FunctionDeclaration(node: any) {
+      const name = node.id?.name;
+      if (!name) return;
+      const lineStart = offsetToLine(lineMap, node.start);
+      const lineEnd = offsetToLine(lineMap, node.end);
+      const isExported =
+        exportedNames.has(name) || defaultExportedNames.has(name);
+      const isDefault = defaultExportedNames.has(name);
+
+      symbols.push({
+        file_path: relPath,
+        name,
+        kind: "function",
+        line_start: lineStart,
+        line_end: lineEnd,
+        signature: buildFunctionSignature(name, node),
+        is_exported: isExported ? 1 : 0,
+        is_default_export: isDefault ? 1 : 0,
+      });
+
+      if (isTsx && /^[A-Z]/.test(name)) {
+        currentFunctionScope = name;
+        hookCalls.set(name, new Set());
+      }
+    },
+    "FunctionDeclaration:exit"(node: any) {
+      const name = node.id?.name;
+      if (name && currentFunctionScope === name) {
+        maybeAddComponent(name, node, false);
+        currentFunctionScope = null;
+      }
+    },
+
+    VariableDeclaration(node: any) {
+      for (const decl of node.declarations) {
+        const name = decl.id?.name;
+        if (!name) continue;
+        const init = decl.init;
+        const lineStart = offsetToLine(lineMap, node.start);
+        const lineEnd = offsetToLine(lineMap, node.end);
+        const isExported =
+          exportedNames.has(name) || defaultExportedNames.has(name);
+        const isDefault = defaultExportedNames.has(name);
+
+        const isArrowOrFn =
+          init?.type === "ArrowFunctionExpression" ||
+          init?.type === "FunctionExpression";
+
+        symbols.push({
+          file_path: relPath,
+          name,
+          kind: isArrowOrFn ? "function" : "const",
+          line_start: lineStart,
+          line_end: lineEnd,
+          signature: isArrowOrFn
+            ? buildFunctionSignature(name, init)
+            : `const ${name}`,
+          is_exported: isExported ? 1 : 0,
+          is_default_export: isDefault ? 1 : 0,
+        });
+
+        if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
+          currentFunctionScope = name;
+          hookCalls.set(name, new Set());
+        }
+      }
+    },
+    "VariableDeclaration:exit"(node: any) {
+      for (const decl of node.declarations) {
+        const name = decl.id?.name;
+        if (name && currentFunctionScope === name) {
+          maybeAddComponent(name, decl.init, true);
+          currentFunctionScope = null;
+        }
+      }
+    },
+
+    TSTypeAliasDeclaration(node: any) {
+      const name = node.id?.name;
+      if (!name) return;
+      const isExported = exportedNames.has(name);
+      symbols.push({
+        file_path: relPath,
+        name,
+        kind: "type",
+        line_start: offsetToLine(lineMap, node.start),
+        line_end: offsetToLine(lineMap, node.end),
+        signature: `type ${name}`,
+        is_exported: isExported ? 1 : 0,
+        is_default_export: 0,
+      });
+    },
+
+    TSInterfaceDeclaration(node: any) {
+      const name = node.id?.name;
+      if (!name) return;
+      const isExported = exportedNames.has(name);
+      symbols.push({
+        file_path: relPath,
+        name,
+        kind: "interface",
+        line_start: offsetToLine(lineMap, node.start),
+        line_end: offsetToLine(lineMap, node.end),
+        signature: `interface ${name}`,
+        is_exported: isExported ? 1 : 0,
+        is_default_export: 0,
+      });
+    },
+
+    TSEnumDeclaration(node: any) {
+      const name = node.id?.name;
+      if (!name) return;
+      const isExported = exportedNames.has(name);
+      symbols.push({
+        file_path: relPath,
+        name,
+        kind: "enum",
+        line_start: offsetToLine(lineMap, node.start),
+        line_end: offsetToLine(lineMap, node.end),
+        signature: `enum ${name}`,
+        is_exported: isExported ? 1 : 0,
+        is_default_export: 0,
+      });
+    },
+
+    ClassDeclaration(node: any) {
+      const name = node.id?.name;
+      if (!name) return;
+      const isExported =
+        exportedNames.has(name) || defaultExportedNames.has(name);
+      symbols.push({
+        file_path: relPath,
+        name,
+        kind: "class",
+        line_start: offsetToLine(lineMap, node.start),
+        line_end: offsetToLine(lineMap, node.end),
+        signature: `class ${name}`,
+        is_exported: isExported ? 1 : 0,
+        is_default_export: defaultExportedNames.has(name) ? 1 : 0,
+      });
+    },
+
+    CallExpression(node: any) {
+      if (!currentFunctionScope) return;
+      const callee = node.callee;
+      if (callee?.type === "Identifier" && /^use[A-Z]/.test(callee.name)) {
+        hookCalls.get(currentFunctionScope)?.add(callee.name);
+      }
+    },
+  });
+
+  visitor.visit(result.program);
+
+  markers.push(...extractMarkers(source, relPath));
+
+  function maybeAddComponent(name: string, node: any, _isArrow: boolean) {
+    if (!isTsx || !/^[A-Z]/.test(name)) return;
+    const hooks = hookCalls.get(name);
+    const isDefault = defaultExportedNames.has(name);
+
+    let propsType: string | null = null;
+    const params = node?.params;
+    if (params?.length > 0) {
+      const firstParam = params[0];
+      if (firstParam.typeAnnotation?.typeAnnotation) {
+        const ta = firstParam.typeAnnotation.typeAnnotation;
+        if (ta.type === "TSTypeReference" && ta.typeName?.name) {
+          propsType = ta.typeName.name;
+        }
+      }
+    }
+
+    components.push({
+      file_path: relPath,
+      name,
+      props_type: propsType,
+      hooks_used: JSON.stringify(hooks ? [...hooks] : []),
+      is_default_export: isDefault ? 1 : 0,
+    });
+  }
+
+  return { symbols, imports, exports, components, markers };
+}
+
+function staticImportToRow(
+  filePath: string,
+  imp: StaticImport,
+  lineMap: number[],
+): ImportRow {
+  const specifiers: string[] = [];
+  let isTypeOnly = true;
+
+  for (const entry of imp.entries) {
+    if (!entry.isType) isTypeOnly = false;
+    const importKind = entry.importName.kind;
+    if (importKind === ("Default" as ImportNameKind)) {
+      specifiers.push(entry.localName.value);
+    } else if (importKind === ("NamespaceObject" as ImportNameKind)) {
+      specifiers.push(`* as ${entry.localName.value}`);
+    } else if (importKind === ("Name" as ImportNameKind)) {
+      const original = entry.importName.name!;
+      const local = entry.localName.value;
+      specifiers.push(
+        original === local ? original : `${original} as ${local}`,
+      );
+    }
+  }
+
+  if (imp.entries.length === 0) {
+    isTypeOnly = false; // side-effect import `import "mod"`
+  }
+
+  return {
+    file_path: filePath,
+    source: imp.moduleRequest.value,
+    resolved_path: null, // filled later by resolver
+    specifiers: JSON.stringify(specifiers),
+    is_type_only: isTypeOnly ? 1 : 0,
+    line_number: offsetToLine(lineMap, imp.start),
+  };
+}
+
+function exportEntryToRow(
+  filePath: string,
+  entry: StaticExportEntry,
+): ExportRow {
+  const exportName = entry.exportName;
+  const isDefault = exportName.kind === ("Default" as ExportExportNameKind);
+  const name = isDefault
+    ? "default"
+    : (exportName.name ?? entry.localName.name ?? "unknown");
+
+  let kind = "value";
+  if (entry.isType) kind = "type";
+  if (entry.moduleRequest) kind = "re-export";
+
+  return {
+    file_path: filePath,
+    name,
+    kind,
+    is_default: isDefault ? 1 : 0,
+    re_export_source: entry.moduleRequest?.value ?? null,
+  };
+}
+
+function buildFunctionSignature(name: string, node: any): string {
+  const params = node?.params;
+  if (!params || params.length === 0) return `${name}()`;
+  const paramNames = params
+    .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
+    .join(", ");
+  return `${name}(${paramNames})`;
+}

@@ -1,9 +1,11 @@
 node_modules/
-.codebase.db
-.codebase.db-wal
-.codebase.db-shm
+.codemap.db
+.codemap.db-wal
+.codemap.db-shm
 .DS_Store
 dist/
 *.log
 .env
 .env.*
+!.env.example
+tsconfig.lint-staged.json

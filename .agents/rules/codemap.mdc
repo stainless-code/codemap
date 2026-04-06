@@ -1,0 +1,110 @@
+---
+alwaysApply: true
+---
+
+# Codemap (structural codebase index)
+
+> **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
+
+A local database (default **`.codemap.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes.
+
+**Generic defaults:** This rule is **project-agnostic**. After you vendor or symlink it (or use a future `codemap` CLI that writes agent files), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
+
+## CLI (this repo vs installed package)
+
+| Context | Incremental index | Query |
+| ------- | ----------------- | ----- |
+| Developing in this repo | `bun src/index.ts` | `bun src/index.ts query "<SQL>"` |
+| After `bun link` / global `codemap` | `codemap` | `codemap query "<SQL>"` |
+| Published package (when available) | `bunx @stainless-code/codemap` | `bunx @stainless-code/codemap query "<SQL>"` |
+
+Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** in this repo — see [docs/bench-repo.md](../../docs/bench-repo.md)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+
+## Session start (do this ONCE per conversation)
+
+Run incremental indexing to catch changes made outside this session:
+
+```bash
+bun src/index.ts
+```
+
+## Pre-flight check (do this EVERY time before searching)
+
+1. **Does the question match a trigger pattern below?**
+2. **If yes → query the index.** Do NOT use Grep/Glob/SemanticSearch/Read.
+3. **If the index result is incomplete → THEN fall back** to other tools, but always try the index first.
+
+Violating this order is wrong even if you get the right answer — it wastes time and ignores the tool purpose-built for this.
+
+## Trigger patterns
+
+If the question looks like any of these → use the index:
+
+| Question shape | Table(s) |
+| --- | --- |
+| "What/which files import X?" | `imports` (by `source`) or `dependencies` (by `to_path`) |
+| "Where is X defined?" | `symbols` |
+| "What does file X export?" | `exports` |
+| "What hooks does component X use?" / "List React components" | `components` |
+| "What are the CSS variables/tokens for X?" | `css_variables` |
+| "Find all TODOs/FIXMEs" | `markers` |
+| "Who depends on file X?" / "What does file X depend on?" | `dependencies` |
+| "How many files/symbols/components are there?" | any table with `COUNT(*)` |
+| "What are the CSS classes in X?" | `css_classes` |
+| "What keyframe animations exist?" | `css_keyframes` |
+
+## When Grep / Read IS appropriate
+
+- Reading implementation details you need to edit
+- Reviewing logic, control flow, or business rules
+- Searching for patterns the index doesn't capture (string literals, inline logic, etc.)
+
+## How to query
+
+```bash
+bun src/index.ts query "<SQL>"
+```
+
+## Quick reference queries
+
+| I need to... | Query |
+| --- | --- |
+| Find a symbol | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'` |
+| Find a symbol (fuzzy) | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'` |
+| See file exports | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'` |
+| See file imports | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'` |
+| Who imports this module? | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'` |
+| Who imports this file? | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'` |
+| What does this depend on? | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'` |
+| Component info | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'` |
+| All components | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name` |
+| TODOs in a file | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'` |
+| Most complex files | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10` |
+| CSS design tokens | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'` |
+| CSS module classes | `SELECT name, file_path FROM css_classes WHERE is_module = 1` |
+| CSS keyframes | `SELECT name, file_path FROM css_keyframes` |
+
+**Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
+
+For the full schema, advanced query patterns, and troubleshooting, read the skill at `.agents/skills/codemap/SKILL.md`.
+
+## Keeping it fresh
+
+**After completing a step that modified source files, re-index before making any further queries.** The index only reflects the state at the time it was last built — edits you just made won't appear until you re-index.
+
+```bash
+# Targeted — re-index only the files you just touched
+bun src/index.ts --files path/to/file1.tsx path/to/file2.ts
+
+# Incremental — auto-detects changed files via git
+bun src/index.ts
+
+# Full rebuild — after rebase, branch switch, or stale index
+bun src/index.ts --full
+```
+
+### When to re-index
+
+- **After editing files** — use `--files` with the paths you modified (fastest). Deleted files are auto-detected and removed from the index
+- **After switching branches or rebasing** — run `--full`
+- **When unsure which files changed** — run without flags to auto-detect via git

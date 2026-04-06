@@ -1,0 +1,5 @@
+# Only run lint-staged for AI agent commits
+# Supported: Cursor, Claude Code, or any agent setting AI_AGENT=1
+if [ "$CURSOR_AGENT" = "1" ] || [ "$CLAUDECODE" = "1" ] || [ "$AI_AGENT" = "1" ]; then
+  bun run lint-staged
+fi

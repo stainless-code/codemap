@@ -1,0 +1,4 @@
+{
+  "include": ["src/**/*.{ts,tsx,js,jsx}", "src/**/*.css", "**/*.{md,json}"],
+  "excludeDirNames": ["node_modules", ".git", "dist", "build", ".output"]
+}
