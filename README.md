@@ -18,7 +18,7 @@ bun add @stainless-code/codemap
 
 (`0.0.0` until the first npm release; use a git dependency or `bun link` until then.)
 
-The package exposes a **`codemap`** binary, a **library** entry (`import` / `exports`), and ships compiled **`dist/`** — see [docs/packaging.md](docs/packaging.md).
+The package exposes a **`codemap`** binary, a **library** entry (`import` / `exports`), compiled **`dist/`**, and **`templates/agents`** for **`codemap agents init`** — see [docs/packaging.md](docs/packaging.md).
 
 **Engines:** Node **≥20** and/or Bun **≥1.1** (see `package.json`).
 
@@ -94,7 +94,7 @@ bun run check    # build + format:check + lint + test + typecheck
 bun run fix      # oxlint --fix, then oxfmt
 ```
 
-**Readability & DX:** Prefer clear names and small functions over cleverness. **Public API** surface (`createCodemap`, `Codemap`, config types, `runCodemapIndex`) should stay **documented with JSDoc** so consumers get good hovers and published `.d.ts` stay useful. **Layering** (`cli` → `application` → parsers / SQLite): see [docs/architecture.md](docs/architecture.md). More for contributors: [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+**Readability & DX:** Prefer clear names and small functions over cleverness. **Public API** surface (`createCodemap`, `Codemap`, config types, `runCodemapIndex`, adapter exports) should stay **documented with JSDoc** so consumers get good hovers and published `.d.ts` stay useful. **Layering** (`cli` → `application` → `adapters` / parsers → SQLite): see [docs/architecture.md](docs/architecture.md). More for contributors: [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ---
 

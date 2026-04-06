@@ -62,7 +62,7 @@ Each scenario runs both approaches back-to-back on the same machine, same data. 
 
 ## Results
 
-Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario result counts are zero — that is expected here). Numbers vary by machine and project shape. Settings: schema v2, `Bun.hash` content fingerprints, `db.query()` caching, covering/partial indexes, mmap, worker threads, deferred indexes, `batchInsert` helper.
+Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario result counts are zero — that is expected here). Numbers vary by machine and project shape. Settings: schema v2, SHA-256 content fingerprints (`src/hash.ts`), `db.query()` caching, covering/partial indexes, mmap, worker threads, deferred indexes, `batchInsert` helper.
 
 | Scenario                                | Index Time | Results | Trad. Time | Results | Files Read | Bytes Read | Speedup  |
 | --------------------------------------- | ---------- | ------- | ---------- | ------- | ---------- | ---------- | -------- |

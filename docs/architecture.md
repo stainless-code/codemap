@@ -15,7 +15,8 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | **`cli.ts`**                                 | Parses argv (`--root`, `--config`, `query`, `agents init`, `--files`, `--full`), wires bootstrap → `runCodemapIndex` / `printQueryResult`.                        |
 | **`api.ts`**                                 | Public programmatic surface: `createCodemap()`, `Codemap` (`query`, `index`), re-exports `runCodemapIndex` for advanced use.                                      |
 | **`application/`**                           | Use cases: `run-index.ts` (incremental / full / targeted orchestration), `index-engine.ts` (collect files, git diff, `indexFiles`, workers via `worker-pool.ts`). |
-| **`runtime.ts` / `config.ts` / `db.ts` / …** | Infrastructure and parsing — unchanged responsibilities.                                                                                                          |
+| **`adapters/`**                              | `LanguageAdapter` registry; built-ins call `parser.ts` / `css-parser.ts` / `markers.ts` from `parse-worker-core`.                                                 |
+| **`runtime.ts` / `config.ts` / `db.ts` / …** | Config, SQLite, resolver, workers.                                                                                                                                |
 
 `index.ts` is the package entry: re-exports the public API and runs `cli.ts` only when executed as the main module (Node/Bun `codemap` binary).
 
@@ -88,7 +89,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | File              | Purpose                                                                                          |
 | ----------------- | ------------------------------------------------------------------------------------------------ |
 | `index.ts`        | Package entry — re-exports `api` / `config`, runs CLI when main                                  |
-| `cli.ts`          | CLI adapter — argv parsing, `query` / index commands                                             |
+| `cli.ts`          | CLI — argv parsing, `query`, `agents init`, `--files`, index modes                               |
 | `api.ts`          | Programmatic API — `createCodemap`, `Codemap`, `runCodemapIndex`                                 |
 | `application/`    | Indexing use cases and engine (`run-index`, `index-engine`, types)                               |
 | `worker-pool.ts`  | Parallel parse workers (Bun / Node)                                                              |
@@ -130,7 +131,7 @@ When specific file paths are passed via `--files`, the indexer skips git diff, g
 
 ## Programmatic usage
 
-The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), **`runCodemapIndex`** (advanced), and config helpers — see **`src/api.ts`** and **`dist/index.d.mts`**. Typical flow:
+The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), **`runCodemapIndex`** (advanced), config helpers, **`CodemapDatabase`** (type), adapter types (`LanguageAdapter`, `getAdapterForExtension`, …), and **`ParsedFile`** — see **`src/api.ts`** / **`src/index.ts`** and **`dist/index.d.mts`**. Typical flow:
 
 1. **`await createCodemap({ root, configFile?, config? })`** — loads `codemap.config.*`, calls **`initCodemap`** and **`configureResolver`**.
 2. **`await cm.index({ mode, files?, quiet? })`** — same pipeline as the CLI (incremental / full / targeted).
@@ -146,15 +147,15 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `files` — Every indexed file (`STRICT`)
 
-| Column        | Type    | Description                           |
-| ------------- | ------- | ------------------------------------- |
-| path          | TEXT PK | Relative path from project root       |
-| content_hash  | TEXT    | `Bun.hash` (wyhash) as base-36 string |
-| size          | INTEGER | File size in bytes                    |
-| line_count    | INTEGER | Total lines                           |
-| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.        |
-| last_modified | INTEGER | File mtime (epoch ms)                 |
-| indexed_at    | INTEGER | When this row was written             |
+| Column        | Type    | Description                                       |
+| ------------- | ------- | ------------------------------------------------- |
+| path          | TEXT PK | Relative path from project root                   |
+| content_hash  | TEXT    | SHA-256 hex (`src/hash.ts`, same on Node and Bun) |
+| size          | INTEGER | File size in bytes                                |
+| line_count    | INTEGER | Total lines                                       |
+| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                    |
+| last_modified | INTEGER | File mtime (epoch ms)                             |
+| indexed_at    | INTEGER | When this row was written                         |
 
 ### `symbols` — Functions, variables, classes, interfaces, type aliases, enums (`STRICT`)
 
