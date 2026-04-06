@@ -53,6 +53,7 @@
     "lint-staged": "lint-staged",
     "lint:ci": "oxlint --quiet",
     "lint:fix": "oxlint --fix",
+    "pack": "bun run build && npm pack",
     "prepare": "husky || true",
     "prepublishOnly": "bun run build",
     "release": "changeset publish",

@@ -16,6 +16,18 @@ How **@stainless-code/codemap** is built and consumed on npm.
 | **Library**         | `"exports"` / `"main"` / `"types"` → **`./dist/index.mjs`** and **`./dist/index.d.mts`** — `createCodemap`, `Codemap`, `defineConfig`, config types, `runCodemapIndex`, adapter helpers, etc. |
 | **Published files** | `package.json` → `"files": ["dist", "templates"]` — `src/` is not published; **`templates/agents`** supports `codemap agents init`.                                                           |
 
+## Local testing (another repo)
+
+Published content is only **`dist/`** and **`templates/`** (`package.json` → `"files"`). There is **no `src/`** in the tarball.
+
+1. **Fresh tarball:** from this repo run **`bun run pack`** (or **`bun run build`** then **`npm pack`**) → `stainless-code-codemap-0.0.0.tgz`.
+2. **Consumer `package.json`:** `"@stainless-code/codemap": "file:/absolute/path/to/stainless-code-codemap-0.0.0.tgz"` (or a correct **relative** `file:` path from that app’s `package.json`).
+3. **Reinstall** in the consumer (`rm -rf node_modules` + install) after changing or replacing the `.tgz`.
+
+**Alternatives:** `file:/path/to/codemap/repo` (directory, after **`bun run build`**), or **`bun link`** in this repo then **`bun link @stainless-code/codemap`** in the consumer.
+
+Run the CLI via **`./node_modules/.bin/codemap`** or **`bunx codemap`** so you don’t accidentally use a global binary. If **`better-sqlite3`** fails to load, run **`npm rebuild better-sqlite3`** in the consumer (native addon must match that project’s Node).
+
 ## Install
 
 - **npm / pnpm / yarn / bun** install the package; **Node ≥20** and/or **Bun ≥1.1** (`engines` in `package.json`).
