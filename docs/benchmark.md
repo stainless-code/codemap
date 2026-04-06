@@ -9,7 +9,7 @@ Compares two approaches to answering common code-discovery questions:
 
 The benchmark script lives at `src/benchmark.ts`.
 
-**OSS note:** Scenario names and paths in the tables below came from **historical snapshots** of a large application. For reproducible numbers, we plan **fixture apps** under `fixtures/` — see [Fixtures (planned)](#fixtures-planned).
+**OSS note:** For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`**. Tables below may still use historical labels; methodology is the same.
 
 ## Prerequisites
 
@@ -126,25 +126,22 @@ The benchmark also measures the cost of keeping the index fresh (3 runs each, sa
 - **Full-text search** — the index doesn't store source code, so you still need grep/read for content-level queries (e.g. "find all usages of `console.log`")
 - **Questions about code logic** — the index captures structure (names, types, locations), not semantics (what the code does)
 
-## Fixtures (planned)
+## Fixtures
 
-### Problem
+### `fixtures/minimal/`
 
-Historical benchmark scenarios used paths and labels tied to a **specific product tree**. In this OSS repo, those paths are **not canonical** — the [Results](#results) tables above are **illustrative** methodology from snapshots, not guaranteed reproducible numbers across machines.
+Small **private** package (not published) with intentional:
 
-### Direction
+- `usePermissions`, `~/api/client` import, `components/shop/*`, `utils/date`, CSS variables, and a TODO marker.
 
-Introduce **one or more small example / test apps** under this repo (e.g. `fixtures/minimal-react/`, `fixtures/monorepo-ts/`) that:
+**Local:**
 
-- Include **stable, intentional** symbols, imports, CSS tokens, and markers.
-- Are indexed with a **pinned `codemap.config`** so `src/benchmark.ts` runs against a **known layout**, not whatever `cwd` happens to be.
-- Allow CI to run **deterministic** index + benchmark steps in isolation.
+```bash
+export CODEMAP_ROOT="$(pwd)/fixtures/minimal"
+bun run dev --full
+bun run benchmark
+```
 
-### Work items
+**CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
 
-- [ ] Add `fixtures/<name>/` with minimal TS/React components, sample pages, and CSS/markers.
-- [ ] Point CI / docs at `CODEMAP_ROOT=$PWD/fixtures/<name>` (or `--root`) for benchmark runs.
-- [ ] Rename benchmark scenario titles to match fixture semantics (e.g. paths under `fixtures/...`) or neutral names (“scoped component subtree”).
-- [ ] Optionally vendor **two** fixtures (small vs medium) to show scale without depending on a private app.
-
-Until fixtures exist, treat the [Results](#results) tables as **illustrative** methodology only.
+Scenario **titles** in `src/benchmark.ts` are still generic (historical names); **indexed row counts** on the fixture are stable for a given schema. A second, larger fixture is optional — see [roadmap.md](./ROADMAP.md).

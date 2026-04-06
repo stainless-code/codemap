@@ -25,7 +25,8 @@
     "codemap": "./dist/index.mjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "templates"
   ],
   "type": "module",
   "main": "./dist/index.mjs",

@@ -47,6 +47,10 @@ codemap --config /path/to/codemap.config.json --full
 
 # Re-index only given paths (relative to project root)
 codemap --files src/a.ts src/b.tsx
+
+# Scaffold .agents/ rules and skills from bundled templates (see CONTRIBUTING)
+codemap agents init
+codemap agents init --force
 ```
 
 **Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**. Using a separate app as a QA target: [docs/bench-repo.md](docs/bench-repo.md).

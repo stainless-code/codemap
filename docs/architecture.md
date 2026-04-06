@@ -12,7 +12,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 | Layer                                        | Role                                                                                                                                                              |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`cli.ts`**                                 | Parses argv (`--root`, `--config`, `query`, `--files`, `--full`), wires bootstrap → `runCodemapIndex` / `printQueryResult`.                                       |
+| **`cli.ts`**                                 | Parses argv (`--root`, `--config`, `query`, `agents init`, `--files`, `--full`), wires bootstrap → `runCodemapIndex` / `printQueryResult`.                        |
 | **`api.ts`**                                 | Public programmatic surface: `createCodemap()`, `Codemap` (`query`, `index`), re-exports `runCodemapIndex` for advanced use.                                      |
 | **`application/`**                           | Use cases: `run-index.ts` (incremental / full / targeted orchestration), `index-engine.ts` (collect files, git diff, `indexFiles`, workers via `worker-pool.ts`). |
 | **`runtime.ts` / `config.ts` / `db.ts` / …** | Infrastructure and parsing — unchanged responsibilities.                                                                                                          |
@@ -79,6 +79,10 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
                     └──────────────┘
 ```
 
+### Language adapters
+
+**`src/adapters/types.ts`** defines **`LanguageAdapter`**: `id`, `extensions`, and **`parse(ctx)`** returning structured rows for the SQLite schema. **`src/adapters/builtin.ts`** registers **TS/JS** (oxc), **CSS** (Lightning CSS), and **text** (markers + configured extensions). **`getAdapterForExtension(ext)`** selects the first matching adapter; unknown extensions fall back to **markers-only** text indexing. Future optional packages can add adapters once a registration API exists (see [roadmap.md](./roadmap.md)).
+
 ## Key Files
 
 | File              | Purpose                                                                                          |
@@ -95,6 +99,9 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | `constants.ts`    | Shared constants — e.g. `LANG_MAP`                                                               |
 | `markers.ts`      | Shared marker extraction (`TODO`/`FIXME`/`HACK`/`NOTE`) — used by all parsers                    |
 | `parse-worker.ts` | Worker thread entry point — reads, parses, and extracts file data in parallel                    |
+| `adapters/`       | `LanguageAdapter` types and built-in TS/CSS/text implementations                                 |
+| `parsed-types.ts` | Shared `ParsedFile` shape for workers and adapters                                               |
+| `agents-init.ts`  | `codemap agents init` — copies `templates/agents` → `.agents/`                                   |
 | `benchmark.ts`    | Performance comparison script — see [benchmark.md](./benchmark.md)                               |
 
 ## CLI usage

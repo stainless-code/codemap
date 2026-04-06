@@ -1,5 +1,6 @@
 import { extname, resolve } from "node:path";
 
+import { runAgentsInit } from "./agents-init";
 import { printQueryResult, VALID_EXTENSIONS } from "./application/index-engine";
 import { runCodemapIndex } from "./application/run-index";
 import { loadUserConfig, resolveCodemapConfig } from "./config";
@@ -31,6 +32,16 @@ export function parseBootstrapArgs(argv: string[]) {
 export async function main() {
   const argv = process.argv.slice(2);
   const { root, configFile, rest } = parseBootstrapArgs(argv);
+
+  if (rest[0] === "agents" && rest[1] === "init") {
+    const ok = runAgentsInit({
+      projectRoot: root,
+      force: rest.includes("--force"),
+    });
+    if (!ok) process.exit(1);
+    return;
+  }
+
   const user = await loadUserConfig(root, configFile);
   initCodemap(resolveCodemapConfig(root, user));
   configureResolver(getProjectRoot(), getTsconfigPath());

@@ -1,34 +1,13 @@
 # Roadmap
 
-Forward-looking plans only — **not** a mirror of `src/`. **Where things live:** `package.json`, `src/`, `.github/workflows/`; **design:** [README.md](./README.md) (index), [architecture.md](./architecture.md), [packaging.md](./packaging.md).
+Forward-looking plans only — **not** a mirror of `src/`. **Index:** [README.md](./README.md); **design:** [architecture.md](./architecture.md), [packaging.md](./packaging.md). **Shipped features** (adapters, fixtures, `codemap agents init`) live in `src/` and linked docs — not enumerated here.
 
 ---
 
 ## Next
 
-### Pluggable language adapters
-
-**TypeScript/JavaScript**, **CSS**, and **text/markers** are implemented under **`src/`** (oxc, lightningcss, etc.). **Not** done: a stable **`LanguageAdapter`-style** boundary so more languages ship as add-ons:
-
-```text
-LanguageAdapter
-  id: string
-  extensions: string[]
-  parseFile(path, content, ctx): ParsedFileFragment
-```
-
-- [ ] Define and document the internal adapter boundary (even if only one implementation ships in-repo at first).
-- [ ] Optional community packages (e.g. Tree-sitter-based) with a **peerDependency** on `@stainless-code/codemap`.
-
-### Benchmarks & fixtures
-
-- [ ] **Fixture tree(s)** under `fixtures/` — [benchmark.md § Fixtures (planned)](./benchmark.md#fixtures-planned)
-- [ ] Point **`CODEMAP_ROOT`** / **`--root`** at a fixture in CI for **repeatable** benchmark numbers
-
-### Agent tooling
-
-- [ ] **`codemap`** subcommands or a small companion CLI to **generate/sync** agent files (Cursor rules, `AGENTS.md`, `.agents/skills/` stubs) — org layout TBD
-- [ ] Evaluate **[TanStack Intent](https://tanstack.com/intent/latest/docs/overview)** for versioned skills in `node_modules` (optional; generator remains fallback)
+- **Community language adapters** — optional packages (e.g. Tree-sitter) with a **peerDependency** on `@stainless-code/codemap` and a public **registration** API beyond built-ins in [`src/adapters/`](../src/adapters/).
+- **Agent tooling** — evaluate [TanStack Intent](https://tanstack.com/intent/latest/docs/overview) for versioned skills in `node_modules` (optional; **`codemap agents init`** remains the default).
 
 ---
 

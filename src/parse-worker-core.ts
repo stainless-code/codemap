@@ -1,51 +1,15 @@
 import { readFileSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
+import { getAdapterForExtension } from "./adapters/builtin";
+import type { ParseContext } from "./adapters/types";
 import { LANG_MAP } from "./constants";
-import { extractCssData } from "./css-parser";
-import type {
-  FileRow,
-  SymbolRow,
-  ImportRow,
-  ExportRow,
-  ComponentRow,
-  MarkerRow,
-  CssVariableRow,
-  CssClassRow,
-  CssKeyframeRow,
-} from "./db";
+import type { FileRow } from "./db";
 import { hashContent } from "./hash";
 import { extractMarkers } from "./markers";
-import { extractFileData } from "./parser";
+import type { ParsedFile } from "./parsed-types";
 
-const TS_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".mts",
-  ".cts",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
-const CSS_EXTENSIONS = new Set([".css"]);
-
-export interface ParsedFile {
-  relPath: string;
-  error?: boolean;
-  parseError?: string;
-  fileRow: FileRow;
-  category: "ts" | "css" | "text";
-  symbols?: SymbolRow[];
-  imports?: ImportRow[];
-  exports?: ExportRow[];
-  components?: ComponentRow[];
-  markers?: MarkerRow[];
-  cssVariables?: CssVariableRow[];
-  cssClasses?: CssClassRow[];
-  cssKeyframes?: CssKeyframeRow[];
-  cssImportSources?: string[];
-}
+export type { ParsedFile } from "./parsed-types";
 
 export interface WorkerInput {
   files: string[];
@@ -54,6 +18,16 @@ export interface WorkerInput {
 
 export interface WorkerOutput {
   results: ParsedFile[];
+}
+
+function parseAsTextFallback(
+  source: string,
+  relPath: string,
+): Pick<ParsedFile, "category" | "markers"> {
+  return {
+    category: "text",
+    markers: extractMarkers(source, relPath),
+  };
 }
 
 export function parseWorkerInput(input: WorkerInput): WorkerOutput {
@@ -84,11 +58,6 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
 
     const ext = extname(relPath);
     const language = LANG_MAP[ext] ?? "text";
-    const category: "ts" | "css" | "text" = TS_EXTENSIONS.has(ext)
-      ? "ts"
-      : CSS_EXTENSIONS.has(ext)
-        ? "css"
-        : "text";
 
     const parsed: ParsedFile = {
       relPath,
@@ -101,27 +70,17 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
         last_modified: Math.floor(stat.mtimeMs),
         indexed_at: Date.now(),
       },
-      category,
+      category: "text",
     };
 
+    const ctx: ParseContext = { absPath, relPath, source };
+
     try {
-      if (category === "text") {
-        parsed.markers = extractMarkers(source, relPath);
-      } else if (category === "css") {
-        const cssData = extractCssData(absPath, source, relPath);
-        parsed.cssVariables = cssData.variables;
-        parsed.cssClasses = cssData.classes;
-        parsed.cssKeyframes = cssData.keyframes;
-        parsed.markers = cssData.markers;
-        parsed.cssImportSources = cssData.importSources;
-      } else {
-        const data = extractFileData(absPath, source, relPath);
-        parsed.symbols = data.symbols;
-        parsed.imports = data.imports;
-        parsed.exports = data.exports;
-        parsed.components = data.components;
-        parsed.markers = data.markers;
-      }
+      const adapter = getAdapterForExtension(ext);
+      const payload = adapter
+        ? adapter.parse(ctx)
+        : parseAsTextFallback(source, relPath);
+      Object.assign(parsed, payload);
     } catch (err) {
       parsed.parseError = err instanceof Error ? err.message : String(err);
     }

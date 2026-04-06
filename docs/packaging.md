@@ -14,7 +14,7 @@ How **@stainless-code/codemap** is built and consumed on npm.
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **CLI**             | `package.json` → `"bin": { "codemap": "./dist/index.mjs" }` — same file as the library entry; **shebang** prepended at build time (tsdown `banner`) for `npx` / `node_modules/.bin`. |
 | **Library**         | `"exports"` / `"main"` / `"types"` → **`./dist/index.mjs`** and **`./dist/index.d.mts`** — `createCodemap`, `Codemap`, `defineConfig`, config types, `runCodemapIndex`, etc.         |
-| **Published files** | `package.json` → `"files": ["dist"]` — `src/` is not published.                                                                                                                      |
+| **Published files** | `package.json` → `"files": ["dist", "templates"]` — `src/` is not published; **`templates/agents`** supports `codemap agents init`.                                                  |
 
 ## Install
 

@@ -35,7 +35,7 @@ Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — ru
 
 ## Agent rules and skills (`.agents/`)
 
-**Upstream** skill and rules in this repo (e.g. `codemap`) stay **generic** — placeholder SQL and triggers, no product-specific paths. Consumer projects should **copy or symlink**, then **edit their copy** for team aliases and queries. A future `codemap` CLI may scaffold these files; customization always belongs in the **consumer** repo.
+**Upstream** skill and rules in this repo (e.g. `codemap`) stay **generic** — placeholder SQL and triggers, no product-specific paths. Consumer projects can run **`codemap agents init`** (ships **`templates/agents`** on npm) or **copy/symlink** manually, then **edit their copy** for team aliases and queries. Customization always belongs in the **consumer** repo.
 
 Rules live under **`.agents/rules/`**; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink each into **`.cursor/`** (see [agents-first-convention.mdc](../.agents/rules/agents-first-convention.mdc)):
 

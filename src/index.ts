@@ -4,11 +4,18 @@ import { fileURLToPath } from "node:url";
 import { main } from "./cli";
 
 export * from "./api";
+export { BUILTIN_ADAPTERS, getAdapterForExtension } from "./adapters/builtin";
+export type {
+  LanguageAdapter,
+  ParsedFilePayload,
+  ParseContext,
+} from "./adapters/types";
 export {
   defineConfig,
   type CodemapUserConfig,
   type ResolvedCodemapConfig,
 } from "./config";
+export type { ParsedFile } from "./parsed-types";
 
 function isMainModule(): boolean {
   if (
