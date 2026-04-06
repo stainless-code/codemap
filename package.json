@@ -1,0 +1,31 @@
+{
+  "name": "@stainless-code/codemap",
+  "version": "0.0.0",
+  "description": "Query your codebase — structural SQLite index for AI agents",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stainless-code/codemap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/stainless-code/codemap/issues"
+  },
+  "homepage": "https://github.com/stainless-code/codemap#readme",
+  "keywords": [
+    "codebase",
+    "index",
+    "sqlite",
+    "ai",
+    "agents",
+    "symbols",
+    "imports",
+    "dependencies"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

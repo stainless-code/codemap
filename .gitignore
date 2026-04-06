@@ -1,0 +1,9 @@
+node_modules/
+.codebase.db
+.codebase.db-wal
+.codebase.db-shm
+.DS_Store
+dist/
+*.log
+.env
+.env.*
