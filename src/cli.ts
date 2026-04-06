@@ -7,6 +7,7 @@ import { loadUserConfig, resolveCodemapConfig } from "./config";
 import { closeDb, openDb } from "./db";
 import { configureResolver } from "./resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "./runtime";
+import { CODEMAP_VERSION } from "./version";
 
 /** Printed for `codemap --help` / `-h` (must run before config or DB access). */
 export function printCliUsage(): void {
@@ -22,12 +23,20 @@ Query:
 Agents:
   codemap agents init [--force]
 
+Other:
+  codemap version
+  codemap --version, -V
+
 Environment: CODEMAP_ROOT (same as --root)
 
 Options:
   --full          Full rebuild
   --help, -h      Show this help
 `);
+}
+
+export function printVersion(): void {
+  console.log(CODEMAP_VERSION);
 }
 
 export function parseBootstrapArgs(argv: string[]) {
@@ -57,6 +66,11 @@ export async function main() {
 
   if (rest[0] === "--help" || rest[0] === "-h") {
     printCliUsage();
+    return;
+  }
+
+  if (rest[0] === "--version" || rest[0] === "-V" || rest[0] === "version") {
+    printVersion();
     return;
   }
 

@@ -10,13 +10,13 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 ## Layering
 
-| Layer                                        | Role                                                                                                                                                              |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`cli.ts`**                                 | Parses argv (`--root`, `--config`, `query`, `agents init`, `--files`, `--full`), wires bootstrap → `runCodemapIndex` / `printQueryResult`.                        |
-| **`api.ts`**                                 | Public programmatic surface: `createCodemap()`, `Codemap` (`query`, `index`), re-exports `runCodemapIndex` for advanced use.                                      |
-| **`application/`**                           | Use cases: `run-index.ts` (incremental / full / targeted orchestration), `index-engine.ts` (collect files, git diff, `indexFiles`, workers via `worker-pool.ts`). |
-| **`adapters/`**                              | `LanguageAdapter` registry; built-ins call `parser.ts` / `css-parser.ts` / `markers.ts` from `parse-worker-core`.                                                 |
-| **`runtime.ts` / `config.ts` / `db.ts` / …** | Config, SQLite, resolver, workers.                                                                                                                                |
+| Layer                                        | Role                                                                                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`cli.ts`**                                 | Parses argv (`--root`, `--config`, `query`, `agents init`, `--files`, `--full`, `--help`, `version` / `--version`), wires bootstrap → `runCodemapIndex` / `printQueryResult`. |
+| **`api.ts`**                                 | Public programmatic surface: `createCodemap()`, `Codemap` (`query`, `index`), re-exports `runCodemapIndex` for advanced use.                                                  |
+| **`application/`**                           | Use cases: `run-index.ts` (incremental / full / targeted orchestration), `index-engine.ts` (collect files, git diff, `indexFiles`, workers via `worker-pool.ts`).             |
+| **`adapters/`**                              | `LanguageAdapter` registry; built-ins call `parser.ts` / `css-parser.ts` / `markers.ts` from `parse-worker-core`.                                                             |
+| **`runtime.ts` / `config.ts` / `db.ts` / …** | Config, SQLite, resolver, workers.                                                                                                                                            |
 
 `index.ts` is the package entry: re-exports the public API and runs `cli.ts` only when executed as the main module (Node/Bun `codemap` binary).
 
@@ -89,7 +89,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | File              | Purpose                                                                                          |
 | ----------------- | ------------------------------------------------------------------------------------------------ |
 | `index.ts`        | Package entry — re-exports `api` / `config`, runs CLI when main                                  |
-| `cli.ts`          | CLI — argv parsing, `query`, `agents init`, `--files`, index modes                               |
+| `cli.ts`          | CLI — argv parsing, `query`, `agents init`, `--files`, `version`, index modes                    |
 | `api.ts`          | Programmatic API — `createCodemap`, `Codemap`, `runCodemapIndex`                                 |
 | `application/`    | Indexing use cases and engine (`run-index`, `index-engine`, types)                               |
 | `worker-pool.ts`  | Parallel parse workers (Bun / Node)                                                              |

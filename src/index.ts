@@ -16,6 +16,7 @@ export {
   type ResolvedCodemapConfig,
 } from "./config";
 export type { ParsedFile } from "./parsed-types";
+export { CODEMAP_VERSION } from "./version";
 
 function isMainModule(): boolean {
   if (

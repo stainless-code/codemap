@@ -33,6 +33,9 @@ The package exposes a **`codemap`** binary, a **library** entry (`import` / `exp
 # Index project root (optional codemap.config.ts / codemap.config.json)
 codemap
 
+# Version (also: codemap --version, codemap -V)
+codemap version
+
 # Full rebuild
 codemap --full
 
