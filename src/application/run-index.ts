@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 
-import { getAllFileHashes, setMeta } from "../db";
+import { createSchema, getAllFileHashes, setMeta } from "../db";
 import type { CodemapDatabase } from "../db";
 import {
   collectFiles,
@@ -102,6 +102,9 @@ export async function runCodemapIndex(
     };
   }
 
+  // Incremental path reads `meta` via getChangedFiles — schema must exist first
+  // (indexFiles / targetedReindex call createSchema later; fresh DB had none).
+  createSchema(db);
   const diff = getChangedFiles(db);
   if (diff) {
     if (!quiet) {
