@@ -62,7 +62,7 @@ Each scenario runs both approaches back-to-back on the same machine, same data. 
 
 ## Results
 
-Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario result counts are zero — that is expected here). Numbers vary by machine and project shape. Settings: schema v2, SHA-256 content fingerprints (`src/hash.ts`), `db.query()` caching, covering/partial indexes, mmap, worker threads, deferred indexes, `batchInsert` helper.
+Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario counts are zero). Numbers vary by machine and project. Schema, indexes, and content fingerprints: [architecture.md § Schema](./architecture.md#schema).
 
 | Scenario                                | Index Time | Results | Trad. Time | Results | Files Read | Bytes Read | Speedup  |
 | --------------------------------------- | ---------- | ------- | ---------- | ------- | ---------- | ---------- | -------- |
@@ -76,7 +76,7 @@ Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts
 
 **Totals**: Index ~408µs vs Traditional ~26.7ms (**~65× overall** on a sample run). Traditional bytes read total ~393 KB (not megabytes) because the globbed sets are small.
 
-On a **large app** indexed via `--root`, the same queries typically return non-zero rows; the indexed side stays sub-millisecond while the traditional side reads megabytes for broad globs. [Fixtures (planned)](#fixtures-planned) describes the plan for CI-friendly trees.
+On a **large app** indexed via `--root`, the same queries typically return non-zero rows; the indexed side stays sub-millisecond while the traditional side reads megabytes for broad globs. Repeatable numbers: [Fixtures](#fixtures).
 
 ### Run-to-run variance
 
@@ -90,22 +90,15 @@ The indexed CSS scenario uses `ORDER BY name LIMIT 50` — see `benchmark.ts` fo
 
 ### Speed
 
-- **Symbol / component queries** — covering indexes resolve from the index B-tree; indexed time stays sub-millisecond while the traditional path reads every matching file for regex
-- **TODO markers** — pre-extracted markers across indexed file types vs a narrower traditional glob
-- **Imports** — `imports` table vs full-file scan for a given module prefix
-  Indexed SQL timings above are sub-millisecond per scenario. See [architecture.md § SQLite Performance Configuration](./architecture.md#sqlite-performance-configuration) for PRAGMAs and indexes.
+Indexed queries use **covering / partial indexes** on the SQLite side; the traditional path scales with **files read** and regex work. PRAGMAs and index design: [architecture.md § SQLite Performance Configuration](./architecture.md#sqlite-performance-configuration).
 
 ### Accuracy
 
-- **React components**: Index uses the same JSX/TSX component heuristic as the rest of the tool; regex “export” scans can over- or under-count vs `components`
-- **CSS tokens**: Indexed rows are structured; raw `--var` regexes often pick up duplicates and non-token matches
-- **TODO markers**: Index scans more configured extensions than a single glob in the benchmark’s traditional path
+Structured parsing vs regex tradeoffs (components, CSS, markers, imports): [why-codemap.md § Accuracy Gains](./why-codemap.md#accuracy-gains).
 
-See [why-codemap.md § Accuracy Gains](./why-codemap.md#accuracy-gains) for the full analysis.
+### Token impact (AI agents)
 
-### Token Impact (AI Agents)
-
-See [why-codemap.md § Token Efficiency](./why-codemap.md#token-efficiency) for the full analysis. On a large tree, the traditional approach can read tens of megabytes across scenarios; indexed queries return only matching rows.
+[why-codemap.md § Token Efficiency](./why-codemap.md#token-efficiency).
 
 ### Reindex Cost
 

@@ -13,6 +13,4 @@ Technical docs for **[@stainless-code/codemap](https://github.com/stainless-code
 | [roadmap.md](./roadmap.md)             | Forward-looking backlog (not a `src/` inventory)                                        |
 | [why-codemap.md](./why-codemap.md)     | Why index + SQL for agents                                                              |
 
-**Conventions:** one topic per file; link with relative paths; no hardcoded symbol/file counts (use `codemap query` / `bun run dev query`); no source line numbers. **Contributors:** keep public API JSDoc useful; run `bun run check` — see [CONTRIBUTING](../.github/CONTRIBUTING.md).
-
-**Also:** [.gitignore](../.gitignore) (`.codemap.db`), [.oxfmtrc.json](../.oxfmtrc.json) / [.oxlintrc.json](../.oxlintrc.json), [.agents/](../.agents/) / [.cursor/](../.cursor/) — [CONTRIBUTING](../.github/CONTRIBUTING.md).
+**Conventions:** one topic per file; relative links; no symbol/file counts or source line numbers in docs (use `codemap query` / `bun run dev query` to measure). **Contributors:** `bun run check`, JSDoc on public API — [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md) (tooling, `.agents/` / `.cursor/`, `.gitignore` / format config).

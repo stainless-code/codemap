@@ -141,21 +141,23 @@ The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), *
 
 ## Schema
 
-Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details
+**Fingerprints:** incremental runs compare **`files.content_hash`** — SHA-256 hex of raw file bytes from [`src/hash.ts`](../src/hash.ts) (same on Node and Bun). Details in the **`files`** table below.
 
-All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. See [SQLite Performance Configuration](#sqlite-performance-configuration) for details.
+Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
+
+All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
 ### `files` — Every indexed file (`STRICT`)
 
-| Column        | Type    | Description                                       |
-| ------------- | ------- | ------------------------------------------------- |
-| path          | TEXT PK | Relative path from project root                   |
-| content_hash  | TEXT    | SHA-256 hex (`src/hash.ts`, same on Node and Bun) |
-| size          | INTEGER | File size in bytes                                |
-| line_count    | INTEGER | Total lines                                       |
-| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                    |
-| last_modified | INTEGER | File mtime (epoch ms)                             |
-| indexed_at    | INTEGER | When this row was written                         |
+| Column        | Type    | Description                                    |
+| ------------- | ------- | ---------------------------------------------- |
+| path          | TEXT PK | Relative path from project root                |
+| content_hash  | TEXT    | SHA-256 hex — see **Fingerprints** at § Schema |
+| size          | INTEGER | File size in bytes                             |
+| line_count    | INTEGER | Total lines                                    |
+| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                 |
+| last_modified | INTEGER | File mtime (epoch ms)                          |
+| indexed_at    | INTEGER | When this row was written                      |
 
 ### `symbols` — Functions, variables, classes, interfaces, type aliases, enums (`STRICT`)
 

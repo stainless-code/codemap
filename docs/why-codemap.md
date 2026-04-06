@@ -13,11 +13,9 @@ This burns context window, wastes tokens, slows response time, and produces less
 
 ## The Solution
 
-A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Build and query timings: [benchmark.md](./benchmark.md).
+A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
 
 ## Speed Gains
-
-Measured via `bun src/benchmark.ts` — see [benchmark.md](./benchmark.md) for full methodology.
 
 ### Headline pattern
 

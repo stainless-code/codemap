@@ -73,7 +73,7 @@ await cm.index({ quiet: true });
 const rows = cm.query("SELECT name FROM symbols LIMIT 5");
 ```
 
-`createCodemap` configures a process-global runtime (`initCodemap`); only **one active project per process** is supported. Advanced: `runCodemapIndex` for an open DB handle. Layering (`cli` → `application` → infrastructure): [docs/architecture.md](docs/architecture.md).
+`createCodemap` configures a process-global runtime (`initCodemap`); only **one active project per process** is supported. Advanced: `runCodemapIndex` for an open DB handle. **Module layout:** [docs/architecture.md § Layering](docs/architecture.md#layering).
 
 ---
 
@@ -94,7 +94,7 @@ bun run check    # build + format:check + lint + test + typecheck
 bun run fix      # oxlint --fix, then oxfmt
 ```
 
-**Readability & DX:** Prefer clear names and small functions over cleverness. **Public API** surface (`createCodemap`, `Codemap`, config types, `runCodemapIndex`, adapter exports) should stay **documented with JSDoc** so consumers get good hovers and published `.d.ts` stay useful. **Layering** (`cli` → `application` → `adapters` / parsers → SQLite): see [docs/architecture.md](docs/architecture.md). More for contributors: [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+**Readability & DX:** Prefer clear names and small functions; keep **JSDoc** on public exports. [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) has contributor workflow and conventions.
 
 ---
 
