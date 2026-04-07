@@ -14,11 +14,24 @@ bun test
 bun run check   # format + lint + tests + typecheck + build
 ```
 
+### `main` and pull requests
+
+Branch **`main`** is **protected**: routine work does **not** push directly to `main`. Open a **pull request** and merge only after **[CI](workflows/ci.yml)** passes (format, lint, typecheck, test, build).
+
+```bash
+git fetch origin && git checkout main && git pull
+git checkout -b your-branch-name
+# … commit …
+git push -u origin your-branch-name
+```
+
+Then open a PR on GitHub into **`main`**.
+
 ### Readability & DX
 
 - **Public API** — Anything exported from the package entry (`src/index.ts` → `src/api.ts`, `config.ts`, shared types) should have **JSDoc** that reads well in hovers and in published typings.
 - **Layers** — Keep boundaries clear: [architecture.md](../docs/architecture.md) (`cli` → `application` → infrastructure). Don’t let CLI concerns leak into parsers or the DB layer.
-- **Before you push** — `bun run check` (or at least `bun run test` + `bun run typecheck` if you’re iterating).
+- **Before you open / update a PR** — `bun run check` (or at least `bun run test` + `bun run typecheck` while iterating).
 - **Style** — Match Oxfmt/Oxlint; prefer **straight-line code** and extracted helpers over long nested blocks.
 
 **Editor (VS Code):** [`.vscode/extensions.json`](../.vscode/extensions.json) lists recommended extensions (Bun, Oxc, TypeScript native preview, etc.). [`.vscode/settings.json`](../.vscode/settings.json) enables Oxc format on save and `tsgo`. Formatting and lint rules live in [`.oxfmtrc.json`](../.oxfmtrc.json) and [`.oxlintrc.json`](../.oxlintrc.json) (no framework-specific options beyond defaults).
