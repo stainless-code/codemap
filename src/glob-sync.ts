@@ -1,8 +1,8 @@
-import fg from "fast-glob";
+import { globSync as tinyglobbySync } from "tinyglobby";
 
 /**
  * Glob files relative to `cwd` (dotfiles included). On Bun uses `Glob` from `bun`;
- * on Node uses `fast-glob` for identical published behavior.
+ * on Node uses `tinyglobby` for identical published behavior.
  */
 export function globSync(pattern: string, cwd: string): string[] {
   if (typeof Bun !== "undefined") {
@@ -11,5 +11,10 @@ export function globSync(pattern: string, cwd: string): string[] {
     const glob = new Glob(pattern);
     return Array.from(glob.scanSync({ cwd, dot: true }));
   }
-  return fg.sync(pattern, { cwd, dot: true, absolute: false });
+  return tinyglobbySync(pattern, {
+    cwd,
+    dot: true,
+    absolute: false,
+    expandDirectories: false,
+  });
 }

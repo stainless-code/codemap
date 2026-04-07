@@ -15,7 +15,7 @@ export default defineConfig({
     neverBundle: [
       "bun",
       "better-sqlite3",
-      "fast-glob",
+      "tinyglobby",
       "lightningcss",
       "oxc-parser",
       "oxc-resolver",
