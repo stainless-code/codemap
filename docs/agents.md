@@ -4,7 +4,7 @@
 
 ## What it does
 
-The published package ships **`templates/agents/`** (rules + skills; mirrored in this repo under [`.agents/`](../.agents/)). The command **`codemap agents init`** writes each bundled file into **`<project>/.agents/`** with per-file copies (not a wholesale directory sync) — the **canonical** copy consumers edit (SQL, team conventions, paths).
+The published package ships **`templates/agents/`** (rules + skills). This repo also has [`.agents/`](../.agents/) for **Codemap development** (CLI from source); it is **not** identical to **`templates/agents/`** for every file (e.g. the **codemap** rule/skill). The command **`codemap agents init`** writes each bundled template file into **`<project>/.agents/`** with per-file copies (not a wholesale directory sync) — the **canonical** copy consumers edit (SQL, team conventions, paths).
 
 ```bash
 codemap agents init

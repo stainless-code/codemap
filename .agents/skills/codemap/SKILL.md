@@ -6,15 +6,15 @@ Query codebase structure via SQLite instead of scanning files. Use when explorin
 
 Examples below use **placeholders** (`'...'`, `getConfig`, `~/lib/api`, etc.) — not a real product tree. **Shipped skill and rules stay generic** so they apply to any repo.
 
-**In your project:** copy or symlink these files into `.agents/` / `.cursor/` (see **`.github/CONTRIBUTING.md`**), or use a future **`codemap` CLI** that vendors agent files. Then **edit your copy** to add your team’s tsconfig aliases, directory conventions, and SQL snippets you reuse. Treat upstream updates as a reference; merge deliberately.
+**This repository:** run the CLI with **`bun src/index.ts`** (same as **`bun run dev`**). **Consumer / npm** copy of this skill lives under **`templates/agents/skills/codemap/`** (installed with **`codemap agents init`**). Edit **`.agents/`** here for Codemap development; **do not** treat it as the published package layout.
 
-**Run queries**
+**Run queries:**
 
 ```bash
 bun src/index.ts query "<SQL>"
 ```
 
-When the package is installed globally or via `bunx`: `codemap query "<SQL>"` or `bunx @stainless-code/codemap query "<SQL>"`. Use **`--root`** to point at another project.
+After **`bun run build`**, **`node dist/index.mjs query …`** or a linked **`codemap`** binary matches the published CLI. Use **`--root`** / **`CODEMAP_ROOT`** to index another tree.
 
 ## Schema
 
@@ -282,7 +282,7 @@ SELECT kind, COUNT(*) as count FROM markers GROUP BY kind;
 
 ## Maintenance
 
-From this repository:
+From this repository (same flags as the published **`codemap`** binary):
 
 ```bash
 # Targeted — re-index only specific files you just modified
@@ -300,13 +300,13 @@ bun src/index.ts query "SELECT key, value FROM meta"
 
 **Prefer `--files`** when you know which files you changed — it skips git diff and filesystem scanning for the rest of the tree. Deleted files passed to `--files` are auto-removed from the index.
 
-When Codemap is installed as a package: `codemap`, `codemap --root /path/to/project`, or `bunx @stainless-code/codemap …` (same flags).
+**End-user / npm** commands: **`templates/agents/skills/codemap/SKILL.md`** ( **`npx @stainless-code/codemap`**, **`codemap`** on **`PATH`**, etc.).
 
 ## Troubleshooting
 
 | Problem                    | Solution                                                                                                               |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Stale results after rebase | Run `bun src/index.ts --full` (or `codemap --full` when installed)                                                     |
+| Stale results after rebase | Run **`bun src/index.ts --full`** (or **`codemap --full`** when exercising the packaged CLI)                           |
 | Missing file in results    | Check exclude / include globs in **`codemap.config.ts`**, **`codemap.config.json`**, or defaults in **`src/index.ts`** |
 | `resolved_path` is NULL    | Import is an external package (not in project)                                                                         |
 | Resolver errors            | Verify `tsconfig.json` paths (or **`tsconfigPath`** in config) when resolving aliases                                  |
