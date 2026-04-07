@@ -33,11 +33,11 @@ function parseArgs(argv: string[]) {
       }
       corpus = v;
     } else if (a === "--root" && argv[i + 1]) root = resolve(argv[++i]);
-    else if (a === "--scenarios" && argv[i + 1])
+    else if (a === "--scenarios" && argv[i + 1]) {
       scenariosPath = resolve(argv[++i]);
-    else if (a === "--golden-dir" && argv[i + 1])
+    } else if (a === "--golden-dir" && argv[i + 1]) {
       goldenDir = resolve(argv[++i]);
-    else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
+    } else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
   }
   return { update, help, strictBudget, corpus, root, scenariosPath, goldenDir };
 }

@@ -135,6 +135,7 @@ export function getDefaultScenarios(db: CodemapDatabase): Scenario[] {
           .query(
             `SELECT name, file_path FROM components
            WHERE file_path LIKE '%/components/shop/%'
+             AND (file_path LIKE '%.tsx' OR file_path LIKE '%.jsx')
            ORDER BY name`,
           )
           .all(),

@@ -175,12 +175,15 @@ function insertParsedResults(
         if (parsed.category === "text") {
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
         } else if (parsed.category === "css") {
-          if (parsed.cssVariables?.length)
+          if (parsed.cssVariables?.length) {
             insertCssVariables(db, parsed.cssVariables);
-          if (parsed.cssClasses?.length)
+          }
+          if (parsed.cssClasses?.length) {
             insertCssClasses(db, parsed.cssClasses);
-          if (parsed.cssKeyframes?.length)
+          }
+          if (parsed.cssKeyframes?.length) {
             insertCssKeyframes(db, parsed.cssKeyframes);
+          }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
 
           if (parsed.cssImportSources) {
@@ -208,8 +211,9 @@ function insertParsedResults(
           }
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
-          if (parsed.components?.length)
+          if (parsed.components?.length) {
             insertComponents(db, parsed.components);
+          }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
         }
       } catch (err) {
@@ -321,11 +325,13 @@ export async function indexFiles(
             if (markers.length) insertMarkers(db, markers);
           } else if (category === "css") {
             const cssData = extractCssData(absPath, source, relPath);
-            if (cssData.variables.length)
+            if (cssData.variables.length) {
               insertCssVariables(db, cssData.variables);
+            }
             if (cssData.classes.length) insertCssClasses(db, cssData.classes);
-            if (cssData.keyframes.length)
+            if (cssData.keyframes.length) {
               insertCssKeyframes(db, cssData.keyframes);
+            }
             if (cssData.markers.length) insertMarkers(db, cssData.markers);
             for (const importSource of cssData.importSources) {
               insertImports(db, [

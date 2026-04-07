@@ -31,11 +31,11 @@ function parseArgs(argv: string[]) {
     else if (a === "--skip-benchmark") skipBenchmark = true;
     else if (a === "--verbose") verboseBenchmark = true;
     else if (a === "--root" && argv[i + 1]) root = resolve(argv[++i]);
-    else if (a === "--max-files" && argv[i + 1])
+    else if (a === "--max-files" && argv[i + 1]) {
       maxFiles = parsePositiveInt("--max-files", argv[++i]);
-    else if (a === "--max-symbols" && argv[i + 1])
+    } else if (a === "--max-symbols" && argv[i + 1]) {
       maxSymbols = parsePositiveInt("--max-symbols", argv[++i]);
-    else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
+    } else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
   }
   return { root, skipBenchmark, verboseBenchmark, help, maxFiles, maxSymbols };
 }

@@ -133,8 +133,9 @@ function stringifyCssValue(value: any): string {
 function stringifyToken(token: any): string {
   if (!token) return "";
   if (typeof token === "string") return token;
-  if (token.type === "length")
+  if (token.type === "length") {
     return `${token.value?.value ?? 0}${token.value?.unit ?? ""}`;
+  }
   if (token.type === "percentage") return `${token.value ?? 0}%`;
   if (token.type === "color") return stringifyColor(token.value);
   if (token.type === "token") {
@@ -154,8 +155,9 @@ function stringifyToken(token: any): string {
 function stringifyColor(color: any): string {
   if (!color) return "";
   if (color.type === "rgb") return `rgb(${color.r}, ${color.g}, ${color.b})`;
-  if (color.type === "rgba")
+  if (color.type === "rgba") {
     return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.alpha})`;
+  }
   return JSON.stringify(color);
 }
 
