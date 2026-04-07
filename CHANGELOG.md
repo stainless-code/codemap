@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.1.3
+
+### Patch Changes
+
+- [#6](https://github.com/stainless-code/codemap/pull/6) [`ad29694`](https://github.com/stainless-code/codemap/commit/ad2969481d4bd4e60d4f29818e4f1e64986216f9) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Align shipped agent templates with the published CLI (`codemap`, `npx @stainless-code/codemap`, …). Keep this repository’s `.agents/` rule and skill dev-oriented (`bun src/index.ts`). Remove the redundant `agents-first-convention` template. Document the dev vs `templates/agents/` split in `templates/agents/README.md` and `docs/agents.md`.
+
 ## 0.1.2
 
 ### Patch Changes
