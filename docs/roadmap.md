@@ -1,6 +1,6 @@
 # Roadmap
 
-Forward-looking plans only — **not** a mirror of `src/`. **Hub:** [README.md](./README.md). **Design:** [architecture.md](./architecture.md), [packaging.md](./packaging.md). **Shipped features** (adapters, fixtures, `codemap agents init`) live in `src/` and linked docs — not enumerated here.
+Forward-looking plans only — **not** a mirror of `src/`. **Hub:** [README.md](./README.md). **Design:** [architecture.md](./architecture.md), [packaging.md](./packaging.md). **Shipped features** (adapters, fixtures, `codemap agents init` — [agents.md](./agents.md)) live in `src/` and linked docs — not enumerated here.
 
 ---
 

@@ -5,7 +5,7 @@
 - **Not** full-text search or grep on arbitrary strings — use those when you need raw file-body search.
 - **Is** a fast, token-efficient way to navigate **structure**: definitions, imports, dependency direction, components, and other extracted facts.
 
-**Documentation:** [docs/README.md](docs/README.md) is the index for technical docs (architecture, packaging, roadmap, benchmarks). **AI / editor agents:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md); Cursor uses `.cursor/` symlinks — [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+**Documentation:** [docs/README.md](docs/README.md) indexes technical docs (architecture, **[`docs/agents.md`](docs/agents.md)** for `codemap agents init`, packaging, roadmap, benchmarks). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ---
 
@@ -47,9 +47,10 @@ codemap --config /path/to/codemap.config.json --full
 # Re-index only given paths (relative to project root)
 codemap --files src/a.ts src/b.tsx
 
-# Scaffold .agents/ rules and skills from bundled templates (see CONTRIBUTING)
+# Scaffold .agents/ from bundled templates — full matrix: docs/agents.md
 codemap agents init
 codemap agents init --force
+codemap agents init --interactive   # -i; IDE wiring + symlink vs copy
 ```
 
 **Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**. Indexing a project outside this clone: [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).

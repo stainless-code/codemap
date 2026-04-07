@@ -41,3 +41,4 @@ Releases use [**Changesets**](https://github.com/changesets/changesets). Repo co
 ## Related
 
 - [architecture.md](./architecture.md) — schema, layering, API.
+- [agents.md](./agents.md) — **`templates/agents`**, **`codemap agents init`**, published **`files`** surface above.
