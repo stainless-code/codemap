@@ -31,24 +31,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Publish runs via Node/npm (not Bun): changesets/action invokes the publish command with
-      # @actions/exec, which must match `npx changeset publish` / local CLI behavior. Using
-      # `bun run release` here has caused exit 1 on no-op pushes (docs-only merges) when nothing
-      # is published — Bun’s subprocess exit handling can differ from Node for @changesets/cli.
-      - name: Setup Node (Changesets publish)
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # Opens/updates the Version PR when `.changeset/*.md` exist; when there are none, still runs
-      # `changeset publish` to release a version PR merge — that path must exit 0 when there is
-      # nothing new (normal for merges without a release). Requires NPM_TOKEN for real publishes.
-      # See https://github.com/changesets/action/blob/main/src/index.ts
+      # Opens/updates the Version PR when `.changeset/*.md` exist. When there are none, the action
+      # can still run `publish` (see changesets/action) so a just-merged Version PR can ship.
+      # `changeset publish` should exit 0 when there is nothing new to publish. If this job fails,
+      # read the step log: common causes are missing/invalid NPM_TOKEN, registry/network errors, or
+      # a real publish failure — not assumed from the runner alone.
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
-          publish: npm run release
+          publish: bun run release
           title: "chore: version packages"
           commit: "chore: version packages"
           createGithubReleases: true
