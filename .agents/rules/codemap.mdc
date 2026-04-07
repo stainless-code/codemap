@@ -69,7 +69,7 @@ If the question looks like any of these → use the index:
 bun src/index.ts query "<SQL>"
 ```
 
-**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. For automation and multi-row answers, prefer **`bun src/index.ts query --json`** — stdout is a JSON array; on failure, stdout is **`{"error":"<message>"}`** and the process exits **1**.
+**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. For automation and multi-row answers, prefer **`bun src/index.ts query --json`** — stdout is a JSON array on success; **on failure**, stdout is **`{"error":"<message>"}`** and the process exits **1** (invalid SQL, database open errors, or **`query` bootstrap** failures such as config/resolver — not only SQL runtime errors). The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not truncated.
 
 **Verbatim answers:** When the user asks for lists, counts, or enumerated structural data from the index, **paste or summarize from the query output without inventing rows** — do not substitute a prose “summary” that omits rows the user asked to see. Prefer **`--json`** so the full result set is unambiguous.
 
