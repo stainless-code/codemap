@@ -9,7 +9,7 @@ How **@stainless-code/codemap** is built and published. Hub: [README.md](./READM
 
 ## Consuming locally
 
-Tarballs contain **`dist/`** + **`templates/`** only. **`bun run pack`**, then point the consumer at **`file:…/stainless-code-codemap-*.tgz`**, or use **`file:/path/to/repo`** after build, or **`bun link`**. If **`better-sqlite3`** fails in the consumer, **`npm rebuild better-sqlite3`** (native addon must match that Node).
+Published tarballs match **`package.json` `files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** (no `src/`). **`bun run pack`**, then point the consumer at **`file:…/stainless-code-codemap-*.tgz`**, or use **`file:/path/to/repo`** after build, or **`bun link`**. If **`better-sqlite3`** fails in the consumer, **`npm rebuild better-sqlite3`** (native addon must match that Node).
 
 **Engines** (`package.json`): **Node** `^20.19.0 || >=22.12.0` (matches **`oxc-parser`**; **`better-sqlite3`** is prebuilt for current Node majors only). **Bun** `>=1.0.0`. **Native bindings:** `better-sqlite3`, `lightningcss`, `oxc-parser`, `oxc-resolver` (NAPI); **`fast-glob`** and **`zod`** are JS-only. **`zod`** validates `codemap.config.*` at runtime (**`codemapUserConfigSchema`** in **`src/config.ts`**); see [architecture.md § User config](./architecture.md#user-config).
 
@@ -30,7 +30,13 @@ Same schema and CLI; implementation differs by runtime. Details: [architecture.m
 
 ## Releases
 
-[**Changesets**](https://github.com/changesets/changesets): **`bun run changeset`** → commit **`.changeset/`** → merge → [release workflow](../.github/workflows/release.yml) versions / publishes. **`bun run release`** runs **`changeset publish`** (CI uses it too). Needs **`NPM_TOKEN`** (and typically **`GITHUB_TOKEN`**) as repo secrets for publish and changelog links.
+Releases use [**Changesets**](https://github.com/changesets/changesets). Repo config: [`.changeset/config.json`](../.changeset/config.json) (`$schema` targets **`@changesets/config`** — resolved version in **`bun.lock`**). Upstream CLI docs: [`.changeset/README.md`](../.changeset/README.md).
+
+| Step | What happens                                                                                                                                                                                                                                                                                                                                              |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | **`bun run changeset`** — add a changeset file under **`.changeset/`**, commit, open PR to **`main`**.                                                                                                                                                                                                                                                    |
+| 2    | **Merge** — on every push to **`main`**, [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs [`changesets/action@v1`](https://github.com/changesets/action): opens/updates the **Version packages** PR when pending changesets exist; **`publish: bun run release`** runs **`changeset publish`**; **`createGithubReleases: true`**. |
+| 3    | **Secrets** — **`GITHUB_TOKEN`** is provided by Actions. **`NPM_TOKEN`** (npm [automation token](https://docs.npmjs.com/creating-and-viewing-access-tokens)) must be a **repository secret** for publishes to npm. If the Release job fails, use the workflow log (missing token, registry error, etc.) — don’t assume the cause from the job name alone. |
 
 ## Related
 

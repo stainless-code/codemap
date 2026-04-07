@@ -45,7 +45,7 @@ Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavi
 ### Overview
 
 1. **Indexed** — single SQL query against `.codemap.db`
-2. **Traditional** — glob (Bun **`Glob`** or **`fast-glob`** on Node, same as the indexer) → **`readFileSync`** → regex match (simulates what AI agent tools like Grep/Read/Glob do)
+2. **Traditional** — glob (same implementation as the indexer — [packaging.md § Node vs Bun](./packaging.md#node-vs-bun)) → **`readFileSync`** → regex match (simulates what AI agent tools like Grep/Read/Glob do)
 
 **OSS note:** For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`**. Tables below may still use historical labels; methodology is the same.
 
@@ -131,7 +131,7 @@ On a small repo, totals move with noise and thermal variance. On a large indexed
 
 The script’s **reindex** section averages **3 internal runs** per mode; full-rebuild wall time varies with disk and CPU load.
 
-The indexed CSS scenario uses `ORDER BY name LIMIT 50` — see `benchmark.ts` for the exact queries.
+The indexed CSS scenario uses `ORDER BY name LIMIT 50` — exact SQL for each scenario lives in **`src/benchmark.ts`** in this repo (not duplicated here; keep in sync when changing scenarios).
 
 ### Key takeaways
 
