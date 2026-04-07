@@ -16,8 +16,6 @@ bun add @stainless-code/codemap
 # or: npm install @stainless-code/codemap
 ```
 
-The package exposes a **`codemap`** binary, a **library** entry (`import` / `exports`), compiled **`dist/`**, and **`templates/agents`** for **`codemap agents init`** — see [docs/packaging.md](docs/packaging.md).
-
 **Engines:** Node **`^20.19.0 || >=22.12.0`** and/or Bun **`>=1.0.0`** — see `package.json` and [docs/packaging.md](docs/packaging.md).
 
 ---
@@ -56,7 +54,7 @@ codemap agents init --force
 
 **Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**. Indexing a project outside this clone: [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).
 
-**Configuration:** optional **`codemap.config.ts`** (default export object or async factory) or **`codemap.config.json`**. Shape: [codemap.config.example.json](codemap.config.example.json). When developing inside this repo you can use `defineConfig` from `@stainless-code/codemap` or `./src/config`. If you set **`include`**, it **replaces** the default glob list entirely.
+**Configuration:** optional **`codemap.config.ts`** (default export object or async factory) or **`codemap.config.json`**. Shape: [codemap.config.example.json](codemap.config.example.json). Runtime validation (**Zod**, strict keys) and API surface: [docs/architecture.md § User config](docs/architecture.md#user-config). When developing inside this repo you can use `defineConfig` from `@stainless-code/codemap` or `./src/config`. If you set **`include`**, it **replaces** the default glob list entirely.
 
 ---
 

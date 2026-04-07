@@ -10,7 +10,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 **`src/sqlite-db.ts`:** Node uses **`better-sqlite3`**; Bun uses **`bun:sqlite`**. Same schema everywhere. **`better-sqlite3`** allows **one SQL statement per `prepare()`**; **`bun:sqlite`** accepts **multiple statements** in one `run()`. On Node, **`runSql()`** splits multi-statement strings on **`;`** and runs each fragment. Do **not** put **`;`** inside **`--` line comments** in **`db.ts`** DDL strings (naive split would break). Details: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
 
-**`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **`src/glob-sync.ts`:** Bun **`Glob`** or **`fast-glob`** for include patterns. **`src/config.ts`:** JSON user config via **`Bun.file`** on Bun, **`readFile` + `JSON.parse`** on Node. Full table: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
+**`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **`src/glob-sync.ts`:** Bun **`Glob`** or **`fast-glob`** for include patterns. **`src/config.ts`:** loads **`codemap.config.json`** / **`codemap.config.ts`** (JSON read path: **`Bun.file`** on Bun, **`readFile` + `JSON.parse`** on Node — [packaging.md § Node vs Bun](./packaging.md#node-vs-bun)), then validates with **Zod** (`codemapUserConfigSchema`). Details: [User config](#user-config).
 
 **Shipped artifact:** **`dist/`** — `package.json` **`bin`** and **`exports`** both point at **`dist/index.mjs`** ([packaging.md](./packaging.md)); tsdown also emits **lazy CLI chunks** (`cmd-index`, `cmd-query`, `cmd-agents`, …) loaded via **`import()`** from **`src/cli/main.ts`**.
 
@@ -111,6 +111,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | `parsed-types.ts` | Shared `ParsedFile` shape for workers and adapters                                                                |
 | `agents-init.ts`  | `codemap agents init` — copies `templates/agents` → `.agents/`                                                    |
 | `benchmark.ts`    | SQL vs traditional timing script — see [benchmark.md § The benchmark script](./benchmark.md#the-benchmark-script) |
+| `config.ts`       | `codemap.config.*` load path, **Zod** user schema (`codemapUserConfigSchema`), `resolveCodemapConfig`             |
 
 ## CLI usage
 
@@ -142,13 +143,21 @@ When specific file paths are passed via `--files`, the indexer skips git diff, g
 
 ## Programmatic usage
 
-The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), **`runCodemapIndex`** (advanced), config helpers, **`CodemapDatabase`** (type), adapter types (`LanguageAdapter`, `getAdapterForExtension`, …), and **`ParsedFile`** — see **`src/api.ts`** / **`src/index.ts`** and **`dist/index.d.mts`**. Typical flow:
+The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), **`runCodemapIndex`** (advanced), **`codemapUserConfigSchema`**, **`parseCodemapUserConfig`**, **`defineConfig`**, **`CodemapDatabase`** (type), adapter types (`LanguageAdapter`, `getAdapterForExtension`, …), and **`ParsedFile`** — see **`src/api.ts`** / **`src/index.ts`** and **`dist/index.d.mts`**. Typical flow:
 
 1. **`await createCodemap({ root, configFile?, config? })`** — loads `codemap.config.*`, calls **`initCodemap`** and **`configureResolver`**.
 2. **`await cm.index({ mode, files?, quiet? })`** — same pipeline as the CLI (incremental / full / targeted).
 3. **`cm.query(sql)`** — read-only SQL against `.codemap.db` (opens the DB per call).
 
 **Constraint:** `initCodemap` is global to the process; only one active indexed project at a time.
+
+### User config
+
+Optional **`codemap.config.ts`** (default export: object or async factory) or **`codemap.config.json`** at the project root; **`--config`** points at either. Example shape: [`codemap.config.example.json`](../codemap.config.example.json).
+
+**Validation:** **`codemapUserConfigSchema`** ([Zod](https://zod.dev)) — strict object (unknown keys are rejected). **`defineConfig({ ... })`**, **`parseCodemapUserConfig`**, and **`resolveCodemapConfig`** (CLI and merged `createCodemap({ config })`) all go through the same schema. Invalid config throws **`TypeError`** with a short path/message list.
+
+**Exports:** `codemapUserConfigSchema`, `parseCodemapUserConfig`, `defineConfig`, and **`CodemapUserConfig`** (inferred type) from the package entry — see **`src/config.ts`** / **`dist/index.d.mts`**.
 
 ## Schema
 

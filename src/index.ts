@@ -11,7 +11,9 @@ export type {
   ParseContext,
 } from "./adapters/types";
 export {
+  codemapUserConfigSchema,
   defineConfig,
+  parseCodemapUserConfig,
   type CodemapUserConfig,
   type ResolvedCodemapConfig,
 } from "./config";

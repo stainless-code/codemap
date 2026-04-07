@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { z } from "zod";
+
 async function readJsonFile(filePath: string): Promise<unknown> {
   if (typeof Bun !== "undefined") {
     return Bun.file(filePath).json();
@@ -43,22 +45,53 @@ export const DEFAULT_EXCLUDE_DIR_NAMES = [
 ] as const;
 
 /**
- * User configuration from `codemap.config.ts` / `.json`, CLI, or `createCodemap({ config })`.
+ * Zod schema for user config (`codemap.config.*`, `defineConfig`, API).
+ * Unknown keys are rejected (`.strict()`).
  */
-export interface CodemapUserConfig {
-  /** Project root. Defaults via CLI `--root` or `process.cwd()`. */
-  root?: string;
-  /** SQLite database path, relative to root or absolute. Default: `<root>/.codemap.db`. */
-  databasePath?: string;
-  /** Glob patterns relative to root; replaces {@link DEFAULT_INCLUDE_PATTERNS} when set. */
-  include?: string[];
-  /** Directory name segments to skip; replaces {@link DEFAULT_EXCLUDE_DIR_NAMES} when set. */
-  excludeDirNames?: string[];
-  /**
-   * Path to `tsconfig.json` for import alias resolution (oxc-resolver).
-   * Use `null` to disable. Default: `<root>/tsconfig.json` if the file exists.
-   */
-  tsconfigPath?: string | null;
+export const codemapUserConfigSchema = z
+  .object({
+    root: z
+      .string()
+      .optional()
+      .describe("Project root. Defaults via CLI `--root` or `process.cwd()`."),
+    databasePath: z
+      .string()
+      .optional()
+      .describe(
+        "SQLite database path, relative to root or absolute. Default: `<root>/.codemap.db`.",
+      ),
+    include: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Glob patterns relative to root; replaces default include list when set.",
+      ),
+    excludeDirNames: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Directory name segments to skip; replaces default exclude list when set.",
+      ),
+    tsconfigPath: z
+      .union([z.string(), z.null()])
+      .optional()
+      .describe(
+        "Path to `tsconfig.json` for import alias resolution. Use `null` to disable.",
+      ),
+  })
+  .strict();
+
+/** Inferred from {@link codemapUserConfigSchema}. */
+export type CodemapUserConfig = z.infer<typeof codemapUserConfigSchema>;
+
+function formatCodemapConfigError(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path =
+        issue.path.length > 0 ? issue.path.map(String).join(".") : "(root)";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
 }
 
 /**
@@ -73,10 +106,25 @@ export interface ResolvedCodemapConfig {
 }
 
 /**
+ * Runtime validation for {@link CodemapUserConfig} (from JSON, `defineConfig`, or API).
+ *
+ * @throws TypeError when the shape is invalid or unknown keys are present.
+ */
+export function parseCodemapUserConfig(config: unknown): CodemapUserConfig {
+  const result = codemapUserConfigSchema.safeParse(config);
+  if (!result.success) {
+    throw new TypeError(
+      `Codemap config: ${formatCodemapConfigError(result.error)}`,
+    );
+  }
+  return result.data;
+}
+
+/**
  * Helper for `export default defineConfig({ ... })` in `codemap.config.ts`.
  */
 export function defineConfig(config: CodemapUserConfig): CodemapUserConfig {
-  return config;
+  return parseCodemapUserConfig(config);
 }
 
 /**
@@ -86,23 +134,24 @@ export function resolveCodemapConfig(
   root: string,
   user: CodemapUserConfig | undefined,
 ): ResolvedCodemapConfig {
+  const parsed = user !== undefined ? parseCodemapUserConfig(user) : undefined;
   const absRoot = resolve(root);
-  const databasePath = user?.databasePath
-    ? resolve(absRoot, user.databasePath)
+  const databasePath = parsed?.databasePath
+    ? resolve(absRoot, parsed.databasePath)
     : join(absRoot, ".codemap.db");
-  const include = user?.include?.length
-    ? [...user.include]
+  const include = parsed?.include?.length
+    ? [...parsed.include]
     : [...DEFAULT_INCLUDE_PATTERNS];
   const excludeDirNames = new Set<string>(
-    user?.excludeDirNames?.length
-      ? user.excludeDirNames
+    parsed?.excludeDirNames?.length
+      ? parsed.excludeDirNames
       : DEFAULT_EXCLUDE_DIR_NAMES,
   );
   let tsconfigPath: string | null;
-  if (user?.tsconfigPath === null) {
+  if (parsed?.tsconfigPath === null) {
     tsconfigPath = null;
-  } else if (user?.tsconfigPath) {
-    tsconfigPath = resolve(absRoot, user.tsconfigPath);
+  } else if (parsed?.tsconfigPath) {
+    tsconfigPath = resolve(absRoot, parsed.tsconfigPath);
   } else {
     const d = join(absRoot, "tsconfig.json");
     tsconfigPath = existsSync(d) ? d : null;

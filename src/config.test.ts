@@ -5,10 +5,45 @@ import { join } from "node:path";
 
 import {
   DEFAULT_INCLUDE_PATTERNS,
+  defineConfig,
   loadUserConfig,
+  parseCodemapUserConfig,
   resolveCodemapConfig,
   type CodemapUserConfig,
 } from "./config";
+
+describe("parseCodemapUserConfig / defineConfig", () => {
+  it("accepts an empty object", () => {
+    expect(parseCodemapUserConfig({})).toEqual({});
+  });
+
+  it("rejects non-objects", () => {
+    expect(() => parseCodemapUserConfig(null)).toThrow(TypeError);
+    expect(() => parseCodemapUserConfig([])).toThrow(TypeError);
+    expect(() => parseCodemapUserConfig("x")).toThrow(TypeError);
+  });
+
+  it("rejects unknown keys", () => {
+    expect(() =>
+      parseCodemapUserConfig({ include: ["**/*.ts"], extra: 1 }),
+    ).toThrow(/Unrecognized key|extra/i);
+  });
+
+  it("rejects wrong array element types", () => {
+    expect(() =>
+      parseCodemapUserConfig({ include: ["**/*.ts", 1 as unknown as string] }),
+    ).toThrow(/include/);
+  });
+
+  it("defineConfig validates like parseCodemapUserConfig", () => {
+    expect(defineConfig({ databasePath: "db.sqlite" })).toEqual({
+      databasePath: "db.sqlite",
+    });
+    expect(() => defineConfig({ bad: true } as CodemapUserConfig)).toThrow(
+      /Unrecognized key|bad/i,
+    );
+  });
+});
 
 describe("resolveCodemapConfig", () => {
   let dir: string;
@@ -98,5 +133,14 @@ describe("loadUserConfig", () => {
   it("returns undefined when explicit json path is missing", async () => {
     const cfg = await loadUserConfig(dir, join(dir, "nope.json"));
     expect(cfg).toBeUndefined();
+  });
+
+  it("invalid JSON config throws when resolved", async () => {
+    writeFileSync(
+      join(dir, "codemap.config.json"),
+      JSON.stringify({ include: [1, 2] }),
+    );
+    const cfg = await loadUserConfig(dir);
+    expect(() => resolveCodemapConfig(dir, cfg)).toThrow(/include/);
   });
 });
