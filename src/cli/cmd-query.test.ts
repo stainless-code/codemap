@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { parseQueryRest } from "./cmd-query";
-import { getQueryRecipeSql } from "./query-recipes";
+import { getQueryRecipeSql, listQueryRecipeCatalog } from "./query-recipes";
 
 describe("parseQueryRest", () => {
   it("errors when only query", () => {
@@ -98,5 +98,64 @@ describe("parseQueryRest", () => {
     const r = parseQueryRest(["query", "--recipe", "fan-out", "SELECT", "1"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("does not take");
+  });
+
+  it("parses --recipes-json", () => {
+    expect(parseQueryRest(["query", "--recipes-json"])).toEqual({
+      kind: "recipesCatalog",
+    });
+  });
+
+  it("parses --json --recipes-json", () => {
+    expect(parseQueryRest(["query", "--json", "--recipes-json"])).toEqual({
+      kind: "recipesCatalog",
+    });
+  });
+
+  it("errors when --recipes-json has extra args", () => {
+    const r = parseQueryRest(["query", "--recipes-json", "SELECT", "1"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--recipes-json");
+  });
+
+  it("errors when --recipes-json combines with --recipe", () => {
+    const r = parseQueryRest([
+      "query",
+      "--recipes-json",
+      "--recipe",
+      "fan-out",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--recipe");
+  });
+
+  it("parses --print-sql fan-out", () => {
+    expect(parseQueryRest(["query", "--print-sql", "fan-out"])).toEqual({
+      kind: "printRecipeSql",
+      id: "fan-out",
+    });
+  });
+
+  it("errors when --print-sql has unknown id", () => {
+    const r = parseQueryRest(["query", "--print-sql", "nope"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("unknown recipe");
+  });
+
+  it("errors when --print-sql has no id", () => {
+    const r = parseQueryRest(["query", "--print-sql"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--print-sql");
+  });
+});
+
+describe("listQueryRecipeCatalog", () => {
+  it("matches QUERY_RECIPES ids and sql", () => {
+    const cat = listQueryRecipeCatalog();
+    expect(cat.length).toBeGreaterThan(0);
+    for (const row of cat) {
+      expect(getQueryRecipeSql(row.id)).toBe(row.sql);
+      expect(row.description.length).toBeGreaterThan(0);
+    }
   });
 });

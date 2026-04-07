@@ -1,4 +1,13 @@
 /**
+ * One bundled recipe: id, human description, and SQL (canonical source for CLI and `--recipes-json`).
+ */
+export type QueryRecipeCatalogEntry = {
+  id: string;
+  description: string;
+  sql: string;
+};
+
+/**
  * Bundled read-only SQL for `codemap query --recipe <id>`. Keys match **`codemap query --help`**.
  */
 export const QUERY_RECIPES: Record<
@@ -102,6 +111,16 @@ ORDER BY count DESC`,
  */
 export function listQueryRecipeIds(): string[] {
   return Object.keys(QUERY_RECIPES).sort();
+}
+
+/**
+ * Full catalog for **`codemap query --recipes-json`** — derived from {@link QUERY_RECIPES} only.
+ */
+export function listQueryRecipeCatalog(): QueryRecipeCatalogEntry[] {
+  return listQueryRecipeIds().map((id) => {
+    const meta = QUERY_RECIPES[id]!;
+    return { id, description: meta.description, sql: meta.sql };
+  });
 }
 
 /**

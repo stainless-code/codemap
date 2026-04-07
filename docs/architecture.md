@@ -115,7 +115,9 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 ## CLI usage
 
-**Commands and flags** (index, query, **`codemap agents init`**, **`--root`**, **`--config`**, environment): [../README.md § CLI](../README.md#cli). From this repository: **`bun run dev`** or **`bun src/index.ts`** (same flags). **`codemap query --json`** prints a JSON array of rows (and **`{"error":"…"}`** on failure) for agents and scripts. **`codemap query --recipe <id>`** runs bundled SQL (see **`codemap query --help`** for ids). The **`components-by-hooks`** recipe ranks components by hook count using a **comma-based tally** on the stored JSON array (no SQLite JSON1 requirement). The query subcommand does **not** cap row count — use SQL **`LIMIT`** (and **`ORDER BY`**) for bounded results.
+**Commands and flags** (index, query, **`codemap agents init`**, **`--root`**, **`--config`**, environment): [../README.md § CLI](../README.md#cli) — **do not duplicate** flag lists here; this section only adds implementation notes. From this repository: **`bun run dev`** or **`bun src/index.ts`** (same flags).
+
+**Query wiring:** **`src/cli/cmd-query.ts`** (argv, **`printQueryResult`**), **`src/cli/query-recipes.ts`** (**`QUERY_RECIPES`** — bundled SQL only source), **`src/cli/main.ts`** (**`--recipes-json`** / **`--print-sql`** exit before config/DB). The **`components-by-hooks`** recipe ranks by hook count with a **comma-based tally** on **`hooks_used`** (no SQLite JSON1).
 
 **Agent templates:** `codemap agents init` — full matrix [agents.md](./agents.md).
 

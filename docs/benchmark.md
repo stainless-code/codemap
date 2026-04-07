@@ -123,7 +123,7 @@ This document measures **indexed SQL vs traditional glob/read** on an existing d
 
 ### Recipes vs ad-hoc SQL
 
-**`codemap query --recipe <id>`** expands to the same SQL string the CLI would run if you pasted it after **`codemap query`**. There is no extra query cost beyond parsing argv — **recipe vs hand-written SQL is not a separate benchmark**.
+**`codemap query --recipe <id>`** expands to the same SQL as pasting that string after **`codemap query`** ([README § CLI](../README.md#cli) — **`--print-sql`**, **`--recipes-json`**). There is no extra query cost beyond parsing argv — **recipe vs hand-written SQL is not a separate benchmark**.
 
 - **`fan-out-sample`** uses **`GROUP_CONCAT`** for sample targets (portable).
 - **`fan-out-sample-json`** uses **`json_group_array`** in the same shape (requires SQLite JSON1). Prefer **`fan-out-sample`** when JSON1 is unavailable.

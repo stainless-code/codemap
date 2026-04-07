@@ -26,7 +26,7 @@ Use **`codemap --root /path/to/project`** (or **`CODEMAP_ROOT`**) to index anoth
 
 Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
-**CLI shortcuts:** **`codemap query --recipe <id>`** runs bundled SQL (optional **`--json`**). Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`codemap query --help`**. The fan-out rows match the SQL below; others align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.
+**CLI shortcuts:** **`codemap query --recipe <id>`** runs bundled SQL (optional **`--json`**). **`codemap query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**) as JSON (no index / DB required). **`codemap query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`codemap query --help`**. The fan-out rows match the SQL below; others align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.
 
 **Top files by dependency fan-out:**
 

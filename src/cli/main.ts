@@ -67,8 +67,13 @@ Copies bundled agent templates into .agents/ under the project root.
   validateIndexModeArgs(rest);
 
   if (rest[0] === "query") {
-    const { parseQueryRest, printQueryCmdHelp, runQueryCmd } =
-      await import("./cmd-query.js");
+    const {
+      parseQueryRest,
+      printQueryCmdHelp,
+      printRecipesCatalogJson,
+      printRecipeSqlToStdout,
+      runQueryCmd,
+    } = await import("./cmd-query.js");
     const parsed = parseQueryRest(rest);
     if (parsed.kind === "help") {
       printQueryCmdHelp();
@@ -77,6 +82,16 @@ Copies bundled agent templates into .agents/ under the project root.
     if (parsed.kind === "error") {
       console.error(parsed.message);
       process.exit(1);
+    }
+    if (parsed.kind === "recipesCatalog") {
+      printRecipesCatalogJson();
+      return;
+    }
+    if (parsed.kind === "printRecipeSql") {
+      if (!printRecipeSqlToStdout(parsed.id)) {
+        process.exit(1);
+      }
+      return;
     }
     await runQueryCmd({
       root,

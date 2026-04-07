@@ -18,6 +18,7 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | Same entry | `bun run dev` | (same as first row) |
 | JSON output | — | `bun src/index.ts query --json "<SQL>"` |
 | Recipe | — | `bun src/index.ts query --recipe fan-out` (see **`bun src/index.ts query --help`**) |
+| Recipe catalog / SQL | — | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out` |
 
 After **`bun run build`**, **`node dist/index.mjs`** matches the published **`codemap`** binary (same flags). **`bun link`** / global **`codemap`** also work when testing the packaged CLI.
 

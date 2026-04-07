@@ -43,6 +43,9 @@ codemap query --json "SELECT name, file_path FROM symbols LIMIT 10"
 # Bundled SQL (same as skill examples): fan-out rankings
 codemap query --recipe fan-out
 codemap query --json --recipe fan-out-sample
+# List bundled recipes as JSON, or print one recipe's SQL (no DB required)
+codemap query --recipes-json
+codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
 
 # Another project
