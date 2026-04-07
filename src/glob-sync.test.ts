@@ -2,11 +2,11 @@ import { expect, test } from "bun:test";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import fg from "fast-glob";
+import { globSync as tinyglobbySync } from "tinyglobby";
 
 import { globSync } from "./glob-sync";
 
-test("globSync matches fast-glob (Bun parity)", () => {
+test("globSync matches tinyglobby (Bun parity)", () => {
   if (typeof Bun === "undefined") return;
 
   const cwd = join(
@@ -15,6 +15,11 @@ test("globSync matches fast-glob (Bun parity)", () => {
   );
   const pattern = "**/*.{ts,tsx}";
   const a = globSync(pattern, cwd).sort();
-  const b = fg.sync(pattern, { cwd, dot: true, absolute: false }).sort();
+  const b = tinyglobbySync(pattern, {
+    cwd,
+    dot: true,
+    absolute: false,
+    expandDirectories: false,
+  }).sort();
   expect(a).toEqual(b);
 });
