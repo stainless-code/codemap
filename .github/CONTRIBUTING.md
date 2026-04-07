@@ -18,7 +18,9 @@ bun run check-updates   # interactive dependency updates (`bun update -i --lates
 
 ### `main` and pull requests
 
-Branch **`main`** is **protected**: routine work does **not** push directly to `main`. Open a **pull request** and merge only after **[CI](workflows/ci.yml)** passes (format, lint, typecheck, test, build).
+Branch **`main`** is **protected**: routine work does **not** push directly to `main`. Open a **pull request** and merge only after **[CI](workflows/ci.yml)** passes.
+
+**Required status checks:** Prefer requiring the single check **`CI complete`** (aggregates the matrix). PRs from **`changeset-release/<branch>`** (Changesets “Version packages”; see [changesets/action](https://github.com/changesets/action)) skip the heavy jobs here; per [GitHub](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging), **`skipped`** can still satisfy required checks — **`CI complete`** remains the clearest green/red signal. Ensure job **names** are unique across workflows ([docs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#about-branch-protection-rules)).
 
 ```bash
 git fetch origin && git checkout main && git pull
