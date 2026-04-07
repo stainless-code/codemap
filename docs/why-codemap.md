@@ -1,6 +1,6 @@
 # Why Codemap
 
-**Design:** [architecture.md](./architecture.md) · **Index:** [README.md](./README.md)
+**Index:** [README.md](./README.md) · **Design:** [architecture.md](./architecture.md)
 
 ## The Problem
 

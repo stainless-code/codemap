@@ -26,17 +26,39 @@ export async function main(): Promise<void> {
 
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
-      console.log(`Usage: codemap agents init [--force]
+      console.log(`Usage: codemap agents init [--force] [--interactive|-i]
 
 Copies bundled agent templates into .agents/ under the project root.
-Use --force to overwrite an existing .agents/ directory.
+  --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
+  --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
 `);
       return;
     }
+    const initRest = rest.slice(2);
+    const knownInit = new Set([
+      "--force",
+      "--interactive",
+      "-i",
+      "--help",
+      "-h",
+    ]);
+    for (const a of initRest) {
+      if (knownInit.has(a)) {
+        continue;
+      }
+      if (a.startsWith("-")) {
+        console.error(`codemap: unknown option "${a}"`);
+      } else {
+        console.error(`codemap: unexpected argument "${a}"`);
+      }
+      console.error("Run codemap agents init --help for usage.");
+      process.exit(1);
+    }
     const { runAgentsInitCmd } = await import("./cmd-agents.js");
-    const ok = runAgentsInitCmd({
+    const ok = await runAgentsInitCmd({
       projectRoot: root,
       force: rest.includes("--force"),
+      interactive: rest.includes("--interactive") || rest.includes("-i"),
     });
     if (!ok) process.exit(1);
     return;

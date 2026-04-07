@@ -1,8 +1,8 @@
 # Benchmarking & external project roots
 
-See [README.md](./README.md) · [why-codemap.md](./why-codemap.md) (rationale for the index).
+**Index:** [README.md](./README.md) · **Why an index:** [why-codemap.md](./why-codemap.md)
 
-**Two different topics live here — pick the row that matches what you need:**
+**Two topics — pick the row that matches what you need:**
 
 | You want to…                                                                                                                                       | Read                                                    |
 | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -47,7 +47,7 @@ Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavi
 1. **Indexed** — single SQL query against `.codemap.db`
 2. **Traditional** — glob (same implementation as the indexer — [packaging.md § Node vs Bun](./packaging.md#node-vs-bun)) → **`readFileSync`** → regex match (simulates what AI agent tools like Grep/Read/Glob do)
 
-**OSS note:** For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`**. Tables below may still use historical labels; methodology is the same.
+For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`** before running the script.
 
 ### Prerequisites
 
@@ -184,4 +184,4 @@ bun run benchmark
 
 **CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
 
-Scenario **titles** in `src/benchmark.ts` are still generic (historical names); **indexed row counts** on the fixture are stable for a given schema. A second, larger fixture is optional — see [roadmap.md](./roadmap.md).
+Scenario titles match the table above; **indexed row counts** on the fixture are stable for a given schema. A larger second fixture is optional — see [roadmap.md](./roadmap.md).

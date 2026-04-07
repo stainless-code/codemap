@@ -1,7 +1,5 @@
 node_modules/
-.codemap.db
-.codemap.db-wal
-.codemap.db-shm
+.codemap.*
 .DS_Store
 dist/
 *.tgz

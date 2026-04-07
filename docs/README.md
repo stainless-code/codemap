@@ -1,15 +1,31 @@
 # Codemap — documentation index
 
-Technical docs for **[@stainless-code/codemap](https://github.com/stainless-code/codemap)**. Quick start: [../README.md](../README.md).
+Technical docs for **[@stainless-code/codemap](https://github.com/stainless-code/codemap)**.
 
-| File                                 | Topic                                                                                                                                                                               |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [architecture.md](./architecture.md) | Schema, layering, CLI, API, [**User config**](./architecture.md#user-config) (Zod), parsers, [Key Files](./architecture.md#key-files)                                               |
-| [benchmark.md](./benchmark.md)       | [**Indexing another project**](./benchmark.md#indexing-another-project) · [**Benchmark script**](./benchmark.md#the-benchmark-script) · [`fixtures/minimal/`](../fixtures/minimal/) |
-| [packaging.md](./packaging.md)       | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets)                |
-| [roadmap.md](./roadmap.md)           | Forward-looking backlog (not a `src/` inventory)                                                                                                                                    |
-| [why-codemap.md](./why-codemap.md)   | Why index + SQL for agents (speed, tokens, accuracy)                                                                                                                                |
+**Start here:** [../README.md](../README.md) (install, CLI, API, dev commands). **This folder** is deeper reference — pick a row below.
 
-**Cross-cutting:** Runtime splits (SQLite, workers, globs, JSON config I/O) — [packaging § Node vs Bun](./packaging.md#node-vs-bun) only (link it; don’t copy the table). **User config** shape/validation — [architecture § User config](./architecture.md#user-config) only.
+| File                                 | Topic                                                                                                                                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [why-codemap.md](./why-codemap.md)   | Why index + SQL for agents (speed, tokens, accuracy) — good first read after the readme                                                                                                                                                   |
+| [architecture.md](./architecture.md) | Schema, layering, CLI internals, API, [**User config**](./architecture.md#user-config) (Zod), parsers, [Key Files](./architecture.md#key-files)                                                                                           |
+| [agents.md](./agents.md)             | **`codemap agents init`** — granular **`templates/agents`** → **`.agents/`**, per-file IDE symlink/copy, **[pointer files](./agents.md#pointer-files)** (`codemap-pointer` markers), **`--interactive`**, **`.gitignore` / `.codemap.*`** |
+| [benchmark.md](./benchmark.md)       | [**Indexing another project**](./benchmark.md#indexing-another-project) · [**Benchmark script**](./benchmark.md#the-benchmark-script) · [`fixtures/minimal/`](../fixtures/minimal/)                                                       |
+| [packaging.md](./packaging.md)       | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets)                                                                      |
+| [roadmap.md](./roadmap.md)           | Forward-looking backlog (not a `src/` inventory)                                                                                                                                                                                          |
 
-**Conventions:** One topic per file; relative links; avoid stale file/symbol counts in narrative docs (use `codemap query` / `bun run dev query` after indexing; methodology tables in [benchmark.md](./benchmark.md) are fine). **This repo:** `bun run dev` → `bun src/index.ts`; `bun run build` → tsdown → `dist/`; `bun run clean` / `bun run check-updates` — [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md). **Contributors:** branch + PR into **`main`** ([CI](../.github/workflows/ci.yml)), `bun run check`, JSDoc on public API.
+## Single source of truth (do not duplicate)
+
+| Topic                                                                                                                                            | Canonical doc                                                                    | Elsewhere                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Runtime splits (SQLite, workers, globs, JSON config I/O)                                                                                         | [packaging § Node vs Bun](./packaging.md#node-vs-bun) — **the table lives here** | [architecture § Runtime](./architecture.md#runtime-and-database) links here; do not copy the table |
+| **`codemap.config.*`** shape / Zod validation                                                                                                    | [architecture § User config](./architecture.md#user-config)                      | Root [README § Configuration](../README.md#configuration) points here                              |
+| **`codemap agents init`**: **`--force`** on **`.agents/`** (template file paths only), IDE matrix, per-file symlink/copy, **`templates/agents`** | [agents.md](./agents.md)                                                         | Link here; do not paste the integration table into README or packaging                             |
+| **`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / Copilot** — managed **`codemap-pointer`** sections, merge vs **`--force`**                           | [agents.md § Pointer files](./agents.md#pointer-files)                           | Link here; do not duplicate the situation table                                                    |
+| End-user CLI (index, query, agents, flags, env)                                                                                                  | [../README.md § CLI](../README.md#cli)                                           | [architecture § CLI usage](./architecture.md#cli-usage) summarizes and links back                  |
+
+## Conventions
+
+- **One topic per file**; prefer relative links between these docs.
+- **Avoid stale file/symbol counts** in narrative text — use `codemap query` / `bun run dev query` after indexing; methodology tables in [benchmark.md](./benchmark.md) are fine.
+- **This repo:** `bun run dev` is **`bun src/index.ts`**; `bun run build` → tsdown → `dist/`; `bun run clean` / `bun run check-updates` — [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md).
+- **Contributors:** branch + PR into **`main`** ([CI](../.github/workflows/ci.yml)), `bun run check`, JSDoc on public API.

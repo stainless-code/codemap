@@ -14,7 +14,7 @@ Query:
   codemap query "<SQL>"
 
 Agents:
-  codemap agents init [--force]
+  codemap agents init [--force] [--interactive|-i]
 
 Other:
   codemap version
@@ -43,7 +43,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
     console.error(
-      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force]`,
+      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force] [--interactive|-i]`,
     );
     process.exit(1);
   }

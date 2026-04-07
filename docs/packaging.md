@@ -1,6 +1,6 @@
 # Packaging
 
-How **@stainless-code/codemap** is built and published. Hub: [README.md](./README.md).
+How **@stainless-code/codemap** is built and published. **Doc index:** [README.md](./README.md). **Runtime comparison table:** [§ Node vs Bun](#node-vs-bun) — link from other docs; do not duplicate the table.
 
 ## Build & publish surface
 
@@ -40,4 +40,6 @@ Releases use [**Changesets**](https://github.com/changesets/changesets). Repo co
 
 ## Related
 
-- [architecture.md](./architecture.md) — schema, layering, API.
+- [architecture.md](./architecture.md) — schema, layering, API, user config.
+- [agents.md](./agents.md) — **`templates/agents`**, **`codemap agents init`** (CLI flags and file behavior documented there), published **`files`** surface above.
+- [benchmark.md](./benchmark.md) — external roots, **`CODEMAP_ROOT`**, benchmark script.
