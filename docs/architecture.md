@@ -156,7 +156,7 @@ The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), *
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap.db`**.
 
-Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **1** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
@@ -431,7 +431,7 @@ When `SCHEMA_VERSION` is bumped (after the first release, when DDL changes requi
 - `createSchema()` detects the mismatch automatically and calls `dropAll()` before recreating
 - No manual intervention needed — run the indexer and it auto-rebuilds on version change
 
-Until the first release, Codemap keeps **`SCHEMA_VERSION` at 2**; pull `--full` or delete `.codemap.db` when the DDL in `db.ts` changes without a version bump.
+Until the first release, Codemap keeps **`SCHEMA_VERSION` at 1**; pull `--full` or delete `.codemap.db` when the DDL in `db.ts` changes without a version bump.
 
 ## SQLite Performance Configuration
 

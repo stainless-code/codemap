@@ -9,7 +9,7 @@ import {
  * tweaks; run `--full` locally after pulling. After v1.0, bump in lockstep with
  * `createTables` / `createIndexes` when the on-disk schema changes.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 1;
 
 export type { CodemapDatabase };
 

@@ -16,8 +16,6 @@ bun add @stainless-code/codemap
 # or: npm install @stainless-code/codemap
 ```
 
-(`0.0.0` until the first npm release; use a git dependency or `bun link` until then.)
-
 The package exposes a **`codemap`** binary, a **library** entry (`import` / `exports`), compiled **`dist/`**, and **`templates/agents`** for **`codemap agents init`** — see [docs/packaging.md](docs/packaging.md).
 
 **Engines:** Node **`^20.19.0 || >=22.12.0`** and/or Bun **`>=1.0.0`** — see `package.json` and [docs/packaging.md](docs/packaging.md).
