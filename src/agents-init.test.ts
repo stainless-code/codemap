@@ -1,9 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resolveAgentsTemplateDir, runAgentsInit } from "./agents-init";
+import {
+  ensureGitignoreCodemapPattern,
+  resolveAgentsTemplateDir,
+  runAgentsInit,
+} from "./agents-init";
 
 describe("runAgentsInit", () => {
   it("copies templates into .agents/", () => {
@@ -37,5 +48,75 @@ describe("runAgentsInit", () => {
   it("resolveAgentsTemplateDir points at templates/agents", () => {
     const p = resolveAgentsTemplateDir().replace(/\\/g, "/");
     expect(p.endsWith("/templates/agents")).toBe(true);
+  });
+
+  it("ensureGitignoreCodemapPattern appends .codemap.* when .gitignore exists", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".git"), { recursive: true });
+      const gi = join(dir, ".gitignore");
+      writeFileSync(gi, "node_modules/\n", "utf-8");
+      ensureGitignoreCodemapPattern(dir);
+      expect(readFileSync(gi, "utf-8")).toContain(".codemap.*");
+      ensureGitignoreCodemapPattern(dir);
+      const lines = readFileSync(gi, "utf-8").split("\n").filter(Boolean);
+      expect(lines.filter((l) => l === ".codemap.*").length).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ensureGitignoreCodemapPattern no-ops when not a Git repo", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      ensureGitignoreCodemapPattern(dir);
+      expect(existsSync(join(dir, ".gitignore"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ensureGitignoreCodemapPattern creates .gitignore when Git repo has none", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".git"), { recursive: true });
+      ensureGitignoreCodemapPattern(dir);
+      expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
+        ".codemap.*\n",
+      );
+      ensureGitignoreCodemapPattern(dir);
+      expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
+        ".codemap.*\n",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit updates .gitignore when present", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".git"), { recursive: true });
+      writeFileSync(join(dir, ".gitignore"), "dist/\n", "utf-8");
+      expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
+      expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toContain(
+        ".codemap.*",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit creates .gitignore in Git repo without one", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".git"), { recursive: true });
+      expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
+      expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
+        ".codemap.*\n",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
