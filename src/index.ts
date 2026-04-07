@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { main } from "./cli";
+import { main } from "./cli/index.js";
 
 export * from "./api";
 export { BUILTIN_ADAPTERS, getAdapterForExtension } from "./adapters/builtin";
