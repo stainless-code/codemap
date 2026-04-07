@@ -448,8 +448,9 @@ export function printQueryResult(
   opts?: { json?: boolean },
 ): number {
   const json = opts?.json === true;
-  const db = openDb();
+  let db: CodemapDatabase | undefined;
   try {
+    db = openDb();
     const rows = db.query(sql).all();
     if (json) {
       console.log(JSON.stringify(rows));
@@ -468,7 +469,7 @@ export function printQueryResult(
     }
     return 1;
   } finally {
-    closeDb(db);
+    if (db !== undefined) closeDb(db);
   }
 }
 

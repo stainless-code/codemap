@@ -216,7 +216,8 @@ Examples:
 }
 
 /**
- * Initialize Codemap for `opts.root`, then run **`printQueryResult`** and **`process.exit(1)`** on failure.
+ * Initialize Codemap for `opts.root`, then run **`printQueryResult`**.
+ * Sets **`process.exitCode`** on failure (no **`process.exit`**). With **`--json`**, bootstrap errors print **`{"error":"…"}`** on stdout like query failures.
  */
 export async function runQueryCmd(opts: {
   root: string;
@@ -224,9 +225,19 @@ export async function runQueryCmd(opts: {
   sql: string;
   json?: boolean;
 }): Promise<void> {
-  const user = await loadUserConfig(opts.root, opts.configFile);
-  initCodemap(resolveCodemapConfig(opts.root, user));
-  configureResolver(getProjectRoot(), getTsconfigPath());
-  const code = printQueryResult(opts.sql, { json: opts.json });
-  if (code !== 0) process.exit(1);
+  try {
+    const user = await loadUserConfig(opts.root, opts.configFile);
+    initCodemap(resolveCodemapConfig(opts.root, user));
+    configureResolver(getProjectRoot(), getTsconfigPath());
+    const code = printQueryResult(opts.sql, { json: opts.json });
+    if (code !== 0) process.exitCode = code;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (opts.json) {
+      console.log(JSON.stringify({ error: msg }));
+    } else {
+      console.error(msg);
+    }
+    process.exitCode = 1;
+  }
 }

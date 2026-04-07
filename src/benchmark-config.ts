@@ -29,8 +29,38 @@ interface ConfigScenario {
 }
 
 interface BenchmarkConfigFile {
-  replaceDefault?: boolean;
+  /** Always normalized in {@link parseConfigJson} (default **true**). */
+  replaceDefault: boolean;
   scenarios: ConfigScenario[];
+}
+
+/**
+ * Reject mutating or multi-statement SQL. Benchmark JSON is local/trusted but must not run DDL/DML against `.codemap.db`.
+ */
+export function assertReadOnlyIndexedSql(sql: string): void {
+  const trimmed = sql.trim();
+  if (trimmed === "") throw new Error("indexedSql must be non-empty");
+  const oneStmt = trimmed.replace(/;\s*$/u, "").trim();
+  if (oneStmt.includes(";")) {
+    throw new Error("indexedSql must be a single statement");
+  }
+  if (
+    /\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|REPLACE|ATTACH|DETACH|VACUUM|PRAGMA|TRUNCATE|REINDEX|ANALYZE)\b/i.test(
+      oneStmt,
+    )
+  ) {
+    throw new Error(
+      "indexedSql must be read-only (no DDL/DML or PRAGMA keywords)",
+    );
+  }
+  if (/\bRETURNING\b/i.test(oneStmt)) {
+    throw new Error("indexedSql must not use RETURNING");
+  }
+  if (!/^\s*(?:WITH\b|SELECT\b)/iu.test(oneStmt)) {
+    throw new Error(
+      "indexedSql must be a single SELECT (optionally WITH … SELECT)",
+    );
+  }
 }
 
 function isBuiltin(t: TraditionalSpec): t is TraditionalBuiltinSpec {
@@ -66,8 +96,10 @@ function traditionalFromSpec(spec: TraditionalSpec): () => {
         }
       }
     } else {
+      // `regex` comes from developer-controlled benchmark JSON (trusted input).
+      const re = new RegExp(regex);
       for (const [path, content] of contents) {
-        if (new RegExp(regex).test(content)) results.push({ file_path: path });
+        if (re.test(content)) results.push({ file_path: path });
       }
     }
     return { results, filesRead: files.length, bytesRead: totalBytes };
@@ -94,6 +126,12 @@ function parseConfigJson(raw: string): BenchmarkConfigFile {
     }
     if (typeof e.indexedSql !== "string" || e.indexedSql.trim() === "") {
       throw new Error(`benchmark config: ${e.name}: indexedSql required`);
+    }
+    try {
+      assertReadOnlyIndexedSql(e.indexedSql);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`benchmark config: ${e.name}: ${msg}`);
     }
     if (e.traditional === null || typeof e.traditional !== "object") {
       throw new Error(`benchmark config: ${e.name}: traditional required`);
@@ -122,6 +160,10 @@ function parseConfigJson(raw: string): BenchmarkConfigFile {
   };
 }
 
+/**
+ * Load scenarios from a JSON file (**`CODEMAP_BENCHMARK_CONFIG`**).
+ * The path is resolved from **`process.cwd()`** via **`resolve(configPath)`** (not relative to this module); use an absolute path or a path relative to the shell cwd.
+ */
 export function loadScenariosFromConfigFile(
   db: CodemapDatabase,
   configPath: string,
@@ -138,7 +180,7 @@ export function loadScenariosFromConfigFile(
     traditional: traditionalFromSpec(s.traditional),
   }));
   return {
-    replaceDefault: config.replaceDefault !== false,
+    replaceDefault: config.replaceDefault,
     scenarios,
   };
 }

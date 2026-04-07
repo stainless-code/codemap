@@ -7,6 +7,17 @@ import { createCodemap } from "../src/api";
 
 const CODEMAP_REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 
+function parsePositiveInt(flag: string, raw: string | undefined): number {
+  if (raw === undefined || raw.startsWith("-")) {
+    throw new Error(`${flag} requires a positive integer`);
+  }
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`${flag} must be a positive integer`);
+  }
+  return n;
+}
+
 function parseArgs(argv: string[]) {
   let root: string | undefined;
   let skipBenchmark = false;
@@ -20,9 +31,10 @@ function parseArgs(argv: string[]) {
     else if (a === "--skip-benchmark") skipBenchmark = true;
     else if (a === "--verbose") verboseBenchmark = true;
     else if (a === "--root" && argv[i + 1]) root = resolve(argv[++i]);
-    else if (a === "--max-files" && argv[i + 1]) maxFiles = Number(argv[++i]);
+    else if (a === "--max-files" && argv[i + 1])
+      maxFiles = parsePositiveInt("--max-files", argv[++i]);
     else if (a === "--max-symbols" && argv[i + 1])
-      maxSymbols = Number(argv[++i]);
+      maxSymbols = parsePositiveInt("--max-symbols", argv[++i]);
     else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
   }
   return { root, skipBenchmark, verboseBenchmark, help, maxFiles, maxSymbols };

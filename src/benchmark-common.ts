@@ -5,11 +5,13 @@ import { globSync } from "./glob-sync";
 import { getProjectRoot, isPathExcluded } from "./runtime";
 
 export function globFiles(patterns: string[], cwd: string): string[] {
-  const files: string[] = [];
+  const files = new Set<string>();
   for (const pattern of patterns) {
-    files.push(...globSync(pattern, cwd));
+    for (const p of globSync(pattern, cwd)) {
+      files.add(p);
+    }
   }
-  return files;
+  return [...files];
 }
 
 export function globFilesFiltered(patterns: string[], cwd: string): string[] {

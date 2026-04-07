@@ -19,7 +19,7 @@ export const QUERY_RECIPES: Record<
     sql: `SELECT from_path, COUNT(*) AS deps
 FROM dependencies
 GROUP BY from_path
-ORDER BY deps DESC
+ORDER BY deps DESC, from_path ASC
 LIMIT 10`,
   },
   "fan-out-sample": {
@@ -28,11 +28,11 @@ LIMIT 10`,
     sql: `SELECT d.from_path,
   COUNT(*) AS deps,
   (SELECT GROUP_CONCAT(to_path, ' | ')
-   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path LIMIT 5))
+   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path ORDER BY to_path ASC LIMIT 5))
     AS sample_targets
 FROM dependencies d
 GROUP BY d.from_path
-ORDER BY deps DESC
+ORDER BY deps DESC, d.from_path ASC
 LIMIT 10`,
   },
   /**
@@ -45,11 +45,11 @@ LIMIT 10`,
     sql: `SELECT d.from_path,
   COUNT(*) AS deps,
   (SELECT json_group_array(to_path)
-   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path LIMIT 5))
+   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path ORDER BY to_path ASC LIMIT 5))
     AS sample_targets
 FROM dependencies d
 GROUP BY d.from_path
-ORDER BY deps DESC
+ORDER BY deps DESC, d.from_path ASC
 LIMIT 10`,
   },
   /**
@@ -60,7 +60,7 @@ LIMIT 10`,
     sql: `SELECT to_path, COUNT(*) AS fan_in
 FROM dependencies
 GROUP BY to_path
-ORDER BY fan_in DESC
+ORDER BY fan_in DESC, to_path ASC
 LIMIT 15`,
   },
   "index-summary": {
@@ -77,7 +77,7 @@ LIMIT 15`,
     description: "Top 20 files by line count (size/complexity hotspots)",
     sql: `SELECT path, line_count, size, language
 FROM files
-ORDER BY line_count DESC
+ORDER BY line_count DESC, path ASC
 LIMIT 20`,
   },
   /**
@@ -94,7 +94,7 @@ LIMIT 20`,
     ELSE (length(hooks_used) - length(replace(hooks_used, ',', ''))) + 1
   END AS hook_count
 FROM components
-ORDER BY hook_count DESC
+ORDER BY hook_count DESC, file_path ASC, name ASC
 LIMIT 20`,
   },
   "markers-by-kind": {
@@ -102,7 +102,7 @@ LIMIT 20`,
     sql: `SELECT kind, COUNT(*) AS count
 FROM markers
 GROUP BY kind
-ORDER BY count DESC`,
+ORDER BY count DESC, kind ASC`,
   },
 };
 
