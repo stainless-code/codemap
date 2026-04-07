@@ -1,6 +1,6 @@
 {
   "name": "@stainless-code/codemap",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Query your codebase — structural SQLite index for AI agents",
   "keywords": [
     "agents",
@@ -25,6 +25,7 @@
     "codemap": "./dist/index.mjs"
   },
   "files": [
+    "CHANGELOG.md",
     "dist",
     "templates"
   ],

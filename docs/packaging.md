@@ -5,7 +5,7 @@ How **@stainless-code/codemap** is built and published. Hub: [README.md](./READM
 ## Build & publish surface
 
 - **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs build.
-- **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`["dist", "templates"]`** — no `src/` on npm.
+- **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** — no `src/` on npm.
 
 ## Consuming locally
 
