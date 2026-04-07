@@ -12,6 +12,8 @@ bun install   # runs `prepare` → Husky git hooks
 bun run dev   # same as `bun src/index.ts` — CLI from source
 bun test
 bun run check   # format + lint + tests + typecheck + build
+bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap.db*`)
+bun run check-updates   # interactive dependency updates (`bun update -i --latest`)
 ```
 
 ### `main` and pull requests

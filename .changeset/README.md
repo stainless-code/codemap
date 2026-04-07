@@ -6,3 +6,7 @@ find the full documentation for it [in our repository](https://github.com/change
 
 We have a quick list of common questions to get you started engaging with this project in
 [our documentation](https://github.com/changesets/changesets/blob/main/docs/common-questions.md).
+
+---
+
+**This repo:** How versioning, **`NPM_TOKEN`**, and the GitHub workflow fit together for **`@stainless-code/codemap`** — see [docs/packaging.md § Releases](../docs/packaging.md#releases) (single place; don’t duplicate here).
