@@ -42,10 +42,10 @@ One schema and SQL surface; backend is chosen in **`src/sqlite-db.ts`**: **`bett
 
 **Speed (indicative, same machine — not a spec):** Bun is often **~1.5×** faster than Node for **`--version`** and short **`query`** (process startup + loading **`dist/`**). A **`fixtures/minimal`** **`--full`** rebuild is often **~2×** faster on Bun by median wall time; first runs can be noisier. Large-app full rebuilds follow the same idea but scale with tree size and I/O.
 
-| Track        | Where                                                                                                  |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| **CI**       | `node dist/index.mjs query "SELECT 1"` after build ([`ci.yml`](../.github/workflows/ci.yml)).          |
-| **Optional** | Extra matrix (more Node versions, Bun smoke); changelog note if **`engines`** or SQLite stack changes. |
+| Track        | Where                                                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CI**       | After build: `node dist/index.mjs query "SELECT 1"`; then **`CODEMAP_ROOT=fixtures/minimal`** `node dist/index.mjs --full` + query ([`ci.yml`](../.github/workflows/ci.yml)). |
+| **Optional** | Extra matrix (more Node versions, Bun smoke); changelog note if **`engines`** or SQLite stack changes.                                                                        |
 
 ## Releases
 

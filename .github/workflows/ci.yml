@@ -79,6 +79,14 @@ jobs:
       - name: Node smoke (dist + better-sqlite3)
         run: node dist/index.mjs query "SELECT 1 as ok"
 
+      # Full rebuild exercises multi-statement DDL (`runSql`), `dropAll`, workers path — Node only.
+      - name: Node full index (fixtures/minimal)
+        run: |
+          export CODEMAP_ROOT="$GITHUB_WORKSPACE/fixtures/minimal"
+          rm -f "$CODEMAP_ROOT/.codemap.db"
+          node dist/index.mjs --full
+          node dist/index.mjs query "SELECT COUNT(*) AS files FROM files"
+
   benchmark:
     name: 📊 Benchmark (fixture)
     runs-on: ubuntu-latest
