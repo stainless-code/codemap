@@ -2,8 +2,6 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 
-import fg from "fast-glob";
-
 import { LANG_MAP } from "../constants";
 import { extractCssData } from "../css-parser";
 import {
@@ -31,6 +29,7 @@ import {
   type CodemapDatabase,
   type FileRow,
 } from "../db";
+import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
 import { extractMarkers } from "../markers";
 import type { ParsedFile } from "../parse-worker";
@@ -69,11 +68,7 @@ export function collectFiles(): string[] {
   const files: string[] = [];
   const root = getProjectRoot();
   for (const pattern of getIncludePatterns()) {
-    const matches = fg.sync(pattern, {
-      cwd: root,
-      dot: true,
-      absolute: false,
-    });
+    const matches = globSync(pattern, root);
     for (const path of matches) {
       if (isPathExcluded(path)) continue;
       files.push(path);

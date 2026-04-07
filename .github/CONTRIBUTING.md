@@ -3,7 +3,7 @@
 Codemap is in **bootstrap / extraction** phase. Before large PRs, please open an issue so we can align on:
 
 - **Core vs adapter** — core should stay small; language-specific logic belongs in **adapters** (see [docs/roadmap.md](../docs/roadmap.md)).
-- **Runtimes** — **Node ≥20** and **Bun ≥1.1** are both supported for the CLI and library; SQLite is **`better-sqlite3`** on Node and **`bun:sqlite`** on Bun ([docs/architecture.md](../docs/architecture.md), [docs/packaging.md § Node vs Bun](../docs/packaging.md#node-vs-bun)).
+- **Runtimes** — **Node** `^20.19.0 || >=22.12.0` and **Bun** `>=1.0.0` (`package.json` **engines**); SQLite is **`better-sqlite3`** on Node and **`bun:sqlite`** on Bun ([docs/architecture.md](../docs/architecture.md), [docs/packaging.md § Node vs Bun](../docs/packaging.md#node-vs-bun)).
 
 ## Dev workflow
 
@@ -27,7 +27,7 @@ bun run check   # format + lint + tests + typecheck + build
 
 ### QA against a real app (testing bench)
 
-Do **not** add Codemap as a dependency to the bench repo. In **this** repo, copy `.env.example` to `.env` and set **`CODEMAP_TEST_BENCH`** to an **absolute path** to the other clone, then run `bun src/index.ts` as usual. See [docs/bench-repo.md](../docs/bench-repo.md).
+Do **not** add Codemap as a dependency to the bench repo. In **this** repo, copy `.env.example` to `.env` and set **`CODEMAP_TEST_BENCH`** to an **absolute path** to the other clone, then run `bun src/index.ts` as usual. See [docs/benchmark.md § Indexing another project](../docs/benchmark.md#indexing-another-project).
 
 Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — run **`bun run changeset`** when your PR should bump the version; see [docs/packaging.md § Releases](../docs/packaging.md#releases).
 

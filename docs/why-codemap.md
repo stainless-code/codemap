@@ -1,5 +1,7 @@
 # Why Codemap
 
+**Design:** [architecture.md](./architecture.md) · **Index:** [README.md](./README.md)
+
 ## The Problem
 
 AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning files at runtime — globbing directories, reading file contents, grepping for patterns, then reading more files to follow leads. For a codebase of this size, every discovery question triggers:

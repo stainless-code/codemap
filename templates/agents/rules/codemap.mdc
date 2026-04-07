@@ -18,7 +18,7 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | After `bun link` / global `codemap` | `codemap` | `codemap query "<SQL>"` |
 | Published package (when available) | `bunx @stainless-code/codemap` | `bunx @stainless-code/codemap query "<SQL>"` |
 
-Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** in this repo — see [docs/bench-repo.md](../../docs/bench-repo.md)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** in this repo — see [docs/benchmark.md § Indexing another project](../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
 
 ## Session start (do this ONCE per conversation)
 

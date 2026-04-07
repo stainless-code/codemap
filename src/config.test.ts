@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
   DEFAULT_INCLUDE_PATTERNS,
+  loadUserConfig,
   resolveCodemapConfig,
   type CodemapUserConfig,
 } from "./config";
@@ -66,5 +67,36 @@ describe("resolveCodemapConfig", () => {
     const r2 = resolveCodemapConfig(dir, { excludeDirNames: ["custom"] });
     expect(r2.excludeDirNames.has("custom")).toBe(true);
     expect(r2.excludeDirNames.has("node_modules")).toBe(false);
+  });
+});
+
+describe("loadUserConfig", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "codemap-load-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("loads codemap.config.json from project root", async () => {
+    writeFileSync(
+      join(dir, "codemap.config.json"),
+      JSON.stringify({ include: ["**/*.ts"] }),
+    );
+    const cfg = await loadUserConfig(dir);
+    expect(cfg?.include).toEqual(["**/*.ts"]);
+  });
+
+  it("loads explicit .json path via --config", async () => {
+    const p = join(dir, "custom.json");
+    writeFileSync(p, JSON.stringify({ databasePath: "data.db" }));
+    const cfg = await loadUserConfig(dir, p);
+    expect(cfg?.databasePath).toBe("data.db");
+  });
+
+  it("returns undefined when explicit json path is missing", async () => {
+    const cfg = await loadUserConfig(dir, join(dir, "nope.json"));
+    expect(cfg).toBeUndefined();
   });
 });

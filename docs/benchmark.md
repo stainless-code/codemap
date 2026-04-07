@@ -1,17 +1,55 @@
-# Codemap — Benchmark
+# Benchmarking & external project roots
 
-## Overview
+See [README.md](./README.md) · [why-codemap.md](./why-codemap.md) (rationale for the index).
 
-Compares two approaches to answering common code-discovery questions:
+**Two different topics live here — pick the row that matches what you need:**
+
+| You want to…                                                                                                                                       | Read                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap.db` goes | [§ Indexing another project](#indexing-another-project) |
+| **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                 | [§ The benchmark script](#the-benchmark-script)         |
+
+---
+
+## Indexing another project
+
+Develop Codemap in **this repository** but index a **different tree** (e.g. another clone). That project does **not** need Codemap as a dependency.
+
+**Precedence:** `--root <path>` (CLI) → **`CODEMAP_ROOT`** → **`CODEMAP_TEST_BENCH`** → `process.cwd()`.
+
+**Day-to-day (Cursor on this repo):**
+
+1. Copy [`.env.example`](../.env.example) to **`.env`** here (gitignored).
+2. Set **`CODEMAP_TEST_BENCH`** to the **absolute path** of the project to index.
+
+[Bun](https://bun.sh) loads `.env` from the current working directory when you run `bun src/index.ts`, so the index targets that tree without passing `--root` each time.
+
+**One-off:**
+
+```bash
+CODEMAP_TEST_BENCH=/absolute/path/to/your-app bun src/index.ts --full
+```
+
+Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavior is the same.
+
+**Where `.codemap.db` lives:** defaults to **`<indexed-project-root>/.codemap.db`**, not inside the Codemap repo — add `.codemap.db` to that project’s `.gitignore` if needed.
+
+**Agents:** Work in the **stainless-code/codemap** window with [`.agents/rules/codemap.mdc`](../.agents/rules/codemap.mdc) and the [skill](../.agents/skills/codemap/SKILL.md). Queries resolve against whatever **`CODEMAP_*`** / **`--root`** selected.
+
+---
+
+## The benchmark script
+
+`src/benchmark.ts` compares **indexed SQL** vs a **traditional** path (glob → read → regex). It does **not** configure which project is indexed — use [§ Indexing another project](#indexing-another-project) or `CODEMAP_ROOT=fixtures/minimal` first, then run the script.
+
+### Overview
 
 1. **Indexed** — single SQL query against `.codemap.db`
-2. **Traditional** — `Glob` → `readFileSync` → regex match (simulates what AI agent tools like Grep/Read/Glob do)
-
-The benchmark script lives at `src/benchmark.ts`.
+2. **Traditional** — glob (Bun **`Glob`** or **`fast-glob`** on Node, same as the indexer) → **`readFileSync`** → regex match (simulates what AI agent tools like Grep/Read/Glob do)
 
 **OSS note:** For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`**. Tables below may still use historical labels; methodology is the same.
 
-## Prerequisites
+### Prerequisites
 
 The database must exist (otherwise the script errors on the warmup query). Build the index once:
 
@@ -23,7 +61,7 @@ bun src/index.ts --full
 
 From an installed package, the same commands work as `codemap` / `codemap --full` (see [README.md](../README.md)).
 
-## Running
+### Running
 
 ```bash
 # Summary table (includes reindex timing at the end)
@@ -33,7 +71,7 @@ bun src/benchmark.ts
 bun src/benchmark.ts --verbose
 ```
 
-## Methodology
+### Methodology
 
 Each scenario runs both approaches back-to-back on the same machine, same data. Measured:
 
@@ -48,16 +86,16 @@ Each scenario runs both approaches back-to-back on the same machine, same data. 
 
 **Important**: the traditional approach simulates best-case AI tool behavior — it reads files in-process with Bun's fast I/O. Real AI agent tool calls add network round-trips, context window serialization, and multiple turn overhead that make the gap significantly larger.
 
-## CLI and runtime startup
+### CLI and runtime startup
 
 This document measures **indexed SQL vs traditional glob/read** on an existing database — **not** process startup time or **Node vs Bun** as runtimes.
 
 - **Lazy CLI:** **`dist/index.mjs`** stays small; **`codemap --help`** / **`version`** load only bootstrap + the matching **dynamic import** chunk ([architecture.md § Layering](./architecture.md#layering)).
-- **Node vs Bun:** **`console.table`** output can differ slightly; SQL semantics match ([packaging.md § Node vs Bun](./packaging.md#node-vs-bun)). Indicative startup / small-rebuild speed ratios are documented there — this benchmark file does not measure Node vs Bun.
+- **Node vs Bun:** **`console.table`** output can differ slightly; SQL semantics match ([packaging.md § Node vs Bun](./packaging.md#node-vs-bun)). This benchmark does not compare Node vs Bun startup or wall time.
 
 **CI** runs **`node dist/index.mjs query "SELECT 1"`** after build to smoke-test the **Node + better-sqlite3** path ([`ci.yml`](../.github/workflows/ci.yml)).
 
-## Scenarios
+### Scenarios
 
 | #   | Scenario                                | What it tests                                        |
 | --- | --------------------------------------- | ---------------------------------------------------- |
@@ -69,7 +107,7 @@ This document measures **indexed SQL vs traditional glob/read** on an existing d
 | 6   | Components in `shop/` subtree           | Scoped component discovery                           |
 | 7   | Reverse deps: who imports `utils/date`? | Dependency graph traversal                           |
 
-## Results
+### Results
 
 Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario counts are zero). Numbers vary by machine and project. Schema, indexes, and content fingerprints: [architecture.md § Schema](./architecture.md#schema).
 
@@ -87,7 +125,7 @@ Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts
 
 On a **large app** indexed via `--root`, the same queries typically return non-zero rows; the indexed side stays sub-millisecond while the traditional side reads megabytes for broad globs. Repeatable numbers: [Fixtures](#fixtures).
 
-### Run-to-run variance
+#### Run-to-run variance
 
 On a small repo, totals move with noise and thermal variance. On a large indexed tree, **per-scenario** index times stay sub-millisecond while traditional times scale with files read. Re-run `bun src/benchmark.ts` after changing code or index target.
 
@@ -95,21 +133,21 @@ The script’s **reindex** section averages **3 internal runs** per mode; full-r
 
 The indexed CSS scenario uses `ORDER BY name LIMIT 50` — see `benchmark.ts` for the exact queries.
 
-## Key Takeaways
+### Key takeaways
 
-### Speed
+#### Speed
 
 Indexed queries use **covering / partial indexes** on the SQLite side; the traditional path scales with **files read** and regex work. PRAGMAs and index design: [architecture.md § SQLite Performance Configuration](./architecture.md#sqlite-performance-configuration).
 
-### Accuracy
+#### Accuracy
 
 Structured parsing vs regex tradeoffs (components, CSS, markers, imports): [why-codemap.md § Accuracy Gains](./why-codemap.md#accuracy-gains).
 
-### Token impact (AI agents)
+#### Token impact (AI agents)
 
 [why-codemap.md § Token Efficiency](./why-codemap.md#token-efficiency).
 
-### Reindex Cost
+#### Reindex cost
 
 The benchmark also measures the cost of keeping the index fresh (3 runs each, same session as the table above):
 
@@ -123,14 +161,14 @@ The benchmark also measures the cost of keeping the index fresh (3 runs each, sa
 
 **Targeted reindex** (`--files`) is the fastest option when the AI knows which files it modified — it skips git diff and filesystem scanning entirely. Incremental uses DB-sourced `indexedPaths` instead of a full `collectFiles()` glob scan, and passes only changed files to the indexer. Both are fast enough to run after every editing step. Full rebuild is appropriate when switching branches or after a rebase.
 
-### Where the Index Doesn't Help
+#### Where the index doesn't help
 
 - **Full-text search** — the index doesn't store source code, so you still need grep/read for content-level queries (e.g. "find all usages of `console.log`")
 - **Questions about code logic** — the index captures structure (names, types, locations), not semantics (what the code does)
 
-## Fixtures
+### Fixtures
 
-### `fixtures/minimal/`
+#### `fixtures/minimal/`
 
 Small **private** package (not published) with intentional:
 
@@ -146,4 +184,4 @@ bun run benchmark
 
 **CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
 
-Scenario **titles** in `src/benchmark.ts` are still generic (historical names); **indexed row counts** on the fixture are stable for a given schema. A second, larger fixture is optional — see [roadmap.md](./ROADMAP.md).
+Scenario **titles** in `src/benchmark.ts` are still generic (historical names); **indexed row counts** on the fixture are stable for a given schema. A second, larger fixture is optional — see [roadmap.md](./roadmap.md).

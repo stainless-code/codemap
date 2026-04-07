@@ -13,10 +13,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import fg from "fast-glob";
-
 import { loadUserConfig, resolveCodemapConfig } from "./config";
 import { closeDb, openDb } from "./db";
+import { globSync } from "./glob-sync";
 import { configureResolver } from "./resolver";
 import {
   getProjectRoot,
@@ -51,7 +50,7 @@ async function timeMsAsync(
 function globFiles(patterns: string[], cwd: string): string[] {
   const files: string[] = [];
   for (const pattern of patterns) {
-    files.push(...fg.sync(pattern, { cwd, dot: true }));
+    files.push(...globSync(pattern, cwd));
   }
   return files;
 }

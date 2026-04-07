@@ -1,6 +1,15 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+async function readJsonFile(filePath: string): Promise<unknown> {
+  if (typeof Bun !== "undefined") {
+    return Bun.file(filePath).json();
+  }
+  const text = await readFile(filePath, "utf-8");
+  return JSON.parse(text) as unknown;
+}
 
 /**
  * Default glob patterns for indexing (relative to project root).
@@ -135,7 +144,7 @@ export async function loadUserConfig(
   if (explicitPath) {
     if (explicitPath.endsWith(".json")) {
       if (!existsSync(explicitPath)) return undefined;
-      const raw = await Bun.file(explicitPath).json();
+      const raw = await readJsonFile(explicitPath);
       return raw as CodemapUserConfig;
     }
     return tryImport(explicitPath);
@@ -147,7 +156,7 @@ export async function loadUserConfig(
 
   const jsonPath = join(root, "codemap.config.json");
   if (existsSync(jsonPath)) {
-    const raw = await Bun.file(jsonPath).json();
+    const raw = await readJsonFile(jsonPath);
     return raw as CodemapUserConfig;
   }
 

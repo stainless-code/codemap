@@ -13,6 +13,7 @@ export default defineConfig({
     fileName === "index.mjs" ? { js: "#!/usr/bin/env node\n" } : undefined,
   deps: {
     neverBundle: [
+      "bun",
       "better-sqlite3",
       "fast-glob",
       "lightningcss",

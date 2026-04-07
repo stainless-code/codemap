@@ -1,5 +1,7 @@
 # Codemap — Architecture
 
+See [documentation index](./README.md).
+
 ## Overview
 
 A local SQLite database (`.codemap.db`) indexes the project tree and stores structural metadata (symbols, imports, exports, components, dependencies, CSS tokens, markers) for SQL queries instead of repeated full-tree scans.
@@ -8,7 +10,9 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 **`src/sqlite-db.ts`:** Node uses **`better-sqlite3`**; Bun uses **`bun:sqlite`**. Same schema everywhere. **`better-sqlite3`** allows **one SQL statement per `prepare()`**; **`bun:sqlite`** accepts **multiple statements** in one `run()`. On Node, **`runSql()`** splits multi-statement strings on **`;`** and runs each fragment. Do **not** put **`;`** inside **`--` line comments** in **`db.ts`** DDL strings (naive split would break). Details: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
 
-**`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **Shipped artifact:** **`dist/`** — `package.json` **`bin`** and **`exports`** both point at **`dist/index.mjs`** ([packaging.md](./packaging.md)); tsdown also emits **lazy CLI chunks** (`cmd-index`, `cmd-query`, `cmd-agents`, …) loaded via **`import()`** from **`src/cli/main.ts`**.
+**`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **`src/glob-sync.ts`:** Bun **`Glob`** or **`fast-glob`** for include patterns. **`src/config.ts`:** JSON user config via **`Bun.file`** on Bun, **`readFile` + `JSON.parse`** on Node. Full table: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
+
+**Shipped artifact:** **`dist/`** — `package.json` **`bin`** and **`exports`** both point at **`dist/index.mjs`** ([packaging.md](./packaging.md)); tsdown also emits **lazy CLI chunks** (`cmd-index`, `cmd-query`, `cmd-agents`, …) loaded via **`import()`** from **`src/cli/main.ts`**.
 
 ## Layering
 
@@ -88,24 +92,25 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 ## Key Files
 
-| File              | Purpose                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| `index.ts`        | Package entry — re-exports `api` / `config`, runs CLI when main                                  |
-| `cli/`            | CLI — bootstrap argv, lazy command modules, `query` / `agents init` / index modes                |
-| `api.ts`          | Programmatic API — `createCodemap`, `Codemap`, `runCodemapIndex`                                 |
-| `application/`    | Indexing use cases and engine (`run-index`, `index-engine`, types)                               |
-| `worker-pool.ts`  | Parallel parse workers (Bun / Node)                                                              |
-| `db.ts`           | SQLite adapter — schema DDL, typed CRUD, connection management                                   |
-| `parser.ts`       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols, imports, exports, components, markers       |
-| `css-parser.ts`   | CSS extraction via `lightningcss` — custom properties, classes, keyframes, `@theme` blocks       |
-| `resolver.ts`     | Import path resolution via `oxc-resolver` — respects `tsconfig` aliases, builds dependency graph |
-| `constants.ts`    | Shared constants — e.g. `LANG_MAP`                                                               |
-| `markers.ts`      | Shared marker extraction (`TODO`/`FIXME`/`HACK`/`NOTE`) — used by all parsers                    |
-| `parse-worker.ts` | Worker thread entry point — reads, parses, and extracts file data in parallel                    |
-| `adapters/`       | `LanguageAdapter` types and built-in TS/CSS/text implementations                                 |
-| `parsed-types.ts` | Shared `ParsedFile` shape for workers and adapters                                               |
-| `agents-init.ts`  | `codemap agents init` — copies `templates/agents` → `.agents/`                                   |
-| `benchmark.ts`    | Performance comparison script — see [benchmark.md](./benchmark.md)                               |
+| File              | Purpose                                                                                                           |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `index.ts`        | Package entry — re-exports `api` / `config`, runs CLI when main                                                   |
+| `cli/`            | CLI — bootstrap argv, lazy command modules, `query` / `agents init` / index modes                                 |
+| `api.ts`          | Programmatic API — `createCodemap`, `Codemap`, `runCodemapIndex`                                                  |
+| `application/`    | Indexing use cases and engine (`run-index`, `index-engine`, types)                                                |
+| `worker-pool.ts`  | Parallel parse workers (Bun / Node)                                                                               |
+| `db.ts`           | SQLite adapter — schema DDL, typed CRUD, connection management                                                    |
+| `parser.ts`       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols, imports, exports, components, markers                        |
+| `css-parser.ts`   | CSS extraction via `lightningcss` — custom properties, classes, keyframes, `@theme` blocks                        |
+| `resolver.ts`     | Import path resolution via `oxc-resolver` — respects `tsconfig` aliases, builds dependency graph                  |
+| `constants.ts`    | Shared constants — e.g. `LANG_MAP`                                                                                |
+| `glob-sync.ts`    | Include globs — Bun `Glob` vs `fast-glob` on Node ([packaging § Node vs Bun](./packaging.md#node-vs-bun))         |
+| `markers.ts`      | Shared marker extraction (`TODO`/`FIXME`/`HACK`/`NOTE`) — used by all parsers                                     |
+| `parse-worker.ts` | Worker thread entry point — reads, parses, and extracts file data in parallel                                     |
+| `adapters/`       | `LanguageAdapter` types and built-in TS/CSS/text implementations                                                  |
+| `parsed-types.ts` | Shared `ParsedFile` shape for workers and adapters                                                                |
+| `agents-init.ts`  | `codemap agents init` — copies `templates/agents` → `.agents/`                                                    |
+| `benchmark.ts`    | SQL vs traditional timing script — see [benchmark.md § The benchmark script](./benchmark.md#the-benchmark-script) |
 
 ## CLI usage
 

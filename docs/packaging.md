@@ -1,64 +1,37 @@
 # Packaging
 
-How **@stainless-code/codemap** is built and consumed on npm.
+How **@stainless-code/codemap** is built and published. Hub: [README.md](./README.md).
 
-## Build output
+## Build & publish surface
 
-- **`bun run build`** runs **tsdown** (see `tsdown.config.ts`).
-- Artifacts **`dist/`**: main **`index.mjs`** (small entry), **`index.d.mts`**, **worker** chunks (`parse-worker*.mjs`), shared chunks (**`config-*`**, **`parser-*`**, …), and **lazy CLI** chunks (**`cmd-index-*`**, **`cmd-query-*`**, **`cmd-agents-*`**, …) emitted from **`import()`** in **`src/cli/main.ts`**.
-- **`prepublishOnly`** runs the build so publishes always include fresh `dist/` (publish **`files`** is **`dist`** + **`templates`** — all chunks ship together).
+- **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs build.
+- **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`["dist", "templates"]`** — no `src/` on npm.
 
-## Entry points
+## Consuming locally
 
-| Surface             | Location                                                                                                                                                                                      |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CLI**             | `package.json` → `"bin": { "codemap": "./dist/index.mjs" }` — same file as the library entry; **shebang** prepended at build time (tsdown `banner`) for `npx` / `node_modules/.bin`.          |
-| **Library**         | `"exports"` / `"main"` / `"types"` → **`./dist/index.mjs`** and **`./dist/index.d.mts`** — `createCodemap`, `Codemap`, `defineConfig`, config types, `runCodemapIndex`, adapter helpers, etc. |
-| **Published files** | `package.json` → `"files": ["dist", "templates"]` — `src/` is not published; **`templates/agents`** supports `codemap agents init`.                                                           |
+Tarballs contain **`dist/`** + **`templates/`** only. **`bun run pack`**, then point the consumer at **`file:…/stainless-code-codemap-*.tgz`**, or use **`file:/path/to/repo`** after build, or **`bun link`**. If **`better-sqlite3`** fails in the consumer, **`npm rebuild better-sqlite3`** (native addon must match that Node).
 
-## Local testing (another repo)
-
-Published content is only **`dist/`** and **`templates/`** (`package.json` → `"files"`). There is **no `src/`** in the tarball.
-
-1. **Fresh tarball:** from this repo run **`bun run pack`** (or **`bun run build`** then **`npm pack`**) → `stainless-code-codemap-0.0.0.tgz`.
-2. **Consumer `package.json`:** `"@stainless-code/codemap": "file:/absolute/path/to/stainless-code-codemap-0.0.0.tgz"` (or a correct **relative** `file:` path from that app’s `package.json`).
-3. **Reinstall** in the consumer (`rm -rf node_modules` + install) after changing or replacing the `.tgz`.
-
-**Alternatives:** `file:/path/to/codemap/repo` (directory, after **`bun run build`**), or **`bun link`** in this repo then **`bun link @stainless-code/codemap`** in the consumer.
-
-Run the CLI via **`./node_modules/.bin/codemap`** or **`bunx codemap`** so you don’t accidentally use a global binary. If **`better-sqlite3`** fails to load, run **`npm rebuild better-sqlite3`** in the consumer (native addon must match that project’s Node).
-
-## Install
-
-- **npm / pnpm / yarn / bun** install the package; **Node ≥20** and/or **Bun ≥1.1** (`engines` in `package.json`).
+**Engines** (`package.json`): **Node** `^20.19.0 || >=22.12.0` (matches **`oxc-parser`**; **`better-sqlite3`** is prebuilt for current Node majors only). **Bun** `>=1.0.0`. **Native bindings:** `better-sqlite3`, `lightningcss`, `oxc-parser`, `oxc-resolver` (NAPI); **`fast-glob`** is JS-only.
 
 ## Node vs Bun
 
-One schema and SQL surface; backend is chosen in **`src/sqlite-db.ts`**: **`better-sqlite3`** on Node, **`bun:sqlite`** on Bun. **`src/db.ts`** does not import `bun:sqlite` directly. Workers: **`src/worker-pool.ts`** (Bun `Worker` vs Node `worker_threads`). More detail: [architecture.md § Runtime and database](./architecture.md#runtime-and-database). Bun’s **`bun:sqlite`** API (constructors, options): [bun-reference.md](./bun-reference.md).
+Same schema and CLI; implementation differs by runtime. Details: [architecture.md § Runtime and database](./architecture.md#runtime-and-database).
 
-**Multi-statement `run()`:** **`better-sqlite3`** allows **one statement per `prepare()`**. **`bun:sqlite`** accepts **several statements** in one call. Codemap’s **`runSql()`** splits multi-statement strings on **`;`** when running on **Node** only. Avoid **`;`** inside **`--` SQL line comments** in **`db.ts`** DDL (a comment like `PK;` would split incorrectly). [architecture.md § Runtime and database](./architecture.md#runtime-and-database).
+| Concern       | Bun                               | Node                                          |
+| ------------- | --------------------------------- | --------------------------------------------- |
+| SQLite        | **`bun:sqlite`** (`sqlite-db.ts`) | **`better-sqlite3`**                          |
+| Workers       | **`Worker`** → `parse-worker.ts`  | **`worker_threads`** → `parse-worker-node.ts` |
+| Include globs | **`Glob`** (`glob-sync.ts`)       | **`fast-glob`**                               |
+| JSON config   | **`Bun.file(…).json()`**          | **`readFile` + `JSON.parse`** (`config.ts`)   |
 
-**Checking both runtimes** after **`bun run build`**: run the same commands with **`node dist/index.mjs …`** and **`bun dist/index.mjs …`** (e.g. **`--version`**, **`query "SELECT 1"`**, **`CODEMAP_ROOT=fixtures/minimal`** **`--full`**). Startup and **`console.table`** formatting may differ; row counts and index stats should match.
+**`db.ts`** does not import **`bun:sqlite`**. Upstream API: [Bun SQLite](https://bun.com/docs/api/sqlite). No **`bun build --compile`** shipping — see [Bun executables](https://bun.sh/docs/bundler/executables).
 
-**Speed (indicative, same machine — not a spec):** Bun is often **~1.5×** faster than Node for **`--version`** and short **`query`** (process startup + loading **`dist/`**). A **`fixtures/minimal`** **`--full`** rebuild is often **~2×** faster on Bun by median wall time; first runs can be noisier. Large-app full rebuilds follow the same idea but scale with tree size and I/O.
-
-| Track        | Where                                                                                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CI**       | After build: `node dist/index.mjs query "SELECT 1"`; then **`CODEMAP_ROOT=fixtures/minimal`** `node dist/index.mjs --full` + query ([`ci.yml`](../.github/workflows/ci.yml)). |
-| **Optional** | Extra matrix (more Node versions, Bun smoke); changelog note if **`engines`** or SQLite stack changes.                                                                        |
+**`runSql()`:** **`better-sqlite3`** is one statement per prepare; **`bun:sqlite`** accepts multiple. On Node only, **`runSql()`** splits on **`;`**. Do not put **`;`** inside **`--`** line comments in **`db.ts`** DDL.
 
 ## Releases
 
-Versioning and **`CHANGELOG.md`** use [**Changesets**](https://github.com/changesets/changesets). Changelog entries are generated with [**`@changesets/changelog-github`**](https://github.com/changesets/changesets/tree/main/packages/changelog-github) (links to PRs/commits on **`stainless-code/codemap`**). The release workflow passes **`GITHUB_TOKEN`** so `changeset version` can resolve those links in CI. For **`changeset version` locally**, set **`GITHUB_TOKEN`** (e.g. a [fine-grained PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token)) if you want the same links in the generated changelog.
-
-1. **`bun run changeset`** — describe the change and semver bump; commit the generated file under **`.changeset/`**.
-2. Merge the PR — on **`main`**, [`.github/workflows/release.yml`](../.github/workflows/release.yml) opens a **Version packages** PR (or publishes if versions are ready).
-3. **`bun run release`** — runs **`changeset publish`** (used by CI). **`prepublishOnly`** runs **`bun run build`** before publish.
-
-**GitHub Releases:** [`.github/workflows/release.yml`](../.github/workflows/release.yml) uses [`changesets/action`](https://github.com/changesets/action) with **`createGithubReleases: true`**, so a **GitHub Release** is created for each published package version when **`changeset publish`** succeeds (same step as npm publish).
-
-**npm from CI:** add an **`NPM_TOKEN`** [repository secret](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions). Without it, the Version PR can still be opened/updated, but **npm publish (and thus GitHub Release creation) will not run** for that publish step.
+[**Changesets**](https://github.com/changesets/changesets): **`bun run changeset`** → commit **`.changeset/`** → merge → [release workflow](../.github/workflows/release.yml) versions / publishes. **`bun run release`** runs **`changeset publish`** (CI uses it too). Needs **`NPM_TOKEN`** (and typically **`GITHUB_TOKEN`**) as repo secrets for publish and changelog links.
 
 ## Related
 
-- [architecture.md](./architecture.md) — schema, layering, CLI, programmatic API.
+- [architecture.md](./architecture.md) — schema, layering, API.
