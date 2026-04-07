@@ -29,7 +29,7 @@ export async function main(): Promise<void> {
       console.log(`Usage: codemap agents init [--force] [--interactive|-i]
 
 Copies bundled agent templates into .agents/ under the project root.
-  --force        Overwrite an existing .agents/ directory
+  --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
   --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
 `);
       return;
@@ -43,11 +43,16 @@ Copies bundled agent templates into .agents/ under the project root.
       "-h",
     ]);
     for (const a of initRest) {
-      if (a.startsWith("-") && !knownInit.has(a)) {
-        console.error(`codemap: unknown option "${a}"`);
-        console.error("Run codemap agents init --help for usage.");
-        process.exit(1);
+      if (knownInit.has(a)) {
+        continue;
       }
+      if (a.startsWith("-")) {
+        console.error(`codemap: unknown option "${a}"`);
+      } else {
+        console.error(`codemap: unexpected argument "${a}"`);
+      }
+      console.error("Run codemap agents init --help for usage.");
+      process.exit(1);
     }
     const { runAgentsInitCmd } = await import("./cmd-agents.js");
     const ok = await runAgentsInitCmd({

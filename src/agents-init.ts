@@ -1,10 +1,12 @@
 import {
   appendFileSync,
-  cpSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -23,12 +25,89 @@ export function resolveAgentsTemplateDir(): string {
   );
 }
 
+/**
+ * Every regular file path under `dir` relative to `dir` (POSIX-style `/`).
+ * Used for template paths (`--force` removal), template writes, and copy-mode IDE sync.
+ */
+export function listRegularFilesRecursive(
+  dir: string,
+  relPrefix = "",
+): string[] {
+  const out: string[] = [];
+  if (!existsSync(dir)) {
+    return out;
+  }
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    const name = ent.name;
+    const rel = relPrefix ? `${relPrefix}/${name}` : name;
+    const full = join(dir, name);
+    if (ent.isDirectory()) {
+      out.push(...listRegularFilesRecursive(full, rel));
+    } else if (ent.isFile()) {
+      out.push(rel);
+    }
+  }
+  return out;
+}
+
+function relPathToAbsSegments(rel: string): string[] {
+  return rel.split("/").filter(Boolean);
+}
+
+/** Copy only listed relative paths from `srcRoot` into `destRoot` (mkdir parents per file). */
+function copyFilesGranular(
+  srcRoot: string,
+  destRoot: string,
+  relPaths: string[],
+): void {
+  for (const rel of relPaths) {
+    const from = join(srcRoot, ...relPathToAbsSegments(rel));
+    const to = join(destRoot, ...relPathToAbsSegments(rel));
+    mkdirSync(dirname(to), { recursive: true });
+    copyFileSync(from, to);
+  }
+}
+
+/** Symlink each file: `destRoot/<rel>` → relative path to `srcRoot/<rel>` (mkdir parents per file). */
+function symlinkFilesGranular(
+  srcRoot: string,
+  destRoot: string,
+  relPaths: string[],
+  labelForErrors: string,
+): void {
+  mkdirSync(destRoot, { recursive: true });
+  for (const rel of relPaths) {
+    const srcFile = join(srcRoot, ...relPathToAbsSegments(rel));
+    const destFile = join(destRoot, ...relPathToAbsSegments(rel));
+    mkdirSync(dirname(destFile), { recursive: true });
+    const target = relative(dirname(destFile), srcFile);
+    try {
+      symlinkSync(target, destFile, "file");
+    } catch (err) {
+      throw new Error(
+        `Codemap: symlink failed for ${labelForErrors} (${destFile}): ${String(err)}. Try copy mode or check permissions on Windows.`,
+        { cause: err },
+      );
+    }
+  }
+}
+
+function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
+  for (const rel of relPaths) {
+    const abs = join(destBase, ...relPathToAbsSegments(rel));
+    if (!existsSync(abs)) {
+      continue;
+    }
+    rmSync(abs, { recursive: true, force: true });
+  }
+}
+
 /** Default DB basename `.codemap` plus SQLite sidecars (`.db`, `-wal`, `-shm`, …). */
 const GITIGNORE_CODEMAP_PATTERN = ".codemap.*";
 
 /**
  * Optional integrations after canonical `.agents/` is written.
- * - Symlink/copy: `cursor`, `windsurf`, `continue`, `cline`, `amazon-q` (rules → `.agents/rules`; Cursor also maps skills).
+ * - Symlink/copy: `cursor`, `windsurf`, `continue`, `cline`, `amazon-q` (per-file symlinks or copies from `.agents/rules`; Cursor also `.agents/skills`).
  * - Pointer files: `copilot`, `claude-md`, `agents-md`, `gemini-md`.
  */
 export type AgentsInitTarget =
@@ -42,7 +121,7 @@ export type AgentsInitTarget =
   | "agents-md"
   | "gemini-md";
 
-/** Targets that mirror `.agents/rules` (and Cursor also `.agents/skills`) via symlink or copy. */
+/** Targets that mirror `.agents/rules` (and Cursor also `.agents/skills`) via per-file symlink or copy. */
 export const AGENTS_INIT_SYMLINK_TARGETS: readonly AgentsInitTarget[] = [
   "cursor",
   "windsurf",
@@ -55,7 +134,7 @@ export function targetsNeedLinkMode(targets: AgentsInitTarget[]): boolean {
   return targets.some((t) => AGENTS_INIT_SYMLINK_TARGETS.includes(t));
 }
 
-/** How symlink-style integrations receive `.agents` rules (and Cursor skills). */
+/** Per-file symlinks vs full file copies into IDE paths. */
 export type AgentsInitLinkMode = "symlink" | "copy";
 
 const POINTER_BODY = `This project uses [Codemap](https://github.com/stainless-code/codemap) — a structural SQLite index for AI agents.
@@ -89,10 +168,96 @@ See [GitHub Docs: custom instructions for Copilot](https://docs.github.com/copil
 
 `;
 
+/** HTML comments — invisible in most Markdown renderers; used to upsert without duplicating on re-run. */
+export const CODMAP_POINTER_BEGIN = "<!-- codemap-pointer:begin -->";
+export const CODMAP_POINTER_END = "<!-- codemap-pointer:end -->";
+
+function wrapCodemapPointerBlock(inner: string): string {
+  return `${CODMAP_POINTER_BEGIN}\n${inner.trim()}\n${CODMAP_POINTER_END}\n`;
+}
+
+function escapeRegexChars(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function codemapPointerBlockRegex(): RegExp {
+  return new RegExp(
+    `${escapeRegexChars(CODMAP_POINTER_BEGIN)}\\s*[\\s\\S]*?${escapeRegexChars(CODMAP_POINTER_END)}`,
+    "m",
+  );
+}
+
+/** Heuristic: file looks like a prior Codemap pointer file before we added markers (upgrade → single managed block). */
+function looksLikeLegacyCodemapPointer(content: string): boolean {
+  const t = content.trim();
+  if (t.length < 80) {
+    return false;
+  }
+  return (
+    t.includes("stainless-code/codemap") &&
+    t.includes(".agents/skills/codemap") &&
+    t.includes("codemap query")
+  );
+}
+
+/**
+ * Create or merge a Codemap pointer file. Idempotent: managed section is between
+ * {@link CODMAP_POINTER_BEGIN} / {@link CODMAP_POINTER_END}; re-runs replace that section only.
+ * - **No file:** write managed block.
+ * - **Existing + markers:** replace inner section (updates stale template text).
+ * - **Existing, no markers, legacy Codemap content:** replace whole file with managed block.
+ * - **Existing, other content:** append managed block once.
+ * - **`force`:** replace entire file with the latest managed block (same as a fresh write).
+ */
+export function upsertCodemapPointerFile(
+  path: string,
+  innerTemplate: string,
+  label: string,
+  force: boolean,
+): void {
+  const wrapped = wrapCodemapPointerBlock(innerTemplate);
+
+  if (!existsSync(path)) {
+    writeFileSync(path, wrapped, "utf-8");
+    console.log(`  Wrote ${label} with Codemap pointers`);
+    return;
+  }
+
+  if (force) {
+    writeFileSync(path, wrapped, "utf-8");
+    console.log(`  Replaced ${label} (--force)`);
+    return;
+  }
+
+  const content = readFileSync(path, "utf-8");
+  const re = codemapPointerBlockRegex();
+
+  if (content.match(re)) {
+    const next = content.replace(re, wrapped);
+    if (next === content) {
+      console.log(`  Codemap section in ${label} already up to date`);
+      return;
+    }
+    writeFileSync(path, next, "utf-8");
+    console.log(`  Updated Codemap section in ${label}`);
+    return;
+  }
+
+  if (looksLikeLegacyCodemapPointer(content)) {
+    writeFileSync(path, wrapped, "utf-8");
+    console.log(`  Migrated ${label} to managed Codemap section`);
+    return;
+  }
+
+  const sep = content.endsWith("\n") ? "\n" : "\n\n";
+  writeFileSync(path, content + sep + wrapped, "utf-8");
+  console.log(`  Appended Codemap section to ${label}`);
+}
+
 export interface AgentsInitOptions {
   /** Project root (`.agents/` is created here). */
   projectRoot: string;
-  /** Overwrite existing files. */
+  /** When `.agents/` exists, replace only files that ship in `templates/agents` (and allow integration overwrites per target). */
   force?: boolean;
   /** Extra tool integrations (after `.agents/` is written). */
   targets?: AgentsInitTarget[];
@@ -166,19 +331,15 @@ function wireAgentsRulesTo(
   mkdirSync(dirname(destPath), { recursive: true });
   removePathForRewrite(destPath, force, label);
   if (linkMode === "symlink") {
-    const rel = relative(dirname(destPath), agentsRules);
-    try {
-      symlinkSync(rel, destPath, "dir");
-    } catch (err) {
-      throw new Error(
-        `Codemap: symlink failed for ${label} (${String(err)}). Try copy mode or check permissions on Windows.`,
-        { cause: err },
-      );
-    }
-    console.log(`  Linked ${label} → .agents/rules`);
+    const ruleFiles = listRegularFilesRecursive(agentsRules);
+    symlinkFilesGranular(agentsRules, destPath, ruleFiles, label);
+    console.log(
+      `  Linked each file under ${label} → .agents/rules (${ruleFiles.length} files)`,
+    );
     return;
   }
-  cpSync(agentsRules, destPath, { recursive: true });
+  const ruleFiles = listRegularFilesRecursive(agentsRules);
+  copyFilesGranular(agentsRules, destPath, ruleFiles);
   console.log(`  Copied .agents/rules → ${label}`);
 }
 
@@ -241,7 +402,7 @@ export function applyAgentsInitTargets(
         );
         break;
       case "claude-md":
-        writePointerFile(
+        upsertCodemapPointerFile(
           join(projectRoot, "CLAUDE.md"),
           CLAUDE_MD_TEMPLATE,
           "CLAUDE.md",
@@ -250,7 +411,7 @@ export function applyAgentsInitTargets(
         break;
       case "copilot":
         mkdirSync(join(projectRoot, ".github"), { recursive: true });
-        writePointerFile(
+        upsertCodemapPointerFile(
           join(projectRoot, ".github", "copilot-instructions.md"),
           COPILOT_TEMPLATE,
           ".github/copilot-instructions.md",
@@ -258,7 +419,7 @@ export function applyAgentsInitTargets(
         );
         break;
       case "agents-md":
-        writePointerFile(
+        upsertCodemapPointerFile(
           join(projectRoot, "AGENTS.md"),
           AGENTS_MD_TEMPLATE,
           "AGENTS.md",
@@ -266,7 +427,7 @@ export function applyAgentsInitTargets(
         );
         break;
       case "gemini-md":
-        writePointerFile(
+        upsertCodemapPointerFile(
           join(projectRoot, "GEMINI.md"),
           GEMINI_MD_TEMPLATE,
           "GEMINI.md",
@@ -275,22 +436,6 @@ export function applyAgentsInitTargets(
         break;
     }
   }
-}
-
-function writePointerFile(
-  path: string,
-  content: string,
-  label: string,
-  force: boolean,
-): void {
-  if (existsSync(path) && !force) {
-    console.warn(
-      `  Skipped ${label} (file exists). Use --force to overwrite, or merge manually.`,
-    );
-    return;
-  }
-  writeFileSync(path, content, "utf-8");
-  console.log(`  Wrote ${label} with Codemap pointers`);
 }
 
 function applyCursorIntegration(
@@ -308,34 +453,41 @@ function applyCursorIntegration(
   if (linkMode === "symlink") {
     removePathForRewrite(cursorRules, force, ".cursor/rules");
     removePathForRewrite(cursorSkills, force, ".cursor/skills");
-    const relRules = relative(dirname(cursorRules), agentsRules);
-    const relSkills = relative(dirname(cursorSkills), agentsSkills);
-    try {
-      symlinkSync(relRules, cursorRules, "dir");
-      symlinkSync(relSkills, cursorSkills, "dir");
-    } catch (err) {
-      throw new Error(
-        `Codemap: symlink failed for Cursor integration (${String(err)}). Try re-running with copy mode or check permissions on Windows.`,
-        { cause: err },
-      );
-    }
+    const ruleFiles = listRegularFilesRecursive(agentsRules);
+    const skillFiles = listRegularFilesRecursive(agentsSkills);
+    symlinkFilesGranular(agentsRules, cursorRules, ruleFiles, ".cursor/rules");
+    symlinkFilesGranular(
+      agentsSkills,
+      cursorSkills,
+      skillFiles,
+      ".cursor/skills",
+    );
     console.log(
-      "  Linked .cursor/rules → .agents/rules and .cursor/skills → .agents/skills",
+      `  Linked ${ruleFiles.length} rule file(s) and ${skillFiles.length} skill file(s) under .cursor/ → .agents/`,
     );
     return;
   }
 
   removePathForRewrite(cursorRules, force, ".cursor/rules");
   removePathForRewrite(cursorSkills, force, ".cursor/skills");
-  cpSync(agentsRules, cursorRules, { recursive: true });
-  cpSync(agentsSkills, cursorSkills, { recursive: true });
+  copyFilesGranular(
+    agentsRules,
+    cursorRules,
+    listRegularFilesRecursive(agentsRules),
+  );
+  copyFilesGranular(
+    agentsSkills,
+    cursorSkills,
+    listRegularFilesRecursive(agentsSkills),
+  );
   console.log(
     "  Copied rules and skills into .cursor/rules and .cursor/skills",
   );
 }
 
 /**
- * Copy bundled rules and skills into `<projectRoot>/.agents/`, optional integrations, `.gitignore` hint.
+ * Copy bundled `rules/` and `skills/` into `<projectRoot>/.agents/`, optional integrations, `.gitignore` hint.
+ * **`--force`** deletes only template-backed files, then writes those files again with per-file copies — your other files under **`.agents/`**, **`rules/`**, or **`skills/`** stay.
  * @returns `false` when `.agents/` exists and `--force` was not used.
  */
 export function runAgentsInit(options: AgentsInitOptions): boolean {
@@ -346,21 +498,35 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
     );
   }
 
+  const templateRules = join(templateRoot, "rules");
+  const templateSkills = join(templateRoot, "skills");
+  const bundledRuleFiles = listRegularFilesRecursive(templateRules);
+  const bundledSkillFiles = listRegularFilesRecursive(templateSkills);
+
   const destRoot = join(options.projectRoot, ".agents");
-  if (existsSync(destRoot) && !options.force) {
-    console.error(
-      `  .agents/ already exists at ${destRoot}. Re-run with --force to overwrite, or remove the directory.`,
-    );
-    return false;
+  const destRules = join(destRoot, "rules");
+  const destSkills = join(destRoot, "skills");
+
+  if (existsSync(destRoot)) {
+    if (!statSync(destRoot).isDirectory()) {
+      throw new Error(
+        `Codemap: ${destRoot} exists but is not a directory — remove or rename it, then retry.`,
+      );
+    }
+    if (!options.force) {
+      console.error(
+        `  .agents/ already exists at ${destRoot}. Re-run with --force to refresh bundled template files under rules/ and skills/, or remove the directory.`,
+      );
+      return false;
+    }
+    removeBundledPathsIfExist(destRules, bundledRuleFiles);
+    removeBundledPathsIfExist(destSkills, bundledSkillFiles);
+  } else {
+    mkdirSync(destRoot, { recursive: true });
   }
 
-  mkdirSync(destRoot, { recursive: true });
-  cpSync(join(templateRoot, "rules"), join(destRoot, "rules"), {
-    recursive: true,
-  });
-  cpSync(join(templateRoot, "skills"), join(destRoot, "skills"), {
-    recursive: true,
-  });
+  copyFilesGranular(templateRules, destRules, bundledRuleFiles);
+  copyFilesGranular(templateSkills, destSkills, bundledSkillFiles);
 
   console.log(`  Wrote agent templates to ${destRoot}`);
 

@@ -1,10 +1,10 @@
 # Agent templates and `codemap agents init`
 
-Hub: [README.md](./README.md). **Package layout:** [packaging.md](./packaging.md) (`templates/` on npm). **CLI layering:** [architecture.md § Key Files](./architecture.md#key-files).
+**Doc index:** [README.md](./README.md). **Package layout:** [packaging.md](./packaging.md) (`templates/` on npm). **CLI layering:** [architecture.md § Key Files](./architecture.md#key-files).
 
 ## What it does
 
-The published package ships **`templates/agents/`** (rules + skills; mirrored in this repo under [`.agents/`](../.agents/)). The command **`codemap agents init`** copies that tree into **`<project>/.agents/`** — the **canonical** copy consumers edit (SQL, team conventions, paths).
+The published package ships **`templates/agents/`** (rules + skills; mirrored in this repo under [`.agents/`](../.agents/)). The command **`codemap agents init`** writes each bundled file into **`<project>/.agents/`** with per-file copies (not a wholesale directory sync) — the **canonical** copy consumers edit (SQL, team conventions, paths).
 
 ```bash
 codemap agents init
@@ -12,7 +12,7 @@ codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
 ```
 
-- **`--force`** — replace an existing **`.agents/`** directory.
+- **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
 - **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **`.agents/rules`** (and Cursor also **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
 
 ## Git and `.gitignore`
@@ -30,30 +30,42 @@ All integrations reuse the **same** bundled content under **`.agents/`**. Symlin
 
 | Integration                           | What gets created                                          | Notes                                                                                                                               |
 | ------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → **`.agents/`** | Symlink or copy both trees.                                                                                                         |
+| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → **`.agents/`** | Per-file symlink or copy (each rule/skill file, not a directory link).                                                              |
 | **Windsurf**                          | **`.windsurf/rules`** → **`.agents/rules`**                | Rules only.                                                                                                                         |
 | **Continue**                          | **`.continue/rules`** → **`.agents/rules`**                | [Continue rules](https://docs.continue.dev/customize/rules).                                                                        |
-| **Cline**                             | **`.clinerules`** → **`.agents/rules`**                    | Directory symlink/copy.                                                                                                             |
+| **Cline**                             | **`.clinerules`** → **`.agents/rules`**                    | Per-file symlink or copy.                                                                                                           |
 | **Amazon Q**                          | **`.amazonq/rules`** → **`.agents/rules`**                 | [AWS rules](https://aws.amazon.com/blogs/devops/mastering-amazon-q-developer-with-rules/).                                          |
 | **GitHub Copilot**                    | **`.github/copilot-instructions.md`**                      | Pointer + link to [GitHub Docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot). |
 | **Claude Code**                       | **`CLAUDE.md`**                                            | Root onboarding pointer.                                                                                                            |
 | **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                            | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
 | **Gemini**                            | **`GEMINI.md`**                                            | For integrations that load **`GEMINI.md`**.                                                                                         |
 
-Pointer files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md`**, Copilot instructions) are **skipped** if the file already exists unless **`--force`** (then overwritten where applicable).
+## Pointer files
+
+Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md`**, **`.github/copilot-instructions.md`**) use a **managed section** between **`<!-- codemap-pointer:begin -->`** and **`<!-- codemap-pointer:end -->`** (HTML comments — usually hidden in rendered Markdown):
+
+| Situation                                                                    | Behavior                                                                                                      |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| File missing                                                                 | Write that section (with markers).                                                                            |
+| File exists, section present                                                 | **Replace only** that section — idempotent re-runs, no duplicate blocks; template updates fix **stale** text. |
+| File exists, no section, but content looks like an **old** Codemap-only file | **Replace whole file** with the managed section (one-time migration).                                         |
+| File exists with other content (e.g. your team intro)                        | **Append** the managed section **once**.                                                                      |
+| **`--force`**                                                                | Replace the **entire file** with the latest managed section.                                                  |
+
+Append alone would duplicate on every run — markers + replace are what prevent duplicates and staleness.
 
 ## Implementation (for contributors)
 
-| Source                               | Role                                                                                                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`src/agents-init.ts`**             | Copy **`templates/agents`** → **`.agents/`**, **`applyAgentsInitTargets`**, **`ensureGitignoreCodemapPattern`**, exported **`targetsNeedLinkMode`**. |
-| **`src/agents-init-interactive.ts`** | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                |
-| **`src/cli/cmd-agents.ts`**          | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                              |
+| Source                               | Role                                                                                                                                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`src/agents-init.ts`**             | **`runAgentsInit`**, **`upsertCodemapPointerFile`**, **`listRegularFilesRecursive`**, **`applyAgentsInitTargets`** (per-file **`copyFileSync`** / **`symlinkFilesGranular`**), **`ensureGitignoreCodemapPattern`**, **`targetsNeedLinkMode`**. |
+| **`src/agents-init-interactive.ts`** | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                                                                                                          |
+| **`src/cli/cmd-agents.ts`**          | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                                                                                                                        |
 
-Do **not** duplicate long IDE matrices in **README.md** or **packaging.md** — link **here** instead.
+Do **not** duplicate long IDE matrices, **`--force`** / pointer behavior, or **`codemap-pointer`** details in **README.md** or **packaging.md** — link **here** instead.
 
 ## Related
 
 - [architecture.md](./architecture.md) — CLI chunks, layering.
-- [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md) — Cursor symlink notes, **`main`** / PR workflow.
+- [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md) — **`.agents/`** + **`.cursor/`** wiring, **`main`** / PR workflow.
 - [why-codemap.md](./why-codemap.md) — why SQL + index for agents.

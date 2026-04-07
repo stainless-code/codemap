@@ -76,4 +76,11 @@ describe("CLI unknown / invalid args", () => {
     expect(exitCode).toBe(1);
     expect(err).toContain("unexpected argument");
   });
+
+  test("agents init rejects positional argument (use --interactive)", async () => {
+    const { exitCode, err } = await runCli(["agents", "init", "interactive"]);
+    expect(exitCode).toBe(1);
+    expect(err).toContain("unexpected argument");
+    expect(err).toContain("interactive");
+  });
 });

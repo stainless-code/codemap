@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,10 +12,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  CODMAP_POINTER_BEGIN,
+  CODMAP_POINTER_END,
   ensureGitignoreCodemapPattern,
+  listRegularFilesRecursive,
   resolveAgentsTemplateDir,
   runAgentsInit,
   targetsNeedLinkMode,
+  upsertCodemapPointerFile,
 } from "./agents-init";
 
 describe("runAgentsInit", () => {
@@ -34,6 +39,51 @@ describe("runAgentsInit", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("runAgentsInit with --force refreshes only template file paths; user files under rules/ and skills/ remain", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
+      mkdirSync(join(dir, ".agents", "skills", "stale"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER_NOTES.md"), "keep me", "utf-8");
+      writeFileSync(
+        join(dir, ".agents", "rules", "stale.txt"),
+        "user rule",
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".agents", "skills", "stale", "SKILL.md"),
+        "user skill",
+        "utf-8",
+      );
+      expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
+      expect(readFileSync(join(dir, ".agents", "USER_NOTES.md"), "utf-8")).toBe(
+        "keep me",
+      );
+      expect(
+        readFileSync(join(dir, ".agents", "rules", "stale.txt"), "utf-8"),
+      ).toBe("user rule");
+      expect(
+        readFileSync(
+          join(dir, ".agents", "skills", "stale", "SKILL.md"),
+          "utf-8",
+        ),
+      ).toBe("user skill");
+      expect(
+        readFileSync(join(dir, ".agents", "rules", "codemap.mdc"), "utf-8"),
+      ).toContain("codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("listRegularFilesRecursive matches bundled rules and skills files", () => {
+    const root = resolveAgentsTemplateDir();
+    const rules = listRegularFilesRecursive(join(root, "rules")).sort();
+    const skills = listRegularFilesRecursive(join(root, "skills")).sort();
+    expect(rules).toContain("codemap.mdc");
+    expect(skills).toContain("codemap/SKILL.md");
   });
 
   it("returns false when .agents exists without force", () => {
@@ -146,6 +196,46 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit with Cursor symlink creates per-file symlinks, not directory symlinks", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      expect(
+        runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "symlink",
+        }),
+      ).toBe(true);
+      const rulesDir = join(dir, ".cursor", "rules");
+      const skillsDir = join(dir, ".cursor", "skills");
+      expect(lstatSync(rulesDir).isSymbolicLink()).toBe(false);
+      expect(lstatSync(skillsDir).isSymbolicLink()).toBe(false);
+      expect(lstatSync(rulesDir).isDirectory()).toBe(true);
+      expect(lstatSync(skillsDir).isDirectory()).toBe(true);
+      for (const rel of listRegularFilesRecursive(
+        join(dir, ".agents", "rules"),
+      )) {
+        expect(
+          lstatSync(
+            join(dir, ".cursor", "rules", ...rel.split("/")),
+          ).isSymbolicLink(),
+        ).toBe(true);
+      }
+      for (const rel of listRegularFilesRecursive(
+        join(dir, ".agents", "skills"),
+      )) {
+        expect(
+          lstatSync(
+            join(dir, ".cursor", "skills", ...rel.split("/")),
+          ).isSymbolicLink(),
+        ).toBe(true);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runAgentsInit with claude-md writes CLAUDE.md", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
@@ -156,9 +246,10 @@ describe("runAgentsInit", () => {
           targets: ["claude-md"],
         }),
       ).toBe(true);
-      expect(readFileSync(join(dir, "CLAUDE.md"), "utf-8")).toContain(
-        "Codemap",
-      );
+      const md = readFileSync(join(dir, "CLAUDE.md"), "utf-8");
+      expect(md).toContain("Codemap");
+      expect(md).toContain(CODMAP_POINTER_BEGIN);
+      expect(md).toContain(CODMAP_POINTER_END);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -185,10 +276,10 @@ describe("runAgentsInit", () => {
         readFileSync(join(dir, ".github", "copilot-instructions.md"), "utf-8"),
       ).toContain("Copilot");
       expect(readFileSync(join(dir, "AGENTS.md"), "utf-8")).toContain(
-        "Codemap",
+        CODMAP_POINTER_BEGIN,
       );
       expect(readFileSync(join(dir, "GEMINI.md"), "utf-8")).toContain(
-        "Codemap",
+        CODMAP_POINTER_BEGIN,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -227,6 +318,94 @@ describe("runAgentsInit", () => {
           linkMode: "copy",
         }),
       ).toThrow(/\.cursor\/rules already exists/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+/** Minimal inner block for pointer tests (matches legacy migration heuristic). */
+const POINTER_INNER_TEST = `# Codemap
+
+This project uses [Codemap](https://github.com/stainless-code/codemap) — test.
+
+- **Skill:** \`.agents/skills/codemap/SKILL.md\`
+- **CLI:** \`codemap query "SELECT 1"\` for SQL
+- **Rules:** \`.agents/rules/\`
+`;
+
+function wrapPointerTest(inner: string): string {
+  return `${CODMAP_POINTER_BEGIN}\n${inner.trim()}\n${CODMAP_POINTER_END}\n`;
+}
+
+describe("upsertCodemapPointerFile", () => {
+  it("appends managed section to existing non-Codemap file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
+    const p = join(dir, "AGENTS.md");
+    try {
+      writeFileSync(p, "# Team\n\nOur project.\n", "utf-8");
+      upsertCodemapPointerFile(p, POINTER_INNER_TEST, "AGENTS.md", false);
+      const out = readFileSync(p, "utf-8");
+      expect(out).toContain("# Team");
+      expect(out).toContain("Our project.");
+      expect(out).toContain(CODMAP_POINTER_BEGIN);
+      expect(out.indexOf("# Team")).toBeLessThan(
+        out.indexOf(CODMAP_POINTER_BEGIN),
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces managed section in place on second run (no duplicate blocks)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
+    const p = join(dir, "NOTE.md");
+    try {
+      writeFileSync(p, wrapPointerTest("FIRST"), "utf-8");
+      upsertCodemapPointerFile(
+        p,
+        "SECOND\n\nstill https://github.com/stainless-code/codemap\n`.agents/skills/codemap`\n`codemap query`",
+        "NOTE.md",
+        false,
+      );
+      const out = readFileSync(p, "utf-8");
+      expect(out).toContain("SECOND");
+      expect(out).not.toContain("FIRST");
+      expect(out.match(new RegExp(CODMAP_POINTER_BEGIN, "g"))?.length).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates legacy unmarked Codemap pointer file to managed section", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
+    const p = join(dir, "CLAUDE.md");
+    try {
+      writeFileSync(p, POINTER_INNER_TEST, "utf-8");
+      upsertCodemapPointerFile(
+        p,
+        `${POINTER_INNER_TEST}\n\n## Extra\n\nMigrated.\n`,
+        "CLAUDE.md",
+        false,
+      );
+      const out = readFileSync(p, "utf-8");
+      expect(out).toContain(CODMAP_POINTER_BEGIN);
+      expect(out).toContain("Migrated.");
+      expect(out).not.toContain(`${POINTER_INNER_TEST}\n${POINTER_INNER_TEST}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("--force replaces entire file with managed section", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
+    const p = join(dir, "AGENTS.md");
+    try {
+      writeFileSync(p, "# Keep me\n\nLots of custom content.\n", "utf-8");
+      upsertCodemapPointerFile(p, POINTER_INNER_TEST, "AGENTS.md", true);
+      expect(readFileSync(p, "utf-8")).toBe(
+        wrapPointerTest(POINTER_INNER_TEST),
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

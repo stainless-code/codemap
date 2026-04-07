@@ -5,7 +5,7 @@
 - **Not** full-text search or grep on arbitrary strings — use those when you need raw file-body search.
 - **Is** a fast, token-efficient way to navigate **structure**: definitions, imports, dependency direction, components, and other extracted facts.
 
-**Documentation:** [docs/README.md](docs/README.md) indexes technical docs (architecture, **[`docs/agents.md`](docs/agents.md)** for `codemap agents init`, packaging, roadmap, benchmarks). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+**Documentation:** [docs/README.md](docs/README.md) is the hub (topic index + single-source rules). Topics: [architecture](docs/architecture.md), [agents](docs/agents.md) (`codemap agents init`), [benchmark](docs/benchmark.md), [packaging](docs/packaging.md), [roadmap](docs/roadmap.md), [why Codemap](docs/why-codemap.md). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ---
 
