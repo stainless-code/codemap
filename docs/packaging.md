@@ -5,8 +5,8 @@ How **@stainless-code/codemap** is built and consumed on npm.
 ## Build output
 
 - **`bun run build`** runs **tsdown** (see `tsdown.config.ts`).
-- Artifacts **`dist/`**: main bundle **`index.mjs`**, declaration **`index.d.mts`**, and **worker** chunks (`parse-worker*.mjs`) used by the indexer.
-- **`prepublishOnly`** runs the build so publishes always include fresh `dist/`.
+- Artifacts **`dist/`**: main **`index.mjs`** (small entry), **`index.d.mts`**, **worker** chunks (`parse-worker*.mjs`), shared chunks (**`config-*`**, **`parser-*`**, …), and **lazy CLI** chunks (**`cmd-index-*`**, **`cmd-query-*`**, **`cmd-agents-*`**, …) emitted from **`import()`** in **`src/cli/main.ts`**.
+- **`prepublishOnly`** runs the build so publishes always include fresh `dist/` (publish **`files`** is **`dist`** + **`templates`** — all chunks ship together).
 
 ## Entry points
 
@@ -35,6 +35,10 @@ Run the CLI via **`./node_modules/.bin/codemap`** or **`bunx codemap`** so you d
 ## Node vs Bun
 
 One schema and SQL surface; backend is chosen in **`src/sqlite-db.ts`**: **`better-sqlite3`** on Node, **`bun:sqlite`** on Bun. **`src/db.ts`** does not import `bun:sqlite` directly. Workers: **`src/worker-pool.ts`** (Bun `Worker` vs Node `worker_threads`). More detail: [architecture.md § Runtime and database](./architecture.md#runtime-and-database). Bun’s **`bun:sqlite`** API (constructors, options): [bun-reference.md](./bun-reference.md).
+
+**Multi-statement `run()`:** **`better-sqlite3`** allows **one statement per `prepare()`**. **`bun:sqlite`** accepts **several statements** in one call. Codemap’s **`runSql()`** splits multi-statement strings on **`;`** when running on **Node** only. Avoid **`;`** inside **`--` SQL line comments** in **`db.ts`** DDL (a comment like `PK;` would split incorrectly). [architecture.md § Runtime and database](./architecture.md#runtime-and-database).
+
+**Checking both runtimes** after **`bun run build`**: run the same commands with **`node dist/index.mjs …`** and **`bun dist/index.mjs …`** (e.g. **`--version`**, **`query "SELECT 1"`**, **`CODEMAP_ROOT=fixtures/minimal`** **`--full`**). Startup and **`console.table`** formatting may differ; row counts and index stats should match.
 
 | Track        | Where                                                                                                  |
 | ------------ | ------------------------------------------------------------------------------------------------------ |

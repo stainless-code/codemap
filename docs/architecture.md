@@ -6,7 +6,9 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 ### Runtime and database
 
-**`src/sqlite-db.ts`:** Node uses **`better-sqlite3`**; Bun uses **`bun:sqlite`**. Same schema everywhere. **`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **Shipped artifact:** **`dist/`** — `package.json` **`bin`** and **`exports`** both point at **`dist/index.mjs`** ([packaging.md](./packaging.md)). Node/Bun matrix notes: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
+**`src/sqlite-db.ts`:** Node uses **`better-sqlite3`**; Bun uses **`bun:sqlite`**. Same schema everywhere. **`better-sqlite3`** allows **one SQL statement per `prepare()`**; **`bun:sqlite`** accepts **multiple statements** in one `run()`. On Node, **`runSql()`** splits multi-statement strings on **`;`** and runs each fragment. Do **not** put **`;`** inside **`--` line comments** in **`db.ts`** DDL strings (naive split would break). Details: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
+
+**`src/worker-pool.ts`:** Bun `Worker` or Node `worker_threads`. **Shipped artifact:** **`dist/`** — `package.json` **`bin`** and **`exports`** both point at **`dist/index.mjs`** ([packaging.md](./packaging.md)); tsdown also emits **lazy CLI chunks** (`cmd-index`, `cmd-query`, `cmd-agents`, …) loaded via **`import()`** from **`src/cli/main.ts`**.
 
 ## Layering
 
@@ -123,7 +125,11 @@ codemap --full
 codemap query "SELECT name, file_path FROM symbols LIMIT 20"
 ```
 
-Timings and methodology: [benchmark.md](./benchmark.md).
+Timings and methodology: [benchmark.md](./benchmark.md). **Startup / Node vs Bun** (not the same as benchmark scenarios): [benchmark.md § CLI and runtime startup](./benchmark.md#cli-and-runtime-startup).
+
+### Help, version, and invalid argv
+
+**`--help`** / **`-h`**, **`version`** / **`--version`** / **`-V`** are handled in **`src/cli/bootstrap.ts`** / **`src/cli/main.ts`** before config or DB access. Unknown **`--…`** flags and stray tokens for the default index mode are rejected with an error (see **`validateIndexModeArgs`**) instead of falling through to indexing.
 
 ### `--files` (targeted reindex)
 
@@ -142,6 +148,8 @@ The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), *
 ## Schema
 
 **Fingerprints:** incremental runs compare **`files.content_hash`** — SHA-256 hex of raw file bytes from [`src/hash.ts`](../src/hash.ts) (same on Node and Bun). Details in the **`files`** table below.
+
+**Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap.db`**.
 
 Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
 

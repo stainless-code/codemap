@@ -48,6 +48,15 @@ Each scenario runs both approaches back-to-back on the same machine, same data. 
 
 **Important**: the traditional approach simulates best-case AI tool behavior — it reads files in-process with Bun's fast I/O. Real AI agent tool calls add network round-trips, context window serialization, and multiple turn overhead that make the gap significantly larger.
 
+## CLI and runtime startup
+
+This document measures **indexed SQL vs traditional glob/read** on an existing database — **not** process startup time or **Node vs Bun** as runtimes.
+
+- **Lazy CLI:** **`dist/index.mjs`** stays small; **`codemap --help`** / **`version`** load only bootstrap + the matching **dynamic import** chunk ([architecture.md § Layering](./architecture.md#layering)).
+- **Node vs Bun:** expect **lower latency** for short commands under **Bun** (typical in local checks); **full index** wall time varies by machine and cold cache. **`console.table`** output can differ slightly between runtimes for the same query rows. Same SQL semantics: [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
+
+**CI** runs **`node dist/index.mjs query "SELECT 1"`** after build to smoke-test the **Node + better-sqlite3** path ([`ci.yml`](../.github/workflows/ci.yml)).
+
 ## Scenarios
 
 | #   | Scenario                                | What it tests                                        |
