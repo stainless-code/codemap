@@ -143,7 +143,7 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_components_name ON components(name, file_path, props_type, hooks_used);
     CREATE INDEX IF NOT EXISTS idx_components_file ON components(file_path, name);
 
-    -- WITHOUT ROWID tables already have a clustered PK; this covers reverse lookups
+    -- WITHOUT ROWID tables already have a clustered PK — this covers reverse lookups
     CREATE INDEX IF NOT EXISTS idx_dependencies_to ON dependencies(to_path, from_path);
 
     CREATE INDEX IF NOT EXISTS idx_markers_kind ON markers(kind, file_path, line_number, content);

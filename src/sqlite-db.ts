@@ -32,6 +32,32 @@ type SqliteInner = {
   close(): void;
 };
 
+/**
+ * `better-sqlite3` allows only one statement per `prepare()`; `bun:sqlite` accepts several.
+ * On Node we split on `;` — do not put `;` inside `--` line comments in `db.ts` SQL strings.
+ */
+function runSql(inner: SqliteInner, sql: string, params?: BindValues): void {
+  if (params !== undefined && params.length > 0) {
+    inner.run(sql, params);
+    return;
+  }
+  if (typeof Bun !== "undefined") {
+    inner.run(sql);
+    return;
+  }
+  const parts = sql
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length <= 1) {
+    inner.run(sql.trim());
+  } else {
+    for (const p of parts) {
+      inner.run(p);
+    }
+  }
+}
+
 function openRaw(path: string): SqliteInner {
   if (typeof Bun !== "undefined") {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -78,11 +104,7 @@ function openRaw(path: string): SqliteInner {
 function wrap(inner: SqliteInner): CodemapDatabase {
   return {
     run(sql: string, params?: BindValues) {
-      if (params !== undefined && params.length > 0) {
-        inner.run(sql, params);
-      } else {
-        inner.run(sql);
-      }
+      runSql(inner, sql, params);
     },
     query<T>(sql: string) {
       return {
