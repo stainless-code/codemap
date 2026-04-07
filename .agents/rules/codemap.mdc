@@ -8,17 +8,18 @@ alwaysApply: true
 
 A local database (default **`.codemap.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes.
 
-**Generic defaults:** This rule is **project-agnostic**. After you vendor or symlink it (or use a future `codemap` CLI that writes agent files), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
+**This file** is for **developing Codemap** in this clone. **End users** of the published package get the agent rule from **`templates/agents/`** (via **`codemap agents init`**). **Generic defaults:** SQL and triggers stay project-agnostic — **edit** this rule for repo-specific paths and queries.
 
-## CLI (this repo vs installed package)
+## CLI (this repository)
 
 | Context | Incremental index | Query |
 | ------- | ----------------- | ----- |
-| Developing in this repo | `bun src/index.ts` | `bun src/index.ts query "<SQL>"` |
-| After `bun link` / global `codemap` | `codemap` | `codemap query "<SQL>"` |
-| Published package (when available) | `bunx @stainless-code/codemap` | `bunx @stainless-code/codemap query "<SQL>"` |
+| **Default** — from this clone | `bun src/index.ts` | `bun src/index.ts query "<SQL>"` |
+| Same entry | `bun run dev` | (same as first row) |
 
-Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** in this repo — see [docs/benchmark.md § Indexing another project](../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+After **`bun run build`**, **`node dist/index.mjs`** matches the published **`codemap`** binary (same flags). **`bun link`** / global **`codemap`** also work when testing the packaged CLI.
+
+Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** — see [docs/benchmark.md § Indexing another project](../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
 
 ## Session start (do this ONCE per conversation)
 

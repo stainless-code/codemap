@@ -6,15 +6,15 @@ Query codebase structure via SQLite instead of scanning files. Use when explorin
 
 Examples below use **placeholders** (`'...'`, `getConfig`, `~/lib/api`, etc.) — not a real product tree. **Shipped skill and rules stay generic** so they apply to any repo.
 
-**In your project:** copy or symlink these files into `.agents/` / `.cursor/` (see **`.github/CONTRIBUTING.md`**), or use a future **`codemap` CLI** that vendors agent files. Then **edit your copy** to add your team’s tsconfig aliases, directory conventions, and SQL snippets you reuse. Treat upstream updates as a reference; merge deliberately.
+**In your project:** run **`codemap agents init`** (ships **`.agents/`** from **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-code/codemap)**), or copy/symlink rules and skills manually (see your repo’s contributor docs). Then **edit your copy** to add your team’s tsconfig aliases, directory conventions, and SQL snippets you reuse. Treat upstream updates as a reference; merge deliberately.
 
-**Run queries**
+**Run queries** (same CLI everywhere — use **`npx @stainless-code/codemap`**, **`pnpm dlx @stainless-code/codemap`**, **`yarn dlx @stainless-code/codemap`**, or **`bunx @stainless-code/codemap`** if **`codemap`** is not on your **`PATH`**):
 
 ```bash
-bun src/index.ts query "<SQL>"
+codemap query "<SQL>"
 ```
 
-When the package is installed globally or via `bunx`: `codemap query "<SQL>"` or `bunx @stainless-code/codemap query "<SQL>"`. Use **`--root`** to point at another project.
+Use **`codemap --root /path/to/project`** (or **`CODEMAP_ROOT`**) to index another tree.
 
 ## Schema
 
@@ -282,31 +282,31 @@ SELECT kind, COUNT(*) as count FROM markers GROUP BY kind;
 
 ## Maintenance
 
-From this repository:
+From the **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-code/codemap)** CLI (see the **codemap** rule for **`npx` / `pnpm dlx` / `yarn dlx` / `bunx`** invocations):
 
 ```bash
 # Targeted — re-index only specific files you just modified
-bun src/index.ts --files path/to/file.tsx path/to/other.ts
+codemap --files path/to/file.tsx path/to/other.ts
 
 # Incremental — auto-detects changes via git
-bun src/index.ts
+codemap
 
 # Full rebuild — after rebase, branch switch, or stale index
-bun src/index.ts --full
+codemap --full
 
 # Check index freshness
-bun src/index.ts query "SELECT key, value FROM meta"
+codemap query "SELECT key, value FROM meta"
 ```
 
 **Prefer `--files`** when you know which files you changed — it skips git diff and filesystem scanning for the rest of the tree. Deleted files passed to `--files` are auto-removed from the index.
 
-When Codemap is installed as a package: `codemap`, `codemap --root /path/to/project`, or `bunx @stainless-code/codemap …` (same flags).
+Same flags as **`npx @stainless-code/codemap`**, **`pnpm dlx @stainless-code/codemap`**, etc. **`codemap --root /path/to/project`** indexes another working tree.
 
 ## Troubleshooting
 
-| Problem                    | Solution                                                                                                               |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Stale results after rebase | Run `bun src/index.ts --full` (or `codemap --full` when installed)                                                     |
-| Missing file in results    | Check exclude / include globs in **`codemap.config.ts`**, **`codemap.config.json`**, or defaults in **`src/index.ts`** |
-| `resolved_path` is NULL    | Import is an external package (not in project)                                                                         |
-| Resolver errors            | Verify `tsconfig.json` paths (or **`tsconfigPath`** in config) when resolving aliases                                  |
+| Problem                    | Solution                                                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Stale results after rebase | Run **`codemap --full`** (see **`npx @stainless-code/codemap`** / **`pnpm dlx`** / … above if needed)                 |
+| Missing file in results    | Check exclude / include globs in **`codemap.config.ts`**, **`codemap.config.json`**, or **`codemap --help`** defaults |
+| `resolved_path` is NULL    | Import is an external package (not in project)                                                                        |
+| Resolver errors            | Verify `tsconfig.json` paths (or **`tsconfigPath`** in config) when resolving aliases                                 |

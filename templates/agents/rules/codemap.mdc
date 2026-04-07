@@ -8,24 +8,33 @@ alwaysApply: true
 
 A local database (default **`.codemap.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes.
 
-**Generic defaults:** This rule is **project-agnostic**. After you vendor or symlink it (or use a future `codemap` CLI that writes agent files), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
+**Generic defaults:** This rule is **project-agnostic**. After **`codemap agents init`** (or copying these files into **`.agents/`**), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
 
-## CLI (this repo vs installed package)
+## CLI (npm package **`@stainless-code/codemap`**)
 
-| Context | Incremental index | Query |
-| ------- | ----------------- | ----- |
-| Developing in this repo | `bun src/index.ts` | `bun src/index.ts query "<SQL>"` |
-| After `bun link` / global `codemap` | `codemap` | `codemap query "<SQL>"` |
-| Published package (when available) | `bunx @stainless-code/codemap` | `bunx @stainless-code/codemap query "<SQL>"` |
+Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-code/codemap)** from npm. The executable name is **`codemap`**.
 
-Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** in this repo — see [docs/benchmark.md § Indexing another project](../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+**Run without a global install:** **`npx @stainless-code/codemap`** (npm), **`pnpm dlx @stainless-code/codemap`** (pnpm), **`yarn dlx @stainless-code/codemap`** (Yarn 2+), or **`bunx @stainless-code/codemap`** (Bun) — same flags everywhere. With a **local** devDependency, **`npx codemap`** / **`pnpm exec codemap`**. With a **global** install, **`codemap`** on your **`PATH`**.
+
+**Examples below use `codemap`** — prefix with **`npx @stainless-code/codemap`** (or **`pnpm dlx`**, **`yarn dlx`**, **`bunx`**) when the CLI is not on your **`PATH`**.
+
+| Action | Command |
+| ------ | ------- |
+| Incremental index | `codemap` |
+| Query | `codemap query "<SQL>"` |
+
+**Bundled rules/skills:** **`codemap agents init`** writes **`.agents/`** from the package (see [docs/agents.md](../../../docs/agents.md)).
+
+Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** — see [docs/benchmark.md § Indexing another project](../../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+
+**Developing the Codemap repo itself:** from a clone, **`bun src/index.ts`** matches **`codemap`** (same flags); see the repository README.
 
 ## Session start (do this ONCE per conversation)
 
 Run incremental indexing to catch changes made outside this session:
 
 ```bash
-bun src/index.ts
+codemap
 ```
 
 ## Pre-flight check (do this EVERY time before searching)
@@ -62,7 +71,7 @@ If the question looks like any of these → use the index:
 ## How to query
 
 ```bash
-bun src/index.ts query "<SQL>"
+codemap query "<SQL>"
 ```
 
 ## Quick reference queries
@@ -94,13 +103,13 @@ For the full schema, advanced query patterns, and troubleshooting, read the skil
 
 ```bash
 # Targeted — re-index only the files you just touched
-bun src/index.ts --files path/to/file1.tsx path/to/file2.ts
+codemap --files path/to/file1.tsx path/to/file2.ts
 
 # Incremental — auto-detects changed files via git
-bun src/index.ts
+codemap
 
 # Full rebuild — after rebase, branch switch, or stale index
-bun src/index.ts --full
+codemap --full
 ```
 
 ### When to re-index
