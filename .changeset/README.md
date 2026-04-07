@@ -9,4 +9,4 @@ We have a quick list of common questions to get you started engaging with this p
 
 ---
 
-**This repo:** How versioning, **`NPM_TOKEN`**, and the GitHub workflow fit together for **`@stainless-code/codemap`** — see [docs/packaging.md § Releases](../docs/packaging.md#releases) (single place; don’t duplicate here).
+**This repo:** How versioning, **`NPM_TOKEN`**, **`bun run version`** (includes **oxfmt** after **`changeset version`**), and the GitHub workflow fit together — see [docs/packaging.md § Releases](../docs/packaging.md#releases) (single place; don’t duplicate here).

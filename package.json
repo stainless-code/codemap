@@ -67,7 +67,8 @@
     "test:coverage": "bun test --coverage",
     "test:golden": "bun scripts/query-golden.ts",
     "test:golden:external": "bun scripts/query-golden.ts --corpus external",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "version": "changeset version && bun run format CHANGELOG.md"
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",

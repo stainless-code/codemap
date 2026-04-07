@@ -40,6 +40,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
+          # Runs `changeset version` then oxfmt on CHANGELOG.md so `format:check` passes (see docs/packaging.md).
+          version: bun run version
           publish: bun run release
           title: "chore: version packages"
           commit: "chore: version packages"
