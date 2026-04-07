@@ -1,3 +1,10 @@
+# Version PRs from `changesets/action` use head branch `changeset-release/<base>` (e.g. `changeset-release/main`;
+# see changesets/action `run.ts`: `versionBranch = \`changeset-release/${branch}\``).
+#
+# GitHub docs: required status checks may be successful, skipped, or neutral — skipped often still allows merge
+# (see https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging ).
+# This workflow still gates on `changeset-release/*` and finishes with one **`CI complete`** job so there is a
+# single unambiguous pass/fail (branch protection also warns that duplicate job *names* across workflows can block merges).
 name: CI
 
 on:
@@ -9,8 +16,26 @@ on:
       - main
 
 jobs:
+  skip-ci:
+    name: Gate (skip full CI for version PRs?)
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+    steps:
+      - id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             echo "${{ github.head_ref }}" | grep -q '^changeset-release/'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Head is changeset-release/* — full CI skipped; ci-complete will pass."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   format:
     name: 💅 Format
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,6 +49,8 @@ jobs:
 
   lint:
     name: 🕵 Lint
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,6 +64,8 @@ jobs:
 
   typecheck:
     name: ✅ Typecheck
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,6 +79,8 @@ jobs:
 
   test:
     name: 🔬 Test
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -63,6 +94,8 @@ jobs:
 
   build:
     name: 🧰 Build
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -89,6 +122,8 @@ jobs:
 
   benchmark:
     name: 📊 Benchmark (fixture)
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -102,3 +137,24 @@ jobs:
           export CODEMAP_ROOT="$GITHUB_WORKSPACE/fixtures/minimal"
           bun run dev --full
           bun run benchmark
+
+  ci-complete:
+    name: CI complete
+    needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed
+        if: |
+          needs['skip-ci'].outputs.skip != 'true' && (
+            needs.format.result != 'success' ||
+            needs.lint.result != 'success' ||
+            needs.typecheck.result != 'success' ||
+            needs.test.result != 'success' ||
+            needs.build.result != 'success' ||
+            needs.benchmark.result != 'success'
+          )
+        run: exit 1
+
+      - name: OK
+        run: echo "CI requirements satisfied"
