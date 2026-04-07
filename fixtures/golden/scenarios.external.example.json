@@ -1,0 +1,8 @@
+[
+  {
+    "id": "files-count-smoke",
+    "prompt": "Smoke: indexed corpus has at least one file row",
+    "sql": "SELECT COUNT(*) AS n FROM files",
+    "match": { "kind": "minRows", "min": 1 }
+  }
+]

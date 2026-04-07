@@ -81,7 +81,9 @@ export const codemapUserConfigSchema = z
   })
   .strict();
 
-/** Inferred from {@link codemapUserConfigSchema}. */
+/**
+ * Inferred from {@link codemapUserConfigSchema}.
+ */
 export type CodemapUserConfig = z.infer<typeof codemapUserConfigSchema>;
 
 function formatCodemapConfigError(error: z.ZodError): string {

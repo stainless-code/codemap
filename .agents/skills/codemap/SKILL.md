@@ -16,6 +16,44 @@ bun src/index.ts query "<SQL>"
 
 After **`bun run build`**, **`node dist/index.mjs query …`** or a linked **`codemap`** binary matches the published CLI. Use **`--root`** / **`CODEMAP_ROOT`** to index another tree.
 
+## Query output and agents
+
+- **`bun src/index.ts query --json`** prints a **JSON array** of row objects to stdout. On SQL error, stdout is **`{"error":"<message>"}`** and the process exits **1**.
+- The CLI **does not cap** how many rows SQLite returns — add **`LIMIT`** and **`ORDER BY`** in SQL when you need a bounded list.
+- When answering with structural facts from the index (lists of paths, symbols, dependency edges), **ground the answer in the query rows** — do not invent or silently drop rows. Prefer **`--json`** for large or multi-column results.
+
+## Agent-friendly SQL recipes
+
+Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
+
+**CLI shortcuts:** **`bun src/index.ts query --recipe <id>`** runs bundled SQL (optional **`--json`**). **`bun src/index.ts query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**) as JSON (no index / DB required). **`bun src/index.ts query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`bun src/index.ts query --help`**. The fan-out rows match the SQL below; others align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.
+
+**Top files by dependency fan-out:**
+
+```sql
+SELECT from_path, COUNT(*) AS deps
+FROM dependencies
+GROUP BY from_path
+ORDER BY deps DESC
+LIMIT 10;
+```
+
+**Same ranking, plus up to five sample targets per file** (uses a correlated subquery; adjust **`LIMIT 5`** as needed):
+
+```sql
+SELECT d.from_path,
+  COUNT(*) AS deps,
+  (SELECT GROUP_CONCAT(to_path, ' | ')
+   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path LIMIT 5))
+    AS sample_targets
+FROM dependencies d
+GROUP BY d.from_path
+ORDER BY deps DESC
+LIMIT 10;
+```
+
+**JSON array samples (JSON1):** replace **`GROUP_CONCAT`** with **`json_group_array(to_path)`** in that subquery if your SQLite build has JSON1 — or use **`bun src/index.ts query --recipe fan-out-sample-json`**.
+
 ## Schema
 
 ### `files` — Every indexed file
@@ -196,6 +234,8 @@ SELECT name, file_path, hooks_used
 FROM components WHERE hooks_used LIKE '%useTheme%';
 
 -- Components with most hooks (complexity indicator)
+-- `json_array_length` requires SQLite JSON1. For a portable ranking, use
+-- `bun src/index.ts query --recipe components-by-hooks` (comma-based count on the stored JSON array).
 SELECT name, file_path,
   json_array_length(hooks_used) as hook_count
 FROM components ORDER BY hook_count DESC LIMIT 15;

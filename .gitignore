@@ -8,3 +8,11 @@ dist/
 .env.*
 !.env.example
 tsconfig.lint-staged.json
+
+# Tier B golden query outputs (local / private trees — see docs/golden-queries.md)
+fixtures/golden/external/
+fixtures/golden/scenarios.external.json
+
+# QA chat prompts tied to a private/local index (paths + product names)
+fixtures/qa/*.local.md
+fixtures/benchmark/*.local.json

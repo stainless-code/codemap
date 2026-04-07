@@ -1,0 +1,10 @@
+[
+  {
+    "from_path": "src/consumer.ts",
+    "to_path": "src/api/client.ts"
+  },
+  {
+    "from_path": "src/consumer.ts",
+    "to_path": "src/utils/date.ts"
+  }
+]

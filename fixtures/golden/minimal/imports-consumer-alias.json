@@ -1,0 +1,8 @@
+[
+  {
+    "file_path": "src/consumer.ts",
+    "source": "~/api/client",
+    "specifiers": "[\"createClient\"]",
+    "is_type_only": 0
+  }
+]

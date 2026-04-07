@@ -16,6 +16,9 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | ------- | ----------------- | ----- |
 | **Default** — from this clone | `bun src/index.ts` | `bun src/index.ts query "<SQL>"` |
 | Same entry | `bun run dev` | (same as first row) |
+| JSON output | — | `bun src/index.ts query --json "<SQL>"` |
+| Recipe | — | `bun src/index.ts query --recipe fan-out` (see **`bun src/index.ts query --help`**) |
+| Recipe catalog / SQL | — | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out` |
 
 After **`bun run build`**, **`node dist/index.mjs`** matches the published **`codemap`** binary (same flags). **`bun link`** / global **`codemap`** also work when testing the packaged CLI.
 
@@ -65,6 +68,10 @@ If the question looks like any of these → use the index:
 ```bash
 bun src/index.ts query "<SQL>"
 ```
+
+**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. For automation and multi-row answers, prefer **`bun src/index.ts query --json`** — stdout is a JSON array; on failure, stdout is **`{"error":"<message>"}`** and the process exits **1**.
+
+**Verbatim answers:** When the user asks for lists, counts, or enumerated structural data from the index, **paste or summarize from the query output without inventing rows** — do not substitute a prose “summary” that omits rows the user asked to see. Prefer **`--json`** so the full result set is unambiguous.
 
 ## Quick reference queries
 

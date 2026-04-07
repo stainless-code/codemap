@@ -77,6 +77,10 @@ export function collectFiles(): string[] {
   return [...new Set(files)].sort();
 }
 
+// Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
+// history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
+// since that commit) with `git status --porcelain` (staged + unstaged not in the diff alone).
+// Filter to extensions we index; `stat` splits live files vs deletions.
 export function getChangedFiles(db: CodemapDatabase): {
   changed: string[];
   deleted: string[];
@@ -114,6 +118,7 @@ export function getChangedFiles(db: CodemapDatabase): {
       .trim()
       .split("\n")
       .filter(Boolean);
+    // Porcelain lines are `XY path` (two status chars + space); skip the prefix to get the path.
     const statusFiles = statusResult.stdout
       .toString()
       .trim()
@@ -170,12 +175,15 @@ function insertParsedResults(
         if (parsed.category === "text") {
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
         } else if (parsed.category === "css") {
-          if (parsed.cssVariables?.length)
+          if (parsed.cssVariables?.length) {
             insertCssVariables(db, parsed.cssVariables);
-          if (parsed.cssClasses?.length)
+          }
+          if (parsed.cssClasses?.length) {
             insertCssClasses(db, parsed.cssClasses);
-          if (parsed.cssKeyframes?.length)
+          }
+          if (parsed.cssKeyframes?.length) {
             insertCssKeyframes(db, parsed.cssKeyframes);
+          }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
 
           if (parsed.cssImportSources) {
@@ -203,8 +211,9 @@ function insertParsedResults(
           }
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
-          if (parsed.components?.length)
+          if (parsed.components?.length) {
             insertComponents(db, parsed.components);
+          }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
         }
       } catch (err) {
@@ -316,11 +325,13 @@ export async function indexFiles(
             if (markers.length) insertMarkers(db, markers);
           } else if (category === "css") {
             const cssData = extractCssData(absPath, source, relPath);
-            if (cssData.variables.length)
+            if (cssData.variables.length) {
               insertCssVariables(db, cssData.variables);
+            }
             if (cssData.classes.length) insertCssClasses(db, cssData.classes);
-            if (cssData.keyframes.length)
+            if (cssData.keyframes.length) {
               insertCssKeyframes(db, cssData.keyframes);
+            }
             if (cssData.markers.length) insertMarkers(db, cssData.markers);
             for (const importSource of cssData.importSources) {
               insertImports(db, [
@@ -434,27 +445,43 @@ export async function targetedReindex(
 }
 
 /**
- * Run SQL and print results to stdout (`console.table`), or a friendly error to stderr.
- * Does not throw on invalid SQL (matches CLI `query` UX).
+ * Run read-only SQL and print results to stdout (`console.table`, or JSON when `opts.json`).
+ * Does not throw on invalid SQL: prints an error and returns **1** (CLI-style). With **`json`**, errors are printed as **`{"error":"<message>"}`** on stdout.
+ * @returns **0** on success, **1** on SQL/runtime error.
  */
-export function printQueryResult(sql: string): void {
-  const db = openDb();
+export function printQueryResult(
+  sql: string,
+  opts?: { json?: boolean },
+): number {
+  const json = opts?.json === true;
+  let db: CodemapDatabase | undefined;
   try {
+    db = openDb();
     const rows = db.query(sql).all();
-    if (rows.length === 0) {
+    if (json) {
+      console.log(JSON.stringify(rows));
+    } else if (rows.length === 0) {
       console.log("(no results)");
     } else {
       console.table(rows);
     }
+    return 0;
   } catch (err) {
-    console.error(`Query error: ${err instanceof Error ? err.message : err}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (json) {
+      console.log(JSON.stringify({ error: msg }));
+    } else {
+      console.error(`Query error: ${msg}`);
+    }
+    return 1;
   } finally {
-    closeDb(db);
+    if (db !== undefined) closeDb(db);
   }
 }
 
 /**
- * Open the index, run SQL, return all rows, then close (used by the public `Codemap.query` API).
+ * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
+ * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
 export function queryRows(sql: string): unknown[] {
   const db = openDb();

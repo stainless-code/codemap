@@ -4,9 +4,13 @@ import type { ParsedFile } from "../parsed-types";
  * Input for a {@link LanguageAdapter}. Paths are absolute / project-relative as noted.
  */
 export interface ParseContext {
-  /** Absolute path on disk (for parsers that need a real `filename`). */
+  /**
+   * Absolute path on disk (for parsers that need a real `filename`).
+   */
   absPath: string;
-  /** Path relative to project root (stored in DB rows). */
+  /**
+   * Path relative to project root (stored in DB rows).
+   */
   relPath: string;
   source: string;
 }
@@ -39,7 +43,9 @@ export type ParsedFilePayload = Pick<
  */
 export interface LanguageAdapter {
   readonly id: string;
-  /** Extensions with leading dot, e.g. `.ts`, `.tsx`. */
+  /**
+   * Extensions with leading dot, e.g. `.ts`, `.tsx`.
+   */
   readonly extensions: readonly string[];
   parse(ctx: ParseContext): ParsedFilePayload;
 }

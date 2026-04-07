@@ -45,7 +45,7 @@
     "benchmark": "bun src/benchmark.ts",
     "build": "tsdown",
     "changeset": "changeset",
-    "check": "bun run build && bun run --parallel format:check lint:ci test typecheck",
+    "check": "bun run build && bun run --parallel format:check lint:ci test typecheck && bun run test:golden",
     "check-updates": "bun update -i --latest",
     "clean": "git clean -xdf -e .env -e .codemap.db -e .codemap.db-wal -e .codemap.db-shm",
     "dev": "bun src/index.ts",
@@ -59,10 +59,13 @@
     "pack": "bun run build && npm pack",
     "prepare": "husky || true",
     "prepublishOnly": "bun run build",
+    "qa:external": "bun scripts/qa-external-repo.ts",
     "release": "changeset publish",
     "test": "bun test",
     "test:ci": "bun run test:coverage",
     "test:coverage": "bun test --coverage",
+    "test:golden": "bun scripts/query-golden.ts",
+    "test:golden:external": "bun scripts/query-golden.ts --corpus external",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {

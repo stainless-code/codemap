@@ -2,7 +2,9 @@ import { resolve } from "node:path";
 
 import { CODEMAP_VERSION } from "../version";
 
-/** Printed for `codemap --help` / `-h` (must run before config or DB access). */
+/**
+ * Printed for `codemap --help` / `-h` (must run before config or DB access).
+ */
 export function printCliUsage(): void {
   console.log(`Usage: codemap [options] [command]
 
@@ -11,7 +13,8 @@ Index (default): update .codemap.db for the project root (\`--root\` or cwd).
   codemap [--root DIR] [--config FILE] --files <paths...>
 
 Query:
-  codemap query "<SQL>"
+  codemap query [--json] "<SQL>"
+  codemap query [--json] --recipe <id>
 
 Agents:
   codemap agents init [--force] [--interactive|-i]

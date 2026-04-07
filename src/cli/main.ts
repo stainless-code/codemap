@@ -66,20 +66,38 @@ Copies bundled agent templates into .agents/ under the project root.
 
   validateIndexModeArgs(rest);
 
-  if (rest[0] === "query" && rest[1]) {
-    if (rest[1] === "--help" || rest[1] === "-h") {
-      console.log(`Usage: codemap query "<SQL>"
-
-Runs read-only SQL against .codemap.db (after at least one successful index run).
-Example: codemap query "SELECT name, file_path FROM symbols LIMIT 10"
-`);
+  if (rest[0] === "query") {
+    const {
+      parseQueryRest,
+      printQueryCmdHelp,
+      printRecipesCatalogJson,
+      printRecipeSqlToStdout,
+      runQueryCmd,
+    } = await import("./cmd-query.js");
+    const parsed = parseQueryRest(rest);
+    if (parsed.kind === "help") {
+      printQueryCmdHelp();
       return;
     }
-    const { runQueryCmd } = await import("./cmd-query.js");
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    if (parsed.kind === "recipesCatalog") {
+      printRecipesCatalogJson();
+      return;
+    }
+    if (parsed.kind === "printRecipeSql") {
+      if (!printRecipeSqlToStdout(parsed.id)) {
+        process.exit(1);
+      }
+      return;
+    }
     await runQueryCmd({
       root,
       configFile,
-      sql: rest.slice(1).join(" "),
+      sql: parsed.sql,
+      json: parsed.json,
     });
     return;
   }

@@ -92,6 +92,9 @@ jobs:
       - name: Run unit tests with coverage
         run: bun run test:coverage
 
+      - name: Golden query regression (fixtures/minimal)
+        run: bun run test:golden
+
   build:
     name: 🧰 Build
     needs: skip-ci

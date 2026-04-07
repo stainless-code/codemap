@@ -38,6 +38,8 @@ Releases use [**Changesets**](https://github.com/changesets/changesets). Repo co
 | 2    | **Merge** — on every push to **`main`**, [`.github/workflows/release.yml`](../.github/workflows/release.yml) runs [`changesets/action@v1`](https://github.com/changesets/action): opens/updates the **Version packages** PR when pending changesets exist; **`publish: bun run release`** runs **`changeset publish`**; **`createGithubReleases: true`**. |
 | 3    | **Secrets** — **`GITHUB_TOKEN`** is provided by Actions. **`NPM_TOKEN`** (npm [automation token](https://docs.npmjs.com/creating-and-viewing-access-tokens)) must be a **repository secret** for publishes to npm. If the Release job fails, use the workflow log (missing token, registry error, etc.) — don’t assume the cause from the job name alone. |
 
+**Before tagging / publishing:** run **`bun run check`** on the branch that will ship. Pending **`.changeset/*.md`** files are turned into **`CHANGELOG.md`** entries and a version bump by the **Version packages** PR (do not hand-edit **`package.json`** version for Changesets-driven releases). Merge that PR to **`main`** to run **`changeset publish`** via the workflow.
+
 ## Related
 
 - [architecture.md](./architecture.md) — schema, layering, API, user config.

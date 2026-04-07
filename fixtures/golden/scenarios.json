@@ -1,0 +1,32 @@
+[
+  {
+    "id": "files-count",
+    "prompt": "How many indexed files exist?",
+    "sql": "SELECT COUNT(*) AS n FROM files"
+  },
+  {
+    "id": "symbol-usePermissions",
+    "prompt": "Where is the usePermissions symbol defined?",
+    "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'usePermissions'"
+  },
+  {
+    "id": "index-summary",
+    "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
+    "recipe": "index-summary"
+  },
+  {
+    "id": "imports-consumer-alias",
+    "prompt": "Which alias import does consumer.ts use for the API client?",
+    "sql": "SELECT file_path, source, specifiers, is_type_only FROM imports WHERE file_path = 'src/consumer.ts' AND source = '~/api/client'"
+  },
+  {
+    "id": "dependencies-from-consumer",
+    "prompt": "What files does src/consumer.ts depend on (resolved edges)?",
+    "sql": "SELECT from_path, to_path FROM dependencies WHERE from_path = 'src/consumer.ts' ORDER BY to_path"
+  },
+  {
+    "id": "markers-notes-todo",
+    "prompt": "TODO marker in fixture notes markdown",
+    "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
+  }
+]
