@@ -32,10 +32,6 @@ export function readAll(
   return { totalBytes, contents };
 }
 
-/**
- * Same semantics as the default "Top 10 by dependency fan-out" traditional path:
- * count lines that look like imports per file, rank, take top 10.
- */
 export function traditionalFanoutImportLines(): {
   results: unknown[];
   filesRead: number;

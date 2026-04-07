@@ -24,7 +24,9 @@ export type {
 } from "./application/types";
 export type { RunIndexOptions as IndexOptions } from "./application/run-index";
 
-/** Database handle returned by `openDb()`; use with {@link runCodemapIndex} in advanced scenarios. */
+/**
+ * Database handle returned by `openDb()`; use with {@link runCodemapIndex} in advanced scenarios.
+ */
 export type { CodemapDatabase } from "./db";
 
 /**
@@ -74,12 +76,16 @@ export async function createCodemap(
  * Each {@link query} opens the database for that call; {@link index} manages its own open/close lifecycle.
  */
 export class Codemap {
-  /** Absolute project root (from resolved config). */
+  /**
+   * Absolute project root (from resolved config).
+   */
   get root(): string {
     return getProjectRoot();
   }
 
-  /** Absolute path to the SQLite index file (e.g. `.codemap.db`). */
+  /**
+   * Absolute path to the SQLite index file (e.g. `.codemap.db`).
+   */
   get databasePath(): string {
     return getDatabasePath();
   }

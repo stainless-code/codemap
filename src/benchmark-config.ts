@@ -12,9 +12,7 @@ import { getProjectRoot } from "./runtime";
 
 interface TraditionalRegexSpec {
   globs: string[];
-  /** JavaScript regex body (not wrapped in slashes). Use \\\\ for backslashes in JSON. */
   regex: string;
-  /** `files` = one result per file with ≥1 match; `matches` = every global match (like TODO scan). */
   mode: "files" | "matches";
 }
 
@@ -31,7 +29,6 @@ interface ConfigScenario {
 }
 
 interface BenchmarkConfigFile {
-  /** If true (default), drop built-in demo scenarios and use only this list. */
   replaceDefault?: boolean;
   scenarios: ConfigScenario[];
 }
@@ -125,10 +122,6 @@ function parseConfigJson(raw: string): BenchmarkConfigFile {
   };
 }
 
-/**
- * Load scenarios from a JSON file (CODEMAP_BENCHMARK_CONFIG).
- * Paths are resolved from cwd first, then relative to this module's directory is not used — use absolute or cwd-relative.
- */
 export function loadScenariosFromConfigFile(
   db: CodemapDatabase,
   configPath: string,

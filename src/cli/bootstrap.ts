@@ -2,7 +2,9 @@ import { resolve } from "node:path";
 
 import { CODEMAP_VERSION } from "../version";
 
-/** Printed for `codemap --help` / `-h` (must run before config or DB access). */
+/**
+ * Printed for `codemap --help` / `-h` (must run before config or DB access).
+ */
 export function printCliUsage(): void {
   console.log(`Usage: codemap [options] [command]
 

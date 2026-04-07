@@ -8,7 +8,7 @@ Forward-looking plans only — **not** a mirror of `src/`. **Doc index:** [READM
 
 - **Community language adapters** — optional packages (e.g. Tree-sitter) with a **peerDependency** on `@stainless-code/codemap` and a public **registration** API beyond built-ins in [`src/adapters/`](../src/adapters/).
 - **Agent tooling** — evaluate [TanStack Intent](https://tanstack.com/intent/latest/docs/overview) for versioned skills in `node_modules` (optional; **`codemap agents init`** remains the default).
-- **Golden query scenarios** — phased plan: [plan-query-golden-scenarios.md](./plan-query-golden-scenarios.md) (`fixtures/minimal` first, optional large clone e.g. via `CODEMAP_ROOT`).
+- **Golden queries** — design & policy: [golden-queries.md](./golden-queries.md); Tier A in CI, Tier B via `CODEMAP_*` (see [benchmark § Fixtures](./benchmark.md#fixtures)).
 
 ---
 
@@ -30,6 +30,7 @@ Forward-looking plans only — **not** a mirror of `src/`. **Doc index:** [READM
 
 ## Backlog
 
+- [ ] Optional **GitHub Actions** `workflow_dispatch` — run golden/benchmark against a **public** corpus only (never private app code)
 - [ ] Optional **FTS5** for opt-in full-text
 - [ ] **MCP** server wrapping `query`
 - [ ] **Watch mode** for dev

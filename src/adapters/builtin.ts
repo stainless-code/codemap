@@ -45,7 +45,9 @@ function parseText(ctx: ParseContext): ParsedFilePayload {
   };
 }
 
-/** Built-in adapters (oxc TS/JS, Lightning CSS, text/markers). Order matters for the first match. */
+/**
+ * Built-in adapters (oxc TS/JS, Lightning CSS, text/markers). Order matters for the first match.
+ */
 export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
   {
     id: "builtin.ts-js",

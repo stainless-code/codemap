@@ -36,14 +36,18 @@ function emptyStats(): IndexTableStats {
 export type IndexMode = "incremental" | "full" | "files";
 
 export interface RunIndexOptions {
-  /** Defaults to `incremental`. */
+  /**
+   * Defaults to `incremental`.
+   */
   mode?: IndexMode;
   /**
    * Paths relative to the project root; used only when `mode === "files"`.
    * Non-indexable extensions are filtered out.
    */
   files?: string[];
-  /** Suppresses progress logs; parse failures may still be printed. Defaults to `false`. */
+  /**
+   * Suppresses progress logs; parse failures may still be printed. Defaults to `false`.
+   */
   quiet?: boolean;
 }
 

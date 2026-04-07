@@ -9,7 +9,7 @@ dist/
 !.env.example
 tsconfig.lint-staged.json
 
-# Tier B golden query outputs (local / private trees — see docs/plan-query-golden-scenarios.md)
+# Tier B golden query outputs (local / private trees — see docs/golden-queries.md)
 fixtures/golden/external/
 fixtures/golden/scenarios.external.json
 

@@ -14,7 +14,9 @@ export interface IndexTableStats extends Record<string, number> {
   css_keyframes: number;
 }
 
-/** Per-run counters; see {@link IndexResult} for the public shape returned from indexing APIs. */
+/**
+ * Per-run counters; see {@link IndexResult} for the public shape returned from indexing APIs.
+ */
 export interface IndexRunStats {
   indexed: number;
   skipped: number;
@@ -27,11 +29,17 @@ export interface IndexRunStats {
  * Outcome of `Codemap#index` or `runCodemapIndex` (CLI and programmatic index runs).
  */
 export interface IndexResult {
-  /** How the index was updated. */
+  /**
+   * How the index was updated.
+   */
   mode: "full" | "incremental" | "files";
-  /** Files written or re-indexed in this run. */
+  /**
+   * Files written or re-indexed in this run.
+   */
   indexed: number;
-  /** Files skipped (unchanged hash). */
+  /**
+   * Files skipped (unchanged hash).
+   */
   skipped: number;
   elapsedMs: number;
   stats: IndexTableStats;

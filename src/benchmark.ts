@@ -1,19 +1,3 @@
-/**
- * Benchmark: Codebase Index (SQL) vs Traditional File Scanning
- *
- * Compares two approaches to answering common code-discovery questions:
- *   1. Indexed — single SQL query against .codemap.db
- *   2. Traditional — Glob + readFileSync + regex (simulates what AI tools do)
- *
- * Usage:
- *   bun src/benchmark.ts
- *   CODEMAP_ROOT=/path/to/repo bun src/benchmark.ts --verbose
- *   CODEMAP_TEST_BENCH=/path/to/repo bun src/benchmark.ts --verbose
- *
- * Custom scenarios (aligned counts for a specific repo):
- *   CODEMAP_BENCHMARK_CONFIG=./fixtures/benchmark/my.local.json bun src/benchmark.ts
- */
-
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -111,7 +95,6 @@ if (configPath !== undefined && configPath !== "") {
   console.log("\n  Codemap — Benchmark\n");
 }
 
-// Warmup query to prime SQLite page cache
 db.query("SELECT COUNT(*) FROM files").get();
 
 const rows: Row[] = [];
@@ -185,7 +168,7 @@ console.log(
   `\n  Totals: Index ${fmtMs(totalIdxMs)} vs Traditional ${fmtMs(totalTradMs)} (${(totalTradMs / Math.max(totalIdxMs, 0.001)).toFixed(1)}× overall)\n`,
 );
 
-const avgTokensPerByte = 0.25; // ~4 bytes per token (rough)
+const avgTokensPerByte = 0.25;
 const totalBytesTraditional = rows.reduce((s, r) => s + r.bytesReadRaw, 0);
 const estimatedTokens = Math.round(totalBytesTraditional * avgTokensPerByte);
 console.log(`  Token impact estimate:`);

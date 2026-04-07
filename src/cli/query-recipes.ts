@@ -1,6 +1,5 @@
 /**
- * Bundled read-only SQL for `codemap query --recipe <id>`.
- * Keep in sync with agent SKILL examples (fan-out rankings).
+ * Bundled read-only SQL for `codemap query --recipe <id>`. Keys match **`codemap query --help`**.
  */
 export const QUERY_RECIPES: Record<
   string,
@@ -44,7 +43,9 @@ GROUP BY d.from_path
 ORDER BY deps DESC
 LIMIT 10`,
   },
-  /** Files most imported/depended-on (complement to fan-out). */
+  /**
+   * Files most imported/depended-on (complement to fan-out).
+   */
   "fan-in": {
     description: "Top 15 files by fan-in (how many other files depend on them)",
     sql: `SELECT to_path, COUNT(*) AS fan_in
@@ -96,10 +97,16 @@ ORDER BY count DESC`,
   },
 };
 
+/**
+ * Sorted recipe ids (same set as {@link QUERY_RECIPES}).
+ */
 export function listQueryRecipeIds(): string[] {
   return Object.keys(QUERY_RECIPES).sort();
 }
 
+/**
+ * Returns the SQL string for a recipe id, or `undefined` if unknown.
+ */
 export function getQueryRecipeSql(id: string): string | undefined {
   return QUERY_RECIPES[id]?.sql;
 }

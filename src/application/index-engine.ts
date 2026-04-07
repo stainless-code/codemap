@@ -77,6 +77,10 @@ export function collectFiles(): string[] {
   return [...new Set(files)].sort();
 }
 
+// Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
+// history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
+// since that commit) with `git status --porcelain` (staged + unstaged not in the diff alone).
+// Filter to extensions we index; `stat` splits live files vs deletions.
 export function getChangedFiles(db: CodemapDatabase): {
   changed: string[];
   deleted: string[];
@@ -114,6 +118,7 @@ export function getChangedFiles(db: CodemapDatabase): {
       .trim()
       .split("\n")
       .filter(Boolean);
+    // Porcelain lines are `XY path` (two status chars + space); skip the prefix to get the path.
     const statusFiles = statusResult.stdout
       .toString()
       .trim()
@@ -434,9 +439,9 @@ export async function targetedReindex(
 }
 
 /**
- * Run SQL and print results to stdout (`console.table` or JSON), or errors.
- * Does not throw on invalid SQL (matches CLI `query` UX).
- * @returns exit code: **0** success, **1** SQL or runtime error
+ * Run read-only SQL and print results to stdout (`console.table`, or JSON when `opts.json`).
+ * Does not throw on invalid SQL: prints an error and returns **1** (CLI-style). With **`json`**, errors are printed as **`{"error":"<message>"}`** on stdout.
+ * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
   sql: string,
@@ -468,7 +473,8 @@ export function printQueryResult(
 }
 
 /**
- * Open the index, run SQL, return all rows, then close (used by the public `Codemap.query` API).
+ * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
+ * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
 export function queryRows(sql: string): unknown[] {
   const db = openDb();

@@ -9,8 +9,8 @@ import {
 } from "./query-recipes";
 
 /**
- * Parse argv after global bootstrap: `rest[0]` must be `"query"`.
- * Supports `--json`, `--recipe <id>`, and raw SQL (see `printQueryCmdHelp`).
+ * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
+ * Supports `--json`, `--recipe <id>`, and a raw SQL string (see {@link printQueryCmdHelp}).
  */
 export function parseQueryRest(
   rest: string[],
@@ -99,6 +99,9 @@ function formatRecipeHelpLines(): string {
   return lines.join("\n");
 }
 
+/**
+ * Print **`codemap query`** usage, flags, and bundled recipe ids to stdout.
+ */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
   console.log(`Usage: codemap query [--json] "<SQL>"
@@ -123,6 +126,9 @@ Examples:
 `);
 }
 
+/**
+ * Initialize Codemap for `opts.root`, then run **`printQueryResult`** and **`process.exit(1)`** on failure.
+ */
 export async function runQueryCmd(opts: {
   root: string;
   configFile: string | undefined;

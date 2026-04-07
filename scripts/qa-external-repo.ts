@@ -1,15 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Index an external repo with Codemap, verify index rows against the filesystem,
- * then optionally run src/benchmark.ts (SQL vs glob/read).
- *
- *   CODEMAP_ROOT=/abs/path/to/app bun run qa:external
- *   CODEMAP_TEST_BENCH=/abs/path/to/app bun scripts/qa-external-repo.ts --skip-benchmark
- *   bun run qa:external -- --root /abs/path/to/other-repo   # overrides env
- *
- * Root resolution (same idea as CLI / createCodemap): --root > CODEMAP_ROOT > CODEMAP_TEST_BENCH.
- * Never vendor external app source into this repo.
- */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

@@ -1,12 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Golden query regression. See docs/plan-query-golden-scenarios.md
- *
- *   bun run test:golden
- *   bun scripts/query-golden.ts --corpus external --root /path/to/repo
- *   bun scripts/query-golden.ts --update
- *   bun scripts/query-golden.ts --help
- */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
