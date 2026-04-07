@@ -17,6 +17,10 @@ This burns context window, wastes tokens, slows response time, and produces less
 
 A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
 
+## Bundled CLI recipes
+
+The **`codemap query --recipe <id>`** command runs **shipped SQL** for common analyses (dependency fan-out, fan-in, index row counts, largest files, markers, React hook counts, etc.) so agents do not have to embed queries in shell one-liners. **`--json`** behaves the same as for ad-hoc SQL. **`fan-out-sample-json`** uses SQLite JSON1 (**`json_group_array`**); **`fan-out-sample`** uses **`GROUP_CONCAT`** for the same shape when JSON1 is a concern. See **`codemap query --help`** and the root [README.md](../README.md) CLI examples.
+
 ## Speed Gains
 
 ### Headline pattern

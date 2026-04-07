@@ -35,6 +35,23 @@ describe("CLI --help", () => {
     expect(out).toContain("codemap query");
     expect(err).toBe("");
   });
+
+  test("query --help exits 0 and documents --json", async () => {
+    const { exitCode, out, err } = await runCli(["query", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("--json");
+    expect(out).toContain("--recipe");
+    expect(out).toContain("fan-out");
+    expect(out).toContain("codemap query");
+    expect(out).toContain("LIMIT");
+    expect(err).toBe("");
+  });
+
+  test("query with no SQL exits 1", async () => {
+    const { exitCode, err } = await runCli(["query"]);
+    expect(exitCode).toBe(1);
+    expect(err).toContain("missing SQL");
+  });
 });
 
 describe("CLI version", () => {

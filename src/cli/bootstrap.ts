@@ -11,7 +11,8 @@ Index (default): update .codemap.db for the project root (\`--root\` or cwd).
   codemap [--root DIR] [--config FILE] --files <paths...>
 
 Query:
-  codemap query "<SQL>"
+  codemap query [--json] "<SQL>"
+  codemap query [--json] --recipe <id>
 
 Agents:
   codemap agents init [--force] [--interactive|-i]

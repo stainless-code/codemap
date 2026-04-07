@@ -11,7 +11,9 @@ Codemap is in **bootstrap / extraction** phase. Before large PRs, please open an
 bun install   # runs `prepare` → Husky git hooks
 bun run dev   # same as `bun src/index.ts` — CLI from source
 bun test
-bun run check   # format + lint + tests + typecheck + build
+bun run test:golden   # golden SQL vs fixtures/minimal (also runs at end of `bun run check`)
+bun run test:golden:external   # Tier B: local tree via CODEMAP_ROOT / --root (not in CI)
+bun run check   # format + lint + tests + typecheck + build + test:golden
 bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap.db*`)
 bun run check-updates   # interactive dependency updates (`bun update -i --latest`)
 ```
@@ -36,6 +38,8 @@ Then open a PR on GitHub into **`main`**.
 - **Public API** — Anything exported from the package entry (`src/index.ts` → `src/api.ts`, `config.ts`, shared types) should have **JSDoc** that reads well in hovers and in published typings.
 - **Layers** — Keep boundaries clear: [architecture.md](../docs/architecture.md) (`cli` → `application` → infrastructure). Don’t let CLI concerns leak into parsers or the DB layer.
 - **Before you open / update a PR** — `bun run check` (or at least `bun run test` + `bun run typecheck` while iterating).
+- **Golden queries (Tier A)** — If you change `fixtures/minimal/` or schema/query behavior expected by [fixtures/golden/](../fixtures/golden/), run `bun scripts/query-golden.ts --update`, review diffs, and commit updated JSON under `fixtures/golden/minimal/`. Prefer **fixing the indexer** when output changes for the wrong reason; only refresh goldens when the new rows are correct. See [docs/plan-query-golden-scenarios.md](../docs/plan-query-golden-scenarios.md).
+- **Golden queries (Tier B)** — Against a **local** clone, use `bun run test:golden:external` with `CODEMAP_ROOT` / `--root`. Copy [fixtures/golden/scenarios.external.example.json](../fixtures/golden/scenarios.external.example.json) to `scenarios.external.json` if you need custom scenarios; goldens under `fixtures/golden/external/` are gitignored — do not commit snapshots from proprietary trees.
 - **Style** — Match Oxfmt/Oxlint; prefer **straight-line code** and extracted helpers over long nested blocks.
 
 **Editor (VS Code):** [`.vscode/extensions.json`](../.vscode/extensions.json) lists recommended extensions (Bun, Oxc, TypeScript native preview, etc.). [`.vscode/settings.json`](../.vscode/settings.json) enables Oxc format on save and `tsgo`. Formatting and lint rules live in [`.oxfmtrc.json`](../.oxfmtrc.json) and [`.oxlintrc.json`](../.oxlintrc.json) (no framework-specific options beyond defaults).
@@ -45,6 +49,8 @@ Then open a PR on GitHub into **`main`**.
 ### QA against a real app (testing bench)
 
 Do **not** add Codemap as a dependency to the bench repo. In **this** repo, copy `.env.example` to `.env` and set **`CODEMAP_TEST_BENCH`** to an **absolute path** to the other clone, then run `bun src/index.ts` as usual. See [docs/benchmark.md § Indexing another project](../docs/benchmark.md#indexing-another-project).
+
+**One-shot QA (index + disk checks + benchmark):** `CODEMAP_ROOT=/absolute/path/to/app bun run qa:external` (or set **`CODEMAP_TEST_BENCH`** in `.env`; optional `--root` overrides). Validates indexed paths exist, spot-checks symbol lines vs files, prints sample SQL rows, then runs `src/benchmark.ts`. Do **not** add external app source into this repository.
 
 Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — run **`bun run changeset`** when your PR should bump the version; see [docs/packaging.md § Releases](../docs/packaging.md#releases).
 

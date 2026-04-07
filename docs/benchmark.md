@@ -71,6 +71,19 @@ bun src/benchmark.ts
 bun src/benchmark.ts --verbose
 ```
 
+### Custom scenarios (`CODEMAP_BENCHMARK_CONFIG`)
+
+For a **specific** checkout (e.g. large app), you can replace or extend the eight built-in demo scenarios with JSON so the **Results** column lines up with **indexed SQL** vs **glob + regex** on the same corpus.
+
+```bash
+# Use a real checkout path — /path/to/repo in docs is a placeholder only.
+CODEMAP_ROOT=/absolute/path/to/your-app CODEMAP_BENCHMARK_CONFIG=fixtures/benchmark/my.local.json bun src/benchmark.ts
+```
+
+- **Tracked example:** [fixtures/benchmark/scenarios.example.json](../fixtures/benchmark/scenarios.example.json) — copy to `*.local.json` (see [.gitignore](../.gitignore); do not commit proprietary paths).
+- Each entry has **`name`**, **`indexedSql`** (read-only), and **`traditional`**: either **`{ "globs": [...], "regex": "...", "mode": "files" | "matches" }`** or **`{ "builtin": "fanoutImportLines" }`** (same traditional path as **`--recipe fan-out`**).
+- **`replaceDefault`:** `true` (default) uses only this list; `false` **appends** these scenarios after the built-in eight.
+
 ### Methodology
 
 Each scenario runs both approaches back-to-back on the same machine, same data. Measured:
@@ -97,15 +110,23 @@ This document measures **indexed SQL vs traditional glob/read** on an existing d
 
 ### Scenarios
 
-| #   | Scenario                                | What it tests                                        |
-| --- | --------------------------------------- | ---------------------------------------------------- |
-| 1   | Find where `usePermissions` is defined  | Symbol lookup by name — needle in haystack           |
-| 2   | List React components (TSX/JSX)         | AST `components` table vs export-line regex          |
-| 3   | Files that import from `~/api/client`   | Large result set — LIKE scan vs grep                 |
-| 4   | Find all TODO/FIXME markers             | Cross-file scan — all file types                     |
-| 5   | CSS design tokens (custom properties)   | Domain-specific extraction — structured vs raw regex |
-| 6   | Components in `shop/` subtree           | Scoped component discovery                           |
-| 7   | Reverse deps: who imports `utils/date`? | Dependency graph traversal                           |
+| #   | Scenario                                | What it tests                                                       |
+| --- | --------------------------------------- | ------------------------------------------------------------------- |
+| 1   | Find where `usePermissions` is defined  | Symbol lookup by name — needle in haystack                          |
+| 2   | List React components (TSX/JSX)         | AST `components` table vs export-line regex                         |
+| 3   | Files that import from `~/api/client`   | Large result set — LIKE scan vs grep                                |
+| 4   | Find all TODO/FIXME markers             | Cross-file scan — all file types                                    |
+| 5   | CSS design tokens (custom properties)   | Domain-specific extraction — structured vs raw regex                |
+| 6   | Components in `shop/` subtree           | Scoped component discovery                                          |
+| 7   | Reverse deps: who imports `utils/date`? | Dependency graph traversal                                          |
+| 8   | Top 10 by dependency fan-out            | Same SQL as **`codemap query --recipe fan-out`** vs line-scan proxy |
+
+### Recipes vs ad-hoc SQL
+
+**`codemap query --recipe <id>`** expands to the same SQL string the CLI would run if you pasted it after **`codemap query`**. There is no extra query cost beyond parsing argv — **recipe vs hand-written SQL is not a separate benchmark**.
+
+- **`fan-out-sample`** uses **`GROUP_CONCAT`** for sample targets (portable).
+- **`fan-out-sample-json`** uses **`json_group_array`** in the same shape (requires SQLite JSON1). Prefer **`fan-out-sample`** when JSON1 is unavailable.
 
 ### Results
 
@@ -120,8 +141,9 @@ Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts
 | CSS design tokens (custom properties)   | 47µs       | 0       | 2.78ms     | 0       | 0          | 0 B        | **59×**  |
 | Components in `shop/` subtree           | 40µs       | 0       | 2.61ms     | 0       | 0          | 0 B        | **66×**  |
 | Reverse deps: who imports `utils/date`? | 39µs       | 0       | 3.59ms     | 0       | 13         | 76.3 KB    | **93×**  |
+| Top 10 by dependency fan-out            | 81µs       | 2       | 15.24ms    | 10      | 56         | 163.4 KB   | **188×** |
 
-**Totals**: Index ~408µs vs Traditional ~26.7ms (**~65× overall** on a sample run). Traditional bytes read total ~393 KB (not megabytes) because the globbed sets are small.
+**Totals** (8 scenarios; sample run on this repo after adding scenario 8): Index ~1.1ms vs Traditional ~140ms (**~132× overall**). Traditional bytes read total ~940 KB on that run — your tree and hardware will differ. Older 7-scenario snapshots showed ~408µs / ~27ms / ~393 KB.
 
 On a **large app** indexed via `--root`, the same queries typically return non-zero rows; the indexed side stays sub-millisecond while the traditional side reads megabytes for broad globs. Repeatable numbers: [Fixtures](#fixtures).
 
@@ -131,7 +153,7 @@ On a small repo, totals move with noise and thermal variance. On a large indexed
 
 The script’s **reindex** section averages **3 internal runs** per mode; full-rebuild wall time varies with disk and CPU load.
 
-The indexed CSS scenario uses `ORDER BY name LIMIT 50` — exact SQL for each scenario lives in **`src/benchmark.ts`** in this repo (not duplicated here; keep in sync when changing scenarios).
+The indexed CSS scenario uses `ORDER BY name LIMIT 50`. Scenario 8’s indexed path uses **`getQueryRecipeSql("fan-out")`** from **`src/cli/query-recipes.ts`** (same text as **`codemap query --recipe fan-out`**). Other scenarios’ SQL lives in **`src/benchmark.ts`** (keep in sync when changing scenarios).
 
 ### Key takeaways
 
@@ -183,5 +205,9 @@ bun run benchmark
 ```
 
 **CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
+
+**Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [plan-query-golden-scenarios.md](./plan-query-golden-scenarios.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
+
+**Tier B (local tree, not in default CI):** `bun run test:golden:external` (or `bun scripts/query-golden.ts --corpus external`) indexes **`CODEMAP_ROOT`**, **`CODEMAP_TEST_BENCH`**, or **`--root`**, loads [fixtures/golden/scenarios.external.json](../fixtures/golden/scenarios.external.json) if present else [scenarios.external.example.json](../fixtures/golden/scenarios.external.example.json), and writes/compares goldens under `fixtures/golden/external/` (gitignored). Use **`match`** in scenarios for subset checks (`minRows`, `everyRowContains`); use **`budgetMs`** with optional **`--strict-budget`** for perf warnings. Do not commit proprietary paths or goldens from private apps.
 
 Scenario titles match the table above; **indexed row counts** on the fixture are stable for a given schema. A larger second fixture is optional — see [roadmap.md](./roadmap.md).

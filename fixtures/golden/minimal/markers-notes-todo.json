@@ -1,0 +1,8 @@
+[
+  {
+    "file_path": "src/notes.md",
+    "line_number": 3,
+    "kind": "TODO",
+    "content": "this file exists so marker scans have a predictable hit."
+  }
+]

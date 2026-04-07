@@ -434,20 +434,34 @@ export async function targetedReindex(
 }
 
 /**
- * Run SQL and print results to stdout (`console.table`), or a friendly error to stderr.
+ * Run SQL and print results to stdout (`console.table` or JSON), or errors.
  * Does not throw on invalid SQL (matches CLI `query` UX).
+ * @returns exit code: **0** success, **1** SQL or runtime error
  */
-export function printQueryResult(sql: string): void {
+export function printQueryResult(
+  sql: string,
+  opts?: { json?: boolean },
+): number {
+  const json = opts?.json === true;
   const db = openDb();
   try {
     const rows = db.query(sql).all();
-    if (rows.length === 0) {
+    if (json) {
+      console.log(JSON.stringify(rows));
+    } else if (rows.length === 0) {
       console.log("(no results)");
     } else {
       console.table(rows);
     }
+    return 0;
   } catch (err) {
-    console.error(`Query error: ${err instanceof Error ? err.message : err}`);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (json) {
+      console.log(JSON.stringify({ error: msg }));
+    } else {
+      console.error(`Query error: ${msg}`);
+    }
+    return 1;
   } finally {
     closeDb(db);
   }

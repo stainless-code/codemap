@@ -1,0 +1,19 @@
+{
+  "replaceDefault": true,
+  "scenarios": [
+    {
+      "name": "usePermissions definition (sample alignment)",
+      "indexedSql": "SELECT file_path, kind FROM symbols WHERE name = 'usePermissions'",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "export\\s+function\\s+usePermissions",
+        "mode": "files"
+      }
+    },
+    {
+      "name": "Top 10 dependency fan-out (same as --recipe fan-out)",
+      "indexedSql": "SELECT from_path, COUNT(*) AS deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10",
+      "traditional": { "builtin": "fanoutImportLines" }
+    }
+  ]
+}

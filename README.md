@@ -5,7 +5,7 @@
 - **Not** full-text search or grep on arbitrary strings — use those when you need raw file-body search.
 - **Is** a fast, token-efficient way to navigate **structure**: definitions, imports, dependency direction, components, and other extracted facts.
 
-**Documentation:** [docs/README.md](docs/README.md) is the hub (topic index + single-source rules). Topics: [architecture](docs/architecture.md), [agents](docs/agents.md) (`codemap agents init`), [benchmark](docs/benchmark.md), [packaging](docs/packaging.md), [roadmap](docs/roadmap.md), [why Codemap](docs/why-codemap.md). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+**Documentation:** [docs/README.md](docs/README.md) is the hub (topic index + single-source rules). Topics: [architecture](docs/architecture.md), [agents](docs/agents.md) (`codemap agents init`), [benchmark](docs/benchmark.md), [golden query plan](docs/plan-query-golden-scenarios.md), [packaging](docs/packaging.md), [roadmap](docs/roadmap.md), [why Codemap](docs/why-codemap.md). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ---
 
@@ -37,6 +37,13 @@ codemap --full
 
 # SQL against the index (after at least one index run)
 codemap query "SELECT name, file_path FROM symbols LIMIT 10"
+# JSON array on stdout (agents / scripts); errors: {"error":"..."}
+codemap query --json "SELECT name, file_path FROM symbols LIMIT 10"
+# Query is not row-capped — add LIMIT in SQL for large selects
+# Bundled SQL (same as skill examples): fan-out rankings
+codemap query --recipe fan-out
+codemap query --json --recipe fan-out-sample
+# `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
 
 # Another project
 codemap --root /path/to/repo --full
@@ -81,12 +88,15 @@ const rows = cm.query("SELECT name FROM symbols LIMIT 5");
 
 Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 
-| Command                              | Purpose                                                          |
-| ------------------------------------ | ---------------------------------------------------------------- |
-| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)             |
-| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing |
-| `bun run fix`                        | Apply lint fixes, then format                                    |
-| `bun run test` / `bun run typecheck` | Focused checks                                                   |
+| Command                              | Purpose                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                       |
+| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing           |
+| `bun run fix`                        | Apply lint fixes, then format                                              |
+| `bun run test` / `bun run typecheck` | Focused checks                                                             |
+| `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)        |
+| `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)     |
+| `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH` |
 
 ```bash
 bun install
@@ -100,11 +110,13 @@ bun run fix      # oxlint --fix, then oxfmt
 
 ## Benchmark
 
+Use a **real** project path (the repo must exist on disk). See [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).
+
 ```bash
-CODEMAP_ROOT=/path/to/indexed-repo bun src/benchmark.ts
+CODEMAP_ROOT=/absolute/path/to/indexed-repo bun src/benchmark.ts
 ```
 
-Details: [docs/benchmark.md](docs/benchmark.md).
+Optional **`CODEMAP_BENCHMARK_CONFIG`** for repo-specific scenarios: [docs/benchmark.md § Custom scenarios](docs/benchmark.md#custom-scenarios-codemap_benchmark_config).
 
 ---
 
