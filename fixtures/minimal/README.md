@@ -6,3 +6,5 @@ Stable tree for **repeatable** `src/benchmark.ts` runs and CI.
 - **Benchmark:** same `CODEMAP_ROOT`, then `bun run benchmark`
 
 Includes intentional symbols (`usePermissions`), a `~/api/client` import, `components/shop/*`, `utils/date`, CSS variables, and a TODO marker.
+
+**Editor / `tsc`:** run **`bun install`** here so **`react`** + **`@types/react`** resolve `react/jsx-runtime` for `.tsx` (`jsx: "react-jsx"` in `tsconfig.json`).

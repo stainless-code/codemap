@@ -2,5 +2,9 @@
   "name": "codemap-fixture-minimal",
   "version": "0.0.0",
   "private": true,
-  "description": "Small fixture for benchmarks and CI — not published."
+  "description": "Small fixture for benchmarks and CI — not published.",
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0"
+  }
 }
