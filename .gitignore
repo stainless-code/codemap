@@ -4,6 +4,7 @@ node_modules/
 .codemap.db-shm
 .DS_Store
 dist/
+*.tgz
 *.log
 .env
 .env.*
