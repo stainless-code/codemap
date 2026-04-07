@@ -28,7 +28,8 @@ describe("parseQueryRest", () => {
   it("errors when --json has no SQL", () => {
     const r = parseQueryRest(["query", "--json"]);
     expect(r.kind).toBe("error");
-    if (r.kind === "error") expect(r.message).toContain("--json");
+    if (r.kind === "error")
+      expect(r.message).toContain("missing SQL or recipe");
   });
 
   it("returns help for query --json --help", () => {

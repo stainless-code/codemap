@@ -23,7 +23,7 @@
 - Each **`indexedSql`** in custom scenario JSON is validated as a single read-only **`SELECT`** (or **`WITH` … `SELECT`**) — DDL/DML and **`RETURNING`** are rejected before execution.
 - Config file paths are resolved from **`process.cwd()`** (see **benchmark.md**). **`traditional.regex`** strings are developer-controlled (local JSON); **`files`** mode compiles the regex once per scenario.
 - Overlapping **globs** in the traditional path are **deduplicated** so **Files read** / **Bytes read** count each path once.
-- The default **components in `shop/`** scenario uses a **`LIKE`** filter aligned with **`**/components/shop/**/\*.tsx`** (avoids matching unrelated paths such as **`workshop`**).
+- The default **components in `shop/`** scenario uses a **`LIKE`** filter aligned with the traditional globs under **`components/shop/`** (**\*.tsx** and **\*.jsx**, matching **`components`** rows from the parser) and avoids unrelated paths such as **`workshop`**.
 
 **Recipes (determinism)**
 

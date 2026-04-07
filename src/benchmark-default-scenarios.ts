@@ -140,7 +140,7 @@ export function getDefaultScenarios(db: CodemapDatabase): Scenario[] {
           .all(),
       traditional: () => {
         const files = globFilesFiltered(
-          ["**/components/shop/**/*.tsx"],
+          ["**/components/shop/**/*.tsx", "**/components/shop/**/*.jsx"],
           getProjectRoot(),
         );
         const { totalBytes, contents } = readAll(files, getProjectRoot());
