@@ -50,7 +50,7 @@ Then open a PR on GitHub into **`main`**.
 
 Do **not** add Codemap as a dependency to the bench repo. In **this** repo, copy `.env.example` to `.env` and set **`CODEMAP_TEST_BENCH`** to an **absolute path** to the other clone, then run `bun src/index.ts` as usual. See [docs/benchmark.md § Indexing another project](../docs/benchmark.md#indexing-another-project).
 
-**One-shot QA (index + disk checks + benchmark):** `CODEMAP_ROOT=/absolute/path/to/app bun run qa:external` (or set **`CODEMAP_TEST_BENCH`** in `.env`; optional `--root` overrides). Validates indexed paths exist, spot-checks symbol lines vs files, prints sample SQL rows, then runs `src/benchmark.ts`. Do **not** add external app source into this repository.
+**One-shot QA (index + disk checks + benchmark):** `CODEMAP_ROOT=/absolute/path/to/app bun run qa:external` (or set **`CODEMAP_TEST_BENCH`** in `.env`; optional `--root` overrides). Optional **`--max-files`** / **`--max-symbols`** (positive integers; default caps sampling). Validates indexed paths exist, spot-checks symbol lines vs files, prints sample SQL rows, then runs `src/benchmark.ts`. Do **not** add external app source into this repository.
 
 Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — run **`bun run changeset`** when your PR should bump the version; see [docs/packaging.md § Releases](../docs/packaging.md#releases).
 

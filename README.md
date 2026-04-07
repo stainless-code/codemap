@@ -37,7 +37,7 @@ codemap --full
 
 # SQL against the index (after at least one index run)
 codemap query "SELECT name, file_path FROM symbols LIMIT 10"
-# JSON array on stdout (agents / scripts); errors: {"error":"..."}
+# JSON array on stdout (agents / scripts); {"error":"..."} for bad SQL, DB open, or query bootstrap (config/resolver) when using --json
 codemap query --json "SELECT name, file_path FROM symbols LIMIT 10"
 # Query is not row-capped — add LIMIT in SQL for large selects
 # Bundled SQL (same as skill examples): fan-out rankings

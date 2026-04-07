@@ -13,3 +13,22 @@
 **Golden tests**
 
 - **`bun run test:golden`**: index **`fixtures/minimal`**, run scenarios from **`fixtures/golden/scenarios.json`**, and compare query JSON to **`fixtures/golden/minimal/`**. Use **`bun scripts/query-golden.ts --update`** after intentional fixture or schema changes. Documented in **benchmark.md** and **CONTRIBUTING**.
+
+**Query robustness**
+
+- With **`--json`**, **`{"error":"…"}`** is printed for invalid SQL, database open failures, and **`codemap query`** bootstrap failures (config / resolver setup), not only bad SQL. The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not cut off mid-stream.
+
+**Benchmark & `CODEMAP_BENCHMARK_CONFIG`**
+
+- Each **`indexedSql`** in custom scenario JSON is validated as a single read-only **`SELECT`** (or **`WITH` … `SELECT`**) — DDL/DML and **`RETURNING`** are rejected before execution.
+- Config file paths are resolved from **`process.cwd()`** (see **benchmark.md**). **`traditional.regex`** strings are developer-controlled (local JSON); **`files`** mode compiles the regex once per scenario.
+- Overlapping **globs** in the traditional path are **deduplicated** so **Files read** / **Bytes read** count each path once.
+- The default **components in `shop/`** scenario uses a **`LIKE`** filter aligned with **`**/components/shop/**/\*.tsx`** (avoids matching unrelated paths such as **`workshop`**).
+
+**Recipes (determinism)**
+
+- Bundled recipe SQL adds stable secondary **`ORDER BY`** columns (and orders inner **`LIMIT`** samples) so **`--recipe`** / **`--json`** output does not vary on aggregate ties.
+
+**External QA**
+
+- **`bun run qa:external`**: **`--max-files`** and **`--max-symbols`** must be positive integers (invalid values throw before indexing).

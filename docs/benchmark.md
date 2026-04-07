@@ -77,25 +77,28 @@ For a **specific** checkout (e.g. large app), you can replace or extend the eigh
 
 ```bash
 # Use a real checkout path — /path/to/repo in docs is a placeholder only.
+# Resolve CODEMAP_BENCHMARK_CONFIG from the shell cwd (see below).
 CODEMAP_ROOT=/absolute/path/to/your-app CODEMAP_BENCHMARK_CONFIG=fixtures/benchmark/my.local.json bun src/benchmark.ts
 ```
 
 - **Tracked example:** [fixtures/benchmark/scenarios.example.json](../fixtures/benchmark/scenarios.example.json) — copy to `*.local.json` (see [.gitignore](../.gitignore); do not commit proprietary paths).
-- Each entry has **`name`**, **`indexedSql`** (read-only), and **`traditional`**: either **`{ "globs": [...], "regex": "...", "mode": "files" | "matches" }`** or **`{ "builtin": "fanoutImportLines" }`** (same traditional path as **`--recipe fan-out`**).
+- **`CODEMAP_BENCHMARK_CONFIG`** is passed to **`path.resolve()`** from **`process.cwd()`** — use an absolute path or a path relative to where you run the command (not relative to **`src/`**).
+- Each entry has **`name`**, **`indexedSql`**, and **`traditional`**: either **`{ "globs": [...], "regex": "...", "mode": "files" | "matches" }`** or **`{ "builtin": "fanoutImportLines" }`** (same traditional path as **`--recipe fan-out`**). **`indexedSql`** must be a **single** read-only **`SELECT`** (or **`WITH` … `SELECT`**) — mutating statements are **rejected** at load time.
+- **`traditional.regex`:** treated as trusted input from your local JSON (benchmark tooling is developer-facing). **`mode": "files"`** reuses one **`RegExp`** per scenario for efficiency.
 - **`replaceDefault`:** `true` (default) uses only this list; `false` **appends** these scenarios after the built-in eight.
 
 ### Methodology
 
 Each scenario runs both approaches back-to-back on the same machine, same data. Measured:
 
-| Metric     | What it captures                                                  |
-| ---------- | ----------------------------------------------------------------- |
-| Index Time | Wall-clock time for the SQL query                                 |
-| Trad. Time | Wall-clock time for glob + read all matching files + regex search |
-| Results    | Number of matches returned                                        |
-| Files Read | How many files the traditional approach had to read               |
-| Bytes Read | Total source bytes loaded into memory by the traditional approach |
-| Speedup    | `traditionalMs / indexMs`                                         |
+| Metric     | What it captures                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------- |
+| Index Time | Wall-clock time for the SQL query                                                            |
+| Trad. Time | Wall-clock time for glob + read all matching files + regex search                            |
+| Results    | Number of matches returned                                                                   |
+| Files Read | How many **unique** files the traditional approach read (overlapping globs are deduplicated) |
+| Bytes Read | Total source bytes loaded for those unique paths (each file counted once)                    |
+| Speedup    | `traditionalMs / indexMs`                                                                    |
 
 **Important**: the traditional approach simulates best-case AI tool behavior — it reads files in-process with Bun's fast I/O. Real AI agent tool calls add network round-trips, context window serialization, and multiple turn overhead that make the gap significantly larger.
 
@@ -153,7 +156,7 @@ On a small repo, totals move with noise and thermal variance. On a large indexed
 
 The script’s **reindex** section averages **3 internal runs** per mode; full-rebuild wall time varies with disk and CPU load.
 
-The indexed CSS scenario uses `ORDER BY name LIMIT 50`. Scenario 8’s indexed path uses **`getQueryRecipeSql("fan-out")`** from **`src/cli/query-recipes.ts`** (same text as **`codemap query --recipe fan-out`**). Other scenarios’ SQL lives in **`src/benchmark.ts`** (keep in sync when changing scenarios).
+The indexed CSS scenario uses `ORDER BY name LIMIT 50`. The **fan-out** row’s indexed path uses **`getQueryRecipeSql("fan-out")`** from **`src/cli/query-recipes.ts`** (same text as **`codemap query --recipe fan-out`**). Other default scenarios’ SQL lives in **`src/benchmark-default-scenarios.ts`**; custom JSON is loaded in **`src/benchmark-config.ts`** (keep **`fixtures/benchmark/scenarios.example.json`** in sync when recipe SQL changes).
 
 ### Key takeaways
 
