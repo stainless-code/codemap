@@ -6,6 +6,8 @@
 
 The published package ships **`templates/agents/`** (rules + skills). This repo also has [`.agents/`](../.agents/) for **Codemap development** (CLI from source); it is **not** identical to **`templates/agents/`** for every file (e.g. the **codemap** rule/skill). The command **`codemap agents init`** writes each bundled template file into **`<project>/.agents/`** with per-file copies (not a wholesale directory sync) — the **canonical** copy consumers edit (SQL, team conventions, paths).
 
+**Query examples** in the bundled **codemap** rule and skill lead with **`codemap query --json`** (agents and automation). Omit **`--json`** when you want **`console.table`** in a terminal — see [README.md § CLI](../README.md#cli).
+
 ```bash
 codemap agents init
 codemap agents init --force

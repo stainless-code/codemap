@@ -35,13 +35,13 @@ codemap version
 # Full rebuild
 codemap --full
 
-# SQL against the index (after at least one index run)
-codemap query "SELECT name, file_path FROM symbols LIMIT 10"
-# JSON array on stdout (agents / scripts); {"error":"..."} for bad SQL, DB open, or query bootstrap (config/resolver) when using --json
+# SQL against the index (after at least one index run). Bundled agent rules/skills use --json first; omit it for console.table in a terminal.
 codemap query --json "SELECT name, file_path FROM symbols LIMIT 10"
+# With --json: JSON array on success; {"error":"..."} on stdout for bad SQL, DB open, or query bootstrap (config/resolver)
+codemap query "SELECT name, file_path FROM symbols LIMIT 10"
 # Query is not row-capped — add LIMIT in SQL for large selects
 # Bundled SQL (same as skill examples): fan-out rankings
-codemap query --recipe fan-out
+codemap query --json --recipe fan-out
 codemap query --json --recipe fan-out-sample
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
@@ -91,15 +91,16 @@ const rows = cm.query("SELECT name FROM symbols LIMIT 5");
 
 Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 
-| Command                              | Purpose                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------- |
-| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                       |
-| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing           |
-| `bun run fix`                        | Apply lint fixes, then format                                              |
-| `bun run test` / `bun run typecheck` | Focused checks                                                             |
-| `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)        |
-| `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)     |
-| `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH` |
+| Command                              | Purpose                                                                                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                                                                                                                         |
+| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing                                                                                                             |
+| `bun run fix`                        | Apply lint fixes, then format                                                                                                                                                |
+| `bun run test` / `bun run typecheck` | Focused checks                                                                                                                                                               |
+| `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)                                                                                                          |
+| `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)                                                                                                       |
+| `bun run benchmark:query`            | Compare `console.table` vs `--json` stdout size (needs local `.codemap.db`; [docs/benchmark.md § Query stdout](docs/benchmark.md#query-stdout-table-vs-json-benchmarkquery)) |
+| `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH`                                                                                                   |
 
 ```bash
 bun install
@@ -120,6 +121,8 @@ CODEMAP_ROOT=/absolute/path/to/indexed-repo bun src/benchmark.ts
 ```
 
 Optional **`CODEMAP_BENCHMARK_CONFIG`** for repo-specific scenarios: [docs/benchmark.md § Custom scenarios](docs/benchmark.md#custom-scenarios-codemap_benchmark_config).
+
+To compare **query** stdout size (`console.table` vs **`--json`**) on an existing index, see [docs/benchmark.md § Query stdout](docs/benchmark.md#query-stdout-table-vs-json-benchmarkquery) (**`bun run benchmark:query`**).
 
 ---
 

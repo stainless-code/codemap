@@ -19,7 +19,7 @@ A pre-built SQLite index (`.codemap.db`) that extracts and structures code metad
 
 ## Bundled CLI recipes
 
-**Shipped SQL** for fan-out, fan-in, index stats, markers, components, etc. — **`codemap query --recipe`**, **`--json`**, **`--recipes-json`**, **`--print-sql`**, and examples: [README.md § CLI](../README.md#cli) (canonical). **`fan-out-sample`** vs **`fan-out-sample-json`**: same ranking; JSON1 vs **`GROUP_CONCAT`** — see readme or **`codemap query --help`**. Agent-oriented SQL and schema: bundled [**`SKILL.md`**](../.agents/skills/codemap/SKILL.md) (this repo) / **`codemap agents init`** templates for consumers.
+**Shipped SQL** for fan-out, fan-in, index stats, markers, components, etc. — **`codemap query --recipe`**, **`--json`**, **`--recipes-json`**, **`--print-sql`**, and examples: [README.md § CLI](../README.md#cli) (canonical). Bundled agent templates default examples to **`codemap query --json`**. **`fan-out-sample`** vs **`fan-out-sample-json`**: same ranking; JSON1 vs **`GROUP_CONCAT`** — see readme or **`codemap query --help`**. Agent-oriented SQL and schema: bundled [**`SKILL.md`**](../.agents/skills/codemap/SKILL.md) (this repo) / **`codemap agents init`** templates for consumers.
 
 ## Speed Gains
 

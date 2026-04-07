@@ -4,10 +4,11 @@
 
 **Two topics — pick the row that matches what you need:**
 
-| You want to…                                                                                                                                       | Read                                                    |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap.db` goes | [§ Indexing another project](#indexing-another-project) |
-| **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                 | [§ The benchmark script](#the-benchmark-script)         |
+| You want to…                                                                                                                                       | Read                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap.db` goes | [§ Indexing another project](#indexing-another-project)                          |
+| **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                 | [§ The benchmark script](#the-benchmark-script)                                  |
+| **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                            | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
 
 ---
 
@@ -70,6 +71,16 @@ bun src/benchmark.ts
 # Verbose — shows per-scenario breakdown and result samples
 bun src/benchmark.ts --verbose
 ```
+
+### Query stdout: table vs JSON (`benchmark:query`)
+
+After **`bun src/index.ts`** (or **`codemap`**) has created **`.codemap.db`** in the project you are measuring:
+
+```bash
+bun run benchmark:query
+```
+
+This runs **`scripts/benchmark-query-output.ts`**, which executes the same SQL with and without **`--json`** and prints line and byte counts. Default output uses **`console.table`**; **`--json`** emits a single JSON array — typically **smaller and easier for agents** to parse (see bundled **`templates/agents/`**). Requires a non-empty index at the repo root you run from.
 
 ### Custom scenarios (`CODEMAP_BENCHMARK_CONFIG`)
 

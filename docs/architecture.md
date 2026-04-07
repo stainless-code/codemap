@@ -117,7 +117,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 **Commands and flags** (index, query, **`codemap agents init`**, **`--root`**, **`--config`**, environment): [../README.md § CLI](../README.md#cli) — **do not duplicate** flag lists here; this section only adds implementation notes. From this repository: **`bun run dev`** or **`bun src/index.ts`** (same flags).
 
-**Query wiring:** **`src/cli/cmd-query.ts`** (argv, **`printQueryResult`**), **`src/cli/query-recipes.ts`** (**`QUERY_RECIPES`** — bundled SQL only source), **`src/cli/main.ts`** (**`--recipes-json`** / **`--print-sql`** exit before config/DB). With **`--json`**, errors use **`{"error":"…"}`** on stdout for SQL failures, DB open, and bootstrap (same shape); **`runQueryCmd`** sets **`process.exitCode`** instead of **`process.exit`**. The **`components-by-hooks`** recipe ranks by hook count with a **comma-based tally** on **`hooks_used`** (no SQLite JSON1).
+**Query wiring:** **`src/cli/cmd-query.ts`** (argv, **`printQueryResult`**), **`src/cli/query-recipes.ts`** (**`QUERY_RECIPES`** — bundled SQL only source), **`src/cli/main.ts`** (**`--recipes-json`** / **`--print-sql`** exit before config/DB). With **`--json`**, errors use **`{"error":"…"}`** on stdout for SQL failures, DB open, and bootstrap (same shape); **`runQueryCmd`** sets **`process.exitCode`** instead of **`process.exit`**. The **`components-by-hooks`** recipe ranks by hook count with a **comma-based tally** on **`hooks_used`** (no SQLite JSON1). Shipped **`templates/agents/`** documents **`codemap query --json`** as the primary agent example ([README § CLI](../README.md#cli)).
 
 **Agent templates:** `codemap agents init` — full matrix [agents.md](./agents.md).
 

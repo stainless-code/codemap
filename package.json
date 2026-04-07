@@ -43,6 +43,7 @@
   },
   "scripts": {
     "benchmark": "bun src/benchmark.ts",
+    "benchmark:query": "bun scripts/benchmark-query-output.ts",
     "build": "tsdown",
     "changeset": "changeset",
     "check": "bun run build && bun run --parallel format:check lint:ci test typecheck && bun run test:golden",

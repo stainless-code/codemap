@@ -21,9 +21,9 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | Action | Command |
 | ------ | ------- |
 | Incremental index | `codemap` |
-| Query | `codemap query "<SQL>"` |
-| Query (JSON) | `codemap query --json "<SQL>"` |
-| Query (recipe) | `codemap query --recipe fan-out` (see **`codemap query --help`**) |
+| Query (JSON — default for agents) | `codemap query --json "<SQL>"` |
+| Query (ASCII table — optional) | `codemap query "<SQL>"` |
+| Query (recipe) | `codemap query --json --recipe fan-out` (see **`codemap query --help`**) |
 | Recipe catalog (JSON) | `codemap query --recipes-json` |
 | Print one recipe’s SQL | `codemap query --print-sql fan-out` |
 
@@ -75,12 +75,14 @@ If the question looks like any of these → use the index:
 ## How to query
 
 ```bash
-codemap query "<SQL>"
+codemap query --json "<SQL>"
 ```
 
-**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. For automation and multi-row answers, prefer **`codemap query --json`** — stdout is a JSON array on success; **on failure**, stdout is **`{"error":"<message>"}`** and the process exits **1** (invalid SQL, database open errors, or **`query` bootstrap** failures such as config/resolver — not only SQL runtime errors). The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not truncated.
+**Human-readable:** Omit **`--json`** to print **`console.table`** to the terminal (optional; wide results use more lines and bytes than JSON).
 
-**Verbatim answers:** When the user asks for lists, counts, or enumerated structural data from the index, **paste or summarize from the query output without inventing rows** — do not substitute a prose “summary” that omits rows the user asked to see. Prefer **`--json`** so the full result set is unambiguous.
+**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. With **`--json`**, stdout is a JSON array on success; **on failure**, stdout is **`{"error":"<message>"}`** and the process exits **1** (invalid SQL, database open errors, or **`query` bootstrap** failures such as config/resolver — not only SQL runtime errors). The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not truncated.
+
+**Verbatim answers:** When the user asks for lists, counts, or enumerated structural data from the index, **paste or summarize from the query output without inventing rows** — do not substitute a prose “summary” that omits rows the user asked to see. Use **`--json`** so the full result set is unambiguous.
 
 ## Quick reference queries
 

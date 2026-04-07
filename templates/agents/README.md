@@ -2,7 +2,7 @@
 
 These files ship with **`@stainless-code/codemap`** for **`codemap agents init`** — written for **npm consumers** ( **`codemap`**, **`npx @stainless-code/codemap`**, etc.).
 
-In **this** repository, **`.agents/`** (and **`.cursor/`** symlinks) are **maintainer / dev** copies: examples use **`bun src/index.ts`** where that matters. **`templates/agents/`** is the **published** agent surface and is **not** required to match **`.agents/`** byte-for-byte (the **codemap** rule and skill intentionally differ).
+In **this** repository, **`.agents/`** (and **`.cursor/`** symlinks) are **maintainer / dev** copies: examples use **`bun src/index.ts`** where that matters. **`templates/agents/`** is the **published** agent surface and is **not** required to match **`.agents/`** byte-for-byte (the **codemap** rule and skill intentionally differ). Query examples in the **codemap** rule and skill lead with **`codemap query --json`**; omit **`--json`** for **`console.table`** in a terminal ([README § CLI](../../README.md#cli)).
 
 **Documentation:** [docs/agents.md](../../docs/agents.md) — interactive setup, **`.gitignore`**, and optional IDE wiring (Cursor, Copilot, …).
 

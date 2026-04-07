@@ -4,7 +4,7 @@ Use with **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`** pointed at the project un
 
 ## How to verify
 
-Run `codemap query` (or `bun src/index.ts query`) with the SQL in each section. Answers should match before you trust free-form chat prose.
+Run `codemap query --json` (or `bun src/index.ts query --json`) with the SQL in each section; omit **`--json`** if you prefer a terminal table. Answers should match before you trust free-form chat prose.
 
 ---
 
