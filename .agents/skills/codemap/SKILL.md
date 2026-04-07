@@ -18,7 +18,8 @@ After **`bun run build`**, **`node dist/index.mjs query …`** or a linked **`co
 
 ## Query output and agents
 
-- **`bun src/index.ts query --json`** prints a **JSON array** of row objects to stdout. On SQL error, stdout is **`{"error":"<message>"}`** and the process exits **1**.
+- **`bun src/index.ts query --json`** prints a **JSON array** of row objects to stdout on success.
+- **On failure**, stdout is a single object **`{"error":"<message>"}`** and the process exits **1**. This covers **invalid SQL**, **database open errors**, and **`query` bootstrap failures** (config load, resolver setup), not only SQL parse/runtime errors. The CLI sets **`process.exitCode`** instead of calling **`process.exit`**, so piped stdout is not cut off mid-stream.
 - The CLI **does not cap** how many rows SQLite returns — add **`LIMIT`** and **`ORDER BY`** in SQL when you need a bounded list.
 - When answering with structural facts from the index (lists of paths, symbols, dependency edges), **ground the answer in the query rows** — do not invent or silently drop rows. Prefer **`--json`** for large or multi-column results.
 
@@ -26,33 +27,37 @@ After **`bun run build`**, **`node dist/index.mjs query …`** or a linked **`co
 
 Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
-**CLI shortcuts:** **`bun src/index.ts query --recipe <id>`** runs bundled SQL (optional **`--json`**). **`bun src/index.ts query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**) as JSON (no index / DB required). **`bun src/index.ts query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`bun src/index.ts query --help`**. The fan-out rows match the SQL below; others align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.
+**CLI shortcuts:** **`bun src/index.ts query --recipe <id>`** runs bundled SQL (optional **`--json`**). **`bun src/index.ts query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**) as JSON (no index / DB required). **`bun src/index.ts query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`bun src/index.ts query --help`**.
 
-**Top files by dependency fan-out:**
+**Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is **`src/cli/query-recipes.ts`** (`QUERY_RECIPES`).
+
+The blocks below match **`fan-out`** and **`fan-out-sample`** in **`QUERY_RECIPES`**; other recipes align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.
+
+**Top files by dependency fan-out** (`fan-out`):
 
 ```sql
 SELECT from_path, COUNT(*) AS deps
 FROM dependencies
 GROUP BY from_path
-ORDER BY deps DESC
-LIMIT 10;
+ORDER BY deps DESC, from_path ASC
+LIMIT 10
 ```
 
-**Same ranking, plus up to five sample targets per file** (uses a correlated subquery; adjust **`LIMIT 5`** as needed):
+**Same ranking, plus up to five sample targets per file** (`fan-out-sample`):
 
 ```sql
 SELECT d.from_path,
   COUNT(*) AS deps,
   (SELECT GROUP_CONCAT(to_path, ' | ')
-   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path LIMIT 5))
+   FROM (SELECT to_path FROM dependencies d2 WHERE d2.from_path = d.from_path ORDER BY to_path ASC LIMIT 5))
     AS sample_targets
 FROM dependencies d
 GROUP BY d.from_path
-ORDER BY deps DESC
-LIMIT 10;
+ORDER BY deps DESC, d.from_path ASC
+LIMIT 10
 ```
 
-**JSON array samples (JSON1):** replace **`GROUP_CONCAT`** with **`json_group_array(to_path)`** in that subquery if your SQLite build has JSON1 — or use **`bun src/index.ts query --recipe fan-out-sample-json`**.
+**JSON array samples (JSON1):** use **`bun src/index.ts query --recipe fan-out-sample-json`** — or replace **`GROUP_CONCAT`** with **`json_group_array(to_path)`** in the inner subquery if your SQLite build has JSON1.
 
 ## Schema
 
