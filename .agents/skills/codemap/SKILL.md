@@ -93,6 +93,15 @@ LIMIT 10
 | value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
 | parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level  |
 
+### `calls` — Function-scoped call edges (deduped per file)
+
+| Column      | Type       | Description                     |
+| ----------- | ---------- | ------------------------------- |
+| id          | INTEGER PK | Auto-increment ID               |
+| file_path   | TEXT FK    | References `files(path)`        |
+| caller_name | TEXT       | Calling function/method name    |
+| callee_name | TEXT       | Called function or `obj.method` |
+
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
 | Column      | Type       | Description                                        |
@@ -233,6 +242,18 @@ WHERE parent_name = 'UserService' ORDER BY name;
 -- Top-level symbols only (skip nested helpers)
 SELECT name, kind, signature FROM symbols
 WHERE parent_name IS NULL AND file_path LIKE '%utils%';
+
+-- Who calls function X? (fan-in)
+SELECT DISTINCT caller_name, file_path FROM calls
+WHERE callee_name = 'fetchUser';
+
+-- What does function X call? (fan-out)
+SELECT DISTINCT callee_name FROM calls
+WHERE caller_name = 'processUser';
+
+-- Most-called functions (hotspots)
+SELECT callee_name, COUNT(*) as fan_in FROM calls
+GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10;
 
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail

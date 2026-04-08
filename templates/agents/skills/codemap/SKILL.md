@@ -93,6 +93,15 @@ LIMIT 10
 | value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
 | parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level  |
 
+### `calls` — Function-scoped call edges (deduped per file)
+
+| Column      | Type       | Description                     |
+| ----------- | ---------- | ------------------------------- |
+| id          | INTEGER PK | Auto-increment ID               |
+| file_path   | TEXT FK    | References `files(path)`        |
+| caller_name | TEXT       | Calling function/method name    |
+| callee_name | TEXT       | Called function or `obj.method` |
+
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
 | Column      | Type       | Description                                        |

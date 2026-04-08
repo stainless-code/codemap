@@ -189,6 +189,17 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | value             | TEXT       | Literal value for `const` declarations (strings, numbers, booleans, `null`). NULL for non-literal or non-const symbols. Handles `as const` and simple template literals             |
 | parent_name       | TEXT       | Name of the enclosing symbol (class, function) for nested symbols. NULL for top-level (module scope). Class methods/properties point to their class                                 |
 
+### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
+
+| Column      | Type       | Description                                                  |
+| ----------- | ---------- | ------------------------------------------------------------ |
+| id          | INTEGER PK | Auto-increment row id                                        |
+| file_path   | TEXT FK    | References `files(path)` ON DELETE CASCADE                   |
+| caller_name | TEXT       | Name of the calling function/method                          |
+| callee_name | TEXT       | Name of the called function or `obj.method` for member calls |
+
+Edges are deduped per file: if `foo` calls `bar` three times in the same file, only one row is stored. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
+
 ### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
 
 | Column      | Type       | Description                                               |

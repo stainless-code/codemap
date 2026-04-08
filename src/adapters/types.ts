@@ -28,6 +28,7 @@ export type ParsedFilePayload = Pick<
   | "components"
   | "markers"
   | "typeMembers"
+  | "calls"
   | "cssVariables"
   | "cssClasses"
   | "cssKeyframes"

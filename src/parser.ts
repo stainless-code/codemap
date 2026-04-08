@@ -15,6 +15,7 @@ import type {
   ComponentRow,
   MarkerRow,
   TypeMemberRow,
+  CallRow,
 } from "./db";
 import { extractMarkers } from "./markers";
 
@@ -25,6 +26,7 @@ interface ExtractedData {
   components: ComponentRow[];
   markers: MarkerRow[];
   typeMembers: TypeMemberRow[];
+  calls: CallRow[];
 }
 
 /**
@@ -81,6 +83,8 @@ export function extractFileData(
   const components: ComponentRow[] = [];
   const markers: MarkerRow[] = [];
   const typeMembers: TypeMemberRow[] = [];
+  const calls: CallRow[] = [];
+  const seenCalls = new Set<string>();
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -381,11 +385,46 @@ export function extractFileData(
       }
     },
 
+    MethodDefinition(node: any) {
+      const name = node.key?.name;
+      if (name) scopeStack.push(name);
+    },
+    "MethodDefinition:exit"(node: any) {
+      const name = node.key?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopeStack.pop();
+      }
+    },
+
     CallExpression(node: any) {
-      if (!currentFunctionScope) return;
+      if (currentFunctionScope) {
+        const callee = node.callee;
+        if (callee?.type === "Identifier" && /^use[A-Z]/.test(callee.name)) {
+          hookCalls.get(currentFunctionScope)?.add(callee.name);
+        }
+      }
+      const caller = currentParent();
+      if (!caller) return;
       const callee = node.callee;
-      if (callee?.type === "Identifier" && /^use[A-Z]/.test(callee.name)) {
-        hookCalls.get(currentFunctionScope)?.add(callee.name);
+      let calleeName: string | null = null;
+      if (callee?.type === "Identifier") {
+        calleeName = callee.name;
+      } else if (
+        callee?.type === "MemberExpression" &&
+        callee.object?.type === "Identifier"
+      ) {
+        calleeName = `${callee.object.name}.${callee.property?.name}`;
+      }
+      if (calleeName) {
+        const key = `${caller}>>${calleeName}`;
+        if (!seenCalls.has(key)) {
+          seenCalls.add(key);
+          calls.push({
+            file_path: relPath,
+            caller_name: caller,
+            callee_name: calleeName,
+          });
+        }
       }
     },
 
@@ -429,7 +468,7 @@ export function extractFileData(
     });
   }
 
-  return { symbols, imports, exports, components, markers, typeMembers };
+  return { symbols, imports, exports, components, markers, typeMembers, calls };
 }
 
 function staticImportToRow(

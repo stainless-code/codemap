@@ -122,6 +122,13 @@ export function createTables(db: CodemapDatabase) {
       line_number INTEGER
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      caller_name TEXT NOT NULL,
+      callee_name TEXT NOT NULL
+    ) STRICT;
+
     CREATE TABLE IF NOT EXISTS type_members (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
@@ -176,6 +183,10 @@ export function createIndexes(db: CodemapDatabase) {
 
     CREATE INDEX IF NOT EXISTS idx_type_members_symbol ON type_members(symbol_name, file_path, name, type, is_optional, is_readonly);
     CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
+
+    CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
   `);
 }
 
@@ -204,6 +215,7 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS calls;
     DROP TABLE IF EXISTS type_members;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
@@ -489,6 +501,22 @@ export function insertCssKeyframes(
     "INSERT INTO css_keyframes (file_path, name, line_number)",
     "(?,?,?)",
     (k, v) => v.push(k.file_path, k.name, k.line_number),
+  );
+}
+
+export interface CallRow {
+  file_path: string;
+  caller_name: string;
+  callee_name: string;
+}
+
+export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
+  batchInsert(
+    db,
+    calls,
+    "INSERT INTO calls (file_path, caller_name, callee_name)",
+    "(?,?,?)",
+    (c, v) => v.push(c.file_path, c.caller_name, c.callee_name),
   );
 }
 

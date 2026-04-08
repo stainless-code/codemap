@@ -24,6 +24,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     components: data.components,
     markers: data.markers,
     typeMembers: data.typeMembers,
+    calls: data.calls,
   };
 }
 

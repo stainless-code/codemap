@@ -58,6 +58,7 @@ If the question looks like any of these → use the index:
 | "What keyframe animations exist?" | `css_keyframes` |
 | "What fields does interface/type X have?" | `type_members` |
 | "Is symbol X deprecated?" / "What does X do?" | `symbols` (`doc_comment`) |
+| "Who calls X?" / "What does X call?" | `calls` |
 
 ## When Grep / Read IS appropriate
 
@@ -101,6 +102,9 @@ bun src/index.ts query --json "<SQL>"
 | Const values | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
 | Class members | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'` |
 | Top-level only | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'` |
+| Who calls X? | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'` |
+| What does X call? | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'` |
+| Call hotspots | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10` |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

@@ -379,6 +379,65 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("call graph extraction", () => {
+    it("extracts function-to-function calls", () => {
+      const src = `function foo() { bar(); baz(); }\nfunction bar() {}\nfunction baz() {}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.calls).toHaveLength(2);
+      expect(d.calls[0]).toMatchObject({
+        caller_name: "foo",
+        callee_name: "bar",
+      });
+      expect(d.calls[1]).toMatchObject({
+        caller_name: "foo",
+        callee_name: "baz",
+      });
+    });
+
+    it("extracts member expression calls", () => {
+      const src = `function init() { console.log("hi"); arr.push(1); }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const names = d.calls.map((c) => c.callee_name);
+      expect(names).toContain("console.log");
+      expect(names).toContain("arr.push");
+    });
+
+    it("deduplicates calls within same caller", () => {
+      const src = `function process() { save(); save(); save(); }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.calls).toHaveLength(1);
+      expect(d.calls[0]).toMatchObject({
+        caller_name: "process",
+        callee_name: "save",
+      });
+    });
+
+    it("tracks calls from arrow functions", () => {
+      const src = `const handler = () => { validate(); submit(); };\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.calls).toHaveLength(2);
+      expect(d.calls[0].caller_name).toBe("handler");
+    });
+
+    it("skips module-level calls (no caller scope)", () => {
+      const src = `configure();\nfunction foo() { bar(); }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.calls).toHaveLength(1);
+      expect(d.calls[0]).toMatchObject({
+        caller_name: "foo",
+        callee_name: "bar",
+      });
+    });
+
+    it("tracks calls from class methods", () => {
+      const src = `class Svc {\n  run() { this.validate(); fetch(); }\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const fromRun = d.calls.filter((c) => c.caller_name === "run");
+      expect(fromRun.length).toBeGreaterThanOrEqual(1);
+      expect(fromRun.map((c) => c.callee_name)).toContain("fetch");
+    });
+  });
+
   describe("component detection heuristic", () => {
     it("detects components that return JSX", () => {
       const src = `export function Card() { return <div>card</div>; }\n`;
