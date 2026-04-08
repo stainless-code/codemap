@@ -126,10 +126,11 @@ export function getChangedFiles(db: CodemapDatabase): {
       .filter(Boolean)
       .map((line: string) => line.slice(3).trim());
 
+    const indexedPaths = new Set(getAllFileHashes(db).keys());
     const allChanged = [...new Set([...diffFiles, ...statusFiles])].filter(
       (f) => {
         const ext = extname(f);
-        return ext in LANG_MAP;
+        return ext in LANG_MAP || indexedPaths.has(f);
       },
     );
 

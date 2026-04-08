@@ -1,5 +1,3 @@
-import { extname } from "node:path";
-
 import { createSchema, getAllFileHashes, setMeta } from "../db";
 import type { CodemapDatabase } from "../db";
 import {
@@ -9,7 +7,6 @@ import {
   getCurrentCommit,
   indexFiles,
   targetedReindex,
-  VALID_EXTENSIONS,
 } from "./index-engine";
 import type { IndexResult, IndexTableStats } from "./types";
 
@@ -82,10 +79,7 @@ export async function runCodemapIndex(
   }
 
   if (mode === "files") {
-    const targetFiles = (options.files ?? []).filter((f) => {
-      const ext = extname(f);
-      return VALID_EXTENSIONS.has(ext);
-    });
+    const targetFiles = options.files ?? [];
     if (targetFiles.length === 0) {
       return {
         mode: "files",
