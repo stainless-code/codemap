@@ -126,23 +126,28 @@ export function getChangedFiles(db: CodemapDatabase): {
       .filter(Boolean)
       .map((line: string) => line.slice(3).trim());
 
-    const indexedPaths = new Set(getAllFileHashes(db).keys());
-    const allChanged = [...new Set([...diffFiles, ...statusFiles])].filter(
+    const existingHashes = getAllFileHashes(db);
+    const allCandidates = [...new Set([...diffFiles, ...statusFiles])].filter(
       (f) => {
         const ext = extname(f);
-        return ext in LANG_MAP || indexedPaths.has(f);
+        return ext in LANG_MAP || existingHashes.has(f);
       },
     );
 
     const changed: string[] = [];
     const deleted: string[] = [];
 
-    for (const f of allChanged) {
+    for (const f of allCandidates) {
+      const absPath = join(getProjectRoot(), f);
+      let source: string;
       try {
-        statSync(join(getProjectRoot(), f));
-        changed.push(f);
+        source = readFileSync(absPath, "utf-8");
       } catch {
         deleted.push(f);
+        continue;
+      }
+      if (existingHashes.get(f) !== hashContent(source)) {
+        changed.push(f);
       }
     }
 
