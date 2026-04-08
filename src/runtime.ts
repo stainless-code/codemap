@@ -41,7 +41,14 @@ export function getTsconfigPath(): string | null {
 
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
-  const parts = relPath.split(/[/\\]/).filter(Boolean);
   const set = getExcludeDirNames();
-  return parts.some((p) => set.has(p));
+  let start = 0;
+  for (let i = 0; i <= relPath.length; i++) {
+    const ch = i < relPath.length ? relPath.charCodeAt(i) : 0;
+    if (ch === 47 || ch === 92 || i === relPath.length) {
+      if (i > start && set.has(relPath.slice(start, i))) return true;
+      start = i + 1;
+    }
+  }
+  return false;
 }

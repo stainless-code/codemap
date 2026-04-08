@@ -155,7 +155,7 @@ Optional **`codemap.config.ts`** (default export: object or async factory) or **
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap.db`**.
 
-Current schema version: **1** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
@@ -426,7 +426,7 @@ All bulk insert functions use a shared `batchInsert<T>()` helper that:
 - **Eliminates `.slice()` allocations** — iterates with index bounds (`i` to `end`) instead of copying array segments per batch
 - **Uses indexed `for (let j)` loops** — avoids per-batch iterator protocol overhead
 
-Batches of 100 rows per `INSERT ... VALUES (...),(...),(...)` statement reduce per-statement overhead (parse, plan, execute cycle) by ~100×.
+Batches of 500 rows per `INSERT ... VALUES (...),(...),(...)` statement reduce per-statement overhead (parse, plan, execute cycle) significantly.
 
 ### Sorted inserts
 
@@ -460,13 +460,13 @@ When `SCHEMA_VERSION` is bumped (after the first release, when DDL changes requi
 - `createSchema()` detects the mismatch automatically and calls `dropAll()` before recreating
 - No manual intervention needed — run the indexer and it auto-rebuilds on version change
 
-Until the first release, Codemap keeps **`SCHEMA_VERSION` at 1**; pull `--full` or delete `.codemap.db` when the DDL in `db.ts` changes without a version bump.
+When `SCHEMA_VERSION` changes, the indexer auto-detects the mismatch and triggers a full rebuild — no manual intervention needed.
 
 ## SQLite Performance Configuration
 
 ### `bun:sqlite` API
 
-All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements internally. On Node, the wrapper maintains a `Map<string, Statement>` cache so repeated `run()` and `query()` calls with the same SQL reuse a single prepared statement. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
+All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements internally. On Node, the wrapper maintains a `Map<string, Statement>` cache so repeated `run()` and `query()` calls with the same SQL reuse a single prepared statement. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 500, pre-computed placeholders, and zero-copy index-bounds iteration.
 
 ### PRAGMAs (set on every `openDb()`)
 

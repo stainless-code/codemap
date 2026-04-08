@@ -19,6 +19,9 @@ import type {
 } from "./db";
 import { extractMarkers } from "./markers";
 
+const RE_COMPONENT = /^[A-Z]/;
+const RE_HOOK = /^use[A-Z]/;
+
 interface ExtractedData {
   symbols: SymbolRow[];
   imports: ImportRow[];
@@ -115,9 +118,18 @@ export function extractFileData(
   const jsxScopes = new Set<string>(); // function scopes that contain JSX
   let currentFunctionScope: string | null = null;
   const scopeStack: string[] = [];
+  let _scopeStr = "";
   const currentParent = () =>
     scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
-  const currentScope = () => scopeStack.join(".");
+  const currentScope = () => _scopeStr;
+  const scopePush = (name: string) => {
+    scopeStack.push(name);
+    _scopeStr = _scopeStr ? `${_scopeStr}.${name}` : name;
+  };
+  const scopePop = () => {
+    scopeStack.pop();
+    _scopeStr = scopeStack.join(".");
+  };
 
   const visitor = new Visitor({
     FunctionDeclaration(node: any) {
@@ -144,8 +156,8 @@ export function extractFileData(
         parent_name: currentParent(),
       });
 
-      scopeStack.push(name);
-      if (isTsx && /^[A-Z]/.test(name)) {
+      scopePush(name);
+      if (isTsx && RE_COMPONENT.test(name)) {
         currentFunctionScope = name;
         hookCalls.set(name, new Set());
       }
@@ -153,7 +165,7 @@ export function extractFileData(
     "FunctionDeclaration:exit"(node: any) {
       const name = node.id?.name;
       if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopeStack.pop();
+        scopePop();
       }
       if (name && currentFunctionScope === name) {
         maybeAddComponent(name, node, false);
@@ -194,9 +206,9 @@ export function extractFileData(
         });
 
         if (isArrowOrFn) {
-          scopeStack.push(name);
+          scopePush(name);
         }
-        if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
+        if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {
           currentFunctionScope = name;
           hookCalls.set(name, new Set());
         }
@@ -213,7 +225,7 @@ export function extractFileData(
           init?.type === "ArrowFunctionExpression" ||
           init?.type === "FunctionExpression";
         if (isArrowOrFn && scopeStack[scopeStack.length - 1] === name) {
-          scopeStack.pop();
+          scopePop();
         }
         if (name && currentFunctionScope === name) {
           maybeAddComponent(name, init, true);
@@ -370,7 +382,7 @@ export function extractFileData(
         value: null,
         parent_name: currentParent(),
       });
-      scopeStack.push(name);
+      scopePush(name);
       extractClassMembers(
         node.body?.body,
         relPath,
@@ -384,25 +396,25 @@ export function extractFileData(
     "ClassDeclaration:exit"(node: any) {
       const name = node.id?.name;
       if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopeStack.pop();
+        scopePop();
       }
     },
 
     MethodDefinition(node: any) {
       const name = node.key?.name;
-      if (name) scopeStack.push(name);
+      if (name) scopePush(name);
     },
     "MethodDefinition:exit"(node: any) {
       const name = node.key?.name;
       if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopeStack.pop();
+        scopePop();
       }
     },
 
     CallExpression(node: any) {
       if (currentFunctionScope) {
         const callee = node.callee;
-        if (callee?.type === "Identifier" && /^use[A-Z]/.test(callee.name)) {
+        if (callee?.type === "Identifier" && RE_HOOK.test(callee.name)) {
           hookCalls.get(currentFunctionScope)?.add(callee.name);
         }
       }
@@ -447,7 +459,7 @@ export function extractFileData(
   markers.push(...extractMarkers(source, relPath));
 
   function maybeAddComponent(name: string, node: any, _isArrow: boolean) {
-    if (!isTsx || !/^[A-Z]/.test(name)) return;
+    if (!isTsx || !RE_COMPONENT.test(name)) return;
     const hooks = hookCalls.get(name);
     const hasJsx = jsxScopes.has(name);
     if (!hasJsx && !(hooks && hooks.size > 0)) return;
@@ -700,8 +712,10 @@ function findJsDoc(
   }
   if (best < 0) return null;
   const doc = docs[best];
-  const gap = source.slice(doc.end, nodeStart);
-  if (/[;{}]/.test(gap)) return null;
+  for (let i = doc.end; i < nodeStart; i++) {
+    const ch = source.charCodeAt(i);
+    if (ch === 59 || ch === 123 || ch === 125) return null; // ; { }
+  }
   return doc.text || null;
 }
 

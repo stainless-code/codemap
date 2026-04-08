@@ -9,6 +9,7 @@ Richer symbol metadata: generics, return types, JSDoc, type members, const value
 - New `type_members` table indexes properties and methods of interfaces and object-literal types
 - New `value` column on symbols captures const literal values (strings, numbers, booleans, null)
 - New `parent_name` column on symbols tracks scope nesting; class methods/properties/getters extracted as individual symbols
-- New `calls` table tracks function-scoped call edges (deduped per file) for fan-in/fan-out and impact analysis
+- New `calls` table tracks function-scoped call edges with `caller_scope` for qualified disambiguation (deduped per file)
 - Enum members extracted into `members` column as JSON
+- Performance: cached scope strings, hoisted hot-path regex, batch deletes, reduced redundant I/O, BATCH_SIZE 100→500
 - SCHEMA_VERSION bumped to 2

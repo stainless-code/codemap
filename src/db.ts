@@ -291,7 +291,7 @@ export interface SymbolRow {
   parent_name: string | null;
 }
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 500;
 
 function batchInsert<T>(
   db: CodemapDatabase,

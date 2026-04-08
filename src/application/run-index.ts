@@ -1,4 +1,4 @@
-import { createSchema, getAllFileHashes, setMeta } from "../db";
+import { createSchema, setMeta } from "../db";
 import type { CodemapDatabase } from "../db";
 import {
   collectFiles,
@@ -115,7 +115,7 @@ export async function runCodemapIndex(
     }
     deleteFilesFromIndex(db, diff.deleted, quiet);
     if (diff.changed.length > 0) {
-      const indexedPaths = new Set(getAllFileHashes(db).keys());
+      const indexedPaths = diff.existingPaths;
       for (const f of diff.changed) indexedPaths.add(f);
       const run = await indexFiles(db, diff.changed, false, indexedPaths, {
         quiet,
