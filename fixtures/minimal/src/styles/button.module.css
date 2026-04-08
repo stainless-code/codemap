@@ -1,0 +1,15 @@
+@import "../theme.css";
+
+.primary {
+  background: var(--color-brand);
+  color: white;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

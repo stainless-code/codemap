@@ -1,0 +1,12 @@
+[
+  {
+    "name": "container",
+    "file_path": "src/theme.css",
+    "is_module": 0
+  },
+  {
+    "name": "primary",
+    "file_path": "src/styles/button.module.css",
+    "is_module": 1
+  }
+]

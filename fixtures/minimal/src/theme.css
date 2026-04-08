@@ -1,3 +1,8 @@
 :root {
   --color-brand: #3366cc;
+  --spacing-md: 1rem;
+}
+
+.container {
+  max-width: 960px;
 }
