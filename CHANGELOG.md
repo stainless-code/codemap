@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.2.1
+
+### Patch Changes
+
+- [`7f663be`](https://github.com/stainless-code/codemap/commit/7f663befa4ff45aafe9fd053c68fb929f49bf2eb) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Sync bundled agent rule template with schema v2: add `type_members`, `calls`, and `doc_comment` trigger patterns and query rows. Add golden scenarios and fixture coverage for both new tables.
+
 ## 0.2.0
 
 ### Minor Changes
