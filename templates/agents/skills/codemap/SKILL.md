@@ -95,12 +95,13 @@ LIMIT 10
 
 ### `calls` — Function-scoped call edges (deduped per file)
 
-| Column      | Type       | Description                     |
-| ----------- | ---------- | ------------------------------- |
-| id          | INTEGER PK | Auto-increment ID               |
-| file_path   | TEXT FK    | References `files(path)`        |
-| caller_name | TEXT       | Calling function/method name    |
-| callee_name | TEXT       | Called function or `obj.method` |
+| Column       | Type       | Description                                     |
+| ------------ | ---------- | ----------------------------------------------- |
+| id           | INTEGER PK | Auto-increment ID                               |
+| file_path    | TEXT FK    | References `files(path)`                        |
+| caller_name  | TEXT       | Calling function/method name                    |
+| caller_scope | TEXT       | Dot-joined scope path (e.g. `MyClass.run`)      |
+| callee_name  | TEXT       | Called function, `obj.method`, or `this.method` |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
@@ -218,6 +219,42 @@ FROM symbols WHERE file_path LIKE '%settings-provider%' AND is_exported = 1;
 -- Enum values (what are the valid members of an enum?)
 SELECT name, members FROM symbols
 WHERE kind = 'enum' AND name = 'TransactionStatus';
+
+-- Interface / type shape (what fields does a type have?)
+SELECT name, type, is_optional, is_readonly FROM type_members
+WHERE symbol_name = 'UserSession';
+
+-- Deprecated symbols (find @deprecated via JSDoc)
+SELECT name, kind, file_path, doc_comment FROM symbols
+WHERE doc_comment LIKE '%@deprecated%';
+
+-- Symbol documentation
+SELECT name, signature, doc_comment FROM symbols
+WHERE name = 'formatCurrency' AND doc_comment IS NOT NULL;
+
+-- Const values (config flags, magic strings)
+SELECT name, value, file_path FROM symbols
+WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%URL%';
+
+-- Class methods (what does class X expose?)
+SELECT name, kind, signature FROM symbols
+WHERE parent_name = 'UserService' ORDER BY name;
+
+-- Top-level symbols only (skip nested helpers)
+SELECT name, kind, signature FROM symbols
+WHERE parent_name IS NULL AND file_path LIKE '%utils%';
+
+-- Who calls function X? (fan-in)
+SELECT DISTINCT caller_name, file_path FROM calls
+WHERE callee_name = 'fetchUser';
+
+-- What does function X call? (fan-out)
+SELECT DISTINCT callee_name FROM calls
+WHERE caller_name = 'processUser';
+
+-- Most-called functions (hotspots)
+SELECT callee_name, COUNT(*) as fan_in FROM calls
+GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10;
 
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail

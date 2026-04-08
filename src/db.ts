@@ -126,6 +126,7 @@ export function createTables(db: CodemapDatabase) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       caller_name TEXT NOT NULL,
+      caller_scope TEXT NOT NULL,
       callee_name TEXT NOT NULL
     ) STRICT;
 
@@ -507,6 +508,7 @@ export function insertCssKeyframes(
 export interface CallRow {
   file_path: string;
   caller_name: string;
+  caller_scope: string;
   callee_name: string;
 }
 
@@ -514,9 +516,9 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, callee_name)",
-    "(?,?,?)",
-    (c, v) => v.push(c.file_path, c.caller_name, c.callee_name),
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name)",
+    "(?,?,?,?)",
+    (c, v) => v.push(c.file_path, c.caller_name, c.caller_scope, c.callee_name),
   );
 }
 

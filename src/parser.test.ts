@@ -386,10 +386,12 @@ describe("extractFileData", () => {
       expect(d.calls).toHaveLength(2);
       expect(d.calls[0]).toMatchObject({
         caller_name: "foo",
+        caller_scope: "foo",
         callee_name: "bar",
       });
       expect(d.calls[1]).toMatchObject({
         caller_name: "foo",
+        caller_scope: "foo",
         callee_name: "baz",
       });
     });
@@ -417,6 +419,7 @@ describe("extractFileData", () => {
       const d = extractFileData("/proj/x.ts", src, "x.ts");
       expect(d.calls).toHaveLength(2);
       expect(d.calls[0].caller_name).toBe("handler");
+      expect(d.calls[0].caller_scope).toBe("handler");
     });
 
     it("skips module-level calls (no caller scope)", () => {
@@ -429,12 +432,23 @@ describe("extractFileData", () => {
       });
     });
 
-    it("tracks calls from class methods", () => {
+    it("tracks calls from class methods with qualified scope", () => {
       const src = `class Svc {\n  run() { this.validate(); fetch(); }\n}\n`;
       const d = extractFileData("/proj/x.ts", src, "x.ts");
       const fromRun = d.calls.filter((c) => c.caller_name === "run");
-      expect(fromRun.length).toBeGreaterThanOrEqual(1);
+      expect(fromRun.length).toBe(2);
       expect(fromRun.map((c) => c.callee_name)).toContain("fetch");
+      expect(fromRun.map((c) => c.callee_name)).toContain("this.validate");
+      expect(fromRun[0].caller_scope).toBe("Svc.run");
+    });
+
+    it("distinguishes same-named methods across classes", () => {
+      const src = `class A { run() { foo(); } }\nclass B { run() { bar(); } }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.calls).toHaveLength(2);
+      const scopes = d.calls.map((c) => c.caller_scope);
+      expect(scopes).toContain("A.run");
+      expect(scopes).toContain("B.run");
     });
   });
 

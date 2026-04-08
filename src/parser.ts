@@ -117,6 +117,7 @@ export function extractFileData(
   const scopeStack: string[] = [];
   const currentParent = () =>
     scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
+  const currentScope = () => scopeStack.join(".");
 
   const visitor = new Visitor({
     FunctionDeclaration(node: any) {
@@ -202,7 +203,9 @@ export function extractFileData(
       }
     },
     "VariableDeclaration:exit"(node: any) {
-      for (const decl of node.declarations) {
+      const decls = node.declarations;
+      for (let i = decls.length - 1; i >= 0; i--) {
+        const decl = decls[i];
         const name = decl.id?.name;
         if (!name) continue;
         const init = decl.init;
@@ -409,19 +412,22 @@ export function extractFileData(
       let calleeName: string | null = null;
       if (callee?.type === "Identifier") {
         calleeName = callee.name;
-      } else if (
-        callee?.type === "MemberExpression" &&
-        callee.object?.type === "Identifier"
-      ) {
-        calleeName = `${callee.object.name}.${callee.property?.name}`;
+      } else if (callee?.type === "MemberExpression" && callee.property?.name) {
+        if (callee.object?.type === "Identifier") {
+          calleeName = `${callee.object.name}.${callee.property.name}`;
+        } else if (callee.object?.type === "ThisExpression") {
+          calleeName = `this.${callee.property.name}`;
+        }
       }
       if (calleeName) {
-        const key = `${caller}>>${calleeName}`;
+        const scope = currentScope();
+        const key = `${scope}>>${calleeName}`;
         if (!seenCalls.has(key)) {
           seenCalls.add(key);
           calls.push({
             file_path: relPath,
             caller_name: caller,
+            caller_scope: scope,
             callee_name: calleeName,
           });
         }

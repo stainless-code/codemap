@@ -178,7 +178,7 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | id                | INTEGER PK | Auto-increment row id                                                                                                                                                               |
 | file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                                                                          |
 | name              | TEXT       | Symbol name                                                                                                                                                                         |
-| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`                                                                                                                           |
+| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`, `method`, `property`, `getter`, `setter` (last four are class members)                                                   |
 | line_start        | INTEGER    | Start line (1-based)                                                                                                                                                                |
 | line_end          | INTEGER    | End line                                                                                                                                                                            |
 | signature         | TEXT       | Reconstructed signature with generics and return types (e.g. `identity<T>(val): T`, `interface Repo<T> extends Iterable<T>`, `class Store<T> extends Base<T> implements IStore<T>`) |
@@ -191,14 +191,15 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
 
-| Column      | Type       | Description                                                  |
-| ----------- | ---------- | ------------------------------------------------------------ |
-| id          | INTEGER PK | Auto-increment row id                                        |
-| file_path   | TEXT FK    | References `files(path)` ON DELETE CASCADE                   |
-| caller_name | TEXT       | Name of the calling function/method                          |
-| callee_name | TEXT       | Name of the called function or `obj.method` for member calls |
+| Column       | Type       | Description                                                                        |
+| ------------ | ---------- | ---------------------------------------------------------------------------------- |
+| id           | INTEGER PK | Auto-increment row id                                                              |
+| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                         |
+| caller_name  | TEXT       | Name of the calling function/method                                                |
+| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Disambiguates same-named methods   |
+| callee_name  | TEXT       | Name of the called function, `obj.method` for member calls, `this.method` for self |
 
-Edges are deduped per file: if `foo` calls `bar` three times in the same file, only one row is stored. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
+Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` three times in the same file, only one row is stored. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
 ### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
 

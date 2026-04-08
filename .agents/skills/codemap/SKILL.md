@@ -95,12 +95,13 @@ LIMIT 10
 
 ### `calls` — Function-scoped call edges (deduped per file)
 
-| Column      | Type       | Description                     |
-| ----------- | ---------- | ------------------------------- |
-| id          | INTEGER PK | Auto-increment ID               |
-| file_path   | TEXT FK    | References `files(path)`        |
-| caller_name | TEXT       | Calling function/method name    |
-| callee_name | TEXT       | Called function or `obj.method` |
+| Column       | Type       | Description                                     |
+| ------------ | ---------- | ----------------------------------------------- |
+| id           | INTEGER PK | Auto-increment ID                               |
+| file_path    | TEXT FK    | References `files(path)`                        |
+| caller_name  | TEXT       | Calling function/method name                    |
+| caller_scope | TEXT       | Dot-joined scope path (e.g. `MyClass.run`)      |
+| callee_name  | TEXT       | Called function, `obj.method`, or `this.method` |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
