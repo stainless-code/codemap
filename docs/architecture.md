@@ -187,6 +187,7 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | members           | TEXT       | JSON array of enum members (NULL for non-enums). Each entry: `{"name":"…","value":"…"}` (value omitted for implicit-value enums)                                                    |
 | doc_comment       | TEXT       | Leading JSDoc comment text (cleaned: `*` prefixes stripped, trimmed). NULL when absent. Preserves `@deprecated`, `@param`, etc. tags                                                |
 | value             | TEXT       | Literal value for `const` declarations (strings, numbers, booleans, `null`). NULL for non-literal or non-const symbols. Handles `as const` and simple template literals             |
+| parent_name       | TEXT       | Name of the enclosing symbol (class, function) for nested symbols. NULL for top-level (module scope). Class methods/properties point to their class                                 |
 
 ### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
 

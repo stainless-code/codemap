@@ -322,6 +322,63 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("symbol nesting and scope", () => {
+    it("top-level symbols have null parent_name", () => {
+      const src = `export function foo(): void {}\nexport const bar = 42;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "foo")?.parent_name).toBeNull();
+      expect(d.symbols.find((s) => s.name === "bar")?.parent_name).toBeNull();
+    });
+
+    it("nested function declarations get parent_name", () => {
+      const src = `export function outer(): void {\n  function inner(): void {}\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "inner")?.parent_name).toBe(
+        "outer",
+      );
+    });
+
+    it("nested arrow functions get parent_name", () => {
+      const src = `export function Component(): void {\n  const handler = (): void => {};\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "handler")?.parent_name).toBe(
+        "Component",
+      );
+    });
+
+    it("class methods get parent_name", () => {
+      const src = `export class Svc {\n  async run(id: string): Promise<void> {}\n  static create(): Svc { return new Svc(); }\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const run = d.symbols.find((s) => s.name === "run");
+      expect(run?.parent_name).toBe("Svc");
+      expect(run?.kind).toBe("method");
+      expect(run?.signature).toContain("async");
+      const create = d.symbols.find((s) => s.name === "create");
+      expect(create?.parent_name).toBe("Svc");
+      expect(create?.signature).toContain("static");
+    });
+
+    it("class properties get parent_name", () => {
+      const src = `export class Config {\n  private host: string;\n  readonly port = 3000;\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const host = d.symbols.find((s) => s.name === "host");
+      expect(host?.parent_name).toBe("Config");
+      expect(host?.kind).toBe("property");
+      expect(host?.signature).toContain("private");
+      const port = d.symbols.find((s) => s.name === "port");
+      expect(port?.signature).toContain("readonly");
+      expect(port?.value).toBe("3000");
+    });
+
+    it("class getters get kind getter", () => {
+      const src = `export class Store {\n  get count(): number { return 0; }\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const count = d.symbols.find((s) => s.name === "count");
+      expect(count?.kind).toBe("getter");
+      expect(count?.parent_name).toBe("Store");
+    });
+  });
+
   describe("component detection heuristic", () => {
     it("detects components that return JSX", () => {
       const src = `export function Card() { return <div>card</div>; }\n`;

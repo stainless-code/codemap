@@ -91,6 +91,7 @@ LIMIT 10
 | members           | TEXT       | JSON enum members (NULL for non-enums)                    |
 | doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
 | value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
+| parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level  |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 

@@ -91,6 +91,7 @@ LIMIT 10
 | members           | TEXT       | JSON enum members (NULL for non-enums)                    |
 | doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
 | value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
+| parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level  |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
@@ -224,6 +225,14 @@ WHERE name = 'formatCurrency' AND doc_comment IS NOT NULL;
 -- Const values (config flags, magic strings)
 SELECT name, value, file_path FROM symbols
 WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%URL%';
+
+-- Class methods (what does class X expose?)
+SELECT name, kind, signature FROM symbols
+WHERE parent_name = 'UserService' ORDER BY name;
+
+-- Top-level symbols only (skip nested helpers)
+SELECT name, kind, signature FROM symbols
+WHERE parent_name IS NULL AND file_path LIKE '%utils%';
 
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail

@@ -110,6 +110,9 @@ export function extractFileData(
   const hookCalls = new Map<string, Set<string>>(); // function scope name -> hook names
   const jsxScopes = new Set<string>(); // function scopes that contain JSX
   let currentFunctionScope: string | null = null;
+  const scopeStack: string[] = [];
+  const currentParent = () =>
+    scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
 
   const visitor = new Visitor({
     FunctionDeclaration(node: any) {
@@ -133,8 +136,10 @@ export function extractFileData(
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
+        parent_name: currentParent(),
       });
 
+      scopeStack.push(name);
       if (isTsx && /^[A-Z]/.test(name)) {
         currentFunctionScope = name;
         hookCalls.set(name, new Set());
@@ -142,6 +147,9 @@ export function extractFileData(
     },
     "FunctionDeclaration:exit"(node: any) {
       const name = node.id?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopeStack.pop();
+      }
       if (name && currentFunctionScope === name) {
         maybeAddComponent(name, node, false);
         currentFunctionScope = null;
@@ -177,8 +185,12 @@ export function extractFileData(
           members: null,
           doc_comment: findJsDoc(jsDocComments, node.start, source),
           value: isArrowOrFn ? null : extractLiteralValue(init),
+          parent_name: currentParent(),
         });
 
+        if (isArrowOrFn) {
+          scopeStack.push(name);
+        }
         if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
           currentFunctionScope = name;
           hookCalls.set(name, new Set());
@@ -188,8 +200,16 @@ export function extractFileData(
     "VariableDeclaration:exit"(node: any) {
       for (const decl of node.declarations) {
         const name = decl.id?.name;
+        if (!name) continue;
+        const init = decl.init;
+        const isArrowOrFn =
+          init?.type === "ArrowFunctionExpression" ||
+          init?.type === "FunctionExpression";
+        if (isArrowOrFn && scopeStack[scopeStack.length - 1] === name) {
+          scopeStack.pop();
+        }
         if (name && currentFunctionScope === name) {
-          maybeAddComponent(name, decl.init, true);
+          maybeAddComponent(name, init, true);
           currentFunctionScope = null;
         }
       }
@@ -212,6 +232,7 @@ export function extractFileData(
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
+        parent_name: currentParent(),
       });
       if (node.typeAnnotation?.type === "TSTypeLiteral") {
         extractObjectMembers(
@@ -256,6 +277,7 @@ export function extractFileData(
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
+        parent_name: currentParent(),
       });
       extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
@@ -293,6 +315,7 @@ export function extractFileData(
         members,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
+        parent_name: currentParent(),
       });
     },
 
@@ -338,7 +361,24 @@ export function extractFileData(
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
+        parent_name: currentParent(),
       });
+      scopeStack.push(name);
+      extractClassMembers(
+        node.body?.body,
+        relPath,
+        name,
+        lineMap,
+        symbols,
+        jsDocComments,
+        source,
+      );
+    },
+    "ClassDeclaration:exit"(node: any) {
+      const name = node.id?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopeStack.pop();
+      }
     },
 
     CallExpression(node: any) {
@@ -618,6 +658,73 @@ function findJsDoc(
   const gap = source.slice(doc.end, nodeStart);
   if (/[;{}]/.test(gap)) return null;
   return doc.text || null;
+}
+
+function extractClassMembers(
+  members: any[] | undefined,
+  filePath: string,
+  className: string,
+  lineMap: number[],
+  out: SymbolRow[],
+  jsDocComments: JsDocEntry[],
+  source: string,
+) {
+  if (!members?.length) return;
+  for (const m of members) {
+    const name = m.key?.name;
+    if (!name) continue;
+
+    if (m.type === "MethodDefinition") {
+      const fn = m.value;
+      const kind =
+        m.kind === "get" ? "getter" : m.kind === "set" ? "setter" : "method";
+      let prefix = "";
+      if (m.accessibility && m.accessibility !== "public") {
+        prefix += `${m.accessibility} `;
+      }
+      if (m.static) prefix += "static ";
+      if (fn?.async) prefix += "async ";
+      const sig = `${prefix}${buildFunctionSignature(name, fn)}`;
+      out.push({
+        file_path: filePath,
+        name,
+        kind,
+        line_start: offsetToLine(lineMap, m.start),
+        line_end: offsetToLine(lineMap, m.end),
+        signature: sig,
+        is_exported: 0,
+        is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, m.start, source),
+        value: null,
+        parent_name: className,
+      });
+    } else if (m.type === "PropertyDefinition") {
+      let prefix = "";
+      if (m.accessibility && m.accessibility !== "public") {
+        prefix += `${m.accessibility} `;
+      }
+      if (m.static) prefix += "static ";
+      if (m.readonly) prefix += "readonly ";
+      const ta = m.typeAnnotation?.typeAnnotation;
+      const typeStr = ta ? stringifyTypeNode(ta) : null;
+      const sig = typeStr ? `${prefix}${name}: ${typeStr}` : `${prefix}${name}`;
+      out.push({
+        file_path: filePath,
+        name,
+        kind: "property",
+        line_start: offsetToLine(lineMap, m.start),
+        line_end: offsetToLine(lineMap, m.end),
+        signature: sig,
+        is_exported: 0,
+        is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, m.start, source),
+        value: extractLiteralValue(m.value),
+        parent_name: className,
+      });
+    }
+  }
 }
 
 function extractLiteralValue(init: any): string | null {
