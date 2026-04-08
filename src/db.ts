@@ -5,9 +5,8 @@ import {
 } from "./sqlite-db";
 
 /**
- * Pre-release: keep at **1** until the first npm release — do not bump for DDL
- * tweaks; run `--full` locally after pulling. After v1.0, bump in lockstep with
- * `createTables` / `createIndexes` when the on-disk schema changes.
+ * Bump in lockstep with `createTables` / `createIndexes` whenever on-disk schema
+ * changes. `createSchema()` rebuilds automatically on version mismatch.
  */
 export const SCHEMA_VERSION = 2;
 
@@ -186,6 +185,7 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
 
     CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
   `);

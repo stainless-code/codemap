@@ -311,8 +311,13 @@ All tables have covering indexes tuned for AI agent query patterns. See [Coverin
 
 Uses the Rust-based `oxc-parser` via NAPI bindings to parse TypeScript/TSX/JS/JSX files into an AST. Extracts:
 
-- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures including generic type parameters (e.g. `<T extends Base>`), return type annotations (e.g. `: Promise<void>`), class/interface heritage (`extends`, `implements`)
-- **Enum members**: String and numeric values for each member, stored as JSON (e.g. `[{"name":"Active","value":"active"}]`)
+- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures including generic type parameters (e.g. `<T extends Base>`), return type annotations (e.g. `: Promise<void>`), class/interface heritage (`extends`, `implements`). Class methods, properties, getters, and setters are extracted as individual symbols with `parent_name` pointing to their class
+- **JSDoc**: Leading `/** … */` comments attached to symbols via `doc_comment` column (cleaned: `*` prefixes stripped, tags preserved)
+- **Enum members**: String and numeric values for each member, stored as JSON in the `members` column (e.g. `[{"name":"Active","value":"active"}]`)
+- **Const values**: Literal values (`string`, `number`, `boolean`, `null`, `as const`, simple template literals) stored in the `value` column
+- **Type members**: Properties and method signatures of interfaces and object-literal type aliases, stored in the `type_members` table
+- **Call graph**: Function-scoped call edges stored in the `calls` table — deduped per (caller_scope, callee) per file. Captures `obj.method()` and `this.method()` patterns
+- **Symbol nesting**: `parent_name` column tracks scope (nested functions → parent function, class members → class name)
 - **Imports**: All `import` statements with specifiers, source paths, and type-only flags
 - **Exports**: Named exports, default exports, re-exports
 - **Components**: React components detected via PascalCase name + (JSX return **or** hook usage). A PascalCase function in `.tsx`/`.jsx` that neither returns JSX nor calls hooks is indexed only as a symbol, not a component. Extracts props type and hooks used
