@@ -71,10 +71,21 @@ function openRaw(path: string): SqliteInner {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const BetterSqlite = require("better-sqlite3") as BetterSqlite;
   const rawDb = new BetterSqlite(path);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stmtCache = new Map<string, any>();
+
+  function cachedPrepare(sql: string) {
+    let stmt = stmtCache.get(sql);
+    if (!stmt) {
+      stmt = rawDb.prepare(sql);
+      stmtCache.set(sql, stmt);
+    }
+    return stmt;
+  }
 
   return {
     run(sql: string, params?: BindValues) {
-      const stmt = rawDb.prepare(sql);
+      const stmt = cachedPrepare(sql);
       if (params !== undefined && params.length > 0) {
         stmt.run(...params);
       } else {
@@ -82,7 +93,7 @@ function openRaw(path: string): SqliteInner {
       }
     },
     query(sql: string) {
-      const stmt = rawDb.prepare(sql);
+      const stmt = cachedPrepare(sql);
       return {
         get(...params: unknown[]) {
           return stmt.get(...params);
