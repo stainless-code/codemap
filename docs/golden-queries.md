@@ -69,12 +69,13 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 ## Status
 
-| Area                          | State                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------- |
-| Tier A runner + CI            | **`bun run test:golden`** in `check`                                    |
-| Tier B external + schema      | **`test:golden:external`**, Zod in **`scripts/query-golden/schema.ts`** |
-| Subset matchers + budgets     | **`match`**, **`budgetMs`**, **`--strict-budget`**                      |
-| Optional CI for public corpus | Deferred — [roadmap § Backlog](./roadmap.md#backlog)                    |
+| Area                          | State                                                                                                                                   |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Tier A runner + CI            | **`bun run test:golden`** in `check`                                                                                                    |
+| Tier A scenario coverage      | 13 scenarios across all indexed tables: files, symbols, imports, exports, components, dependencies, markers, CSS vars/classes/keyframes |
+| Tier B external + schema      | **`test:golden:external`**, Zod in **`scripts/query-golden/schema.ts`**                                                                 |
+| Subset matchers + budgets     | **`match`**, **`budgetMs`**, **`--strict-budget`**                                                                                      |
+| Optional CI for public corpus | Deferred — [roadmap § Backlog](./roadmap.md#backlog)                                                                                    |
 
 ---
 

@@ -129,7 +129,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 
 ### `--files` (targeted reindex)
 
-When specific file paths are passed via `--files`, the indexer skips git diff, git status, and the full filesystem glob scan. It reads the set of already-indexed paths from the database (for import resolution), then only processes the listed files. Files that no longer exist on disk are automatically removed from the index via `ON DELETE CASCADE`.
+When specific file paths are passed via `--files`, the indexer skips git diff, git status, and the full filesystem glob scan. It reads the set of already-indexed paths from the database (for import resolution), then only processes the listed files. Files with non-standard extensions (e.g. custom `include` globs) are accepted and indexed as text; a warning is printed but they are not skipped. Files that no longer exist on disk are automatically removed from the index via `ON DELETE CASCADE`.
 
 ## Programmatic usage
 
@@ -208,7 +208,7 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | is_default       | INTEGER    | 1 if default export          |
 | re_export_source | TEXT       | Source module if re-exported |
 
-### `components` — React components (detected by JSX return + PascalCase) (`STRICT`)
+### `components` — React components (detected by PascalCase + JSX return or hook usage) (`STRICT`)
 
 | Column            | Type       | Description                   |
 | ----------------- | ---------- | ----------------------------- |
@@ -286,7 +286,7 @@ Uses the Rust-based `oxc-parser` via NAPI bindings to parse TypeScript/TSX/JS/JS
 - **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures
 - **Imports**: All `import` statements with specifiers, source paths, and type-only flags
 - **Exports**: Named exports, default exports, re-exports
-- **Components**: React components detected via PascalCase name + JSX return. Extracts props type and hooks used
+- **Components**: React components detected via PascalCase name + (JSX return **or** hook usage). A PascalCase function in `.tsx`/`.jsx` that neither returns JSX nor calls hooks is indexed only as a symbol, not a component. Extracts props type and hooks used
 - **Markers**: `TODO`, `FIXME`, `HACK`, `NOTE` comments with line numbers
 
 ### CSS — `css-parser.ts` (`lightningcss`)
@@ -327,9 +327,10 @@ The indexer uses git to detect changes since the last indexed commit:
 
 1. **Stores `last_indexed_commit`** (HEAD SHA) in the `meta` table after each run
 2. On next run, computes `git diff --name-only <last_commit>..HEAD` + `git status --porcelain`
-3. Only re-indexes changed files (SHA-256 content comparison), using DB-sourced `indexedPaths` for import resolution (skips full `collectFiles()` glob scan)
-4. Deleted files are removed via `ON DELETE CASCADE` — deleting from `files` cascades to all related tables
-5. Falls back to full rebuild if commit history is incompatible (e.g. force push, branch switch)
+3. Filters changed files to those with a known extension **or** already present in the `files` table (so custom-extension files indexed during `--full` are re-indexed on subsequent incremental runs)
+4. Only re-indexes changed files (SHA-256 content comparison), using DB-sourced `indexedPaths` for import resolution (skips full `collectFiles()` glob scan)
+5. Deleted files are removed via `ON DELETE CASCADE` — deleting from `files` cascades to all related tables
+6. Falls back to full rebuild if commit history is incompatible (e.g. force push, branch switch)
 
 ## File Artifacts
 
@@ -436,7 +437,7 @@ Until the first release, Codemap keeps **`SCHEMA_VERSION` at 1**; pull `--full` 
 
 ### `bun:sqlite` API
 
-All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements; on Node, `better-sqlite3` re-prepares on each call via the wrapper's `run()` method. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
+All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements internally. On Node, the wrapper maintains a `Map<string, Statement>` cache so repeated `run()` and `query()` calls with the same SQL reuse a single prepared statement. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
 
 ### PRAGMAs (set on every `openDb()`)
 
@@ -456,6 +457,8 @@ All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper a
 | ---------------- | ----- | ------------------------------------------------------------------ |
 | `analysis_limit` | `400` | Caps rows sampled by `optimize` to keep it fast                    |
 | `optimize`       | —     | Gathers query planner statistics (`sqlite_stat1`) for better plans |
+
+Read-only query paths (`printQueryResult`, `queryRows`) call `closeDb` with `{ readonly: true }`, which skips both PRAGMAs to avoid write contention under concurrent `codemap query` processes.
 
 ### WITHOUT ROWID tables
 
