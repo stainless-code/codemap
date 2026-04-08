@@ -1,15 +1,13 @@
-import { extname } from "node:path";
-
 import { createSchema, getAllFileHashes, setMeta } from "../db";
 import type { CodemapDatabase } from "../db";
 import {
   collectFiles,
   deleteFilesFromIndex,
+  fetchTableStats,
   getChangedFiles,
   getCurrentCommit,
   indexFiles,
   targetedReindex,
-  VALID_EXTENSIONS,
 } from "./index-engine";
 import type { IndexResult, IndexTableStats } from "./types";
 
@@ -42,7 +40,7 @@ export interface RunIndexOptions {
   mode?: IndexMode;
   /**
    * Paths relative to the project root; used only when `mode === "files"`.
-   * Non-indexable extensions are filtered out.
+   * All paths are forwarded as-is; non-standard extensions are indexed as text.
    */
   files?: string[];
   /**
@@ -82,10 +80,7 @@ export async function runCodemapIndex(
   }
 
   if (mode === "files") {
-    const targetFiles = (options.files ?? []).filter((f) => {
-      const ext = extname(f);
-      return VALID_EXTENSIONS.has(ext);
-    });
+    const targetFiles = options.files ?? [];
     if (targetFiles.length === 0) {
       return {
         mode: "files",
@@ -139,7 +134,7 @@ export async function runCodemapIndex(
         indexed: 0,
         skipped: 0,
         elapsedMs: 0,
-        stats: fetchStats(db),
+        stats: fetchTableStats(db),
         idle: true,
       };
     }
@@ -149,7 +144,7 @@ export async function runCodemapIndex(
       indexed: 0,
       skipped: 0,
       elapsedMs: 0,
-      stats: fetchStats(db),
+      stats: fetchTableStats(db),
       idle: true,
     };
   }
@@ -168,23 +163,4 @@ export async function runCodemapIndex(
     elapsedMs: run.elapsedMs,
     stats: run.stats,
   };
-}
-
-function fetchStats(db: CodemapDatabase): IndexTableStats {
-  const row = db
-    .query<Record<string, number>>(
-      `SELECT
-        (SELECT COUNT(*) FROM files) as files,
-        (SELECT COUNT(*) FROM symbols) as symbols,
-        (SELECT COUNT(*) FROM imports) as imports,
-        (SELECT COUNT(*) FROM exports) as exports,
-        (SELECT COUNT(*) FROM components) as components,
-        (SELECT COUNT(*) FROM dependencies) as dependencies,
-        (SELECT COUNT(*) FROM markers) as markers,
-        (SELECT COUNT(*) FROM css_variables) as css_vars,
-        (SELECT COUNT(*) FROM css_classes) as css_classes,
-        (SELECT COUNT(*) FROM css_keyframes) as css_keyframes`,
-    )
-    .get()!;
-  return row as IndexTableStats;
 }

@@ -20,14 +20,12 @@ export async function runIndexCmd(opts: {
   const db = openDb();
   try {
     if (args[0] === "--files" && args.length > 1) {
-      const targetFiles = args.slice(1).filter((f) => {
-        const ext = extname(f);
-        if (!VALID_EXTENSIONS.has(ext)) {
-          console.warn(`  Skipping ${f}: unsupported extension "${ext}"`);
-          return false;
+      const targetFiles = args.slice(1);
+      for (const f of targetFiles) {
+        if (!VALID_EXTENSIONS.has(extname(f))) {
+          console.warn(`  ${f}: non-standard extension, indexing as text`);
         }
-        return true;
-      });
+      }
       if (targetFiles.length > 0) {
         await runCodemapIndex(db, {
           mode: "files",

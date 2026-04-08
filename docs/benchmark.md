@@ -206,9 +206,12 @@ The benchmark also measures the cost of keeping the index fresh (3 runs each, sa
 
 #### `fixtures/minimal/`
 
-Small **private** package (not published) with intentional:
+Small **private** package (not published) with intentional coverage of all indexed tables:
 
-- `usePermissions`, `~/api/client` import, `components/shop/*`, `utils/date`, CSS variables, and a TODO marker.
+- **Symbols / imports / dependencies**: `usePermissions`, `~/api/client` path alias, `components/shop/*`, `utils/date`
+- **Components**: `ShopButton` (JSX return) + `FormatPrice` (PascalCase non-component — validates detection heuristic)
+- **CSS**: variables (`--color-brand`, `--spacing-md`), class selectors (`.container`, `.primary` in a `.module.css`), `@keyframes fadeIn`, `@import` edge
+- **Markers**: `TODO` (in `notes.md`) + `FIXME` (in `consumer.ts`)
 
 **Local:**
 

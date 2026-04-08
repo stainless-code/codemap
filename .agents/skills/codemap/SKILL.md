@@ -68,7 +68,7 @@ LIMIT 10
 | Column        | Type    | Description                                                                      |
 | ------------- | ------- | -------------------------------------------------------------------------------- |
 | path          | TEXT PK | Relative path from project root                                                  |
-| content_hash  | TEXT    | Wyhash fingerprint (base-36)                                                     |
+| content_hash  | TEXT    | SHA-256 hex digest                                                               |
 | size          | INTEGER | File size in bytes                                                               |
 | line_count    | INTEGER | Number of lines                                                                  |
 | language      | TEXT    | `ts`, `tsx`, `js`, `jsx`, `css`, `md`, `mdx`, `mdc`, `json`, `yaml`, `sh`, `txt` |
@@ -77,17 +77,17 @@ LIMIT 10
 
 ### `symbols` — Functions, types, interfaces, enums, constants, classes
 
-| Column            | Type       | Description                                                           |
-| ----------------- | ---------- | --------------------------------------------------------------------- |
-| id                | INTEGER PK | Auto-increment ID                                                     |
-| file_path         | TEXT FK    | References `files(path)`                                              |
-| name              | TEXT       | Symbol name                                                           |
-| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const`, `variable` |
-| line_start        | INTEGER    | Start line (1-based)                                                  |
-| line_end          | INTEGER    | End line (1-based)                                                    |
-| signature         | TEXT       | e.g. `createHandler()`, `type UserProps`                              |
-| is_exported       | INTEGER    | 1 if exported                                                         |
-| is_default_export | INTEGER    | 1 if default export                                                   |
+| Column            | Type       | Description                                               |
+| ----------------- | ---------- | --------------------------------------------------------- |
+| id                | INTEGER PK | Auto-increment ID                                         |
+| file_path         | TEXT FK    | References `files(path)`                                  |
+| name              | TEXT       | Symbol name                                               |
+| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const` |
+| line_start        | INTEGER    | Start line (1-based)                                      |
+| line_end          | INTEGER    | End line (1-based)                                        |
+| signature         | TEXT       | e.g. `createHandler()`, `type UserProps`                  |
+| is_exported       | INTEGER    | 1 if exported                                             |
+| is_default_export | INTEGER    | 1 if default export                                       |
 
 ### `imports` — Import statements
 

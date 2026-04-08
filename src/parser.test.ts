@@ -35,9 +35,46 @@ describe("extractFileData", () => {
     });
 
     it("treats .tsx as JSX for PascalCase function components", () => {
-      const src = `export function Button() { return null; }\n`;
+      const src = `export function Button() { return <button>click</button>; }\n`;
       const d = extractFileData("/proj/x.tsx", src, "x.tsx");
       expect(d.components.some((c) => c.name === "Button")).toBe(true);
+    });
+  });
+
+  describe("component detection heuristic", () => {
+    it("detects components that return JSX", () => {
+      const src = `export function Card() { return <div>card</div>; }\n`;
+      const d = extractFileData("/proj/x.tsx", src, "x.tsx");
+      expect(d.components.some((c) => c.name === "Card")).toBe(true);
+    });
+
+    it("detects arrow components that return JSX", () => {
+      const src = `export const Card = () => <div>card</div>;\n`;
+      const d = extractFileData("/proj/x.tsx", src, "x.tsx");
+      expect(d.components.some((c) => c.name === "Card")).toBe(true);
+    });
+
+    it("detects components that use hooks", () => {
+      const src = `export function Timer() { useEffect(() => {}); return null; }\n`;
+      const d = extractFileData("/proj/x.tsx", src, "x.tsx");
+      expect(d.components.some((c) => c.name === "Timer")).toBe(true);
+    });
+
+    it("rejects PascalCase functions without JSX or hooks", () => {
+      const src = [
+        `export function FormatCurrency(n: number): string { return "$"+n; }`,
+        `export function ValidateEmail(e: string): boolean { return e.includes("@"); }`,
+      ].join("\n");
+      const d = extractFileData("/proj/x.tsx", src, "x.tsx");
+      expect(d.components).toHaveLength(0);
+    });
+
+    it("rejects PascalCase functions that return null without hooks", () => {
+      const src = `export function EmptyPlaceholder() { return null; }\n`;
+      const d = extractFileData("/proj/x.tsx", src, "x.tsx");
+      expect(d.components.some((c) => c.name === "EmptyPlaceholder")).toBe(
+        false,
+      );
     });
   });
 });

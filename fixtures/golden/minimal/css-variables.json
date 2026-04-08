@@ -1,0 +1,10 @@
+[
+  {
+    "name": "--color-brand",
+    "value": "rgb(51, 102, 204)"
+  },
+  {
+    "name": "--spacing-md",
+    "value": "1rem"
+  }
+]

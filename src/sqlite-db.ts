@@ -60,7 +60,6 @@ function runSql(inner: SqliteInner, sql: string, params?: BindValues): void {
 
 function openRaw(path: string): SqliteInner {
   if (typeof Bun !== "undefined") {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Database } = require("bun:sqlite") as {
       Database: new (path: string, opts?: { create?: boolean }) => unknown;
     };
@@ -68,13 +67,22 @@ function openRaw(path: string): SqliteInner {
   }
 
   type BetterSqlite = typeof import("better-sqlite3");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const BetterSqlite = require("better-sqlite3") as BetterSqlite;
   const rawDb = new BetterSqlite(path);
+  const stmtCache = new Map<string, any>();
+
+  function cachedPrepare(sql: string) {
+    let stmt = stmtCache.get(sql);
+    if (!stmt) {
+      stmt = rawDb.prepare(sql);
+      stmtCache.set(sql, stmt);
+    }
+    return stmt;
+  }
 
   return {
     run(sql: string, params?: BindValues) {
-      const stmt = rawDb.prepare(sql);
+      const stmt = cachedPrepare(sql);
       if (params !== undefined && params.length > 0) {
         stmt.run(...params);
       } else {
@@ -82,7 +90,7 @@ function openRaw(path: string): SqliteInner {
       }
     },
     query(sql: string) {
-      const stmt = rawDb.prepare(sql);
+      const stmt = cachedPrepare(sql);
       return {
         get(...params: unknown[]) {
           return stmt.get(...params);
@@ -107,12 +115,13 @@ function wrap(inner: SqliteInner): CodemapDatabase {
       runSql(inner, sql, params);
     },
     query<T>(sql: string) {
+      const stmt = inner.query(sql);
       return {
         get(...params: unknown[]) {
-          return inner.query(sql).get(...params) as T | undefined;
+          return stmt.get(...params) as T | undefined;
         },
         all(...params: unknown[]) {
-          return inner.query(sql).all(...params) as T[];
+          return stmt.all(...params) as T[];
         },
       };
     },

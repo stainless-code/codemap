@@ -126,10 +126,11 @@ export function getChangedFiles(db: CodemapDatabase): {
       .filter(Boolean)
       .map((line: string) => line.slice(3).trim());
 
+    const indexedPaths = new Set(getAllFileHashes(db).keys());
     const allChanged = [...new Set([...diffFiles, ...statusFiles])].filter(
       (f) => {
         const ext = extname(f);
-        return ext in LANG_MAP;
+        return ext in LANG_MAP || indexedPaths.has(f);
       },
     );
 
@@ -186,19 +187,18 @@ function insertParsedResults(
           }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
 
-          if (parsed.cssImportSources) {
-            for (const importSource of parsed.cssImportSources) {
-              insertImports(db, [
-                {
-                  file_path: parsed.relPath,
-                  source: importSource,
-                  resolved_path: null,
-                  specifiers: "[]",
-                  is_type_only: 0,
-                  line_number: 0,
-                },
-              ]);
-            }
+          if (parsed.cssImportSources?.length) {
+            insertImports(
+              db,
+              parsed.cssImportSources.map((importSource) => ({
+                file_path: parsed.relPath,
+                source: importSource,
+                resolved_path: null,
+                specifiers: "[]",
+                is_type_only: 0,
+                line_number: 0,
+              })),
+            );
           }
         } else {
           if (parsed.symbols?.length) insertSymbols(db, parsed.symbols);
@@ -230,7 +230,7 @@ function insertParsedResults(
   return indexed;
 }
 
-function fetchTableStats(db: CodemapDatabase): IndexTableStats {
+export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
   const row = db
     .query<Record<string, number>>(
       `SELECT
@@ -333,17 +333,18 @@ export async function indexFiles(
               insertCssKeyframes(db, cssData.keyframes);
             }
             if (cssData.markers.length) insertMarkers(db, cssData.markers);
-            for (const importSource of cssData.importSources) {
-              insertImports(db, [
-                {
+            if (cssData.importSources.length) {
+              insertImports(
+                db,
+                cssData.importSources.map((importSource) => ({
                   file_path: relPath,
                   source: importSource,
                   resolved_path: null,
                   specifiers: "[]",
                   is_type_only: 0,
                   line_number: 0,
-                },
-              ]);
+                })),
+              );
             }
           } else {
             const data = extractFileData(absPath, source, relPath);
@@ -475,7 +476,7 @@ export function printQueryResult(
     }
     return 1;
   } finally {
-    if (db !== undefined) closeDb(db);
+    if (db !== undefined) closeDb(db, { readonly: true });
   }
 }
 
@@ -488,6 +489,6 @@ export function queryRows(sql: string): unknown[] {
   try {
     return db.query(sql).all();
   } finally {
-    closeDb(db);
+    closeDb(db, { readonly: true });
   }
 }

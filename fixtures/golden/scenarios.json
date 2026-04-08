@@ -28,5 +28,40 @@
     "id": "markers-notes-todo",
     "prompt": "TODO marker in fixture notes markdown",
     "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
+  },
+  {
+    "id": "exports-client",
+    "prompt": "What does src/api/client.ts export?",
+    "sql": "SELECT name, kind FROM exports WHERE file_path = 'src/api/client.ts'"
+  },
+  {
+    "id": "css-variables",
+    "prompt": "Which CSS custom properties (design tokens) are defined?",
+    "sql": "SELECT name, value FROM css_variables ORDER BY name"
+  },
+  {
+    "id": "css-classes-module",
+    "prompt": "Which CSS classes exist and are any from CSS modules?",
+    "sql": "SELECT name, file_path, is_module FROM css_classes ORDER BY name"
+  },
+  {
+    "id": "css-keyframes",
+    "prompt": "Which @keyframes animations are defined?",
+    "sql": "SELECT name, file_path FROM css_keyframes"
+  },
+  {
+    "id": "css-imports",
+    "prompt": "Which CSS files import other stylesheets?",
+    "sql": "SELECT file_path, source FROM imports WHERE file_path LIKE '%.css'"
+  },
+  {
+    "id": "markers-all-kinds",
+    "prompt": "How many markers of each kind exist?",
+    "sql": "SELECT kind, COUNT(*) as n FROM markers GROUP BY kind ORDER BY kind"
+  },
+  {
+    "id": "components-no-false-positives",
+    "prompt": "Which components are detected (FormatPrice should not appear)?",
+    "sql": "SELECT name FROM components ORDER BY name"
   }
 ]
