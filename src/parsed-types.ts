@@ -8,6 +8,8 @@ import type {
   CssVariableRow,
   CssClassRow,
   CssKeyframeRow,
+  TypeMemberRow,
+  CallRow,
 } from "./db";
 
 /**
@@ -24,6 +26,8 @@ export interface ParsedFile {
   exports?: ExportRow[];
   components?: ComponentRow[];
   markers?: MarkerRow[];
+  typeMembers?: TypeMemberRow[];
+  calls?: CallRow[];
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];
   cssKeyframes?: CssKeyframeRow[];

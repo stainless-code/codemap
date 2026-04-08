@@ -14,8 +14,13 @@ import type {
   ExportRow,
   ComponentRow,
   MarkerRow,
+  TypeMemberRow,
+  CallRow,
 } from "./db";
 import { extractMarkers } from "./markers";
+
+const RE_COMPONENT = /^[A-Z]/;
+const RE_HOOK = /^use[A-Z]/;
 
 interface ExtractedData {
   symbols: SymbolRow[];
@@ -23,6 +28,8 @@ interface ExtractedData {
   exports: ExportRow[];
   components: ComponentRow[];
   markers: MarkerRow[];
+  typeMembers: TypeMemberRow[];
+  calls: CallRow[];
 }
 
 /**
@@ -71,11 +78,16 @@ export function extractFileData(
   const lineMap = buildLineMap(source);
   const mod = result.module;
 
+  const jsDocComments = buildJsDocIndex(result.comments);
+
   const symbols: SymbolRow[] = [];
   const imports: ImportRow[] = [];
   const exports: ExportRow[] = [];
   const components: ComponentRow[] = [];
   const markers: MarkerRow[] = [];
+  const typeMembers: TypeMemberRow[] = [];
+  const calls: CallRow[] = [];
+  const seenCalls = new Set<string>();
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -105,6 +117,19 @@ export function extractFileData(
   const hookCalls = new Map<string, Set<string>>(); // function scope name -> hook names
   const jsxScopes = new Set<string>(); // function scopes that contain JSX
   let currentFunctionScope: string | null = null;
+  const scopeStack: string[] = [];
+  let _scopeStr = "";
+  const currentParent = () =>
+    scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
+  const currentScope = () => _scopeStr;
+  const scopePush = (name: string) => {
+    scopeStack.push(name);
+    _scopeStr = _scopeStr ? `${_scopeStr}.${name}` : name;
+  };
+  const scopePop = () => {
+    scopeStack.pop();
+    _scopeStr = scopeStack.join(".");
+  };
 
   const visitor = new Visitor({
     FunctionDeclaration(node: any) {
@@ -125,15 +150,23 @@ export function extractFileData(
         signature: buildFunctionSignature(name, node),
         is_exported: isExported ? 1 : 0,
         is_default_export: isDefault ? 1 : 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
+        parent_name: currentParent(),
       });
 
-      if (isTsx && /^[A-Z]/.test(name)) {
+      scopePush(name);
+      if (isTsx && RE_COMPONENT.test(name)) {
         currentFunctionScope = name;
         hookCalls.set(name, new Set());
       }
     },
     "FunctionDeclaration:exit"(node: any) {
       const name = node.id?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopePop();
+      }
       if (name && currentFunctionScope === name) {
         maybeAddComponent(name, node, false);
         currentFunctionScope = null;
@@ -166,19 +199,36 @@ export function extractFileData(
             : `const ${name}`,
           is_exported: isExported ? 1 : 0,
           is_default_export: isDefault ? 1 : 0,
+          members: null,
+          doc_comment: findJsDoc(jsDocComments, node.start, source),
+          value: isArrowOrFn ? null : extractLiteralValue(init),
+          parent_name: currentParent(),
         });
 
-        if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
+        if (isArrowOrFn) {
+          scopePush(name);
+        }
+        if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {
           currentFunctionScope = name;
           hookCalls.set(name, new Set());
         }
       }
     },
     "VariableDeclaration:exit"(node: any) {
-      for (const decl of node.declarations) {
+      const decls = node.declarations;
+      for (let i = decls.length - 1; i >= 0; i--) {
+        const decl = decls[i];
         const name = decl.id?.name;
+        if (!name) continue;
+        const init = decl.init;
+        const isArrowOrFn =
+          init?.type === "ArrowFunctionExpression" ||
+          init?.type === "FunctionExpression";
+        if (isArrowOrFn && scopeStack[scopeStack.length - 1] === name) {
+          scopePop();
+        }
         if (name && currentFunctionScope === name) {
-          maybeAddComponent(name, decl.init, true);
+          maybeAddComponent(name, init, true);
           currentFunctionScope = null;
         }
       }
@@ -188,38 +238,90 @@ export function extractFileData(
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
       symbols.push({
         file_path: relPath,
         name,
         kind: "type",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `type ${name}`,
+        signature: `type ${name}${tp}`,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
+        parent_name: currentParent(),
       });
+      if (node.typeAnnotation?.type === "TSTypeLiteral") {
+        extractObjectMembers(
+          node.typeAnnotation.members,
+          relPath,
+          name,
+          typeMembers,
+        );
+      }
     },
 
     TSInterfaceDeclaration(node: any) {
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
+      let sig = `interface ${name}${tp}`;
+      if (node.extends?.length) {
+        const bases = node.extends
+          .map((e: any) => {
+            const base = e.expression?.name ?? e.typeName?.name ?? "";
+            if (!base) return null;
+            const ta = e.typeArguments ?? e.typeParameters;
+            if (ta?.params?.length) {
+              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+              if (args.length) return `${base}<${args.join(", ")}>`;
+            }
+            return base;
+          })
+          .filter(Boolean);
+        if (bases.length) sig += ` extends ${bases.join(", ")}`;
+      }
       symbols.push({
         file_path: relPath,
         name,
         kind: "interface",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `interface ${name}`,
+        signature: sig,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
+        parent_name: currentParent(),
       });
+      extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
 
     TSEnumDeclaration(node: any) {
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const enumMembers = node.body?.members;
+      let members: string | null = null;
+      if (enumMembers?.length) {
+        const extracted = enumMembers.map((m: any) => {
+          const mName = m.id?.name ?? m.id?.value;
+          if (!mName) return null;
+          const init = m.initializer;
+          let mValue: string | number | null = null;
+          if (init?.type === "Literal" || init?.type === "StringLiteral")
+            mValue = init.value;
+          else if (init?.type === "NumericLiteral") mValue = init.value;
+          return mValue !== null && mValue !== undefined
+            ? { name: mName, value: mValue }
+            : { name: mName };
+        });
+        members = JSON.stringify(extracted.filter(Boolean));
+      }
       symbols.push({
         file_path: relPath,
         name,
@@ -229,6 +331,10 @@ export function extractFileData(
         signature: `enum ${name}`,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
+        parent_name: currentParent(),
       });
     },
 
@@ -237,23 +343,106 @@ export function extractFileData(
       if (!name) return;
       const isExported =
         exportedNames.has(name) || defaultExportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
+      let sig = `class ${name}${tp}`;
+      if (node.superClass?.name) {
+        sig += ` extends ${node.superClass.name}`;
+        const sta = node.superTypeArguments ?? node.superTypeParameters;
+        if (sta?.params?.length) {
+          const args = sta.params.map(stringifyTypeNode).filter(Boolean);
+          if (args.length) sig += `<${args.join(", ")}>`;
+        }
+      }
+      if (node.implements?.length) {
+        const impls = node.implements
+          .map((i: any) => {
+            const n = i.expression?.name ?? "";
+            if (!n) return null;
+            const ta = i.typeArguments ?? i.typeParameters;
+            if (ta?.params?.length) {
+              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+              if (args.length) return `${n}<${args.join(", ")}>`;
+            }
+            return n;
+          })
+          .filter(Boolean);
+        if (impls.length) sig += ` implements ${impls.join(", ")}`;
+      }
       symbols.push({
         file_path: relPath,
         name,
         kind: "class",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `class ${name}`,
+        signature: sig,
         is_exported: isExported ? 1 : 0,
         is_default_export: defaultExportedNames.has(name) ? 1 : 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
+        parent_name: currentParent(),
       });
+      scopePush(name);
+      extractClassMembers(
+        node.body?.body,
+        relPath,
+        name,
+        lineMap,
+        symbols,
+        jsDocComments,
+        source,
+      );
+    },
+    "ClassDeclaration:exit"(node: any) {
+      const name = node.id?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopePop();
+      }
+    },
+
+    MethodDefinition(node: any) {
+      const name = node.key?.name;
+      if (name) scopePush(name);
+    },
+    "MethodDefinition:exit"(node: any) {
+      const name = node.key?.name;
+      if (name && scopeStack[scopeStack.length - 1] === name) {
+        scopePop();
+      }
     },
 
     CallExpression(node: any) {
-      if (!currentFunctionScope) return;
+      if (currentFunctionScope) {
+        const callee = node.callee;
+        if (callee?.type === "Identifier" && RE_HOOK.test(callee.name)) {
+          hookCalls.get(currentFunctionScope)?.add(callee.name);
+        }
+      }
+      const caller = currentParent();
+      if (!caller) return;
       const callee = node.callee;
-      if (callee?.type === "Identifier" && /^use[A-Z]/.test(callee.name)) {
-        hookCalls.get(currentFunctionScope)?.add(callee.name);
+      let calleeName: string | null = null;
+      if (callee?.type === "Identifier") {
+        calleeName = callee.name;
+      } else if (callee?.type === "MemberExpression" && callee.property?.name) {
+        if (callee.object?.type === "Identifier") {
+          calleeName = `${callee.object.name}.${callee.property.name}`;
+        } else if (callee.object?.type === "ThisExpression") {
+          calleeName = `this.${callee.property.name}`;
+        }
+      }
+      if (calleeName) {
+        const scope = currentScope();
+        const key = `${scope}>>${calleeName}`;
+        if (!seenCalls.has(key)) {
+          seenCalls.add(key);
+          calls.push({
+            file_path: relPath,
+            caller_name: caller,
+            caller_scope: scope,
+            callee_name: calleeName,
+          });
+        }
       }
     },
 
@@ -270,7 +459,7 @@ export function extractFileData(
   markers.push(...extractMarkers(source, relPath));
 
   function maybeAddComponent(name: string, node: any, _isArrow: boolean) {
-    if (!isTsx || !/^[A-Z]/.test(name)) return;
+    if (!isTsx || !RE_COMPONENT.test(name)) return;
     const hooks = hookCalls.get(name);
     const hasJsx = jsxScopes.has(name);
     if (!hasJsx && !(hooks && hooks.size > 0)) return;
@@ -297,7 +486,7 @@ export function extractFileData(
     });
   }
 
-  return { symbols, imports, exports, components, markers };
+  return { symbols, imports, exports, components, markers, typeMembers, calls };
 }
 
 function staticImportToRow(
@@ -361,11 +550,303 @@ function exportEntryToRow(
   };
 }
 
+function stringifyTypeNode(node: any): string | null {
+  if (!node) return null;
+  switch (node.type) {
+    case "TSTypeReference": {
+      let name: string | null = null;
+      const tn = node.typeName;
+      if (tn?.type === "Identifier") name = tn.name;
+      else if (typeof tn?.name === "string") name = tn.name;
+      else if (tn?.type === "TSQualifiedName")
+        name = `${tn.left?.name ?? ""}.${tn.right?.name ?? ""}`;
+      if (!name) return null;
+      const ta = node.typeArguments ?? node.typeParameters;
+      if (ta?.params?.length) {
+        const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+        if (args.length) return `${name}<${args.join(", ")}>`;
+      }
+      return name;
+    }
+    case "TSStringKeyword":
+      return "string";
+    case "TSNumberKeyword":
+      return "number";
+    case "TSBooleanKeyword":
+      return "boolean";
+    case "TSVoidKeyword":
+      return "void";
+    case "TSNullKeyword":
+      return "null";
+    case "TSUndefinedKeyword":
+      return "undefined";
+    case "TSAnyKeyword":
+      return "any";
+    case "TSNeverKeyword":
+      return "never";
+    case "TSUnknownKeyword":
+      return "unknown";
+    case "TSObjectKeyword":
+      return "object";
+    case "TSBigIntKeyword":
+      return "bigint";
+    case "TSSymbolKeyword":
+      return "symbol";
+    case "TSArrayType": {
+      const elem = stringifyTypeNode(node.elementType);
+      return elem ? `${elem}[]` : null;
+    }
+    case "TSUnionType": {
+      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
+      return types?.length ? types.join(" | ") : null;
+    }
+    case "TSIntersectionType": {
+      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
+      return types?.length ? types.join(" & ") : null;
+    }
+    case "TSTupleType": {
+      const elems = node.elementTypes?.map(stringifyTypeNode).filter(Boolean);
+      return `[${elems?.join(", ") ?? ""}]`;
+    }
+    case "TSLiteralType": {
+      const lit = node.literal;
+      if (lit?.type === "StringLiteral") return `"${lit.value}"`;
+      if (lit?.type === "NumericLiteral") return String(lit.value);
+      if (lit?.type === "BooleanLiteral") return String(lit.value);
+      return null;
+    }
+    case "TSTypeQuery": {
+      const exprName = node.exprName;
+      const n =
+        typeof exprName?.name === "string" ? exprName.name : exprName?.name;
+      return n ? `typeof ${n}` : null;
+    }
+    case "TSTypeOperator": {
+      const inner = stringifyTypeNode(node.typeAnnotation);
+      return inner ? `${node.operator} ${inner}` : null;
+    }
+    case "TSThisType":
+      return "this";
+    default:
+      return null;
+  }
+}
+
+function stringifyTypeParams(typeParameters: any): string {
+  const params = typeParameters?.params;
+  if (!params?.length) return "";
+  const parts = params.map((p: any) => {
+    const name = typeof p.name === "string" ? p.name : (p.name?.name ?? "?");
+    let s = name;
+    if (p.constraint) {
+      const c = stringifyTypeNode(p.constraint);
+      if (c) s += ` extends ${c}`;
+    }
+    if (p.default) {
+      const d = stringifyTypeNode(p.default);
+      if (d) s += ` = ${d}`;
+    }
+    return s;
+  });
+  return `<${parts.join(", ")}>`;
+}
+
 function buildFunctionSignature(name: string, node: any): string {
+  const typeParams = stringifyTypeParams(node?.typeParameters);
   const params = node?.params;
-  if (!params || params.length === 0) return `${name}()`;
-  const paramNames = params
-    .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
-    .join(", ");
-  return `${name}(${paramNames})`;
+  let paramStr = "";
+  if (params?.length) {
+    paramStr = params
+      .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
+      .join(", ");
+  }
+  let sig = `${name}${typeParams}(${paramStr})`;
+  const returnType = node?.returnType?.typeAnnotation;
+  if (returnType) {
+    const rt = stringifyTypeNode(returnType);
+    if (rt) sig += `: ${rt}`;
+  }
+  return sig;
+}
+
+interface JsDocEntry {
+  end: number;
+  text: string;
+}
+
+function buildJsDocIndex(comments: any[]): JsDocEntry[] {
+  if (!comments?.length) return [];
+  const docs: JsDocEntry[] = [];
+  for (const c of comments) {
+    if (c.type !== "Block" || !c.value.startsWith("*")) continue;
+    docs.push({ end: c.end, text: cleanJsDoc(c.value) });
+  }
+  return docs;
+}
+
+function cleanJsDoc(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/^\s*\*\s?/, ""))
+    .join("\n")
+    .trim();
+}
+
+function findJsDoc(
+  docs: JsDocEntry[],
+  nodeStart: number,
+  source: string,
+): string | null {
+  if (!docs.length) return null;
+  let lo = 0;
+  let hi = docs.length - 1;
+  let best = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (docs[mid].end <= nodeStart) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  if (best < 0) return null;
+  const doc = docs[best];
+  for (let i = doc.end; i < nodeStart; i++) {
+    const ch = source.charCodeAt(i);
+    if (ch === 59 || ch === 123 || ch === 125) return null; // ; { }
+  }
+  return doc.text || null;
+}
+
+function extractClassMembers(
+  members: any[] | undefined,
+  filePath: string,
+  className: string,
+  lineMap: number[],
+  out: SymbolRow[],
+  jsDocComments: JsDocEntry[],
+  source: string,
+) {
+  if (!members?.length) return;
+  for (const m of members) {
+    const name = m.key?.name;
+    if (!name) continue;
+
+    if (m.type === "MethodDefinition") {
+      const fn = m.value;
+      const kind =
+        m.kind === "get" ? "getter" : m.kind === "set" ? "setter" : "method";
+      let prefix = "";
+      if (m.accessibility && m.accessibility !== "public") {
+        prefix += `${m.accessibility} `;
+      }
+      if (m.static) prefix += "static ";
+      if (fn?.async) prefix += "async ";
+      const sig = `${prefix}${buildFunctionSignature(name, fn)}`;
+      out.push({
+        file_path: filePath,
+        name,
+        kind,
+        line_start: offsetToLine(lineMap, m.start),
+        line_end: offsetToLine(lineMap, m.end),
+        signature: sig,
+        is_exported: 0,
+        is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, m.start, source),
+        value: null,
+        parent_name: className,
+      });
+    } else if (m.type === "PropertyDefinition") {
+      let prefix = "";
+      if (m.accessibility && m.accessibility !== "public") {
+        prefix += `${m.accessibility} `;
+      }
+      if (m.static) prefix += "static ";
+      if (m.readonly) prefix += "readonly ";
+      const ta = m.typeAnnotation?.typeAnnotation;
+      const typeStr = ta ? stringifyTypeNode(ta) : null;
+      const sig = typeStr ? `${prefix}${name}: ${typeStr}` : `${prefix}${name}`;
+      out.push({
+        file_path: filePath,
+        name,
+        kind: "property",
+        line_start: offsetToLine(lineMap, m.start),
+        line_end: offsetToLine(lineMap, m.end),
+        signature: sig,
+        is_exported: 0,
+        is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, m.start, source),
+        value: extractLiteralValue(m.value),
+        parent_name: className,
+      });
+    }
+  }
+}
+
+function extractLiteralValue(init: any): string | null {
+  if (!init) return null;
+  let node = init;
+  if (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression") {
+    node = node.expression;
+  }
+  if (node.type === "Literal") {
+    return node.value === null ? "null" : String(node.value);
+  }
+  if (
+    node.type === "UnaryExpression" &&
+    node.prefix &&
+    node.operator === "-" &&
+    node.argument?.type === "Literal" &&
+    typeof node.argument.value === "number"
+  ) {
+    return String(-node.argument.value);
+  }
+  if (
+    node.type === "TemplateLiteral" &&
+    node.expressions?.length === 0 &&
+    node.quasis?.length === 1
+  ) {
+    return node.quasis[0].value?.cooked ?? null;
+  }
+  return null;
+}
+
+function extractObjectMembers(
+  members: any[] | undefined,
+  filePath: string,
+  symbolName: string,
+  out: TypeMemberRow[],
+) {
+  if (!members?.length) return;
+  for (const m of members) {
+    const name = m.key?.name ?? m.key?.value;
+    if (!name) continue;
+    let type: string | null = null;
+    if (m.type === "TSMethodSignature") {
+      const rt = m.returnType?.typeAnnotation;
+      const rtStr = rt ? stringifyTypeNode(rt) : null;
+      const params = m.params;
+      let paramStr = "";
+      if (params?.length) {
+        paramStr = params
+          .map((p: any) => p.name ?? p.left?.name ?? "...")
+          .join(", ");
+      }
+      type = `(${paramStr})${rtStr ? ` => ${rtStr}` : ""}`;
+    } else {
+      const ta = m.typeAnnotation?.typeAnnotation;
+      if (ta) type = stringifyTypeNode(ta);
+    }
+    out.push({
+      file_path: filePath,
+      symbol_name: symbolName,
+      name,
+      type,
+      is_optional: m.optional ? 1 : 0,
+      is_readonly: m.readonly ? 1 : 0,
+    });
+  }
 }

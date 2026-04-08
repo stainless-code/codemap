@@ -21,6 +21,8 @@ const WORKER_URL_NODE = new URL(
 );
 
 const WORKER_COUNT = Math.max(2, Math.min(cpus().length || 4, 6));
+const IS_BUN = typeof Bun !== "undefined";
+const NODE_WORKER_PATH = IS_BUN ? "" : fileURLToPath(WORKER_URL_NODE);
 
 export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
   const chunkSize = Math.ceil(filePaths.length / WORKER_COUNT);
@@ -29,16 +31,18 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
     chunks.push(filePaths.slice(i, i + chunkSize));
   }
 
+  const projectRoot = getProjectRoot();
+
   return Promise.all(
     chunks.map(
       (chunk) =>
         new Promise<ParsedFile[]>((resolve, reject) => {
           const input: WorkerInput = {
             files: chunk,
-            projectRoot: getProjectRoot(),
+            projectRoot,
           };
 
-          if (typeof Bun !== "undefined") {
+          if (IS_BUN) {
             const worker = new Worker(WORKER_URL_BUN);
             worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
               resolve(event.data.results);
@@ -52,8 +56,7 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
             return;
           }
 
-          const workerPath = fileURLToPath(WORKER_URL_NODE);
-          const worker = new NodeWorker(workerPath, {
+          const worker = new NodeWorker(NODE_WORKER_PATH, {
             type: "module",
           } as import("node:worker_threads").WorkerOptions);
           worker.on("message", (data: WorkerOutput) => {

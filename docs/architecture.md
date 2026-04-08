@@ -100,7 +100,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | `application/`                                                                                    | Indexing use cases and engine (`run-index`, `index-engine`, types)                                                                                                    |
 | `worker-pool.ts`                                                                                  | Parallel parse workers (Bun / Node)                                                                                                                                   |
 | `db.ts`                                                                                           | SQLite adapter — schema DDL, typed CRUD, connection management                                                                                                        |
-| `parser.ts`                                                                                       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols, imports, exports, components, markers                                                                            |
+| `parser.ts`                                                                                       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols (with JSDoc + generics + return types), type members, imports, exports, components, markers                       |
 | `css-parser.ts`                                                                                   | CSS extraction via `lightningcss` — custom properties, classes, keyframes, `@theme` blocks                                                                            |
 | `resolver.ts`                                                                                     | Import path resolution via `oxc-resolver` — respects `tsconfig` aliases, builds dependency graph                                                                      |
 | `constants.ts`                                                                                    | Shared constants — e.g. `LANG_MAP`                                                                                                                                    |
@@ -155,7 +155,7 @@ Optional **`codemap.config.ts`** (default export: object or async factory) or **
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap.db`**.
 
-Current schema version: **1** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
@@ -173,17 +173,45 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `symbols` — Functions, constants, classes, interfaces, types, enums (`STRICT`)
 
-| Column            | Type       | Description                                                           |
-| ----------------- | ---------- | --------------------------------------------------------------------- |
-| id                | INTEGER PK | Auto-increment row id                                                 |
-| file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                            |
-| name              | TEXT       | Symbol name                                                           |
-| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`             |
-| line_start        | INTEGER    | Start line (1-based)                                                  |
-| line_end          | INTEGER    | End line                                                              |
-| signature         | TEXT       | Reconstructed signature (e.g. `usePermissions(): PermissionsContext`) |
-| is_exported       | INTEGER    | 1 if exported                                                         |
-| is_default_export | INTEGER    | 1 if default export                                                   |
+| Column            | Type       | Description                                                                                                                                                                         |
+| ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                | INTEGER PK | Auto-increment row id                                                                                                                                                               |
+| file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                                                                          |
+| name              | TEXT       | Symbol name                                                                                                                                                                         |
+| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`, `method`, `property`, `getter`, `setter` (last four are class members)                                                   |
+| line_start        | INTEGER    | Start line (1-based)                                                                                                                                                                |
+| line_end          | INTEGER    | End line                                                                                                                                                                            |
+| signature         | TEXT       | Reconstructed signature with generics and return types (e.g. `identity<T>(val): T`, `interface Repo<T> extends Iterable<T>`, `class Store<T> extends Base<T> implements IStore<T>`) |
+| is_exported       | INTEGER    | 1 if exported                                                                                                                                                                       |
+| is_default_export | INTEGER    | 1 if default export                                                                                                                                                                 |
+| members           | TEXT       | JSON array of enum members (NULL for non-enums). Each entry: `{"name":"…","value":"…"}` (value omitted for implicit-value enums)                                                    |
+| doc_comment       | TEXT       | Leading JSDoc comment text (cleaned: `*` prefixes stripped, trimmed). NULL when absent. Preserves `@deprecated`, `@param`, etc. tags                                                |
+| value             | TEXT       | Literal value for `const` declarations (strings, numbers, booleans, `null`). NULL for non-literal or non-const symbols. Handles `as const` and simple template literals             |
+| parent_name       | TEXT       | Name of the enclosing symbol (class, function) for nested symbols. NULL for top-level (module scope). Class methods/properties point to their class                                 |
+
+### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
+
+| Column       | Type       | Description                                                                        |
+| ------------ | ---------- | ---------------------------------------------------------------------------------- |
+| id           | INTEGER PK | Auto-increment row id                                                              |
+| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                         |
+| caller_name  | TEXT       | Name of the calling function/method                                                |
+| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Disambiguates same-named methods   |
+| callee_name  | TEXT       | Name of the called function, `obj.method` for member calls, `this.method` for self |
+
+Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` three times in the same file, only one row is stored. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
+
+### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
+
+| Column      | Type       | Description                                               |
+| ----------- | ---------- | --------------------------------------------------------- |
+| id          | INTEGER PK | Auto-increment row id                                     |
+| file_path   | TEXT FK    | References `files(path)` ON DELETE CASCADE                |
+| symbol_name | TEXT       | Name of the parent interface or type alias                |
+| name        | TEXT       | Property or method name                                   |
+| type        | TEXT       | Type annotation string (e.g. `string`, `(key) => number`) |
+| is_optional | INTEGER    | 1 if `?` modifier present                                 |
+| is_readonly | INTEGER    | 1 if `readonly` modifier present                          |
 
 ### `imports` — Import statements (`STRICT`)
 
@@ -283,7 +311,13 @@ All tables have covering indexes tuned for AI agent query patterns. See [Coverin
 
 Uses the Rust-based `oxc-parser` via NAPI bindings to parse TypeScript/TSX/JS/JSX files into an AST. Extracts:
 
-- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures
+- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures including generic type parameters (e.g. `<T extends Base>`), return type annotations (e.g. `: Promise<void>`), class/interface heritage (`extends`, `implements`). Class methods, properties, getters, and setters are extracted as individual symbols with `parent_name` pointing to their class
+- **JSDoc**: Leading `/** … */` comments attached to symbols via `doc_comment` column (cleaned: `*` prefixes stripped, tags preserved)
+- **Enum members**: String and numeric values for each member, stored as JSON in the `members` column (e.g. `[{"name":"Active","value":"active"}]`)
+- **Const values**: Literal values (`string`, `number`, `boolean`, `null`, `as const`, simple template literals) stored in the `value` column
+- **Type members**: Properties and method signatures of interfaces and object-literal type aliases, stored in the `type_members` table
+- **Call graph**: Function-scoped call edges stored in the `calls` table — deduped per (caller_scope, callee) per file. Captures `obj.method()` and `this.method()` patterns
+- **Symbol nesting**: `parent_name` column tracks scope (nested functions → parent function, class members → class name)
 - **Imports**: All `import` statements with specifiers, source paths, and type-only flags
 - **Exports**: Named exports, default exports, re-exports
 - **Components**: React components detected via PascalCase name + (JSX return **or** hook usage). A PascalCase function in `.tsx`/`.jsx` that neither returns JSX nor calls hooks is indexed only as a symbol, not a component. Extracts props type and hooks used
@@ -397,7 +431,7 @@ All bulk insert functions use a shared `batchInsert<T>()` helper that:
 - **Eliminates `.slice()` allocations** — iterates with index bounds (`i` to `end`) instead of copying array segments per batch
 - **Uses indexed `for (let j)` loops** — avoids per-batch iterator protocol overhead
 
-Batches of 100 rows per `INSERT ... VALUES (...),(...),(...)` statement reduce per-statement overhead (parse, plan, execute cycle) by ~100×.
+Batches of 500 rows per `INSERT ... VALUES (...),(...),(...)` statement reduce per-statement overhead (parse, plan, execute cycle) significantly.
 
 ### Sorted inserts
 
@@ -431,13 +465,13 @@ When `SCHEMA_VERSION` is bumped (after the first release, when DDL changes requi
 - `createSchema()` detects the mismatch automatically and calls `dropAll()` before recreating
 - No manual intervention needed — run the indexer and it auto-rebuilds on version change
 
-Until the first release, Codemap keeps **`SCHEMA_VERSION` at 1**; pull `--full` or delete `.codemap.db` when the DDL in `db.ts` changes without a version bump.
+When `SCHEMA_VERSION` changes, the indexer auto-detects the mismatch and triggers a full rebuild — no manual intervention needed.
 
 ## SQLite Performance Configuration
 
 ### `bun:sqlite` API
 
-All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements internally. On Node, the wrapper maintains a `Map<string, Statement>` cache so repeated `run()` and `query()` calls with the same SQL reuse a single prepared statement. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
+All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements internally. On Node, the wrapper maintains a `Map<string, Statement>` cache so repeated `run()` and `query()` calls with the same SQL reuse a single prepared statement. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 500, pre-computed placeholders, and zero-copy index-bounds iteration.
 
 ### PRAGMAs (set on every `openDb()`)
 

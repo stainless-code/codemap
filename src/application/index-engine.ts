@@ -24,6 +24,8 @@ import {
   insertCssVariables,
   insertCssClasses,
   insertCssKeyframes,
+  insertTypeMembers,
+  insertCalls,
   getAllFileHashes,
   SCHEMA_VERSION,
   type CodemapDatabase,
@@ -84,16 +86,18 @@ export function collectFiles(): string[] {
 export function getChangedFiles(db: CodemapDatabase): {
   changed: string[];
   deleted: string[];
+  existingPaths: Set<string>;
 } | null {
   const lastCommit = getMeta(db, "last_indexed_commit");
   if (!lastCommit) return null;
 
   try {
+    const root = getProjectRoot();
     const isAncestor = spawnSync(
       "git",
       ["merge-base", "--is-ancestor", lastCommit, "HEAD"],
       {
-        cwd: getProjectRoot(),
+        cwd: root,
       },
     );
     if (isAncestor.status !== 0) return null;
@@ -102,14 +106,14 @@ export function getChangedFiles(db: CodemapDatabase): {
       "git",
       ["diff", "--name-only", `${lastCommit}..HEAD`],
       {
-        cwd: getProjectRoot(),
+        cwd: root,
       },
     );
     const statusResult = spawnSync(
       "git",
       ["status", "--porcelain", "--no-renames"],
       {
-        cwd: getProjectRoot(),
+        cwd: root,
       },
     );
 
@@ -138,7 +142,7 @@ export function getChangedFiles(db: CodemapDatabase): {
     const deleted: string[] = [];
 
     for (const f of allCandidates) {
-      const absPath = join(getProjectRoot(), f);
+      const absPath = join(root, f);
       let source: string;
       try {
         source = readFileSync(absPath, "utf-8");
@@ -151,7 +155,7 @@ export function getChangedFiles(db: CodemapDatabase): {
       }
     }
 
-    return { changed, deleted };
+    return { changed, deleted, existingPaths: new Set(existingHashes.keys()) };
   } catch {
     return null;
   }
@@ -170,6 +174,7 @@ function insertParsedResults(
   indexedPaths: Set<string>,
 ) {
   let indexed = 0;
+  const root = getProjectRoot();
 
   const transaction = db.transaction(() => {
     for (const parsed of results) {
@@ -209,7 +214,7 @@ function insertParsedResults(
           if (parsed.symbols?.length) insertSymbols(db, parsed.symbols);
 
           if (parsed.imports?.length) {
-            const absPath = join(getProjectRoot(), parsed.relPath);
+            const absPath = join(root, parsed.relPath);
             const deps = resolveImports(absPath, parsed.imports, indexedPaths);
             insertImports(db, parsed.imports);
             if (deps.length) insertDependencies(db, deps);
@@ -220,6 +225,10 @@ function insertParsedResults(
             insertComponents(db, parsed.components);
           }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
+          if (parsed.typeMembers?.length) {
+            insertTypeMembers(db, parsed.typeMembers);
+          }
+          if (parsed.calls?.length) insertCalls(db, parsed.calls);
         }
       } catch (err) {
         console.error(
@@ -246,6 +255,8 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM components) as components,
         (SELECT COUNT(*) FROM dependencies) as dependencies,
         (SELECT COUNT(*) FROM markers) as markers,
+        (SELECT COUNT(*) FROM type_members) as type_members,
+        (SELECT COUNT(*) FROM calls) as calls,
         (SELECT COUNT(*) FROM css_variables) as css_vars,
         (SELECT COUNT(*) FROM css_classes) as css_classes,
         (SELECT COUNT(*) FROM css_keyframes) as css_keyframes`,
@@ -284,10 +295,11 @@ export async function indexFiles(
     indexed = insertParsedResults(db, results, indexedPaths);
   } else {
     const existingHashes = getAllFileHashes(db);
+    const root = getProjectRoot();
 
     const transaction = db.transaction(() => {
       for (const relPath of filePaths) {
-        const absPath = join(getProjectRoot(), relPath);
+        const absPath = join(root, relPath);
         let source: string;
         try {
           source = readFileSync(absPath, "utf-8");
@@ -360,6 +372,9 @@ export async function indexFiles(
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);
             if (data.markers.length) insertMarkers(db, data.markers);
+            if (data.typeMembers.length)
+              insertTypeMembers(db, data.typeMembers);
+            if (data.calls.length) insertCalls(db, data.calls);
           }
         } catch (err) {
           console.error(
@@ -421,8 +436,11 @@ export function deleteFilesFromIndex(
   quiet?: boolean,
 ) {
   if (deleted.length === 0) return;
-  for (const f of deleted) {
-    deleteFileData(db, f);
+  const CHUNK = 500;
+  for (let i = 0; i < deleted.length; i += CHUNK) {
+    const batch = deleted.slice(i, i + CHUNK);
+    const placeholders = batch.map(() => "?").join(",");
+    db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
   }
   if (!quiet) {
     console.log(`  Removed ${deleted.length} deleted files from index`);
