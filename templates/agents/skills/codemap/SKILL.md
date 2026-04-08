@@ -190,6 +190,10 @@ FROM symbols WHERE name LIKE '%Config%' ORDER BY name;
 SELECT name, kind, signature
 FROM symbols WHERE file_path LIKE '%settings-provider%' AND is_exported = 1;
 
+-- Enum values (what are the valid members of an enum?)
+SELECT name, members FROM symbols
+WHERE kind = 'enum' AND name = 'TransactionStatus';
+
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail
 FROM imports WHERE file_path LIKE '%OrderRow%'

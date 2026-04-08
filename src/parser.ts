@@ -125,6 +125,7 @@ export function extractFileData(
         signature: buildFunctionSignature(name, node),
         is_exported: isExported ? 1 : 0,
         is_default_export: isDefault ? 1 : 0,
+        members: null,
       });
 
       if (isTsx && /^[A-Z]/.test(name)) {
@@ -166,6 +167,7 @@ export function extractFileData(
             : `const ${name}`,
           is_exported: isExported ? 1 : 0,
           is_default_export: isDefault ? 1 : 0,
+          members: null,
         });
 
         if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
@@ -188,15 +190,17 @@ export function extractFileData(
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
       symbols.push({
         file_path: relPath,
         name,
         kind: "type",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `type ${name}`,
+        signature: `type ${name}${tp}`,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members: null,
       });
     },
 
@@ -204,15 +208,33 @@ export function extractFileData(
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
+      let sig = `interface ${name}${tp}`;
+      if (node.extends?.length) {
+        const bases = node.extends
+          .map((e: any) => {
+            const base = e.expression?.name ?? e.typeName?.name ?? "";
+            if (!base) return null;
+            const ta = e.typeArguments ?? e.typeParameters;
+            if (ta?.params?.length) {
+              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+              if (args.length) return `${base}<${args.join(", ")}>`;
+            }
+            return base;
+          })
+          .filter(Boolean);
+        if (bases.length) sig += ` extends ${bases.join(", ")}`;
+      }
       symbols.push({
         file_path: relPath,
         name,
         kind: "interface",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `interface ${name}`,
+        signature: sig,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members: null,
       });
     },
 
@@ -220,6 +242,23 @@ export function extractFileData(
       const name = node.id?.name;
       if (!name) return;
       const isExported = exportedNames.has(name);
+      const enumMembers = node.body?.members;
+      let members: string | null = null;
+      if (enumMembers?.length) {
+        const extracted = enumMembers.map((m: any) => {
+          const mName = m.id?.name ?? m.id?.value;
+          if (!mName) return null;
+          const init = m.initializer;
+          let mValue: string | number | null = null;
+          if (init?.type === "Literal" || init?.type === "StringLiteral")
+            mValue = init.value;
+          else if (init?.type === "NumericLiteral") mValue = init.value;
+          return mValue !== null && mValue !== undefined
+            ? { name: mName, value: mValue }
+            : { name: mName };
+        });
+        members = JSON.stringify(extracted.filter(Boolean));
+      }
       symbols.push({
         file_path: relPath,
         name,
@@ -229,6 +268,7 @@ export function extractFileData(
         signature: `enum ${name}`,
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
+        members,
       });
     },
 
@@ -237,15 +277,41 @@ export function extractFileData(
       if (!name) return;
       const isExported =
         exportedNames.has(name) || defaultExportedNames.has(name);
+      const tp = stringifyTypeParams(node.typeParameters);
+      let sig = `class ${name}${tp}`;
+      if (node.superClass?.name) {
+        sig += ` extends ${node.superClass.name}`;
+        const sta = node.superTypeArguments ?? node.superTypeParameters;
+        if (sta?.params?.length) {
+          const args = sta.params.map(stringifyTypeNode).filter(Boolean);
+          if (args.length) sig += `<${args.join(", ")}>`;
+        }
+      }
+      if (node.implements?.length) {
+        const impls = node.implements
+          .map((i: any) => {
+            const n = i.expression?.name ?? "";
+            if (!n) return null;
+            const ta = i.typeArguments ?? i.typeParameters;
+            if (ta?.params?.length) {
+              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+              if (args.length) return `${n}<${args.join(", ")}>`;
+            }
+            return n;
+          })
+          .filter(Boolean);
+        if (impls.length) sig += ` implements ${impls.join(", ")}`;
+      }
       symbols.push({
         file_path: relPath,
         name,
         kind: "class",
         line_start: offsetToLine(lineMap, node.start),
         line_end: offsetToLine(lineMap, node.end),
-        signature: `class ${name}`,
+        signature: sig,
         is_exported: isExported ? 1 : 0,
         is_default_export: defaultExportedNames.has(name) ? 1 : 0,
+        members: null,
       });
     },
 
@@ -361,11 +427,121 @@ function exportEntryToRow(
   };
 }
 
+function stringifyTypeNode(node: any): string | null {
+  if (!node) return null;
+  switch (node.type) {
+    case "TSTypeReference": {
+      let name: string | null = null;
+      const tn = node.typeName;
+      if (tn?.type === "Identifier") name = tn.name;
+      else if (typeof tn?.name === "string") name = tn.name;
+      else if (tn?.type === "TSQualifiedName")
+        name = `${tn.left?.name ?? ""}.${tn.right?.name ?? ""}`;
+      if (!name) return null;
+      const ta = node.typeArguments ?? node.typeParameters;
+      if (ta?.params?.length) {
+        const args = ta.params.map(stringifyTypeNode).filter(Boolean);
+        if (args.length) return `${name}<${args.join(", ")}>`;
+      }
+      return name;
+    }
+    case "TSStringKeyword":
+      return "string";
+    case "TSNumberKeyword":
+      return "number";
+    case "TSBooleanKeyword":
+      return "boolean";
+    case "TSVoidKeyword":
+      return "void";
+    case "TSNullKeyword":
+      return "null";
+    case "TSUndefinedKeyword":
+      return "undefined";
+    case "TSAnyKeyword":
+      return "any";
+    case "TSNeverKeyword":
+      return "never";
+    case "TSUnknownKeyword":
+      return "unknown";
+    case "TSObjectKeyword":
+      return "object";
+    case "TSBigIntKeyword":
+      return "bigint";
+    case "TSSymbolKeyword":
+      return "symbol";
+    case "TSArrayType": {
+      const elem = stringifyTypeNode(node.elementType);
+      return elem ? `${elem}[]` : null;
+    }
+    case "TSUnionType": {
+      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
+      return types?.length ? types.join(" | ") : null;
+    }
+    case "TSIntersectionType": {
+      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
+      return types?.length ? types.join(" & ") : null;
+    }
+    case "TSTupleType": {
+      const elems = node.elementTypes?.map(stringifyTypeNode).filter(Boolean);
+      return `[${elems?.join(", ") ?? ""}]`;
+    }
+    case "TSLiteralType": {
+      const lit = node.literal;
+      if (lit?.type === "StringLiteral") return `"${lit.value}"`;
+      if (lit?.type === "NumericLiteral") return String(lit.value);
+      if (lit?.type === "BooleanLiteral") return String(lit.value);
+      return null;
+    }
+    case "TSTypeQuery": {
+      const exprName = node.exprName;
+      const n =
+        typeof exprName?.name === "string" ? exprName.name : exprName?.name;
+      return n ? `typeof ${n}` : null;
+    }
+    case "TSTypeOperator": {
+      const inner = stringifyTypeNode(node.typeAnnotation);
+      return inner ? `${node.operator} ${inner}` : null;
+    }
+    case "TSThisType":
+      return "this";
+    default:
+      return null;
+  }
+}
+
+function stringifyTypeParams(typeParameters: any): string {
+  const params = typeParameters?.params;
+  if (!params?.length) return "";
+  const parts = params.map((p: any) => {
+    const name = typeof p.name === "string" ? p.name : (p.name?.name ?? "?");
+    let s = name;
+    if (p.constraint) {
+      const c = stringifyTypeNode(p.constraint);
+      if (c) s += ` extends ${c}`;
+    }
+    if (p.default) {
+      const d = stringifyTypeNode(p.default);
+      if (d) s += ` = ${d}`;
+    }
+    return s;
+  });
+  return `<${parts.join(", ")}>`;
+}
+
 function buildFunctionSignature(name: string, node: any): string {
+  const typeParams = stringifyTypeParams(node?.typeParameters);
   const params = node?.params;
-  if (!params || params.length === 0) return `${name}()`;
-  const paramNames = params
-    .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
-    .join(", ");
-  return `${name}(${paramNames})`;
+  let paramStr = "";
+  if (params?.length) {
+    paramStr = params
+      .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
+      .join(", ");
+  }
+  let sig = `${name}${typeParams}(${paramStr})`;
+  const returnType = node?.returnType?.typeAnnotation;
+  if (returnType) {
+    const rt = stringifyTypeNode(returnType);
+    if (rt) sig += `: ${rt}`;
+  }
+  return sig;
 }

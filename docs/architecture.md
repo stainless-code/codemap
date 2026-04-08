@@ -173,17 +173,18 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `symbols` — Functions, constants, classes, interfaces, types, enums (`STRICT`)
 
-| Column            | Type       | Description                                                           |
-| ----------------- | ---------- | --------------------------------------------------------------------- |
-| id                | INTEGER PK | Auto-increment row id                                                 |
-| file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                            |
-| name              | TEXT       | Symbol name                                                           |
-| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`             |
-| line_start        | INTEGER    | Start line (1-based)                                                  |
-| line_end          | INTEGER    | End line                                                              |
-| signature         | TEXT       | Reconstructed signature (e.g. `usePermissions(): PermissionsContext`) |
-| is_exported       | INTEGER    | 1 if exported                                                         |
-| is_default_export | INTEGER    | 1 if default export                                                   |
+| Column            | Type       | Description                                                                                                                                                                         |
+| ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                | INTEGER PK | Auto-increment row id                                                                                                                                                               |
+| file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                                                                          |
+| name              | TEXT       | Symbol name                                                                                                                                                                         |
+| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`                                                                                                                           |
+| line_start        | INTEGER    | Start line (1-based)                                                                                                                                                                |
+| line_end          | INTEGER    | End line                                                                                                                                                                            |
+| signature         | TEXT       | Reconstructed signature with generics and return types (e.g. `identity<T>(val): T`, `interface Repo<T> extends Iterable<T>`, `class Store<T> extends Base<T> implements IStore<T>`) |
+| is_exported       | INTEGER    | 1 if exported                                                                                                                                                                       |
+| is_default_export | INTEGER    | 1 if default export                                                                                                                                                                 |
+| members           | TEXT       | JSON array of enum members (NULL for non-enums). Each entry: `{"name":"…","value":"…"}` (value omitted for implicit-value enums)                                                    |
 
 ### `imports` — Import statements (`STRICT`)
 
@@ -283,7 +284,8 @@ All tables have covering indexes tuned for AI agent query patterns. See [Coverin
 
 Uses the Rust-based `oxc-parser` via NAPI bindings to parse TypeScript/TSX/JS/JSX files into an AST. Extracts:
 
-- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures
+- **Symbols**: Functions, arrow functions, classes, interfaces, type aliases, enums — with reconstructed signatures including generic type parameters (e.g. `<T extends Base>`), return type annotations (e.g. `: Promise<void>`), class/interface heritage (`extends`, `implements`)
+- **Enum members**: String and numeric values for each member, stored as JSON (e.g. `[{"name":"Active","value":"active"}]`)
 - **Imports**: All `import` statements with specifiers, source paths, and type-only flags
 - **Exports**: Named exports, default exports, re-exports
 - **Components**: React components detected via PascalCase name + (JSX return **or** hook usage). A PascalCase function in `.tsx`/`.jsx` that neither returns JSX nor calls hooks is indexed only as a symbol, not a component. Extracts props type and hooks used
