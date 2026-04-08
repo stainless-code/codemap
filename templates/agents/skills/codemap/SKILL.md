@@ -68,7 +68,7 @@ LIMIT 10
 | Column        | Type    | Description                                                                      |
 | ------------- | ------- | -------------------------------------------------------------------------------- |
 | path          | TEXT PK | Relative path from project root                                                  |
-| content_hash  | TEXT    | Wyhash fingerprint (base-36)                                                     |
+| content_hash  | TEXT    | SHA-256 hex digest                                                               |
 | size          | INTEGER | File size in bytes                                                               |
 | line_count    | INTEGER | Number of lines                                                                  |
 | language      | TEXT    | `ts`, `tsx`, `js`, `jsx`, `css`, `md`, `mdx`, `mdc`, `json`, `yaml`, `sh`, `txt` |

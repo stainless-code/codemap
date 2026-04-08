@@ -171,14 +171,14 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | last_modified | INTEGER | File mtime (epoch ms)                          |
 | indexed_at    | INTEGER | When this row was written                      |
 
-### `symbols` — Functions, variables, classes, interfaces, type aliases, enums (`STRICT`)
+### `symbols` — Functions, constants, classes, interfaces, types, enums (`STRICT`)
 
 | Column            | Type       | Description                                                           |
 | ----------------- | ---------- | --------------------------------------------------------------------- |
 | id                | INTEGER PK | Auto-increment row id                                                 |
 | file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                            |
 | name              | TEXT       | Symbol name                                                           |
-| kind              | TEXT       | `function`, `variable`, `class`, `interface`, `type_alias`, `enum`    |
+| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`             |
 | line_start        | INTEGER    | Start line (1-based)                                                  |
 | line_end          | INTEGER    | End line                                                              |
 | signature         | TEXT       | Reconstructed signature (e.g. `usePermissions(): PermissionsContext`) |
@@ -204,7 +204,7 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | id               | INTEGER PK | Auto-increment row id        |
 | file_path        | TEXT FK    | File containing the export   |
 | name             | TEXT       | Exported name                |
-| kind             | TEXT       | `function`, `variable`, etc. |
+| kind             | TEXT       | `value`, `type`, `re-export` |
 | is_default       | INTEGER    | 1 if default export          |
 | re_export_source | TEXT       | Source module if re-exported |
 
@@ -327,7 +327,7 @@ The indexer uses git to detect changes since the last indexed commit:
 
 1. **Stores `last_indexed_commit`** (HEAD SHA) in the `meta` table after each run
 2. On next run, computes `git diff --name-only <last_commit>..HEAD` + `git status --porcelain`
-3. Only re-indexes changed files (Wyhash content comparison), using DB-sourced `indexedPaths` for import resolution (skips full `collectFiles()` glob scan)
+3. Only re-indexes changed files (SHA-256 content comparison), using DB-sourced `indexedPaths` for import resolution (skips full `collectFiles()` glob scan)
 4. Deleted files are removed via `ON DELETE CASCADE` — deleting from `files` cascades to all related tables
 5. Falls back to full rebuild if commit history is incompatible (e.g. force push, branch switch)
 
@@ -436,7 +436,7 @@ Until the first release, Codemap keeps **`SCHEMA_VERSION` at 1**; pull `--full` 
 
 ### `bun:sqlite` API
 
-All DDL and PRAGMA statements use `Database.run()` (not the deprecated `Database.exec()` alias). Parameterized insert/update statements use `Database.query()` (which caches compiled statements) instead of `Database.prepare()` (which does not cache). Read queries also use `Database.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
+All DDL and PRAGMA statements use `Database.run()`. The `sqlite-db.ts` wrapper abstracts both Bun (`bun:sqlite`) and Node (`better-sqlite3`). On Bun, `Database.query()` caches compiled statements; on Node, `better-sqlite3` re-prepares on each call via the wrapper's `run()` method. Read queries use the wrapper's `.query().all()` or `.get()`. Bulk inserts use the generic `batchInsert<T>()` helper with multi-row `INSERT ... VALUES (...),(...),(...)` in batches of 100, pre-computed placeholders, and zero-copy index-bounds iteration.
 
 ### PRAGMAs (set on every `openDb()`)
 
