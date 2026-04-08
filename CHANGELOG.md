@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.1.9
+
+### Patch Changes
+
+- [#17](https://github.com/stainless-code/codemap/pull/17) [`e962326`](https://github.com/stainless-code/codemap/commit/e962326991ae4f5a966d0e94cbfb7c3d69341f21) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix incremental detection reporting unchanged files as "changed" on every run when the working tree has uncommitted modifications. `getChangedFiles` now compares content hashes against the index before including candidates, so only truly modified files enter the indexing pipeline.
+
 ## 0.1.8
 
 ### Patch Changes
