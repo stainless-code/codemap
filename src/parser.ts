@@ -103,6 +103,7 @@ export function extractFileData(
   }
 
   const hookCalls = new Map<string, Set<string>>(); // function scope name -> hook names
+  const jsxScopes = new Set<string>(); // function scopes that contain JSX
   let currentFunctionScope: string | null = null;
 
   const visitor = new Visitor({
@@ -255,6 +256,13 @@ export function extractFileData(
         hookCalls.get(currentFunctionScope)?.add(callee.name);
       }
     },
+
+    JSXElement() {
+      if (currentFunctionScope) jsxScopes.add(currentFunctionScope);
+    },
+    JSXFragment() {
+      if (currentFunctionScope) jsxScopes.add(currentFunctionScope);
+    },
   });
 
   visitor.visit(result.program);
@@ -264,6 +272,8 @@ export function extractFileData(
   function maybeAddComponent(name: string, node: any, _isArrow: boolean) {
     if (!isTsx || !/^[A-Z]/.test(name)) return;
     const hooks = hookCalls.get(name);
+    const hasJsx = jsxScopes.has(name);
+    if (!hasJsx && !(hooks && hooks.size > 0)) return;
     const isDefault = defaultExportedNames.has(name);
 
     let propsType: string | null = null;
