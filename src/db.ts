@@ -18,11 +18,14 @@ export function openDb(): CodemapDatabase {
 }
 
 export function closeDb(db: CodemapDatabase, opts?: { readonly?: boolean }) {
-  if (!opts?.readonly) {
-    db.run("PRAGMA analysis_limit = 400");
-    db.run("PRAGMA optimize");
+  try {
+    if (!opts?.readonly) {
+      db.run("PRAGMA analysis_limit = 400");
+      db.run("PRAGMA optimize");
+    }
+  } finally {
+    db.close();
   }
-  db.close();
 }
 
 export function createTables(db: CodemapDatabase) {

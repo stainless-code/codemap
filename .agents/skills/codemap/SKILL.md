@@ -77,17 +77,17 @@ LIMIT 10
 
 ### `symbols` — Functions, types, interfaces, enums, constants, classes
 
-| Column            | Type       | Description                                                           |
-| ----------------- | ---------- | --------------------------------------------------------------------- |
-| id                | INTEGER PK | Auto-increment ID                                                     |
-| file_path         | TEXT FK    | References `files(path)`                                              |
-| name              | TEXT       | Symbol name                                                           |
-| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const`, `variable` |
-| line_start        | INTEGER    | Start line (1-based)                                                  |
-| line_end          | INTEGER    | End line (1-based)                                                    |
-| signature         | TEXT       | e.g. `createHandler()`, `type UserProps`                              |
-| is_exported       | INTEGER    | 1 if exported                                                         |
-| is_default_export | INTEGER    | 1 if default export                                                   |
+| Column            | Type       | Description                                               |
+| ----------------- | ---------- | --------------------------------------------------------- |
+| id                | INTEGER PK | Auto-increment ID                                         |
+| file_path         | TEXT FK    | References `files(path)`                                  |
+| name              | TEXT       | Symbol name                                               |
+| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const` |
+| line_start        | INTEGER    | Start line (1-based)                                      |
+| line_end          | INTEGER    | End line (1-based)                                        |
+| signature         | TEXT       | e.g. `createHandler()`, `type UserProps`                  |
+| is_exported       | INTEGER    | 1 if exported                                             |
+| is_default_export | INTEGER    | 1 if default export                                       |
 
 ### `imports` — Import statements
 

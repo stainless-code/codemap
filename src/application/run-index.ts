@@ -40,7 +40,7 @@ export interface RunIndexOptions {
   mode?: IndexMode;
   /**
    * Paths relative to the project root; used only when `mode === "files"`.
-   * Non-indexable extensions are filtered out.
+   * All paths are forwarded as-is; non-standard extensions are indexed as text.
    */
   files?: string[];
   /**
