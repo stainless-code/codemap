@@ -65,6 +65,9 @@ If the question looks like any of these → use the index:
 | "How many files/symbols/components are there?" | any table with `COUNT(*)` |
 | "What are the CSS classes in X?" | `css_classes` |
 | "What keyframe animations exist?" | `css_keyframes` |
+| "What fields does interface/type X have?" | `type_members` |
+| "Is symbol X deprecated?" / "What does X do?" | `symbols` (`doc_comment`) |
+| "Who calls X?" / "What does X call?" | `calls` |
 
 ## When Grep / Read IS appropriate
 
@@ -102,6 +105,15 @@ codemap query --json "<SQL>"
 | CSS design tokens | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'` |
 | CSS module classes | `SELECT name, file_path FROM css_classes WHERE is_module = 1` |
 | CSS keyframes | `SELECT name, file_path FROM css_keyframes` |
+| Type/interface shape | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'` |
+| Deprecated symbols | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'` |
+| Symbol docs | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL` |
+| Const values | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
+| Class members | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'` |
+| Top-level only | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'` |
+| Who calls X? | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'` |
+| What does X call? | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'` |
+| Call hotspots | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10` |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

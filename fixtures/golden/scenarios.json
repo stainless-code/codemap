@@ -63,5 +63,15 @@
     "id": "components-no-false-positives",
     "prompt": "Which components are detected (FormatPrice should not appear)?",
     "sql": "SELECT name FROM components ORDER BY name"
+  },
+  {
+    "id": "type-members-client-config",
+    "prompt": "What fields does ClientConfig have?",
+    "sql": "SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = 'ClientConfig' ORDER BY name"
+  },
+  {
+    "id": "calls-consumer",
+    "prompt": "What does the run function in consumer.ts call?",
+    "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
   }
 ]

@@ -1,5 +1,9 @@
 [
   {
+    "name": "ClientConfig",
+    "kind": "type"
+  },
+  {
     "name": "createClient",
     "kind": "value"
   }
