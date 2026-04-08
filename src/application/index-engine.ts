@@ -230,7 +230,7 @@ function insertParsedResults(
   return indexed;
 }
 
-function fetchTableStats(db: CodemapDatabase): IndexTableStats {
+export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
   const row = db
     .query<Record<string, number>>(
       `SELECT

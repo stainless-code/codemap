@@ -34,7 +34,6 @@ export function extractCssData(
       filename: filePath,
       code: Buffer.from(source),
       errorRecovery: true,
-      analyzeDependencies: true,
       customAtRules: {
         // Tailwind v4 @theme blocks
         theme: { body: "declaration-list" },
