@@ -6,7 +6,6 @@ import { globSync as tinyglobbySync } from "tinyglobby";
  */
 export function globSync(pattern: string, cwd: string): string[] {
   if (typeof Bun !== "undefined") {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Glob } = require("bun") as typeof import("bun");
     const glob = new Glob(pattern);
     return Array.from(glob.scanSync({ cwd, dot: true }));
