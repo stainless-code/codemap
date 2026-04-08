@@ -21,7 +21,14 @@ Fix three HIGH-severity bugs found via cross-audit triangulation, plus performan
 
 - Fix Wyhash → SHA-256 in architecture.md and SKILL.md (3 locations)
 - Correct `symbols.kind` values (`variable` → `const`, `type_alias` → `type`) and `exports.kind` values
-- Clarify `Database.query()` caching is Bun-only; Node re-prepares via wrapper
+- Clarify `Database.query()` caching is Bun-only; Node statement cache via wrapper
+- Update architecture.md: component heuristic, statement cache, `closeDb` readonly, incremental/`--files` custom extensions
+- Update benchmark.md and golden-queries.md for enriched fixture
+
+**Testing**
+
+- Enrich `fixtures/minimal/` to cover all 10 indexed tables (CSS module, `@keyframes`, `@import`, non-component PascalCase export, FIXME marker)
+- Add 7 new golden scenarios (exports, css_variables, css_classes, css_keyframes, css_imports, markers-all-kinds, components-no-false-positives)
 
 **Cleanup**
 
