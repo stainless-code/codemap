@@ -85,9 +85,23 @@ LIMIT 10
 | kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const` |
 | line_start        | INTEGER    | Start line (1-based)                                      |
 | line_end          | INTEGER    | End line (1-based)                                        |
-| signature         | TEXT       | e.g. `createHandler()`, `type UserProps`                  |
+| signature         | TEXT       | Reconstructed signature with generics and return types    |
 | is_exported       | INTEGER    | 1 if exported                                             |
 | is_default_export | INTEGER    | 1 if default export                                       |
+| members           | TEXT       | JSON enum members (NULL for non-enums)                    |
+| doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
+
+### `type_members` — Properties of interfaces and object-literal type aliases
+
+| Column      | Type       | Description                                        |
+| ----------- | ---------- | -------------------------------------------------- |
+| id          | INTEGER PK | Auto-increment ID                                  |
+| file_path   | TEXT FK    | References `files(path)`                           |
+| symbol_name | TEXT       | Parent interface / type alias name                 |
+| name        | TEXT       | Property or method name                            |
+| type        | TEXT       | Type annotation (e.g. `string`, `(key) => number`) |
+| is_optional | INTEGER    | 1 if `?` modifier                                  |
+| is_readonly | INTEGER    | 1 if `readonly` modifier                           |
 
 ### `imports` — Import statements
 
@@ -193,6 +207,18 @@ FROM symbols WHERE file_path LIKE '%settings-provider%' AND is_exported = 1;
 -- Enum values (what are the valid members of an enum?)
 SELECT name, members FROM symbols
 WHERE kind = 'enum' AND name = 'TransactionStatus';
+
+-- Interface / type shape (what fields does a type have?)
+SELECT name, type, is_optional, is_readonly FROM type_members
+WHERE symbol_name = 'UserSession';
+
+-- Deprecated symbols (find @deprecated via JSDoc)
+SELECT name, kind, file_path, doc_comment FROM symbols
+WHERE doc_comment LIKE '%@deprecated%';
+
+-- Symbol documentation
+SELECT name, signature, doc_comment FROM symbols
+WHERE name = 'formatCurrency' AND doc_comment IS NOT NULL;
 
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail

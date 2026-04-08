@@ -9,6 +9,7 @@ export interface IndexTableStats extends Record<string, number> {
   components: number;
   dependencies: number;
   markers: number;
+  type_members: number;
   css_vars: number;
   css_classes: number;
   css_keyframes: number;

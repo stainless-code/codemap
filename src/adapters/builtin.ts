@@ -23,6 +23,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     exports: data.exports,
     components: data.components,
     markers: data.markers,
+    typeMembers: data.typeMembers,
   };
 }
 

@@ -100,7 +100,7 @@ A local SQLite database (`.codemap.db`) indexes the project tree and stores stru
 | `application/`                                                                                    | Indexing use cases and engine (`run-index`, `index-engine`, types)                                                                                                    |
 | `worker-pool.ts`                                                                                  | Parallel parse workers (Bun / Node)                                                                                                                                   |
 | `db.ts`                                                                                           | SQLite adapter — schema DDL, typed CRUD, connection management                                                                                                        |
-| `parser.ts`                                                                                       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols, imports, exports, components, markers                                                                            |
+| `parser.ts`                                                                                       | TS/TSX/JS/JSX extraction via `oxc-parser` — symbols (with JSDoc + generics + return types), type members, imports, exports, components, markers                       |
 | `css-parser.ts`                                                                                   | CSS extraction via `lightningcss` — custom properties, classes, keyframes, `@theme` blocks                                                                            |
 | `resolver.ts`                                                                                     | Import path resolution via `oxc-resolver` — respects `tsconfig` aliases, builds dependency graph                                                                      |
 | `constants.ts`                                                                                    | Shared constants — e.g. `LANG_MAP`                                                                                                                                    |
@@ -185,6 +185,19 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | is_exported       | INTEGER    | 1 if exported                                                                                                                                                                       |
 | is_default_export | INTEGER    | 1 if default export                                                                                                                                                                 |
 | members           | TEXT       | JSON array of enum members (NULL for non-enums). Each entry: `{"name":"…","value":"…"}` (value omitted for implicit-value enums)                                                    |
+| doc_comment       | TEXT       | Leading JSDoc comment text (cleaned: `*` prefixes stripped, trimmed). NULL when absent. Preserves `@deprecated`, `@param`, etc. tags                                                |
+
+### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
+
+| Column      | Type       | Description                                               |
+| ----------- | ---------- | --------------------------------------------------------- |
+| id          | INTEGER PK | Auto-increment row id                                     |
+| file_path   | TEXT FK    | References `files(path)` ON DELETE CASCADE                |
+| symbol_name | TEXT       | Name of the parent interface or type alias                |
+| name        | TEXT       | Property or method name                                   |
+| type        | TEXT       | Type annotation string (e.g. `string`, `(key) => number`) |
+| is_optional | INTEGER    | 1 if `?` modifier present                                 |
+| is_readonly | INTEGER    | 1 if `readonly` modifier present                          |
 
 ### `imports` — Import statements (`STRICT`)
 

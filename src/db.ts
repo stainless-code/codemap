@@ -9,7 +9,7 @@ import {
  * tweaks; run `--full` locally after pulling. After v1.0, bump in lockstep with
  * `createTables` / `createIndexes` when the on-disk schema changes.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export type { CodemapDatabase };
 
@@ -50,7 +50,8 @@ export function createTables(db: CodemapDatabase) {
       signature TEXT,
       is_exported INTEGER DEFAULT 0,
       is_default_export INTEGER DEFAULT 0,
-      members TEXT
+      members TEXT,
+      doc_comment TEXT
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -119,6 +120,16 @@ export function createTables(db: CodemapDatabase) {
       line_number INTEGER
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS type_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      symbol_name TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT,
+      is_optional INTEGER DEFAULT 0,
+      is_readonly INTEGER DEFAULT 0
+    ) STRICT;
+
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -160,6 +171,9 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_css_classes_name ON css_classes(name, file_path, is_module);
     CREATE INDEX IF NOT EXISTS idx_css_classes_file ON css_classes(file_path);
     CREATE INDEX IF NOT EXISTS idx_css_keyframes_name ON css_keyframes(name, file_path);
+
+    CREATE INDEX IF NOT EXISTS idx_type_members_symbol ON type_members(symbol_name, file_path, name, type, is_optional, is_readonly);
+    CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
   `);
 }
 
@@ -188,6 +202,7 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS type_members;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
     DROP TABLE IF EXISTS components;
@@ -256,6 +271,7 @@ export interface SymbolRow {
   is_exported: number;
   is_default_export: number;
   members: string | null;
+  doc_comment: string | null;
 }
 
 const BATCH_SIZE = 100;
@@ -288,8 +304,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members)",
-    "(?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment)",
+    "(?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -301,6 +317,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.is_exported,
         s.is_default_export,
         s.members,
+        s.doc_comment,
       ),
   );
 }
@@ -466,6 +483,36 @@ export function insertCssKeyframes(
     "INSERT INTO css_keyframes (file_path, name, line_number)",
     "(?,?,?)",
     (k, v) => v.push(k.file_path, k.name, k.line_number),
+  );
+}
+
+export interface TypeMemberRow {
+  file_path: string;
+  symbol_name: string;
+  name: string;
+  type: string | null;
+  is_optional: number;
+  is_readonly: number;
+}
+
+export function insertTypeMembers(
+  db: CodemapDatabase,
+  members: TypeMemberRow[],
+) {
+  batchInsert(
+    db,
+    members,
+    "INSERT INTO type_members (file_path, symbol_name, name, type, is_optional, is_readonly)",
+    "(?,?,?,?,?,?)",
+    (m, v) =>
+      v.push(
+        m.file_path,
+        m.symbol_name,
+        m.name,
+        m.type,
+        m.is_optional,
+        m.is_readonly,
+      ),
   );
 }
 

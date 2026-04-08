@@ -24,6 +24,7 @@ import {
   insertCssVariables,
   insertCssClasses,
   insertCssKeyframes,
+  insertTypeMembers,
   getAllFileHashes,
   SCHEMA_VERSION,
   type CodemapDatabase,
@@ -220,6 +221,9 @@ function insertParsedResults(
             insertComponents(db, parsed.components);
           }
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
+          if (parsed.typeMembers?.length) {
+            insertTypeMembers(db, parsed.typeMembers);
+          }
         }
       } catch (err) {
         console.error(
@@ -246,6 +250,7 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM components) as components,
         (SELECT COUNT(*) FROM dependencies) as dependencies,
         (SELECT COUNT(*) FROM markers) as markers,
+        (SELECT COUNT(*) FROM type_members) as type_members,
         (SELECT COUNT(*) FROM css_variables) as css_vars,
         (SELECT COUNT(*) FROM css_classes) as css_classes,
         (SELECT COUNT(*) FROM css_keyframes) as css_keyframes`,
@@ -360,6 +365,8 @@ export async function indexFiles(
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);
             if (data.markers.length) insertMarkers(db, data.markers);
+            if (data.typeMembers.length)
+              insertTypeMembers(db, data.typeMembers);
           }
         } catch (err) {
           console.error(

@@ -56,6 +56,8 @@ If the question looks like any of these → use the index:
 | "How many files/symbols/components are there?" | any table with `COUNT(*)` |
 | "What are the CSS classes in X?" | `css_classes` |
 | "What keyframe animations exist?" | `css_keyframes` |
+| "What fields does interface/type X have?" | `type_members` |
+| "Is symbol X deprecated?" / "What does X do?" | `symbols` (`doc_comment`) |
 
 ## When Grep / Read IS appropriate
 
@@ -93,6 +95,9 @@ bun src/index.ts query --json "<SQL>"
 | CSS design tokens | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'` |
 | CSS module classes | `SELECT name, file_path FROM css_classes WHERE is_module = 1` |
 | CSS keyframes | `SELECT name, file_path FROM css_keyframes` |
+| Type/interface shape | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'` |
+| Deprecated symbols | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'` |
+| Symbol docs | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL` |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

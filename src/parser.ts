@@ -14,6 +14,7 @@ import type {
   ExportRow,
   ComponentRow,
   MarkerRow,
+  TypeMemberRow,
 } from "./db";
 import { extractMarkers } from "./markers";
 
@@ -23,6 +24,7 @@ interface ExtractedData {
   exports: ExportRow[];
   components: ComponentRow[];
   markers: MarkerRow[];
+  typeMembers: TypeMemberRow[];
 }
 
 /**
@@ -71,11 +73,14 @@ export function extractFileData(
   const lineMap = buildLineMap(source);
   const mod = result.module;
 
+  const jsDocComments = buildJsDocIndex(result.comments);
+
   const symbols: SymbolRow[] = [];
   const imports: ImportRow[] = [];
   const exports: ExportRow[] = [];
   const components: ComponentRow[] = [];
   const markers: MarkerRow[] = [];
+  const typeMembers: TypeMemberRow[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -126,6 +131,7 @@ export function extractFileData(
         is_exported: isExported ? 1 : 0,
         is_default_export: isDefault ? 1 : 0,
         members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
       });
 
       if (isTsx && /^[A-Z]/.test(name)) {
@@ -168,6 +174,7 @@ export function extractFileData(
           is_exported: isExported ? 1 : 0,
           is_default_export: isDefault ? 1 : 0,
           members: null,
+          doc_comment: findJsDoc(jsDocComments, node.start, source),
         });
 
         if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
@@ -201,7 +208,16 @@ export function extractFileData(
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
         members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
       });
+      if (node.typeAnnotation?.type === "TSTypeLiteral") {
+        extractObjectMembers(
+          node.typeAnnotation.members,
+          relPath,
+          name,
+          typeMembers,
+        );
+      }
     },
 
     TSInterfaceDeclaration(node: any) {
@@ -235,7 +251,9 @@ export function extractFileData(
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
         members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
       });
+      extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
 
     TSEnumDeclaration(node: any) {
@@ -269,6 +287,7 @@ export function extractFileData(
         is_exported: isExported ? 1 : 0,
         is_default_export: 0,
         members,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
       });
     },
 
@@ -312,6 +331,7 @@ export function extractFileData(
         is_exported: isExported ? 1 : 0,
         is_default_export: defaultExportedNames.has(name) ? 1 : 0,
         members: null,
+        doc_comment: findJsDoc(jsDocComments, node.start, source),
       });
     },
 
@@ -363,7 +383,7 @@ export function extractFileData(
     });
   }
 
-  return { symbols, imports, exports, components, markers };
+  return { symbols, imports, exports, components, markers, typeMembers };
 }
 
 function staticImportToRow(
@@ -544,4 +564,89 @@ function buildFunctionSignature(name: string, node: any): string {
     if (rt) sig += `: ${rt}`;
   }
   return sig;
+}
+
+interface JsDocEntry {
+  end: number;
+  text: string;
+}
+
+function buildJsDocIndex(comments: any[]): JsDocEntry[] {
+  if (!comments?.length) return [];
+  const docs: JsDocEntry[] = [];
+  for (const c of comments) {
+    if (c.type !== "Block" || !c.value.startsWith("*")) continue;
+    docs.push({ end: c.end, text: cleanJsDoc(c.value) });
+  }
+  return docs;
+}
+
+function cleanJsDoc(raw: string): string {
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/^\s*\*\s?/, ""))
+    .join("\n")
+    .trim();
+}
+
+function findJsDoc(
+  docs: JsDocEntry[],
+  nodeStart: number,
+  source: string,
+): string | null {
+  if (!docs.length) return null;
+  let lo = 0;
+  let hi = docs.length - 1;
+  let best = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (docs[mid].end <= nodeStart) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  if (best < 0) return null;
+  const doc = docs[best];
+  const gap = source.slice(doc.end, nodeStart);
+  if (/[;{}]/.test(gap)) return null;
+  return doc.text || null;
+}
+
+function extractObjectMembers(
+  members: any[] | undefined,
+  filePath: string,
+  symbolName: string,
+  out: TypeMemberRow[],
+) {
+  if (!members?.length) return;
+  for (const m of members) {
+    const name = m.key?.name ?? m.key?.value;
+    if (!name) continue;
+    let type: string | null = null;
+    if (m.type === "TSMethodSignature") {
+      const rt = m.returnType?.typeAnnotation;
+      const rtStr = rt ? stringifyTypeNode(rt) : null;
+      const params = m.params;
+      let paramStr = "";
+      if (params?.length) {
+        paramStr = params
+          .map((p: any) => p.name ?? p.left?.name ?? "...")
+          .join(", ");
+      }
+      type = `(${paramStr})${rtStr ? ` => ${rtStr}` : ""}`;
+    } else {
+      const ta = m.typeAnnotation?.typeAnnotation;
+      if (ta) type = stringifyTypeNode(ta);
+    }
+    out.push({
+      file_path: filePath,
+      symbol_name: symbolName,
+      name,
+      type,
+      is_optional: m.optional ? 1 : 0,
+      is_readonly: m.readonly ? 1 : 0,
+    });
+  }
 }

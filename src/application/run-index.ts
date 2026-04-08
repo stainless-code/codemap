@@ -20,6 +20,7 @@ function emptyStats(): IndexTableStats {
     components: 0,
     dependencies: 0,
     markers: 0,
+    type_members: 0,
     css_vars: 0,
     css_classes: 0,
     css_keyframes: 0,

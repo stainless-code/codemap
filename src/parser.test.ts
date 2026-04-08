@@ -166,6 +166,105 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("JSDoc extraction", () => {
+    it("attaches single-line JSDoc to function", () => {
+      const src = `/** Formats a value. */\nexport function fmt(v: string): string { return v; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "fmt")?.doc_comment).toBe(
+        "Formats a value.",
+      );
+    });
+
+    it("attaches multi-line JSDoc with @deprecated", () => {
+      const src = `/**\n * Old helper.\n * @deprecated Use newHelper instead.\n */\nexport function oldHelper(): void {}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const doc = d.symbols.find((s) => s.name === "oldHelper")?.doc_comment;
+      expect(doc).toContain("Old helper.");
+      expect(doc).toContain("@deprecated");
+    });
+
+    it("does not attach orphan comment across code boundary", () => {
+      const src = `/** Orphan */\nconst x = 1;\nexport function foo(): void {}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "foo")?.doc_comment).toBeNull();
+    });
+
+    it("attaches JSDoc to interface", () => {
+      const src = `/** Session data. */\nexport interface Session { id: string; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "Session")?.doc_comment).toBe(
+        "Session data.",
+      );
+    });
+
+    it("returns null when no JSDoc present", () => {
+      const src = `export const x = 42;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "x")?.doc_comment).toBeNull();
+    });
+  });
+
+  describe("type members extraction", () => {
+    it("extracts interface property members", () => {
+      const src = `export interface User { id: string; name: string; age?: number; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.typeMembers).toHaveLength(3);
+      expect(d.typeMembers[0]).toMatchObject({
+        symbol_name: "User",
+        name: "id",
+        type: "string",
+        is_optional: 0,
+      });
+      expect(d.typeMembers[2]).toMatchObject({
+        name: "age",
+        type: "number",
+        is_optional: 1,
+      });
+    });
+
+    it("extracts interface method signatures", () => {
+      const src = `export interface Store { get(key: string): number; set(key: string, val: number): void; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.typeMembers).toHaveLength(2);
+      expect(d.typeMembers[0]).toMatchObject({
+        symbol_name: "Store",
+        name: "get",
+        type: "(key) => number",
+      });
+      expect(d.typeMembers[1]).toMatchObject({
+        name: "set",
+        type: "(key, val) => void",
+      });
+    });
+
+    it("extracts type alias object literal members", () => {
+      const src = `export type Config = { host: string; port?: number; };\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.typeMembers).toHaveLength(2);
+      expect(d.typeMembers[0]).toMatchObject({
+        symbol_name: "Config",
+        name: "host",
+        type: "string",
+      });
+      expect(d.typeMembers[1]).toMatchObject({
+        name: "port",
+        is_optional: 1,
+      });
+    });
+
+    it("does not extract type members from union types", () => {
+      const src = `export type Status = "ok" | "error";\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.typeMembers).toHaveLength(0);
+    });
+
+    it("does not extract type members from functions", () => {
+      const src = `export function foo(): void {}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.typeMembers).toHaveLength(0);
+    });
+  });
+
   describe("component detection heuristic", () => {
     it("detects components that return JSX", () => {
       const src = `export function Card() { return <div>card</div>; }\n`;
