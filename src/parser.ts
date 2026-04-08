@@ -132,6 +132,7 @@ export function extractFileData(
         is_default_export: isDefault ? 1 : 0,
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
       });
 
       if (isTsx && /^[A-Z]/.test(name)) {
@@ -175,6 +176,7 @@ export function extractFileData(
           is_default_export: isDefault ? 1 : 0,
           members: null,
           doc_comment: findJsDoc(jsDocComments, node.start, source),
+          value: isArrowOrFn ? null : extractLiteralValue(init),
         });
 
         if (isTsx && /^[A-Z]/.test(name) && isArrowOrFn) {
@@ -209,6 +211,7 @@ export function extractFileData(
         is_default_export: 0,
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
       });
       if (node.typeAnnotation?.type === "TSTypeLiteral") {
         extractObjectMembers(
@@ -252,6 +255,7 @@ export function extractFileData(
         is_default_export: 0,
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
       });
       extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
@@ -288,6 +292,7 @@ export function extractFileData(
         is_default_export: 0,
         members,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
       });
     },
 
@@ -332,6 +337,7 @@ export function extractFileData(
         is_default_export: defaultExportedNames.has(name) ? 1 : 0,
         members: null,
         doc_comment: findJsDoc(jsDocComments, node.start, source),
+        value: null,
       });
     },
 
@@ -612,6 +618,34 @@ function findJsDoc(
   const gap = source.slice(doc.end, nodeStart);
   if (/[;{}]/.test(gap)) return null;
   return doc.text || null;
+}
+
+function extractLiteralValue(init: any): string | null {
+  if (!init) return null;
+  let node = init;
+  if (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression") {
+    node = node.expression;
+  }
+  if (node.type === "Literal") {
+    return node.value === null ? "null" : String(node.value);
+  }
+  if (
+    node.type === "UnaryExpression" &&
+    node.prefix &&
+    node.operator === "-" &&
+    node.argument?.type === "Literal" &&
+    typeof node.argument.value === "number"
+  ) {
+    return String(-node.argument.value);
+  }
+  if (
+    node.type === "TemplateLiteral" &&
+    node.expressions?.length === 0 &&
+    node.quasis?.length === 1
+  ) {
+    return node.quasis[0].value?.cooked ?? null;
+  }
+  return null;
 }
 
 function extractObjectMembers(

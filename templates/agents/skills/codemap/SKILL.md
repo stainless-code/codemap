@@ -90,6 +90,7 @@ LIMIT 10
 | is_default_export | INTEGER    | 1 if default export                                       |
 | members           | TEXT       | JSON enum members (NULL for non-enums)                    |
 | doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
+| value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 

@@ -51,7 +51,8 @@ export function createTables(db: CodemapDatabase) {
       is_exported INTEGER DEFAULT 0,
       is_default_export INTEGER DEFAULT 0,
       members TEXT,
-      doc_comment TEXT
+      doc_comment TEXT,
+      value TEXT
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -272,6 +273,7 @@ export interface SymbolRow {
   is_default_export: number;
   members: string | null;
   doc_comment: string | null;
+  value: string | null;
 }
 
 const BATCH_SIZE = 100;
@@ -304,8 +306,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment)",
-    "(?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value)",
+    "(?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -318,6 +320,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.is_default_export,
         s.members,
         s.doc_comment,
+        s.value,
       ),
   );
 }

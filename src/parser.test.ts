@@ -265,6 +265,63 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("const literal value extraction", () => {
+    it("extracts string literal", () => {
+      const src = `export const URL = "https://api.example.com";\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "URL")?.value).toBe(
+        "https://api.example.com",
+      );
+    });
+
+    it("extracts number literal", () => {
+      const src = `export const MAX = 42;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "MAX")?.value).toBe("42");
+    });
+
+    it("extracts boolean literal", () => {
+      const src = `export const DEBUG = true;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "DEBUG")?.value).toBe("true");
+    });
+
+    it("extracts negative number", () => {
+      const src = `export const OFFSET = -1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "OFFSET")?.value).toBe("-1");
+    });
+
+    it("extracts null literal", () => {
+      const src = `export const EMPTY = null;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "EMPTY")?.value).toBe("null");
+    });
+
+    it("extracts value through as const", () => {
+      const src = `export const MODE = "production" as const;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "MODE")?.value).toBe(
+        "production",
+      );
+    });
+
+    it("extracts simple template literal without expressions", () => {
+      const src = `export const GREETING = \`hello world\`;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "GREETING")?.value).toBe(
+        "hello world",
+      );
+    });
+
+    it("returns null for non-literal values", () => {
+      const src = `export const arr = [1, 2];\nexport const fn = () => {};\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "arr")?.value).toBeNull();
+      expect(d.symbols.find((s) => s.name === "fn")?.value).toBeNull();
+    });
+  });
+
   describe("component detection heuristic", () => {
     it("detects components that return JSX", () => {
       const src = `export function Card() { return <div>card</div>; }\n`;

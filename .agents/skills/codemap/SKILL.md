@@ -90,6 +90,7 @@ LIMIT 10
 | is_default_export | INTEGER    | 1 if default export                                       |
 | members           | TEXT       | JSON enum members (NULL for non-enums)                    |
 | doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
+| value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
 
 ### `type_members` — Properties of interfaces and object-literal type aliases
 
@@ -219,6 +220,10 @@ WHERE doc_comment LIKE '%@deprecated%';
 -- Symbol documentation
 SELECT name, signature, doc_comment FROM symbols
 WHERE name = 'formatCurrency' AND doc_comment IS NOT NULL;
+
+-- Const values (config flags, magic strings)
+SELECT name, value, file_path FROM symbols
+WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%URL%';
 
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail
