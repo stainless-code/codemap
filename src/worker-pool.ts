@@ -44,6 +44,10 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
               resolve(event.data.results);
               worker.terminate();
             };
+            worker.onerror = (event: ErrorEvent) => {
+              reject(new Error(event.message));
+              worker.terminate();
+            };
             worker.postMessage(input);
             return;
           }

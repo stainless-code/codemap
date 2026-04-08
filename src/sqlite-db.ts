@@ -107,12 +107,13 @@ function wrap(inner: SqliteInner): CodemapDatabase {
       runSql(inner, sql, params);
     },
     query<T>(sql: string) {
+      const stmt = inner.query(sql);
       return {
         get(...params: unknown[]) {
-          return inner.query(sql).get(...params) as T | undefined;
+          return stmt.get(...params) as T | undefined;
         },
         all(...params: unknown[]) {
-          return inner.query(sql).all(...params) as T[];
+          return stmt.all(...params) as T[];
         },
       };
     },

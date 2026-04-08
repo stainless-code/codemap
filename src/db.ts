@@ -5,7 +5,7 @@ import {
 } from "./sqlite-db";
 
 /**
- * Pre-release: keep at **2** until the first npm release — do not bump for DDL
+ * Pre-release: keep at **1** until the first npm release — do not bump for DDL
  * tweaks; run `--full` locally after pulling. After v1.0, bump in lockstep with
  * `createTables` / `createIndexes` when the on-disk schema changes.
  */
@@ -17,9 +17,11 @@ export function openDb(): CodemapDatabase {
   return openCodemapDatabase();
 }
 
-export function closeDb(db: CodemapDatabase) {
-  db.run("PRAGMA analysis_limit = 400");
-  db.run("PRAGMA optimize");
+export function closeDb(db: CodemapDatabase, opts?: { readonly?: boolean }) {
+  if (!opts?.readonly) {
+    db.run("PRAGMA analysis_limit = 400");
+    db.run("PRAGMA optimize");
+  }
   db.close();
 }
 
