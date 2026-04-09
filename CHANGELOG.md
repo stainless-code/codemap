@@ -1,5 +1,14 @@
 # @stainless-code/codemap
 
+## 0.2.2
+
+### Patch Changes
+
+- [`5f65c33`](https://github.com/stainless-code/codemap/commit/5f65c330d80bede97f4114820cb931bd5ac97a16) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Use vendor-neutral `.md` extension for agent rules in templates; Cursor integration remaps to `.mdc` at wiring time
+  - `codemap agents init` now writes `.md` rule files to `.agents/rules/` (plain Markdown with YAML frontmatter)
+  - Cursor target automatically renames rules to `.mdc` (required for frontmatter parsing); all other targets (Windsurf, Continue, Cline, Amazon Q) keep `.md`
+  - `SKILL.md` now includes `name` and `description` frontmatter per the Agent Skills spec
+
 ## 0.2.1
 
 ### Patch Changes
