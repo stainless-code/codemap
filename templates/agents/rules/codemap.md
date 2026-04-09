@@ -1,0 +1,141 @@
+---
+alwaysApply: true
+---
+
+# Codemap (structural codebase index)
+
+> **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
+
+A local database (default **`.codemap.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes.
+
+**Generic defaults:** This rule is **project-agnostic**. After **`codemap agents init`** (or copying these files into **`.agents/`**), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
+
+## CLI (npm package **`@stainless-code/codemap`**)
+
+Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-code/codemap)** from npm. The executable name is **`codemap`**.
+
+**Run without a global install:** **`npx @stainless-code/codemap`** (npm), **`pnpm dlx @stainless-code/codemap`** (pnpm), **`yarn dlx @stainless-code/codemap`** (Yarn 2+), or **`bunx @stainless-code/codemap`** (Bun) — same flags everywhere. With a **local** devDependency, **`npx codemap`** / **`pnpm exec codemap`**. With a **global** install, **`codemap`** on your **`PATH`**.
+
+**Examples below use `codemap`** — prefix with **`npx @stainless-code/codemap`** (or **`pnpm dlx`**, **`yarn dlx`**, **`bunx`**) when the CLI is not on your **`PATH`**.
+
+| Action                            | Command                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| Incremental index                 | `codemap`                                                                |
+| Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                           |
+| Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                  |
+| Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**) |
+| Recipe catalog (JSON)             | `codemap query --recipes-json`                                           |
+| Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                      |
+
+**Bundled rules/skills:** **`codemap agents init`** writes **`.agents/`** from the package (see [docs/agents.md](../../../docs/agents.md)).
+
+Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** — see [docs/benchmark.md § Indexing another project](../../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
+
+**Developing the Codemap repo itself:** from a clone, **`bun src/index.ts`** matches **`codemap`** (same flags); see the repository README.
+
+## Session start (do this ONCE per conversation)
+
+Run incremental indexing to catch changes made outside this session:
+
+```bash
+codemap
+```
+
+## Pre-flight check (do this EVERY time before searching)
+
+1. **Does the question match a trigger pattern below?**
+2. **If yes → query the index.** Do NOT use Grep/Glob/SemanticSearch/Read.
+3. **If the index result is incomplete → THEN fall back** to other tools, but always try the index first.
+
+Violating this order is wrong even if you get the right answer — it wastes time and ignores the tool purpose-built for this.
+
+## Trigger patterns
+
+If the question looks like any of these → use the index:
+
+| Question shape                                               | Table(s)                                                 |
+| ------------------------------------------------------------ | -------------------------------------------------------- |
+| "What/which files import X?"                                 | `imports` (by `source`) or `dependencies` (by `to_path`) |
+| "Where is X defined?"                                        | `symbols`                                                |
+| "What does file X export?"                                   | `exports`                                                |
+| "What hooks does component X use?" / "List React components" | `components`                                             |
+| "What are the CSS variables/tokens for X?"                   | `css_variables`                                          |
+| "Find all TODOs/FIXMEs"                                      | `markers`                                                |
+| "Who depends on file X?" / "What does file X depend on?"     | `dependencies`                                           |
+| "How many files/symbols/components are there?"               | any table with `COUNT(*)`                                |
+| "What are the CSS classes in X?"                             | `css_classes`                                            |
+| "What keyframe animations exist?"                            | `css_keyframes`                                          |
+| "What fields does interface/type X have?"                    | `type_members`                                           |
+| "Is symbol X deprecated?" / "What does X do?"                | `symbols` (`doc_comment`)                                |
+| "Who calls X?" / "What does X call?"                         | `calls`                                                  |
+
+## When Grep / Read IS appropriate
+
+- Reading implementation details you need to edit
+- Reviewing logic, control flow, or business rules
+- Searching for patterns the index doesn't capture (string literals, inline logic, etc.)
+
+## How to query
+
+```bash
+codemap query --json "<SQL>"
+```
+
+**Human-readable:** Omit **`--json`** to print **`console.table`** to the terminal (optional; wide results use more lines and bytes than JSON).
+
+**Row count:** The CLI does **not** impose a maximum number of rows. Add **`LIMIT`** (and **`ORDER BY`**) in SQL when you need a bounded list. With **`--json`**, stdout is a JSON array on success; **on failure**, stdout is **`{"error":"<message>"}`** and the process exits **1** (invalid SQL, database open errors, or **`query` bootstrap** failures such as config/resolver — not only SQL runtime errors). The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not truncated.
+
+**Verbatim answers:** When the user asks for lists, counts, or enumerated structural data from the index, **paste or summarize from the query output without inventing rows** — do not substitute a prose “summary” that omits rows the user asked to see. Use **`--json`** so the full result set is unambiguous.
+
+## Quick reference queries
+
+| I need to...              | Query                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Find a symbol             | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'`              |
+| Find a symbol (fuzzy)     | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                              |
+| See file exports          | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'`                                     |
+| See file imports          | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'`                           |
+| Who imports this module?  | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'`                                  |
+| Who imports this file?    | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                      |
+| What does this depend on? | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                      |
+| Component info            | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                     |
+| All components            | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name`                               |
+| TODOs in a file           | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                     |
+| Most complex files        | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10`        |
+| CSS design tokens         | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'`                                      |
+| CSS module classes        | `SELECT name, file_path FROM css_classes WHERE is_module = 1`                                                |
+| CSS keyframes             | `SELECT name, file_path FROM css_keyframes`                                                                  |
+| Type/interface shape      | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                    |
+| Deprecated symbols        | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`              |
+| Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`            |
+| Const values              | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
+| Class members             | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                        |
+| Top-level only            | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'`              |
+| Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
+| What does X call?         | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
+| Call hotspots             | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
+
+**Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
+
+For the full schema, advanced query patterns, and troubleshooting, read the skill at `.agents/skills/codemap/SKILL.md`.
+
+## Keeping it fresh
+
+**After completing a step that modified source files, re-index before making any further queries.** The index only reflects the state at the time it was last built — edits you just made won't appear until you re-index.
+
+```bash
+# Targeted — re-index only the files you just touched
+codemap --files path/to/file1.tsx path/to/file2.ts
+
+# Incremental — auto-detects changed files via git
+codemap
+
+# Full rebuild — after rebase, branch switch, or stale index
+codemap --full
+```
+
+### When to re-index
+
+- **After editing files** — use `--files` with the paths you modified (fastest). Deleted files are auto-detected and removed from the index
+- **After switching branches or rebasing** — run `--full`
+- **When unsure which files changed** — run without flags to auto-detect via git

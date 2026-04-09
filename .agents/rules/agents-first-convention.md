@@ -7,13 +7,13 @@ alwaysApply: true
 
 When creating **any** new rule or skill, follow this convention:
 
-## Rules (`.mdc` files)
+## Rules (`.md` files)
 
-1. Create the file in `.agents/rules/<name>.mdc`
-2. Create a symlink in `.cursor/rules/`:
+1. Create the file in `.agents/rules/<name>.md` (with YAML frontmatter)
+2. Create a `.mdc` symlink in `.cursor/rules/` (Cursor requires `.mdc` for frontmatter parsing):
 
    ```bash
-   ln -s ../../.agents/rules/<name>.mdc .cursor/rules/<name>.mdc
+   ln -s ../../.agents/rules/<name>.md .cursor/rules/<name>.mdc
    ```
 
 ## Skills (`SKILL.md` files)

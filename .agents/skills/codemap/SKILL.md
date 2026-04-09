@@ -1,3 +1,8 @@
+---
+name: codemap
+description: Query codebase structure via SQLite instead of scanning files. Use when exploring code, finding symbols, tracing dependencies, or auditing a project indexed by Codemap.
+---
+
 # Codemap — full reference
 
 Query codebase structure via SQLite instead of scanning files. Use when exploring code, finding symbols, tracing dependencies, or auditing a project indexed by **Codemap**.

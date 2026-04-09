@@ -60,23 +60,23 @@ Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — ru
 
 **Upstream** skill and rules in this repo (e.g. `codemap`) stay **generic** — placeholder SQL and triggers, no product-specific paths. Consumer projects can run **`codemap agents init`** (ships **`templates/agents`** on npm; see [docs/agents.md](../docs/agents.md)) or **copy/symlink** manually, then **edit their copy** for team aliases and queries. Customization always belongs in the **consumer** repo.
 
-Rules live under **`.agents/rules/`**; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink each into **`.cursor/`** (see [agents-first-convention.mdc](../.agents/rules/agents-first-convention.mdc)):
+Rules live under **`.agents/rules/`** as `.md` files; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink into **`.cursor/`** with `.mdc` extension (Cursor requires `.mdc` for frontmatter parsing; see [agents-first-convention.md](../.agents/rules/agents-first-convention.md)):
 
 ```bash
 mkdir -p .cursor/rules .cursor/skills
 for f in codemap agents-first-convention no-bypass-hooks verify-after-each-step tracer-bullets concise-reporting; do
-  ln -sf "../../.agents/rules/${f}.mdc" ".cursor/rules/${f}.mdc"
+  ln -sf "../../.agents/rules/${f}.md" ".cursor/rules/${f}.mdc"
 done
 ln -sf ../../.agents/skills/codemap .cursor/skills/codemap
 ```
 
-| Rule                          | Purpose                                   |
-| ----------------------------- | ----------------------------------------- |
-| `codemap.mdc`                 | Query SQLite index before structural grep |
-| `agents-first-convention.mdc` | `.agents/` source + `.cursor/` symlinks   |
-| `no-bypass-hooks.mdc`         | Never `--no-verify` on commit             |
-| `verify-after-each-step.mdc`  | Run checks between milestones             |
-| `tracer-bullets.mdc`          | Vertical slices end-to-end                |
-| `concise-reporting.mdc`       | Short agent replies                       |
+| Rule                         | Purpose                                   |
+| ---------------------------- | ----------------------------------------- |
+| `codemap.md`                 | Query SQLite index before structural grep |
+| `agents-first-convention.md` | `.agents/` source + `.cursor/` symlinks   |
+| `no-bypass-hooks.md`         | Never `--no-verify` on commit             |
+| `verify-after-each-step.md`  | Run checks between milestones             |
+| `tracer-bullets.md`          | Vertical slices end-to-end                |
+| `concise-reporting.md`       | Short agent replies                       |
 
 Thank you for helping make structural codebase queries fast and reusable for agents.

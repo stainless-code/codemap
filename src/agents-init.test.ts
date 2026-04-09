@@ -34,7 +34,7 @@ describe("runAgentsInit", () => {
       );
       expect(skill.length).toBeGreaterThan(100);
       expect(
-        readFileSync(join(dir, ".agents", "rules", "codemap.mdc"), "utf-8"),
+        readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8"),
       ).toContain("codemap");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -71,7 +71,7 @@ describe("runAgentsInit", () => {
         ),
       ).toBe("user skill");
       expect(
-        readFileSync(join(dir, ".agents", "rules", "codemap.mdc"), "utf-8"),
+        readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8"),
       ).toContain("codemap");
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -82,7 +82,7 @@ describe("runAgentsInit", () => {
     const root = resolveAgentsTemplateDir();
     const rules = listRegularFilesRecursive(join(root, "rules")).sort();
     const skills = listRegularFilesRecursive(join(root, "skills")).sort();
-    expect(rules).toContain("codemap.mdc");
+    expect(rules).toContain("codemap.md");
     expect(skills).toContain("codemap/SKILL.md");
   });
 
@@ -216,9 +216,10 @@ describe("runAgentsInit", () => {
       for (const rel of listRegularFilesRecursive(
         join(dir, ".agents", "rules"),
       )) {
+        const cursorRel = rel.endsWith(".md") ? rel.slice(0, -3) + ".mdc" : rel;
         expect(
           lstatSync(
-            join(dir, ".cursor", "rules", ...rel.split("/")),
+            join(dir, ".cursor", "rules", ...cursorRel.split("/")),
           ).isSymbolicLink(),
         ).toBe(true);
       }
@@ -298,7 +299,7 @@ describe("runAgentsInit", () => {
         }),
       ).toBe(true);
       expect(
-        readFileSync(join(dir, ".windsurf", "rules", "codemap.mdc"), "utf-8"),
+        readFileSync(join(dir, ".windsurf", "rules", "codemap.md"), "utf-8"),
       ).toContain("codemap");
     } finally {
       rmSync(dir, { recursive: true, force: true });

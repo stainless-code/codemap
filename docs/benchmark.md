@@ -35,7 +35,7 @@ Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavi
 
 **Where `.codemap.db` lives:** defaults to **`<indexed-project-root>/.codemap.db`**, not inside the Codemap repo — add `.codemap.db` to that project’s `.gitignore` if needed.
 
-**Agents:** Work in the **stainless-code/codemap** window with [`.agents/rules/codemap.mdc`](../.agents/rules/codemap.mdc) and the [skill](../.agents/skills/codemap/SKILL.md). Queries resolve against whatever **`CODEMAP_*`** / **`--root`** selected.
+**Agents:** Work in the **stainless-code/codemap** window with [`.agents/rules/codemap.md`](../.agents/rules/codemap.md) and the [skill](../.agents/skills/codemap/SKILL.md). Queries resolve against whatever **`CODEMAP_*`** / **`--root`** selected.
 
 ---
 

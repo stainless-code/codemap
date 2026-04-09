@@ -59,10 +59,12 @@ function copyFilesGranular(
   srcRoot: string,
   destRoot: string,
   relPaths: string[],
+  renameFn?: (rel: string) => string,
 ): void {
   for (const rel of relPaths) {
+    const destRel = renameFn ? renameFn(rel) : rel;
     const from = join(srcRoot, ...relPathToAbsSegments(rel));
-    const to = join(destRoot, ...relPathToAbsSegments(rel));
+    const to = join(destRoot, ...relPathToAbsSegments(destRel));
     mkdirSync(dirname(to), { recursive: true });
     copyFileSync(from, to);
   }
@@ -74,11 +76,13 @@ function symlinkFilesGranular(
   destRoot: string,
   relPaths: string[],
   labelForErrors: string,
+  renameFn?: (rel: string) => string,
 ): void {
   mkdirSync(destRoot, { recursive: true });
   for (const rel of relPaths) {
+    const destRel = renameFn ? renameFn(rel) : rel;
     const srcFile = join(srcRoot, ...relPathToAbsSegments(rel));
-    const destFile = join(destRoot, ...relPathToAbsSegments(rel));
+    const destFile = join(destRoot, ...relPathToAbsSegments(destRel));
     mkdirSync(dirname(destFile), { recursive: true });
     const target = relative(dirname(destFile), srcFile);
     try {
@@ -438,6 +442,11 @@ export function applyAgentsInitTargets(
   }
 }
 
+/** Cursor requires `.mdc` for frontmatter-based rules; templates ship as `.md`. */
+function mdToMdc(rel: string): string {
+  return rel.endsWith(".md") ? rel.slice(0, -3) + ".mdc" : rel;
+}
+
 function applyCursorIntegration(
   projectRoot: string,
   linkMode: AgentsInitLinkMode,
@@ -455,7 +464,13 @@ function applyCursorIntegration(
     removePathForRewrite(cursorSkills, force, ".cursor/skills");
     const ruleFiles = listRegularFilesRecursive(agentsRules);
     const skillFiles = listRegularFilesRecursive(agentsSkills);
-    symlinkFilesGranular(agentsRules, cursorRules, ruleFiles, ".cursor/rules");
+    symlinkFilesGranular(
+      agentsRules,
+      cursorRules,
+      ruleFiles,
+      ".cursor/rules",
+      mdToMdc,
+    );
     symlinkFilesGranular(
       agentsSkills,
       cursorSkills,
@@ -474,6 +489,7 @@ function applyCursorIntegration(
     agentsRules,
     cursorRules,
     listRegularFilesRecursive(agentsRules),
+    mdToMdc,
   );
   copyFilesGranular(
     agentsSkills,

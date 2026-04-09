@@ -19,12 +19,12 @@ AI agents tend to chain many edits across files and only discover breakage at co
 
 ## Current Per-File Checks (from `lint-staged.config.js`)
 
-| File pattern | Checks |
-| --- | --- |
-| `*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}` | `bun run format:check`, `bun run lint` |
-| `*.{css,json,md,mdc,html,yaml,yml}` | `bun run format:check` |
-| `*.{ts,tsx}` | `bun run typecheck` with a temporary `tsconfig.lint-staged.json` that includes only **staged files under `src/`** (project-wide types still interconnect — use `bun run typecheck` if you need full-project certainty) |
-| `*.test.ts` | `bun test` (on changed test files) |
+| File pattern                        | Checks                                                                                                                                                                                                                 |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}` | `bun run format:check`, `bun run lint`                                                                                                                                                                                 |
+| `*.{css,json,md,mdc,html,yaml,yml}` | `bun run format:check`                                                                                                                                                                                                 |
+| `*.{ts,tsx}`                        | `bun run typecheck` with a temporary `tsconfig.lint-staged.json` that includes only **staged files under `src/`** (project-wide types still interconnect — use `bun run typecheck` if you need full-project certainty) |
+| `*.test.ts`                         | `bun test` (on changed test files)                                                                                                                                                                                     |
 
 ## What Counts as a Step
 
@@ -43,4 +43,4 @@ A "step" is any self-contained unit of work where you've finished editing and ar
 3. **Use the right scope** — Run `bun run lint` and `bun run format:check` on specific files when possible. Prefer `bun run typecheck` project-wide when types may depend on unstaged files.
 4. **Run affected tests** — If you modified or created `*.test.ts` files, run `bun test <file>` on them.
 5. **Re-index before querying Codemap** — If you changed indexed source and plan to run SQL against the structural index next, run `bun src/index.ts --files <paths>` with paths **relative to the indexed project root** (set `CODEMAP_TEST_BENCH` / `CODEMAP_ROOT` or `--root` so that root is correct — see [docs/benchmark.md § Indexing another project](../../docs/benchmark.md#indexing-another-project)).
-6. **Don't duplicate the hook's job** — You don't need to re-verify at commit time; the pre-commit hook (`lint-staged`) handles that automatically when AI/agent env vars trigger it. Your job is to stay green *between* commits.
+6. **Don't duplicate the hook's job** — You don't need to re-verify at commit time; the pre-commit hook (`lint-staged`) handles that automatically when AI/agent env vars trigger it. Your job is to stay green _between_ commits.
