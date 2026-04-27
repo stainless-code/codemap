@@ -22,7 +22,13 @@ export interface ContextEnvelope {
     languages: { language: string; files: number }[];
   };
   hubs?: { to_path: string; fan_in: number }[];
-  recent_markers?: {
+  /**
+   * A flavor sample of TODO/FIXME/HACK/NOTE markers — the alphabetically-first
+   * 20 across the repo, ordered by `(file_path, line_number)`. Not a recency
+   * signal; for time-ordered output query `markers` directly, joining
+   * `files.last_modified`.
+   */
+  sample_markers?: {
     file_path: string;
     line_number: number;
     kind: string;
@@ -51,11 +57,12 @@ export function printContextCmdHelp(): void {
   console.log(`Usage: codemap context [--compact] [--for "<intent>"]
 
 Emit a JSON envelope describing the current index — project metadata, top
-hubs (fan-in), recent markers, and the bundled recipe catalog. Designed for
-agents and editors that want a single-command "give me everything cheap".
+hubs (fan-in), a sample of markers, and the bundled recipe catalog. Designed
+for agents and editors that want a single-command "give me everything cheap".
 
 Flags:
-  --compact          Drop hubs and recent_markers (smaller payload).
+  --compact          Drop hubs and sample_markers; emit JSON without
+                     pretty-print (smaller payload).
   --for "<intent>"   Pre-classify a free-text intent (refactor, debug, test,
                      feature, explore) and recommend recipes that match.
   --help, -h         Show this help.
@@ -90,7 +97,7 @@ export function parseContextRest(
     }
     if (a === "--for") {
       const v = rest[i + 1];
-      if (v === undefined || v.startsWith("--")) {
+      if (v === undefined || v === "" || v.startsWith("--")) {
         return {
           kind: "error",
           message: 'codemap: "--for" requires an intent string in quotes.',
@@ -210,11 +217,11 @@ export function buildContextEnvelope(
     envelope.hubs = db
       .query(QUERY_RECIPES["fan-in"]!.sql)
       .all() as ContextEnvelope["hubs"];
-    envelope.recent_markers = db
+    envelope.sample_markers = db
       .query(
         "SELECT file_path, line_number, kind, content FROM markers ORDER BY file_path ASC, line_number ASC LIMIT 20",
       )
-      .all() as ContextEnvelope["recent_markers"];
+      .all() as ContextEnvelope["sample_markers"];
   }
 
   if (opts.intent !== null) {
@@ -248,7 +255,11 @@ export async function runContextCmd(opts: ContextOpts): Promise<void> {
     } finally {
       closeDb(db, { readonly: true });
     }
-    console.log(JSON.stringify(envelope, null, 2));
+    console.log(
+      opts.compact
+        ? JSON.stringify(envelope)
+        : JSON.stringify(envelope, null, 2),
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.log(JSON.stringify({ error: msg }));

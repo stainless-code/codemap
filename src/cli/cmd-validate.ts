@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
 import { loadUserConfig, resolveCodemapConfig } from "../config";
@@ -116,18 +116,24 @@ export function computeValidateRows(
 
     const indexedHash = indexByPath.get(rel);
     const abs = resolve(projectRoot, rel);
-    const onDisk = existsSync(abs);
+    let source: string | undefined;
+    try {
+      source = readFileSync(abs, "utf8");
+    } catch {
+      source = undefined;
+    }
 
     if (indexedHash === undefined) {
-      if (onDisk) rows.push({ path: rel, status: "unindexed" });
+      if (source !== undefined) rows.push({ path: rel, status: "unindexed" });
       continue;
     }
-    if (!onDisk) {
+    if (source === undefined) {
       rows.push({ path: rel, status: "missing" });
       continue;
     }
-    const diskHash = hashContent(readFileSync(abs, "utf8"));
-    if (diskHash !== indexedHash) rows.push({ path: rel, status: "stale" });
+    if (hashContent(source) !== indexedHash) {
+      rows.push({ path: rel, status: "stale" });
+    }
   }
   rows.sort((a, b) => a.path.localeCompare(b.path));
   return rows;

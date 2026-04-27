@@ -46,9 +46,11 @@ bun add @stainless-code/codemap
 
 ```bash
 codemap                                                      # incremental index (run once per session)
-codemap query --json --recipe fan-out                        # bundled SQL via recipe id
+codemap query --json --recipe fan-out                        # bundled SQL via recipe id (alias: -r)
 codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  # ad-hoc SQL
 codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
+codemap validate --json                                      # detect stale / missing / unindexed files
+codemap context --compact --for "refactor auth"              # JSON envelope + intent-matched recipes
 codemap agents init                                          # scaffold .agents/ rules + skills
 ```
 

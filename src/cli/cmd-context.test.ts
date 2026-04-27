@@ -48,6 +48,11 @@ describe("parseContextRest", () => {
     expect(r.kind).toBe("error");
   });
 
+  it("errors when --for value is an empty string", () => {
+    const r = parseContextRest(["context", "--for", ""]);
+    expect(r.kind).toBe("error");
+  });
+
   it("rejects unknown options", () => {
     expect(parseContextRest(["context", "--nope"]).kind).toBe("error");
   });

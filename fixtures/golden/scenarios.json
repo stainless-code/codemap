@@ -86,8 +86,8 @@
   },
   {
     "id": "files-hashes",
-    "prompt": "All indexed file paths with language and line count (powers `codemap validate`)",
-    "sql": "SELECT path, language, line_count FROM files ORDER BY path"
+    "prompt": "All indexed files with content_hash (recipe powers `codemap validate`)",
+    "recipe": "files-hashes"
   },
   {
     "id": "barrel-files",
