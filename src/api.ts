@@ -1,13 +1,11 @@
 import { resolve } from "node:path";
 
 import { queryRows } from "./application/index-engine";
-import { runCodemapIndex, type RunIndexOptions } from "./application/run-index";
+import { runCodemapIndex } from "./application/run-index";
+import type { RunIndexOptions } from "./application/run-index";
 import type { IndexResult } from "./application/types";
-import {
-  type CodemapUserConfig,
-  loadUserConfig,
-  resolveCodemapConfig,
-} from "./config";
+import { loadUserConfig, resolveCodemapConfig } from "./config";
+import type { CodemapUserConfig } from "./config";
 import { closeDb, openDb } from "./db";
 import { configureResolver } from "./resolver";
 import {

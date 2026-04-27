@@ -28,9 +28,8 @@ import {
   insertCalls,
   getAllFileHashes,
   SCHEMA_VERSION,
-  type CodemapDatabase,
-  type FileRow,
 } from "../db";
+import type { CodemapDatabase, FileRow } from "../db";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
 import { extractMarkers } from "../markers";
@@ -39,7 +38,11 @@ import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
 import { getIncludePatterns, getProjectRoot, isPathExcluded } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
-import type { IndexRunStats, IndexTableStats } from "./types";
+import type {
+  IndexPerformanceReport,
+  IndexRunStats,
+  IndexTableStats,
+} from "./types";
 
 export const VALID_EXTENSIONS = new Set(Object.keys(LANG_MAP));
 
@@ -270,10 +273,15 @@ export async function indexFiles(
   filePaths: string[],
   fullRebuild: boolean,
   knownIndexedPaths?: Set<string>,
-  options?: { quiet?: boolean },
+  options?: { quiet?: boolean; performance?: boolean; collectMs?: number },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
+  const wantPerformance = options?.performance === true;
   const startTime = performance.now();
+  let parseMs = 0;
+  let insertMs = 0;
+  let indexCreateMs = 0;
+  let slowest: { path: string; parse_ms: number }[] = [];
 
   if (fullRebuild) {
     dropAll(db);
@@ -290,9 +298,20 @@ export async function indexFiles(
   let skipped = 0;
 
   if (fullRebuild) {
+    const parseStart = performance.now();
     const results = await parseFilesParallel(filePaths);
+    parseMs = performance.now() - parseStart;
     results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    if (wantPerformance) {
+      slowest = results
+        .filter((r) => typeof r.parseMs === "number")
+        .map((r) => ({ path: r.relPath, parse_ms: Math.round(r.parseMs!) }))
+        .sort((a, b) => b.parse_ms - a.parse_ms)
+        .slice(0, 10);
+    }
+    const insertStart = performance.now();
     indexed = insertParsedResults(db, results, indexedPaths);
+    insertMs = performance.now() - insertStart;
   } else {
     const existingHashes = getAllFileHashes(db);
     const root = getProjectRoot();
@@ -390,7 +409,9 @@ export async function indexFiles(
   }
 
   if (fullRebuild) {
+    const idxStart = performance.now();
     createIndexes(db);
+    indexCreateMs = performance.now() - idxStart;
     db.run("PRAGMA synchronous = NORMAL");
     db.run("PRAGMA foreign_keys = ON");
     setMeta(db, "schema_version", String(SCHEMA_VERSION));
@@ -407,6 +428,19 @@ export async function indexFiles(
   const elapsed = Math.round(performance.now() - startTime);
   const stats = fetchTableStats(db);
 
+  let perf: IndexPerformanceReport | undefined;
+  if (wantPerformance) {
+    const collectMs = Math.round(options?.collectMs ?? 0);
+    perf = {
+      collect_ms: collectMs,
+      parse_ms: Math.round(parseMs),
+      insert_ms: Math.round(insertMs),
+      index_create_ms: Math.round(indexCreateMs),
+      total_ms: elapsed,
+      slowest_files: slowest,
+    };
+  }
+
   if (!quiet) {
     console.log(
       `\n  Codemap ${fullRebuild ? "(full rebuild)" : "(incremental)"}`,
@@ -418,6 +452,27 @@ export async function indexFiles(
     for (const [key, value] of Object.entries(stats)) {
       console.log(`  ${(key + ":").padEnd(14)}${value}`);
     }
+    if (perf) {
+      console.log(`  ───────────────────────────────────`);
+      console.log(`  Performance breakdown (ms)`);
+      console.log(`    collect:        ${perf.collect_ms}  (file glob)`);
+      console.log(`    parse:          ${perf.parse_ms}  (workers)`);
+      console.log(`    insert:         ${perf.insert_ms}  (bulk SQL)`);
+      console.log(
+        `    index_create:   ${perf.index_create_ms}  (B-tree build)`,
+      );
+      console.log(
+        `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL)`,
+      );
+      if (perf.slowest_files.length > 0) {
+        console.log(
+          `  Top ${perf.slowest_files.length} slowest files (parse ms)`,
+        );
+        for (const f of perf.slowest_files) {
+          console.log(`    ${String(f.parse_ms).padStart(5)}  ${f.path}`);
+        }
+      }
+    }
     console.log();
   }
 
@@ -427,6 +482,7 @@ export async function indexFiles(
     elapsedMs: elapsed,
     fullRebuild,
     stats,
+    performance: perf,
   };
 }
 
@@ -491,7 +547,9 @@ export function printQueryResult(
     }
     return 0;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = enrichQueryError(
+      err instanceof Error ? err.message : String(err),
+    );
     if (json) {
       console.log(JSON.stringify({ error: msg }));
     } else {
@@ -501,6 +559,20 @@ export function printQueryResult(
   } finally {
     if (db !== undefined) closeDb(db, { readonly: true });
   }
+}
+
+/**
+ * Rewrites raw SQLite errors that almost always indicate a missing or empty
+ * `.codemap.db` into an actionable hint. Other errors are returned unchanged.
+ */
+function enrichQueryError(message: string): string {
+  if (
+    /^no such table:\s*\w+/i.test(message) ||
+    /^no such column:\s*\w+/i.test(message)
+  ) {
+    return `${message} — run \`codemap\` (or \`codemap --full\`) first to build the index, then re-run your query.`;
+  }
+  return message;
 }
 
 /**

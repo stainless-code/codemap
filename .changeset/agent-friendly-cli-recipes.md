@@ -1,0 +1,15 @@
+---
+"@stainless-code/codemap": patch
+---
+
+Agent-friendly CLI surface: `codemap validate`, `codemap context`, `--performance`, `-r` recipe alias, and four new bundled query recipes.
+
+- **New: `codemap validate [--json] [paths...]`** — diffs the on-disk SHA-256 of indexed files against `files.content_hash` and prints stale / missing / unindexed rows. Lets agents skip re-reads they don't need; exits `1` on any drift (git-status semantics)
+- **New: `codemap context [--compact] [--for "<intent>"]`** — emits a stable JSON envelope (project metadata, top hubs, recent markers, recipe catalog) for any agent or editor that wants the index in one cheap shot. `--for` runs lightweight intent classification (refactor / debug / test / feature / explore / other) and returns matched recipe ids plus a hint
+- **New: `codemap --performance`** flag — prints a per-phase timing breakdown (collect / parse / insert / index_create) and the top-10 slowest files by parse time during full rebuilds, for triaging giant or pathological inputs
+- **New: `-r` short alias for `codemap query --recipe`** + cleaner organized `codemap query --help` (sectioned flags, dynamic recipe-id padding, examples for both forms)
+- **New recipes**: `deprecated-symbols` (`@deprecated` JSDoc tag scan), `visibility-tags` (`@internal` / `@private` / `@alpha` / `@beta`), `files-hashes` (powers `validate`), `barrel-files` (top files by export count)
+- **Friendlier no-`.codemap.db` error**: `no such table: <X>` now rewrites to an actionable hint pointing at `codemap` / `codemap --full`, on both the JSON and human paths
+- **Public type surface**: new `IndexPerformanceReport`; `IndexRunStats.performance?` field; per-field JSDoc coverage on `IndexResult`, `IndexRunStats`, `ResolvedCodemapConfig`, all `db.ts` row interfaces (`FileRow`, `SymbolRow`, `ImportRow`, `ExportRow`, `ComponentRow`, `DependencyRow`, `MarkerRow`, `CssVariableRow`, `CssClassRow`, `CssKeyframeRow`, `CallRow`, `TypeMemberRow`), and `ParsedFile`
+- **Documentation**: README now leads with a "What you get" Grep/Read vs Codemap capability table and a "Daily commands" stripe; `docs/why-codemap.md` adds a "What Codemap is **not**" anti-pitch section and a scenario-keyed token-savings table (single lookup → 50-turn session) replacing the earlier hand-wave
+- **Stricter lint baseline**: enabled `prefer-const`, `consistent-type-specifier-style`, `consistent-type-definitions`, `no-confusing-non-null-assertion`, `no-unnecessary-{boolean-literal-compare,template-expression,type-assertion}`, `prefer-{includes,nullish-coalescing,optional-chain}`, and `unicorn/switch-case-braces`

@@ -1,8 +1,5 @@
-import {
-  openCodemapDatabase,
-  type CodemapDatabase,
-  type BindValues,
-} from "./sqlite-db";
+import { openCodemapDatabase } from "./sqlite-db";
+import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /**
  * Bump in lockstep with `createTables` / `createIndexes` whenever on-disk schema
@@ -250,6 +247,13 @@ export function deleteFileData(db: CodemapDatabase, filePath: string) {
   db.run("DELETE FROM files WHERE path = ?", [filePath]);
 }
 
+/**
+ * One row in the `files` table — the header for every indexed file. All other
+ * row types reference `path` (FK with `ON DELETE CASCADE`). `content_hash` is
+ * SHA-256 hex from `src/hash.ts` and drives incremental staleness detection.
+ *
+ * Schema: see [docs/architecture.md § `files`](../docs/architecture.md#files--every-indexed-file-strict).
+ */
 export interface FileRow {
   path: string;
   content_hash: string;
@@ -276,6 +280,15 @@ export function insertFile(db: CodemapDatabase, file: FileRow) {
   );
 }
 
+/**
+ * One row in the `symbols` table — top-level or nested function / const / class
+ * / interface / type / enum / method / property / getter / setter. Class
+ * members carry `parent_name`. JSDoc tags (`@deprecated`, `@internal`, etc.)
+ * live in `doc_comment` and power the `deprecated-symbols` /
+ * `visibility-tags` recipes.
+ *
+ * Schema: see [docs/architecture.md § `symbols`](../docs/architecture.md#symbols--functions-constants-classes-interfaces-types-enums-strict).
+ */
 export interface SymbolRow {
   file_path: string;
   name: string;
@@ -341,6 +354,14 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   );
 }
 
+/**
+ * One row in the `imports` table — a raw `import` statement. `specifiers` is a
+ * JSON-encoded string array. `resolved_path` is non-null only when the
+ * resolver could map `source` to a file inside the indexed set (see
+ * `dependencies` for the resolved edge view).
+ *
+ * Schema: see [docs/architecture.md § `imports`](../docs/architecture.md#imports--import-statements-strict).
+ */
 export interface ImportRow {
   file_path: string;
   source: string;
@@ -368,6 +389,13 @@ export function insertImports(db: CodemapDatabase, imports: ImportRow[]) {
   );
 }
 
+/**
+ * One row in the `exports` table — named, default, or re-export. `kind` is one
+ * of `value` / `type` / `re-export`; `re_export_source` is non-null only for
+ * `re-export` rows.
+ *
+ * Schema: see [docs/architecture.md § `exports`](../docs/architecture.md#exports--export-declarations-strict).
+ */
 export interface ExportRow {
   file_path: string;
   name: string;
@@ -387,6 +415,15 @@ export function insertExports(db: CodemapDatabase, exports: ExportRow[]) {
   );
 }
 
+/**
+ * One row in the `components` table — React component detected by PascalCase
+ * name plus JSX return or hook usage. `hooks_used` is a JSON-encoded string
+ * array (e.g. `'["useState","useEffect"]'`). PascalCase functions in `.tsx`
+ * that neither return JSX nor call hooks are stored as `symbols` only, never
+ * as `components`.
+ *
+ * Schema: see [docs/architecture.md § `components`](../docs/architecture.md#components--react-components-detected-by-pascalcase--jsx-return-or-hook-usage-strict).
+ */
 export interface ComponentRow {
   file_path: string;
   name: string;
@@ -415,6 +452,14 @@ export function insertComponents(
   );
 }
 
+/**
+ * One row in the `dependencies` table — a resolved file-to-file edge derived
+ * from `imports.resolved_path`. Self-edges and unresolved imports are
+ * excluded. `(from_path, to_path)` is the composite primary key
+ * (`STRICT, WITHOUT ROWID`).
+ *
+ * Schema: see [docs/architecture.md § `dependencies`](../docs/architecture.md#dependencies--resolved-file-to-file-dependency-graph-strict-without-rowid).
+ */
 export interface DependencyRow {
   from_path: string;
   to_path: string;
@@ -430,6 +475,13 @@ export function insertDependencies(db: CodemapDatabase, deps: DependencyRow[]) {
   );
 }
 
+/**
+ * One row in the `markers` table — a `TODO` / `FIXME` / `HACK` / `NOTE` comment
+ * extracted from any indexed file (TS, CSS, Markdown, JSON, YAML, …).
+ * `content` is the comment text without the marker prefix.
+ *
+ * Schema: see [docs/architecture.md § `markers`](../docs/architecture.md#markers--todofixmehacknote-comments-extracted-from-all-file-types-strict).
+ */
 export interface MarkerRow {
   file_path: string;
   line_number: number;
@@ -447,6 +499,13 @@ export function insertMarkers(db: CodemapDatabase, markers: MarkerRow[]) {
   );
 }
 
+/**
+ * One row in the `css_variables` table — a CSS custom property
+ * (`--token: value`). `scope` is `:root`, `@theme` (Tailwind v4), or the
+ * selector text where the property was declared.
+ *
+ * Schema: see [docs/architecture.md § `css_variables`](../docs/architecture.md#css_variables--css-custom-properties-design-tokens-strict).
+ */
 export interface CssVariableRow {
   file_path: string;
   name: string;
@@ -469,6 +528,13 @@ export function insertCssVariables(
   );
 }
 
+/**
+ * One row in the `css_classes` table — a class name extracted from a CSS
+ * selector (without the leading `.`). `is_module` is `1` when the file ends
+ * in `.module.css` (CSS Modules — names are usually rewritten by bundlers).
+ *
+ * Schema: see [docs/architecture.md § `css_classes`](../docs/architecture.md#css_classes--css-class-definitions-strict).
+ */
 export interface CssClassRow {
   file_path: string;
   name: string;
@@ -486,6 +552,11 @@ export function insertCssClasses(db: CodemapDatabase, classes: CssClassRow[]) {
   );
 }
 
+/**
+ * One row in the `css_keyframes` table — a `@keyframes <name>` declaration.
+ *
+ * Schema: see [docs/architecture.md § `css_keyframes`](../docs/architecture.md#css_keyframes--keyframes-animation-definitions-strict).
+ */
 export interface CssKeyframeRow {
   file_path: string;
   name: string;
@@ -505,6 +576,15 @@ export function insertCssKeyframes(
   );
 }
 
+/**
+ * One row in the `calls` table — a function-scoped call edge, deduped per
+ * `(caller_scope, callee_name)` per file. `caller_scope` is the dot-joined
+ * enclosing scope (e.g. `UserService.run`) so same-named methods in different
+ * classes stay distinct. Module-level calls (outside any function) are
+ * intentionally excluded.
+ *
+ * Schema: see [docs/architecture.md § `calls`](../docs/architecture.md#calls--function-scoped-call-edges-deduped-per-file-strict).
+ */
 export interface CallRow {
   file_path: string;
   caller_name: string;
@@ -522,6 +602,14 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   );
 }
 
+/**
+ * One row in the `type_members` table — a property or method signature on an
+ * interface or object-literal type alias. `symbol_name` references the parent
+ * `symbols.name`; `type` is the raw annotation string (or `null` when the
+ * parser cannot reconstruct it).
+ *
+ * Schema: see [docs/architecture.md § `type_members`](../docs/architecture.md#type_members--properties-and-methods-of-interfaces-and-object-literal-types-strict).
+ */
 export interface TypeMemberRow {
   file_path: string;
   symbol_name: string;

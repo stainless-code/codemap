@@ -66,6 +66,48 @@ Copies bundled agent templates into .agents/ under the project root.
 
   validateIndexModeArgs(rest);
 
+  if (rest[0] === "context") {
+    const { parseContextRest, printContextCmdHelp, runContextCmd } =
+      await import("./cmd-context.js");
+    const parsed = parseContextRest(rest);
+    if (parsed.kind === "help") {
+      printContextCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runContextCmd({
+      root,
+      configFile,
+      compact: parsed.compact,
+      intent: parsed.intent,
+    });
+    return;
+  }
+
+  if (rest[0] === "validate") {
+    const { parseValidateRest, printValidateCmdHelp, runValidateCmd } =
+      await import("./cmd-validate.js");
+    const parsed = parseValidateRest(rest);
+    if (parsed.kind === "help") {
+      printValidateCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runValidateCmd({
+      root,
+      configFile,
+      paths: parsed.paths,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "query") {
     const {
       parseQueryRest,

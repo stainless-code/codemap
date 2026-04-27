@@ -13,7 +13,10 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX_TS = join(REPO_ROOT, "src/index.ts");
 
-type Scenario = { label: string; args: string[] };
+interface Scenario {
+  label: string;
+  args: string[];
+}
 
 const SCENARIOS: Scenario[] = [
   {

@@ -5,11 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../src/api";
 import { getQueryRecipeSql } from "../src/cli/query-recipes";
-import {
-  type GoldenMatch,
-  type GoldenScenario,
-  parseScenariosJson,
-} from "./query-golden/schema";
+import { parseScenariosJson } from "./query-golden/schema";
+import type { GoldenMatch, GoldenScenario } from "./query-golden/schema";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
