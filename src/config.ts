@@ -97,10 +97,8 @@ function formatCodemapConfigError(error: z.ZodError): string {
 }
 
 /**
- * Fully resolved configuration after {@link resolveCodemapConfig} — defaults
- * filled in, paths absolute, types narrowed. Stored in the process-global
- * runtime by {@link initCodemap} and read by every layer that needs project
- * context (workers, resolver, DB, glob).
+ * Fully resolved config (defaults filled, paths absolute) — stored in the
+ * process-global runtime by {@link initCodemap} and read by every layer.
  */
 export interface ResolvedCodemapConfig {
   /** Absolute project root (from CLI `--root`, env, or `process.cwd()`). */

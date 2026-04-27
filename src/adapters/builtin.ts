@@ -78,15 +78,9 @@ export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
 ];
 
 /**
- * First-match lookup of a {@link LanguageAdapter} by file extension.
- *
- * @param ext - File extension **with leading dot**, e.g. `".tsx"`. Compared
- *   verbatim against each adapter's `extensions` array.
- * @param adapters - Adapter list to search; defaults to {@link BUILTIN_ADAPTERS}.
- *   Pass a custom list to support project-local adapters once a registration
- *   API lands (see [docs/roadmap.md](../../docs/roadmap.md)).
- * @returns The first adapter whose `extensions` contains `ext`, or `undefined`
- *   when no adapter matches (the indexer then falls back to markers-only text).
+ * First-match adapter lookup by file extension. `ext` must include the
+ * leading dot (`.tsx`); returns `undefined` when nothing matches (the
+ * indexer then falls back to markers-only text).
  */
 export function getAdapterForExtension(
   ext: string,
