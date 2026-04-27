@@ -81,6 +81,23 @@ describe("parseQueryRest", () => {
     });
   });
 
+  it("accepts -r as a short alias for --recipe", () => {
+    const r = parseQueryRest(["query", "--json", "-r", "fan-out"]);
+    const sql = getQueryRecipeSql("fan-out");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: true,
+    });
+  });
+
+  it("errors when -r has no id", () => {
+    const r = parseQueryRest(["query", "-r"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("-r");
+  });
+
   it("errors on unknown recipe", () => {
     const r = parseQueryRest(["query", "--recipe", "nope"]);
     expect(r.kind).toBe("error");

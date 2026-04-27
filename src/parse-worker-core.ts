@@ -75,6 +75,7 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
 
     const ctx: ParseContext = { absPath, relPath, source };
 
+    const parseStart = performance.now();
     try {
       const adapter = getAdapterForExtension(ext);
       const payload = adapter
@@ -84,6 +85,7 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
     } catch (err) {
       parsed.parseError = err instanceof Error ? err.message : String(err);
     }
+    parsed.parseMs = performance.now() - parseStart;
 
     results.push(parsed);
   }

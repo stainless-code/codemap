@@ -16,6 +16,12 @@ Query:
   codemap query [--json] "<SQL>"
   codemap query [--json] --recipe <id>
 
+Validate (compare on-disk SHA-256 to indexed hash):
+  codemap validate [--json] [paths...]
+
+Context (project snapshot envelope for any agent):
+  codemap context [--compact] [--for "<intent>"]
+
 Agents:
   codemap agents init [--force] [--interactive|-i]
 
@@ -27,6 +33,8 @@ Environment: CODEMAP_ROOT (same as --root)
 
 Options:
   --full          Full rebuild
+  --performance   Print per-phase timing breakdown + top-10 slowest files
+                  (full rebuild only)
   --help, -h      Show this help
 `);
 }
@@ -42,6 +50,8 @@ export function printVersion(): void {
 export function validateIndexModeArgs(rest: string[]): void {
   if (rest.length === 0) return;
   if (rest[0] === "query") return;
+  if (rest[0] === "validate") return;
+  if (rest[0] === "context") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
@@ -54,7 +64,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   let i = 0;
   while (i < rest.length) {
     const a = rest[i];
-    if (a === "--full") {
+    if (a === "--full" || a === "--performance") {
       i++;
       continue;
     }

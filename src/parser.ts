@@ -568,30 +568,42 @@ function stringifyTypeNode(node: any): string | null {
       }
       return name;
     }
-    case "TSStringKeyword":
+    case "TSStringKeyword": {
       return "string";
-    case "TSNumberKeyword":
+    }
+    case "TSNumberKeyword": {
       return "number";
-    case "TSBooleanKeyword":
+    }
+    case "TSBooleanKeyword": {
       return "boolean";
-    case "TSVoidKeyword":
+    }
+    case "TSVoidKeyword": {
       return "void";
-    case "TSNullKeyword":
+    }
+    case "TSNullKeyword": {
       return "null";
-    case "TSUndefinedKeyword":
+    }
+    case "TSUndefinedKeyword": {
       return "undefined";
-    case "TSAnyKeyword":
+    }
+    case "TSAnyKeyword": {
       return "any";
-    case "TSNeverKeyword":
+    }
+    case "TSNeverKeyword": {
       return "never";
-    case "TSUnknownKeyword":
+    }
+    case "TSUnknownKeyword": {
       return "unknown";
-    case "TSObjectKeyword":
+    }
+    case "TSObjectKeyword": {
       return "object";
-    case "TSBigIntKeyword":
+    }
+    case "TSBigIntKeyword": {
       return "bigint";
-    case "TSSymbolKeyword":
+    }
+    case "TSSymbolKeyword": {
       return "symbol";
+    }
     case "TSArrayType": {
       const elem = stringifyTypeNode(node.elementType);
       return elem ? `${elem}[]` : null;
@@ -625,10 +637,12 @@ function stringifyTypeNode(node: any): string | null {
       const inner = stringifyTypeNode(node.typeAnnotation);
       return inner ? `${node.operator} ${inner}` : null;
     }
-    case "TSThisType":
+    case "TSThisType": {
       return "this";
-    default:
+    }
+    default: {
       return null;
+    }
   }
 }
 

@@ -77,6 +77,11 @@ export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
   },
 ];
 
+/**
+ * First-match adapter lookup by file extension. `ext` must include the
+ * leading dot (`.tsx`); returns `undefined` when nothing matches (the
+ * indexer then falls back to markers-only text).
+ */
 export function getAdapterForExtension(
   ext: string,
   adapters: readonly LanguageAdapter[] = BUILTIN_ADAPTERS,

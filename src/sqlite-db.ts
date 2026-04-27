@@ -22,7 +22,7 @@ export interface CodemapDatabase {
   close(): void;
 }
 
-type SqliteInner = {
+interface SqliteInner {
   run(sql: string, params?: BindValues): void;
   query(sql: string): {
     get(...params: unknown[]): unknown;
@@ -30,7 +30,7 @@ type SqliteInner = {
   };
   transaction<T>(fn: () => T): unknown;
   close(): void;
-};
+}
 
 /**
  * `better-sqlite3` allows only one statement per `prepare()`; `bun:sqlite` accepts several.

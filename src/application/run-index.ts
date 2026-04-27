@@ -49,6 +49,11 @@ export interface RunIndexOptions {
    * Suppresses progress logs; parse failures may still be printed. Defaults to `false`.
    */
   quiet?: boolean;
+  /**
+   * Emits a per-phase timing breakdown and the top-10 slowest files (full
+   * rebuild only). Off by default — wired by the CLI's `--performance` flag.
+   */
+  performance?: boolean;
 }
 
 /**
@@ -68,10 +73,18 @@ export async function runCodemapIndex(
   const quiet = options.quiet ?? false;
   const mode: IndexMode = options.mode ?? "incremental";
 
+  const wantPerformance = options.performance === true;
+
   if (mode === "full") {
     if (!quiet) console.log("  Full rebuild requested...");
+    const collectStart = performance.now();
     const files = collectFiles();
-    const run = await indexFiles(db, files, true, undefined, { quiet });
+    const collectMs = performance.now() - collectStart;
+    const run = await indexFiles(db, files, true, undefined, {
+      quiet,
+      performance: wantPerformance,
+      collectMs,
+    });
     return {
       mode: "full",
       indexed: run.indexed,
@@ -156,8 +169,14 @@ export async function runCodemapIndex(
       "  No previous index or incompatible history, doing full rebuild...",
     );
   }
+  const fallbackCollectStart = performance.now();
   const files = collectFiles();
-  const run = await indexFiles(db, files, true, undefined, { quiet });
+  const fallbackCollectMs = performance.now() - fallbackCollectStart;
+  const run = await indexFiles(db, files, true, undefined, {
+    quiet,
+    performance: wantPerformance,
+    collectMs: fallbackCollectMs,
+  });
   return {
     mode: "full",
     indexed: run.indexed,

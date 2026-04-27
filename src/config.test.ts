@@ -9,8 +9,8 @@ import {
   loadUserConfig,
   parseCodemapUserConfig,
   resolveCodemapConfig,
-  type CodemapUserConfig,
 } from "./config";
+import type { CodemapUserConfig } from "./config";
 
 describe("parseCodemapUserConfig / defineConfig", () => {
   it("accepts an empty object", () => {

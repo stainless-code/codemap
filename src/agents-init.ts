@@ -366,10 +366,11 @@ export function applyAgentsInitTargets(
 
   for (const t of targets) {
     switch (t) {
-      case "cursor":
+      case "cursor": {
         applyCursorIntegration(projectRoot, linkMode, force);
         break;
-      case "windsurf":
+      }
+      case "windsurf": {
         wireAgentsRulesTo(
           projectRoot,
           join(projectRoot, ".windsurf", "rules"),
@@ -378,7 +379,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "continue":
+      }
+      case "continue": {
         wireAgentsRulesTo(
           projectRoot,
           join(projectRoot, ".continue", "rules"),
@@ -387,7 +389,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "cline":
+      }
+      case "cline": {
         wireAgentsRulesTo(
           projectRoot,
           join(projectRoot, ".clinerules"),
@@ -396,7 +399,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "amazon-q":
+      }
+      case "amazon-q": {
         wireAgentsRulesTo(
           projectRoot,
           join(projectRoot, ".amazonq", "rules"),
@@ -405,7 +409,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "claude-md":
+      }
+      case "claude-md": {
         upsertCodemapPointerFile(
           join(projectRoot, "CLAUDE.md"),
           CLAUDE_MD_TEMPLATE,
@@ -413,7 +418,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "copilot":
+      }
+      case "copilot": {
         mkdirSync(join(projectRoot, ".github"), { recursive: true });
         upsertCodemapPointerFile(
           join(projectRoot, ".github", "copilot-instructions.md"),
@@ -422,7 +428,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "agents-md":
+      }
+      case "agents-md": {
         upsertCodemapPointerFile(
           join(projectRoot, "AGENTS.md"),
           AGENTS_MD_TEMPLATE,
@@ -430,7 +437,8 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
-      case "gemini-md":
+      }
+      case "gemini-md": {
         upsertCodemapPointerFile(
           join(projectRoot, "GEMINI.md"),
           GEMINI_MD_TEMPLATE,
@@ -438,6 +446,7 @@ export function applyAgentsInitTargets(
           force,
         );
         break;
+      }
     }
   }
 }

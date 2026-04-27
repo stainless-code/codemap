@@ -2,10 +2,8 @@ import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { loadScenariosFromConfigFile } from "./benchmark-config";
-import {
-  getDefaultScenarios,
-  type Scenario,
-} from "./benchmark-default-scenarios";
+import { getDefaultScenarios } from "./benchmark-default-scenarios";
+import type { Scenario } from "./benchmark-default-scenarios";
 import { loadUserConfig, resolveCodemapConfig } from "./config";
 import { closeDb, openDb } from "./db";
 import { configureResolver } from "./resolver";

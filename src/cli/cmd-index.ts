@@ -34,8 +34,10 @@ export async function runIndexCmd(opts: {
       }
     } else {
       const fullRebuild = args.includes("--full");
+      const reportPerformance = args.includes("--performance");
       await runCodemapIndex(db, {
         mode: fullRebuild ? "full" : "incremental",
+        performance: reportPerformance,
       });
     }
   } finally {

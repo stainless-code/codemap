@@ -97,13 +97,19 @@ function formatCodemapConfigError(error: z.ZodError): string {
 }
 
 /**
- * Fully resolved configuration after {@link resolveCodemapConfig}.
+ * Fully resolved config (defaults filled, paths absolute) — stored in the
+ * process-global runtime by {@link initCodemap} and read by every layer.
  */
 export interface ResolvedCodemapConfig {
+  /** Absolute project root (from CLI `--root`, env, or `process.cwd()`). */
   readonly root: string;
+  /** Absolute path to the SQLite database file (default `<root>/.codemap.db`). */
   readonly databasePath: string;
+  /** Glob patterns relative to `root`; either user-supplied or {@link DEFAULT_INCLUDE_PATTERNS}. */
   readonly include: readonly string[];
+  /** Directory **names** (any segment) to skip — either user-supplied or {@link DEFAULT_EXCLUDE_DIR_NAMES}. */
   readonly excludeDirNames: ReadonlySet<string>;
+  /** Absolute path to `tsconfig.json` for alias resolution, or `null` to disable. */
   readonly tsconfigPath: string | null;
 }
 

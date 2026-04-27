@@ -1,0 +1,68 @@
+[
+  {
+    "path": "README.md",
+    "content_hash": "428564b4ac5e4864ca2292a4195b726be3d4c7c5cac3d19dd01f17714d026c66",
+    "language": "md",
+    "line_count": 11
+  },
+  {
+    "path": "package.json",
+    "content_hash": "a8e79efc943697cee4d4435360de9150bd7261376abe9e2c34c0c7238177c7de",
+    "language": "json",
+    "line_count": 11
+  },
+  {
+    "path": "src/api/client.ts",
+    "content_hash": "4d0ec5edad3f758e7f84898dd602dbacaf3ea65ad87614ae9f179bd2383bbf56",
+    "language": "ts",
+    "line_count": 9
+  },
+  {
+    "path": "src/components/shop/ShopButton.tsx",
+    "content_hash": "481b9ff2e493fd69b36b67d2738e298999ce55040bce64c4c38a2e736c0573fd",
+    "language": "tsx",
+    "line_count": 8
+  },
+  {
+    "path": "src/consumer.ts",
+    "content_hash": "420ad98f7fedaf07ec07d1a64ef6ade100be4a7973883718a3942c68b1350903",
+    "language": "ts",
+    "line_count": 11
+  },
+  {
+    "path": "src/notes.md",
+    "content_hash": "1a2bff433137690132077b15032ba3f07f5ed1b576b894816890342155ab640a",
+    "language": "md",
+    "line_count": 4
+  },
+  {
+    "path": "src/styles/button.module.css",
+    "content_hash": "1c385277a506b2cb1c70c2d2128bbd280bf080796c83ab37f6f3434655c17348",
+    "language": "css",
+    "line_count": 16
+  },
+  {
+    "path": "src/theme.css",
+    "content_hash": "19ff92a0acce67e5a385e8f1b1607f787462626669d3b941ee0fc91030672b67",
+    "language": "css",
+    "line_count": 9
+  },
+  {
+    "path": "src/usePermissions.ts",
+    "content_hash": "8758cc9ba2756e08198f11fca9ff58a0612fc9219173d06784e0b7e2f2ca1e1f",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
+    "path": "src/utils/date.ts",
+    "content_hash": "89e6301076caeb9f4c13cee8ea06f7f25a5e1aa239daf921f7ff984236ffa177",
+    "language": "ts",
+    "line_count": 15
+  },
+  {
+    "path": "tsconfig.json",
+    "content_hash": "6b8ead4b09e6885483c805937a35fa0df3cbc47de346abb2d0ed8b73dc7f9e92",
+    "language": "json",
+    "line_count": 17
+  }
+]

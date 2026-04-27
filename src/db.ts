@@ -1,14 +1,8 @@
-import {
-  openCodemapDatabase,
-  type CodemapDatabase,
-  type BindValues,
-} from "./sqlite-db";
+import { openCodemapDatabase } from "./sqlite-db";
+import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
-/**
- * Bump in lockstep with `createTables` / `createIndexes` whenever on-disk schema
- * changes. `createSchema()` rebuilds automatically on version mismatch.
- */
-export const SCHEMA_VERSION = 2;
+/** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
+export const SCHEMA_VERSION = 3;
 
 export type { CodemapDatabase };
 
@@ -32,11 +26,11 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS files (
       path TEXT PRIMARY KEY,
       content_hash TEXT NOT NULL,
-      size INTEGER,
-      line_count INTEGER,
-      language TEXT,
-      last_modified INTEGER,
-      indexed_at INTEGER
+      size INTEGER NOT NULL,
+      line_count INTEGER NOT NULL,
+      language TEXT NOT NULL,
+      last_modified INTEGER NOT NULL,
+      indexed_at INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS symbols (
@@ -44,11 +38,11 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
-      line_start INTEGER,
-      line_end INTEGER,
-      signature TEXT,
-      is_exported INTEGER DEFAULT 0,
-      is_default_export INTEGER DEFAULT 0,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      signature TEXT NOT NULL,
+      is_exported INTEGER NOT NULL DEFAULT 0,
+      is_default_export INTEGER NOT NULL DEFAULT 0,
       members TEXT,
       doc_comment TEXT,
       value TEXT,
@@ -60,17 +54,17 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       source TEXT NOT NULL,
       resolved_path TEXT,
-      specifiers TEXT,
-      is_type_only INTEGER DEFAULT 0,
-      line_number INTEGER
+      specifiers TEXT NOT NULL,
+      is_type_only INTEGER NOT NULL DEFAULT 0,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS exports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      kind TEXT,
-      is_default INTEGER DEFAULT 0,
+      kind TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
       re_export_source TEXT
     ) STRICT;
 
@@ -79,8 +73,8 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       props_type TEXT,
-      hooks_used TEXT,
-      is_default_export INTEGER DEFAULT 0
+      hooks_used TEXT NOT NULL,
+      is_default_export INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS dependencies (
@@ -92,9 +86,9 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS markers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
-      line_number INTEGER,
+      line_number INTEGER NOT NULL,
       kind TEXT NOT NULL,
-      content TEXT
+      content TEXT NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_variables (
@@ -102,23 +96,23 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       value TEXT,
-      scope TEXT,
-      line_number INTEGER
+      scope TEXT NOT NULL,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_classes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      is_module INTEGER DEFAULT 0,
-      line_number INTEGER
+      is_module INTEGER NOT NULL DEFAULT 0,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_keyframes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      line_number INTEGER
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS calls (
@@ -135,8 +129,8 @@ export function createTables(db: CodemapDatabase) {
       symbol_name TEXT NOT NULL,
       name TEXT NOT NULL,
       type TEXT,
-      is_optional INTEGER DEFAULT 0,
-      is_readonly INTEGER DEFAULT 0
+      is_optional INTEGER NOT NULL DEFAULT 0,
+      is_readonly INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS meta (
@@ -250,6 +244,11 @@ export function deleteFileData(db: CodemapDatabase, filePath: string) {
   db.run("DELETE FROM files WHERE path = ?", [filePath]);
 }
 
+/**
+ * Header row for every indexed file; all other rows FK `file_path` here with
+ * `ON DELETE CASCADE`. `content_hash` is SHA-256 hex (see `src/hash.ts`) and
+ * drives incremental staleness detection + the `files-hashes` recipe.
+ */
 export interface FileRow {
   path: string;
   content_hash: string;
@@ -276,6 +275,12 @@ export function insertFile(db: CodemapDatabase, file: FileRow) {
   );
 }
 
+/**
+ * Function / const / class / interface / type / enum, plus class members
+ * (`method` / `property` / `getter` / `setter`) — class members carry
+ * `parent_name`. JSDoc tags in `doc_comment` power the `deprecated-symbols`
+ * and `visibility-tags` recipes; `members` is JSON for enums.
+ */
 export interface SymbolRow {
   file_path: string;
   name: string;
@@ -341,6 +346,11 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   );
 }
 
+/**
+ * Raw `import` statement. `specifiers` is JSON; `resolved_path` is null when
+ * the resolver couldn't map `source` to an indexed file (see `dependencies`
+ * for the resolved edge view).
+ */
 export interface ImportRow {
   file_path: string;
   source: string;
@@ -368,6 +378,10 @@ export function insertImports(db: CodemapDatabase, imports: ImportRow[]) {
   );
 }
 
+/**
+ * Named, default, or re-export. `kind` is `value` / `type` / `re-export`;
+ * `re_export_source` is non-null only for `re-export` rows.
+ */
 export interface ExportRow {
   file_path: string;
   name: string;
@@ -387,6 +401,11 @@ export function insertExports(db: CodemapDatabase, exports: ExportRow[]) {
   );
 }
 
+/**
+ * React component (PascalCase + JSX return or hook usage). `hooks_used` is
+ * JSON, e.g. `'["useState","useEffect"]'`. PascalCase functions that neither
+ * return JSX nor call hooks stay in `symbols` only.
+ */
 export interface ComponentRow {
   file_path: string;
   name: string;
@@ -415,6 +434,10 @@ export function insertComponents(
   );
 }
 
+/**
+ * Resolved file-to-file edge derived from `imports.resolved_path`. Composite
+ * PK `(from_path, to_path)`; self-edges and unresolved imports are excluded.
+ */
 export interface DependencyRow {
   from_path: string;
   to_path: string;
@@ -430,6 +453,10 @@ export function insertDependencies(db: CodemapDatabase, deps: DependencyRow[]) {
   );
 }
 
+/**
+ * `TODO` / `FIXME` / `HACK` / `NOTE` comment from any indexed file (TS, CSS,
+ * Markdown, JSON, YAML, …). `content` excludes the marker prefix.
+ */
 export interface MarkerRow {
   file_path: string;
   line_number: number;
@@ -447,6 +474,10 @@ export function insertMarkers(db: CodemapDatabase, markers: MarkerRow[]) {
   );
 }
 
+/**
+ * CSS custom property (`--token: value`). `scope` is `:root`, `@theme`
+ * (Tailwind v4), or the selector text where the property was declared.
+ */
 export interface CssVariableRow {
   file_path: string;
   name: string;
@@ -469,6 +500,10 @@ export function insertCssVariables(
   );
 }
 
+/**
+ * Class name from a CSS selector (no leading `.`). `is_module = 1` for
+ * `.module.css` files (names get rewritten by bundlers).
+ */
 export interface CssClassRow {
   file_path: string;
   name: string;
@@ -486,6 +521,7 @@ export function insertCssClasses(db: CodemapDatabase, classes: CssClassRow[]) {
   );
 }
 
+/** `@keyframes <name>` declaration. */
 export interface CssKeyframeRow {
   file_path: string;
   name: string;
@@ -505,6 +541,12 @@ export function insertCssKeyframes(
   );
 }
 
+/**
+ * Function-scoped call edge, deduped per `(caller_scope, callee_name)` per
+ * file. `caller_scope` is the dot-joined enclosing scope (e.g. `UserService.run`)
+ * so same-named methods in different classes stay distinct. Module-level
+ * calls are excluded.
+ */
 export interface CallRow {
   file_path: string;
   caller_name: string;
@@ -522,6 +564,11 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   );
 }
 
+/**
+ * Property / method signature on an interface or object-literal type.
+ * `symbol_name` references the parent `symbols.name`; `type` is null when
+ * the parser can't reconstruct the annotation.
+ */
 export interface TypeMemberRow {
   file_path: string;
   symbol_name: string;

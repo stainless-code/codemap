@@ -13,6 +13,19 @@ AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning fil
 
 This burns context window, wastes tokens, slows response time, and produces less accurate results.
 
+## What Codemap is not
+
+Codemap is intentionally narrow. It is **not**:
+
+- **Full-text search** — use `ripgrep` / your IDE for raw string queries on file bodies.
+- **A language server (LSP)** — no rename, no go-to-definition wired to your editor, no hover types.
+- **An AI agent** — Codemap does not reason, decide, or generate. Agents call Codemap; Codemap does not call agents.
+- **A static analyzer** — no dead-code detection, duplication detection, complexity scoring, or boundary enforcement (those are different products — e.g. [fallow](https://github.com/fallow-rs/fallow), `knip`, `jscpd`).
+- **A semantic / embedding index** — no vector search, no PageRank summarization, no "what's relevant" inference.
+- **A replacement for reading code** — the index returns paths, line ranges, signatures; the agent still reads the snippets it needs.
+
+What Codemap **is**: a deterministic, AST-backed SQLite index of structural facts (symbols, imports, exports, components, calls, dependencies, CSS tokens, markers) that an agent can query in **one SQL round-trip** instead of scanning the tree.
+
 ## The Solution
 
 A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
@@ -43,13 +56,17 @@ Traditional cost **depends on the question**: scanning all `app/**/*.{ts,tsx}` i
 
 ### Across a Typical Session
 
-A typical AI agent session involves 10-20 discovery questions (finding definitions, tracing imports, checking dependencies). At traditional rates on a large app:
+Token cost compounds across a session. The savings are not "any single lookup" — they are "every lookup, multiplied". Concrete shapes:
 
-| Metric                    | Traditional | Indexed     | Savings    |
-| ------------------------- | ----------- | ----------- | ---------- |
-| Token cost (10 questions) | very large  | ~5K tokens  | **~99%+**  |
-| Token cost (20 questions) | very large  | ~10K tokens | **~99%+**  |
-| Tool calls per question   | 3-5         | 1           | **60-80%** |
+| Scenario                                                     | Without Codemap                                         | With Codemap                                          | Savings |
+| ------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------- | ------- |
+| **Single symbol lookup** ("where is `UserService` defined?") | 1 Glob + 1–2 Reads to disambiguate ≈ **0.5–1K tokens**  | 1 SQL row → file/line range ≈ **~150 tokens**         | ~70–85% |
+| **Trace dependents** ("who imports `~/utils/date`?")         | Grep + read 5–10 files to resolve aliases ≈ **30–100K** | 1 SQL row set ≈ **~500 tokens**                       | ~95%    |
+| **10-file refactor session**                                 | 10× full file reads + grep traces ≈ **100–300K**        | 10× targeted SQL + 10× line-range reads ≈ **~10–25K** | ~85–90% |
+| **50-turn agent session** (mixed discovery + reads)          | ≈ **500K – 1M+ tokens**                                 | ≈ **30–60K tokens**                                   | ~90%+   |
+| **Tool calls per discovery question**                        | 3–5 (Glob → Read → Grep → Read → …)                     | 1 (`codemap query`)                                   | 60–80%  |
+
+> Token estimates assume **~4 bytes/token** and a medium TS codebase. Actual numbers vary by repo. Run `bun run benchmark:query` against your tree for concrete values; methodology in [benchmark.md § Query stdout](./benchmark.md#query-stdout-table-vs-json-benchmarkquery).
 
 ### Real-World Context Window Impact
 
@@ -85,6 +102,25 @@ Some queries are trivial with the index but impractical (or slow) with tradition
 | "Heaviest files by dependency count" | `SELECT from_path, COUNT(*) AS n FROM dependencies GROUP BY from_path ORDER BY n DESC` | Scan every file for imports → approximate without resolver                           |
 | "Exports from a specific module"     | `SELECT name, kind FROM exports WHERE file_path = '...'`                               | Read the file → parse mentally → identify exports vs internal                        |
 | "All CSS animations in the project"  | `SELECT name, file_path FROM css_keyframes`                                            | Grep `@keyframes` across CSS files → parse names                                     |
+
+## Codemap vs alternatives
+
+Other "AI-friendly code intelligence" tools occupy different points in the design space. Each one is solving a different problem:
+
+| Axis              | **Codemap**                           | [fallow](https://github.com/fallow-rs/fallow)                 | [Aider RepoMap](https://aider.chat) | LSP servers                 |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------- | ----------------------------------- | --------------------------- |
+| Primary thesis    | Query structure with **SQL**          | Detect dead code / dupes / complexity                         | Summarize repo into a context blob  | Per-edit semantic helpers   |
+| Output shape      | Result rows from a SQL query          | SARIF / JSON findings, fix `actions`                          | Markdown / token-budgeted text      | LSP messages over stdio     |
+| Decides relevance | The agent (via SQL)                   | The tool (via static rules)                                   | The tool (PageRank-style)           | The editor                  |
+| Scope             | Structural facts (definitions, edges) | Static analysis verdicts                                      | Whole-repo summary                  | One file at a time          |
+| Storage           | Local SQLite (`.codemap.db`)          | In-process; emits findings                                    | In-prompt context                   | In-process index            |
+| Token cost        | Per-query; tiny result rows           | Per-run; finding lists                                        | Upfront; bounded by token budget    | None (editor-side)          |
+| Best for          | Targeted "where / what / who" lookups | "Did this PR introduce dead code / dupes / complexity drift?" | First-touch context priming         | Editor-time refactoring     |
+| Worst for         | Whole-file semantic understanding     | Granular structural lookups (different shape)                 | Targeted line-range reads           | Cross-cutting graph queries |
+
+**Why this matters:** Codemap deliberately **doesn't try to be smart**. Other tools predict what context an agent will need; Codemap lets the agent decide and just makes each decision cheap. The same agent can use Codemap **and** fallow **and** an LSP — they don't compete for the same slot.
+
+For more on what Codemap deliberately does **not** do, see [What Codemap is not](#what-codemap-is-not) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
 
 ## Cost Summary
 
