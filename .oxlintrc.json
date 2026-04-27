@@ -1,5 +1,25 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": [".output", "node_modules", "dist", "coverage", "bun.lock"],
-  "plugins": ["eslint", "typescript", "unicorn", "oxc"]
+  "ignorePatterns": [
+    ".output",
+    "bun.lock",
+    "coverage",
+    "dist",
+    "fixtures",
+    "node_modules"
+  ],
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import"],
+  "rules": {
+    "eslint/prefer-const": "error",
+    "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
+    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/no-confusing-non-null-assertion": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "unicorn/switch-case-braces": "error"
+  }
 }
