@@ -1,8 +1,8 @@
 ---
-"@stainless-code/codemap": patch
+"@stainless-code/codemap": minor
 ---
 
-Agent-friendly CLI surface: `codemap validate`, `codemap context`, `--performance`, `-r` recipe alias, and four new bundled query recipes.
+Agent-friendly CLI surface plus a schema v3 bump that tightens `NOT NULL` invariants. Existing `.codemap.db` files auto-rebuild on first open.
 
 - **New: `codemap validate [--json] [paths...]`** — diffs the on-disk SHA-256 of indexed files against `files.content_hash` and prints stale / missing / unindexed rows. Lets agents skip re-reads they don't need; exits `1` on any drift (git-status semantics)
 - **New: `codemap context [--compact] [--for "<intent>"]`** — emits a stable JSON envelope (project metadata, top hubs, recent markers, recipe catalog) for any agent or editor that wants the index in one cheap shot. `--for` runs lightweight intent classification (refactor / debug / test / feature / explore / other) and returns matched recipe ids plus a hint
@@ -13,3 +13,4 @@ Agent-friendly CLI surface: `codemap validate`, `codemap context`, `--performanc
 - **Public type surface**: new `IndexPerformanceReport`; `IndexRunStats.performance?` field; per-field JSDoc coverage on `IndexResult`, `IndexRunStats`, `ResolvedCodemapConfig`, all `db.ts` row interfaces (`FileRow`, `SymbolRow`, `ImportRow`, `ExportRow`, `ComponentRow`, `DependencyRow`, `MarkerRow`, `CssVariableRow`, `CssClassRow`, `CssKeyframeRow`, `CallRow`, `TypeMemberRow`), and `ParsedFile`
 - **Documentation**: README now leads with a "What you get" Grep/Read vs Codemap capability table and a "Daily commands" stripe; `docs/why-codemap.md` adds a "What Codemap is **not**" anti-pitch section and a scenario-keyed token-savings table (single lookup → 50-turn session) replacing the earlier hand-wave
 - **Stricter lint baseline**: enabled `prefer-const`, `consistent-type-specifier-style`, `consistent-type-definitions`, `no-confusing-non-null-assertion`, `no-unnecessary-{boolean-literal-compare,template-expression,type-assertion}`, `prefer-{includes,nullish-coalescing,optional-chain}`, and `unicorn/switch-case-braces`
+- **Schema v3 — tighter `NOT NULL` invariants**: every column whose `Row`-interface type was non-nullable is now `NOT NULL` in the SQLite DDL (`files.size`/`line_count`/`language`/`last_modified`/`indexed_at`, `symbols.line_start`/`line_end`/`signature`/`is_exported`/`is_default_export`, `imports.specifiers`/`is_type_only`/`line_number`, `exports.kind`/`is_default`, `components.hooks_used`/`is_default_export`, `markers.line_number`/`content`, `css_variables.scope`/`line_number`, `css_classes.is_module`/`line_number`, `css_keyframes.line_number`, `type_members.is_optional`/`is_readonly`). Existing v2 databases auto-rebuild via `createSchema()`'s version-mismatch detector — no manual action needed

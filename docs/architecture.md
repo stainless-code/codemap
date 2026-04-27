@@ -155,7 +155,7 @@ Optional **`codemap.config.ts`** (default export: object or async factory) or **
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap.db`**.
 
-Current schema version: **2** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **3** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 

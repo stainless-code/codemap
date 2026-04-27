@@ -4,8 +4,14 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 /**
  * Bump in lockstep with `createTables` / `createIndexes` whenever on-disk schema
  * changes. `createSchema()` rebuilds automatically on version mismatch.
+ *
+ * @remarks
+ * v3 (this PR): tightened `NOT NULL` on every column whose Row-interface type
+ * is non-nullable, so SQLite enforces the same invariants at write time that
+ * the TypeScript reads already assume. Existing v2 DBs auto-rebuild on first
+ * open via the version-mismatch detector below.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type { CodemapDatabase };
 
@@ -29,11 +35,11 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS files (
       path TEXT PRIMARY KEY,
       content_hash TEXT NOT NULL,
-      size INTEGER,
-      line_count INTEGER,
-      language TEXT,
-      last_modified INTEGER,
-      indexed_at INTEGER
+      size INTEGER NOT NULL,
+      line_count INTEGER NOT NULL,
+      language TEXT NOT NULL,
+      last_modified INTEGER NOT NULL,
+      indexed_at INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS symbols (
@@ -41,11 +47,11 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
-      line_start INTEGER,
-      line_end INTEGER,
-      signature TEXT,
-      is_exported INTEGER DEFAULT 0,
-      is_default_export INTEGER DEFAULT 0,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      signature TEXT NOT NULL,
+      is_exported INTEGER NOT NULL DEFAULT 0,
+      is_default_export INTEGER NOT NULL DEFAULT 0,
       members TEXT,
       doc_comment TEXT,
       value TEXT,
@@ -57,17 +63,17 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       source TEXT NOT NULL,
       resolved_path TEXT,
-      specifiers TEXT,
-      is_type_only INTEGER DEFAULT 0,
-      line_number INTEGER
+      specifiers TEXT NOT NULL,
+      is_type_only INTEGER NOT NULL DEFAULT 0,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS exports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      kind TEXT,
-      is_default INTEGER DEFAULT 0,
+      kind TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
       re_export_source TEXT
     ) STRICT;
 
@@ -76,8 +82,8 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       props_type TEXT,
-      hooks_used TEXT,
-      is_default_export INTEGER DEFAULT 0
+      hooks_used TEXT NOT NULL,
+      is_default_export INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS dependencies (
@@ -89,9 +95,9 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS markers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
-      line_number INTEGER,
+      line_number INTEGER NOT NULL,
       kind TEXT NOT NULL,
-      content TEXT
+      content TEXT NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_variables (
@@ -99,23 +105,23 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
       value TEXT,
-      scope TEXT,
-      line_number INTEGER
+      scope TEXT NOT NULL,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_classes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      is_module INTEGER DEFAULT 0,
-      line_number INTEGER
+      is_module INTEGER NOT NULL DEFAULT 0,
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_keyframes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       name TEXT NOT NULL,
-      line_number INTEGER
+      line_number INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS calls (
@@ -132,8 +138,8 @@ export function createTables(db: CodemapDatabase) {
       symbol_name TEXT NOT NULL,
       name TEXT NOT NULL,
       type TEXT,
-      is_optional INTEGER DEFAULT 0,
-      is_readonly INTEGER DEFAULT 0
+      is_optional INTEGER NOT NULL DEFAULT 0,
+      is_readonly INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS meta (
