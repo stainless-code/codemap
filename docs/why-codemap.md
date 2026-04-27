@@ -103,6 +103,25 @@ Some queries are trivial with the index but impractical (or slow) with tradition
 | "Exports from a specific module"     | `SELECT name, kind FROM exports WHERE file_path = '...'`                               | Read the file → parse mentally → identify exports vs internal                        |
 | "All CSS animations in the project"  | `SELECT name, file_path FROM css_keyframes`                                            | Grep `@keyframes` across CSS files → parse names                                     |
 
+## Codemap vs alternatives
+
+Other "AI-friendly code intelligence" tools occupy different points in the design space. Each one is solving a different problem:
+
+| Axis              | **Codemap**                           | [fallow](https://github.com/fallow-rs/fallow)                 | [Aider RepoMap](https://aider.chat) | LSP servers                 |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------- | ----------------------------------- | --------------------------- |
+| Primary thesis    | Query structure with **SQL**          | Detect dead code / dupes / complexity                         | Summarize repo into a context blob  | Per-edit semantic helpers   |
+| Output shape      | Result rows from a SQL query          | SARIF / JSON findings, fix `actions`                          | Markdown / token-budgeted text      | LSP messages over stdio     |
+| Decides relevance | The agent (via SQL)                   | The tool (via static rules)                                   | The tool (PageRank-style)           | The editor                  |
+| Scope             | Structural facts (definitions, edges) | Static analysis verdicts                                      | Whole-repo summary                  | One file at a time          |
+| Storage           | Local SQLite (`.codemap.db`)          | In-process; emits findings                                    | In-prompt context                   | In-process index            |
+| Token cost        | Per-query; tiny result rows           | Per-run; finding lists                                        | Upfront; bounded by token budget    | None (editor-side)          |
+| Best for          | Targeted "where / what / who" lookups | "Did this PR introduce dead code / dupes / complexity drift?" | First-touch context priming         | Editor-time refactoring     |
+| Worst for         | Whole-file semantic understanding     | Granular structural lookups (different shape)                 | Targeted line-range reads           | Cross-cutting graph queries |
+
+**Why this matters:** Codemap deliberately **doesn't try to be smart**. Other tools predict what context an agent will need; Codemap lets the agent decide and just makes each decision cheap. The same agent can use Codemap **and** fallow **and** an LSP — they don't compete for the same slot.
+
+For more on what Codemap deliberately does **not** do, see [What Codemap is not](#what-codemap-is-not) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
+
 ## Cost Summary
 
 | Dimension               | Without Index           | With Index                                    | Improvement                        |
