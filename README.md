@@ -9,6 +9,23 @@
 
 ---
 
+## What you get
+
+Structural questions answered in **one SQL round-trip** instead of 3–5 file reads:
+
+| Question                                           | Grep / Read (today)                                          | Codemap                                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| Find a symbol by exact name                        | Glob + Read + filter by hand                                 | `SELECT name, file_path, line_start FROM symbols WHERE name = 'X'`                     |
+| Who imports `~/utils/date`?                        | Grep + resolve `tsconfig` aliases manually                   | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%utils/date%'`        |
+| Components using the `useQuery` hook               | Grep `useQuery` + filter to component files                  | `SELECT name, file_path FROM components WHERE hooks_used LIKE '%useQuery%'`            |
+| Heaviest files by import fan-out                   | Impractical without a parser                                 | `SELECT from_path, COUNT(*) AS n FROM dependencies GROUP BY from_path ORDER BY n DESC` |
+| All CSS keyframes / design tokens / module classes | Grep `@keyframes`, `--var-`, `.module.css` then disambiguate | One `SELECT` against `css_keyframes` / `css_variables` / `css_classes`                 |
+| Deprecated symbols (`@deprecated` JSDoc)           | Grep `@deprecated` + cross-reference symbol                  | `SELECT name, kind FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                |
+
+Full schema and recipe catalog: [docs/architecture.md § Schema](docs/architecture.md#schema) · [docs/why-codemap.md](docs/why-codemap.md) · `codemap query --recipes-json`.
+
+---
+
 ## Install
 
 ```bash
@@ -24,6 +41,20 @@ bun add @stainless-code/codemap
 
 - **Installed package:** `codemap`, `bunx @stainless-code/codemap`, or `node node_modules/@stainless-code/codemap/dist/index.mjs`
 - **This repo (dev):** `bun src/index.ts` (same flags)
+
+### Daily commands
+
+```bash
+codemap                                                      # incremental index (run once per session)
+codemap query --json --recipe fan-out                        # bundled SQL via recipe id
+codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  # ad-hoc SQL
+codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
+codemap agents init                                          # scaffold .agents/ rules + skills
+```
+
+**Version-matched agent guidance:** the published npm package ships **`templates/agents/`** (rules + skills) keyed to that version, so `codemap agents init` writes guidance that matches the CLI you installed. See [docs/agents.md](docs/agents.md).
+
+### Full reference
 
 ```bash
 # Index project root (optional codemap.config.ts / codemap.config.json)

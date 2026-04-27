@@ -13,6 +13,19 @@ AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning fil
 
 This burns context window, wastes tokens, slows response time, and produces less accurate results.
 
+## What Codemap is not
+
+Codemap is intentionally narrow. It is **not**:
+
+- **Full-text search** — use `ripgrep` / your IDE for raw string queries on file bodies.
+- **A language server (LSP)** — no rename, no go-to-definition wired to your editor, no hover types.
+- **An AI agent** — Codemap does not reason, decide, or generate. Agents call Codemap; Codemap does not call agents.
+- **A static analyzer** — no dead-code detection, duplication detection, complexity scoring, or boundary enforcement (those are different products — e.g. [fallow](https://github.com/fallow-rs/fallow), `knip`, `jscpd`).
+- **A semantic / embedding index** — no vector search, no PageRank summarization, no "what's relevant" inference.
+- **A replacement for reading code** — the index returns paths, line ranges, signatures; the agent still reads the snippets it needs.
+
+What Codemap **is**: a deterministic, AST-backed SQLite index of structural facts (symbols, imports, exports, components, calls, dependencies, CSS tokens, markers) that an agent can query in **one SQL round-trip** instead of scanning the tree.
+
 ## The Solution
 
 A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
@@ -43,13 +56,17 @@ Traditional cost **depends on the question**: scanning all `app/**/*.{ts,tsx}` i
 
 ### Across a Typical Session
 
-A typical AI agent session involves 10-20 discovery questions (finding definitions, tracing imports, checking dependencies). At traditional rates on a large app:
+Token cost compounds across a session. The savings are not "any single lookup" — they are "every lookup, multiplied". Concrete shapes:
 
-| Metric                    | Traditional | Indexed     | Savings    |
-| ------------------------- | ----------- | ----------- | ---------- |
-| Token cost (10 questions) | very large  | ~5K tokens  | **~99%+**  |
-| Token cost (20 questions) | very large  | ~10K tokens | **~99%+**  |
-| Tool calls per question   | 3-5         | 1           | **60-80%** |
+| Scenario                                                     | Without Codemap                                         | With Codemap                                          | Savings |
+| ------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------- | ------- |
+| **Single symbol lookup** ("where is `UserService` defined?") | 1 Glob + 1–2 Reads to disambiguate ≈ **0.5–1K tokens**  | 1 SQL row → file/line range ≈ **~150 tokens**         | ~70–85% |
+| **Trace dependents** ("who imports `~/utils/date`?")         | Grep + read 5–10 files to resolve aliases ≈ **30–100K** | 1 SQL row set ≈ **~500 tokens**                       | ~95%    |
+| **10-file refactor session**                                 | 10× full file reads + grep traces ≈ **100–300K**        | 10× targeted SQL + 10× line-range reads ≈ **~10–25K** | ~85–90% |
+| **50-turn agent session** (mixed discovery + reads)          | ≈ **500K – 1M+ tokens**                                 | ≈ **30–60K tokens**                                   | ~90%+   |
+| **Tool calls per discovery question**                        | 3–5 (Glob → Read → Grep → Read → …)                     | 1 (`codemap query`)                                   | 60–80%  |
+
+> Token estimates assume **~4 bytes/token** and a medium TS codebase. Actual numbers vary by repo. Run `bun run benchmark:query` against your tree for concrete values; methodology in [benchmark.md § Query stdout](./benchmark.md#query-stdout-table-vs-json-benchmarkquery).
 
 ### Real-World Context Window Impact
 
