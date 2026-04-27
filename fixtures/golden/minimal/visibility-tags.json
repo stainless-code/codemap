@@ -1,0 +1,10 @@
+[
+  {
+    "name": "_epochSeconds",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 12,
+    "signature": "_epochSeconds(): number",
+    "doc_comment": "@internal Implementation helper — fixture for the `visibility-tags` recipe."
+  }
+]

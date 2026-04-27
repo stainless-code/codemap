@@ -1,0 +1,10 @@
+[
+  {
+    "name": "now",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 5,
+    "signature": "now(): number",
+    "doc_comment": "@deprecated Use `Date.now()` directly. Kept as a fixture for the\n`deprecated-symbols` recipe golden test."
+  }
+]

@@ -1,11 +1,11 @@
 /**
  * One bundled recipe: id, human description, and SQL (canonical source for CLI and `--recipes-json`).
  */
-export type QueryRecipeCatalogEntry = {
+export interface QueryRecipeCatalogEntry {
   id: string;
   description: string;
   sql: string;
-};
+}
 
 /**
  * Bundled read-only SQL for `codemap query --recipe <id>`. Keys match **`codemap query --help`**.
@@ -103,6 +103,62 @@ LIMIT 20`,
 FROM markers
 GROUP BY kind
 ORDER BY count DESC, kind ASC`,
+  },
+  /**
+   * Symbols documented with `@deprecated` in their leading JSDoc. Useful for
+   * agents to flag callers of soon-to-be-removed APIs before suggesting changes.
+   */
+  "deprecated-symbols": {
+    description:
+      "Symbols whose JSDoc contains @deprecated (caller-warning candidates)",
+    sql: `SELECT name, kind, file_path, line_start, signature, doc_comment
+FROM symbols
+WHERE doc_comment LIKE '%@deprecated%'
+ORDER BY file_path ASC, line_start ASC
+LIMIT 50`,
+  },
+  /**
+   * Symbols carrying JSDoc visibility tags (`@internal`, `@private`, `@alpha`,
+   * `@beta`). Useful for agents to know what is *not* part of the public API
+   * before suggesting imports or extending re-exports.
+   */
+  "visibility-tags": {
+    description:
+      "Symbols tagged @internal / @private / @alpha / @beta in JSDoc",
+    sql: `SELECT name, kind, file_path, line_start, signature, doc_comment
+FROM symbols
+WHERE doc_comment LIKE '%@internal%'
+   OR doc_comment LIKE '%@private%'
+   OR doc_comment LIKE '%@alpha%'
+   OR doc_comment LIKE '%@beta%'
+ORDER BY file_path ASC, line_start ASC
+LIMIT 100`,
+  },
+  /**
+   * All indexed file paths with their content hash. Powers the \`codemap validate\`
+   * CLI: callers diff this list against on-disk content to detect stale entries
+   * without paying to re-read every file.
+   */
+  "files-hashes": {
+    description:
+      "All indexed files with content_hash (input for staleness checks)",
+    sql: `SELECT path, content_hash, language, line_count
+FROM files
+ORDER BY path ASC`,
+  },
+  /**
+   * "Barrel" candidates — files that re-export a lot. High export count can
+   * indicate either an intentional public API surface or accidental fan-out;
+   * agents can use it to decide whether a new export should land here or stay local.
+   */
+  "barrel-files": {
+    description:
+      "Top 20 files by export count (barrel / public-API candidates)",
+    sql: `SELECT file_path, COUNT(*) AS exports
+FROM exports
+GROUP BY file_path
+ORDER BY exports DESC, file_path ASC
+LIMIT 20`,
   },
 };
 

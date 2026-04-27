@@ -66,13 +66,12 @@ export function parseQueryRest(
       i += 2;
       continue;
     }
-    if (a === "--recipe") {
+    if (a === "--recipe" || a === "-r") {
       const name = rest[i + 1];
       if (name === undefined || name.startsWith("-")) {
         return {
           kind: "error",
-          message:
-            'codemap: "--recipe" requires a recipe id. Example: codemap query --recipe fan-out',
+          message: `codemap: "${a}" requires a recipe id. Example: codemap query ${a} fan-out`,
         };
       }
       recipeId = name;
@@ -172,10 +171,11 @@ export function printRecipeSqlToStdout(id: string): boolean {
 
 function formatRecipeHelpLines(): string {
   const ids = listQueryRecipeIds();
+  const width = ids.reduce((n, id) => Math.max(n, id.length), 0);
   const lines = ids.map((id) => {
     const meta = QUERY_RECIPES[id];
     const desc = meta?.description ?? "";
-    return `    ${id.padEnd(16)} ${desc}`;
+    return `    ${id.padEnd(width)}  ${desc}`;
   });
   return lines.join("\n");
 }
@@ -186,30 +186,35 @@ function formatRecipeHelpLines(): string {
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
   console.log(`Usage: codemap query [--json] "<SQL>"
-       codemap query [--json] --recipe <id>
+       codemap query [--json] --recipe <id>     (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
 
 Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
-  --json          Print a JSON array of row objects to stdout (for agents and scripts).
-                  On error, prints a single object: {"error":"<message>"} to stdout.
-
-  --recipe <id>   Run bundled SQL (no SQL string on the command line).
-
-  --recipes-json  Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
-
-  --print-sql <id> Print one recipe's SQL text to stdout (does not run the query). No DB.
+Flags:
+  --json              Print a JSON array of row objects to stdout (for agents and scripts).
+                      On error, prints a single object: {"error":"<message>"} to stdout.
+  --recipe, -r <id>   Run bundled SQL (no SQL string on the command line).
+  --recipes-json      Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
+  --print-sql <id>    Print one recipe's SQL text to stdout (does not run the query). No DB.
+  --help, -h          Show this help.
 
 Bundled recipes:
 ${recipeBlock}
 
 Examples:
+  # Ad-hoc SQL
   codemap query "SELECT name, file_path FROM symbols LIMIT 10"
   codemap query --json "SELECT COUNT(*) AS n FROM symbols"
+
+  # Bundled recipe (full flag and short alias)
   codemap query --recipe fan-out
-  codemap query --json --recipe fan-out-sample
+  codemap query -r fan-out
+  codemap query --json -r deprecated-symbols
+
+  # Inspect recipes without touching the DB
   codemap query --recipes-json
   codemap query --print-sql fan-out
 `);

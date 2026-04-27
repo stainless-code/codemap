@@ -73,5 +73,25 @@
     "id": "calls-consumer",
     "prompt": "What does the run function in consumer.ts call?",
     "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
+  },
+  {
+    "id": "deprecated-symbols",
+    "prompt": "Which symbols are flagged @deprecated in JSDoc?",
+    "recipe": "deprecated-symbols"
+  },
+  {
+    "id": "visibility-tags",
+    "prompt": "Which symbols are tagged @internal / @private / @alpha / @beta?",
+    "recipe": "visibility-tags"
+  },
+  {
+    "id": "files-hashes",
+    "prompt": "All indexed file paths with language and line count (powers `codemap validate`)",
+    "sql": "SELECT path, language, line_count FROM files ORDER BY path"
+  },
+  {
+    "id": "barrel-files",
+    "prompt": "Top files by export count (barrel candidates)",
+    "recipe": "barrel-files"
   }
 ]

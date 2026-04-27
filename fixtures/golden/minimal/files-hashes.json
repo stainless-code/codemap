@@ -1,0 +1,57 @@
+[
+  {
+    "path": "README.md",
+    "language": "md",
+    "line_count": 11
+  },
+  {
+    "path": "package.json",
+    "language": "json",
+    "line_count": 11
+  },
+  {
+    "path": "src/api/client.ts",
+    "language": "ts",
+    "line_count": 9
+  },
+  {
+    "path": "src/components/shop/ShopButton.tsx",
+    "language": "tsx",
+    "line_count": 8
+  },
+  {
+    "path": "src/consumer.ts",
+    "language": "ts",
+    "line_count": 11
+  },
+  {
+    "path": "src/notes.md",
+    "language": "md",
+    "line_count": 4
+  },
+  {
+    "path": "src/styles/button.module.css",
+    "language": "css",
+    "line_count": 16
+  },
+  {
+    "path": "src/theme.css",
+    "language": "css",
+    "line_count": 9
+  },
+  {
+    "path": "src/usePermissions.ts",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
+    "path": "src/utils/date.ts",
+    "language": "ts",
+    "line_count": 15
+  },
+  {
+    "path": "tsconfig.json",
+    "language": "json",
+    "line_count": 17
+  }
+]
