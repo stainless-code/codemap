@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
@@ -139,9 +139,16 @@ export function computeValidateRows(
   return rows;
 }
 
+/**
+ * Convert a CLI-supplied path to a project-relative POSIX-style key matching
+ * the `files.path` format stored in the index. `path.relative()` returns
+ * backslash-separated paths on Windows; the index always stores forward
+ * slashes (tinyglobby / Bun.Glob / git diff all emit POSIX), so we normalize
+ * here to make `indexByPath.get(rel)` succeed cross-platform.
+ */
 function toProjectRelative(projectRoot: string, p: string): string {
-  if (isAbsolute(p)) return relative(projectRoot, p);
-  return p;
+  const rel = isAbsolute(p) ? relative(projectRoot, p) : p;
+  return sep === "/" ? rel : rel.split(sep).join("/");
 }
 
 /**

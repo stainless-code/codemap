@@ -97,13 +97,13 @@ export function parseContextRest(
     }
     if (a === "--for") {
       const v = rest[i + 1];
-      if (v === undefined || v === "" || v.startsWith("--")) {
+      if (v === undefined || v.startsWith("--") || v.trim() === "") {
         return {
           kind: "error",
           message: 'codemap: "--for" requires an intent string in quotes.',
         };
       }
-      intent = v;
+      intent = v.trim();
       i++;
       continue;
     }

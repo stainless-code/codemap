@@ -53,6 +53,20 @@ describe("parseContextRest", () => {
     expect(r.kind).toBe("error");
   });
 
+  it("errors when --for value is whitespace-only", () => {
+    const r = parseContextRest(["context", "--for", "   "]);
+    expect(r.kind).toBe("error");
+  });
+
+  it("trims the intent before storing it", () => {
+    const r = parseContextRest(["context", "--for", "  refactor auth  "]);
+    expect(r).toEqual({
+      kind: "run",
+      compact: false,
+      intent: "refactor auth",
+    });
+  });
+
   it("rejects unknown options", () => {
     expect(parseContextRest(["context", "--nope"]).kind).toBe("error");
   });
