@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export type { CodemapDatabase };
 
@@ -46,7 +46,8 @@ export function createTables(db: CodemapDatabase) {
       members TEXT,
       doc_comment TEXT,
       value TEXT,
-      parent_name TEXT
+      parent_name TEXT,
+      visibility TEXT
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -152,6 +153,8 @@ export function createIndexes(db: CodemapDatabase) {
       WHERE is_exported = 1;
     CREATE INDEX IF NOT EXISTS idx_symbols_functions ON symbols(name, file_path, line_start, line_end, signature)
       WHERE kind = 'function';
+    CREATE INDEX IF NOT EXISTS idx_symbols_visibility ON symbols(visibility, file_path, name, line_start)
+      WHERE visibility IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS idx_imports_source ON imports(source, file_path);
     CREATE INDEX IF NOT EXISTS idx_imports_resolved ON imports(resolved_path, file_path);
@@ -294,6 +297,12 @@ export interface SymbolRow {
   doc_comment: string | null;
   value: string | null;
   parent_name: string | null;
+  /**
+   * JSDoc visibility tag: `public` / `private` / `internal` / `alpha` / `beta`.
+   * Null when the doc has no visibility tag (or no doc at all). First match
+   * in document order wins when multiple tags are present.
+   */
+  visibility: string | null;
 }
 
 const BATCH_SIZE = 500;
@@ -326,8 +335,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -342,6 +351,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.doc_comment,
         s.value,
         s.parent_name,
+        s.visibility,
       ),
   );
 }

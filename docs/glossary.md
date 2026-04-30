@@ -393,7 +393,7 @@ TS shape for one row of the `type_members` table.
 
 ### visibility tag
 
-A JSDoc tag controlling export visibility — `@public`, `@internal`, `@private`, `@alpha`, `@beta`, `@deprecated`. Stored in `symbols.doc_comment`. The `visibility-tags` and `deprecated-symbols` recipes filter on these.
+A JSDoc tag controlling export visibility — `@public`, `@internal`, `@private`, `@alpha`, `@beta`. Parsed from `doc_comment` at parse time (line-leading match) and stored in the `symbols.visibility` column (TEXT, NULL when no tag). The `visibility-tags` recipe filters on `WHERE visibility IS NOT NULL`. `@deprecated` is a related but separate JSDoc tag — surfaced via `WHERE doc_comment LIKE '%@deprecated%'` in the `deprecated-symbols` recipe (no dedicated column; deprecation is orthogonal to visibility, not a 6th value).
 
 ---
 
