@@ -49,6 +49,13 @@ export function getFilesChangedSince(
   const status = spawnSync("git", ["status", "--porcelain", "--no-renames"], {
     cwd: root,
   });
+  if (status.status !== 0) {
+    const stderr = status.stderr.toString().trim();
+    return {
+      ok: false,
+      error: `--changed-since: git status failed${stderr ? ` (${stderr})` : ""}`,
+    };
+  }
 
   const diffFiles = diff.stdout.toString().trim().split("\n").filter(Boolean);
   // Porcelain rows are `XY path` (two status chars + space); slice past the prefix.

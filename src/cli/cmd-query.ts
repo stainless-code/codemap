@@ -1,7 +1,7 @@
 import { printQueryResult, queryRows } from "../application/index-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { filterRowsByChangedFiles, getFilesChangedSince } from "../git-changed";
-import type { GroupByMode } from "../group-by";
+import type { Bucketizer, GroupByMode } from "../group-by";
 import {
   discoverWorkspaceRoots,
   firstDirectory,
@@ -391,16 +391,17 @@ function runGroupedQuery(opts: {
   recipeActions: ReadonlyArray<unknown> | undefined;
   root: string;
 }) {
-  let bucketize: ReturnType<typeof loadCodeowners> = null;
+  let bucketize: Bucketizer;
   if (opts.groupBy === "owner") {
-    bucketize = loadCodeowners(opts.root);
-    if (bucketize === null) {
+    const ownerBucketize = loadCodeowners(opts.root);
+    if (ownerBucketize === null) {
       emitErrorMaybeJson(
         "--group-by owner: no CODEOWNERS file found (looked in .github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS).",
         opts.json,
       );
       return;
     }
+    bucketize = ownerBucketize;
   } else if (opts.groupBy === "package") {
     const roots = discoverWorkspaceRoots(opts.root);
     bucketize = makePackageBucketizer(roots);
@@ -429,7 +430,7 @@ function runGroupedQuery(opts: {
       : rows;
 
   const noBucketLabel = opts.groupBy === "owner" ? "<no-owner>" : "<unknown>";
-  const grouped = groupRowsBy(enriched, bucketize!, noBucketLabel);
+  const grouped = groupRowsBy(enriched, bucketize, noBucketLabel);
 
   if (opts.json) {
     if (opts.summary) {

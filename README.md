@@ -85,8 +85,8 @@ codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM sym
 codemap query --json --summary --group-by directory -r fan-in
 codemap query --json --group-by owner -r deprecated-symbols
 codemap query --json --summary --group-by package "SELECT file_path FROM symbols"
-# Recipes append per-row "actions" hints (kebab-case verb + description) in --json output;
-# ad-hoc SQL never carries actions. Inspect a recipe's actions via --recipes-json.
+# Recipes that define per-row action templates append "actions" hints (kebab-case verb +
+# description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out
