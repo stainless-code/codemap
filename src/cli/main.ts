@@ -143,6 +143,7 @@ Copies bundled agent templates into .agents/ under the project root.
       summary: parsed.summary,
       changedSince: parsed.changedSince,
       recipeId: parsed.recipeId,
+      groupBy: parsed.groupBy,
     });
     return;
   }

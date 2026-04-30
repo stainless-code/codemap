@@ -36,11 +36,13 @@ describe("CLI --help", () => {
     expect(err).toBe("");
   });
 
-  test("query --help exits 0 and documents --json + --summary", async () => {
+  test("query --help exits 0 and documents --json + --summary + --group-by", async () => {
     const { exitCode, out, err } = await runCli(["query", "--help"]);
     expect(exitCode).toBe(0);
     expect(out).toContain("--json");
     expect(out).toContain("--summary");
+    expect(out).toContain("--changed-since");
+    expect(out).toContain("--group-by");
     expect(out).toContain("--recipe");
     expect(out).toContain("fan-out");
     expect(out).toContain("codemap query");

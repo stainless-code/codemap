@@ -28,6 +28,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
+      groupBy: undefined,
     });
   });
 
@@ -40,6 +41,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
+      groupBy: undefined,
     });
   });
 
@@ -52,6 +54,7 @@ describe("parseQueryRest", () => {
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
+      groupBy: undefined,
     });
   });
 
@@ -64,6 +67,7 @@ describe("parseQueryRest", () => {
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
+      groupBy: undefined,
     });
   });
 
@@ -78,6 +82,7 @@ describe("parseQueryRest", () => {
       summary: true,
       changedSince: undefined,
       recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -95,6 +100,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: "origin/main",
       recipeId: undefined,
+      groupBy: undefined,
     });
   });
 
@@ -116,7 +122,54 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: "HEAD~3",
       recipeId: "fan-out",
+      groupBy: undefined,
     });
+  });
+
+  it("parses --group-by directory with SQL", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--group-by",
+      "directory",
+      "SELECT * FROM symbols",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT * FROM symbols",
+      json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: "directory",
+    });
+  });
+
+  it("parses --group-by owner --recipe fan-in", () => {
+    const r = parseQueryRest(["query", "--group-by", "owner", "-r", "fan-in"]);
+    const sql = getQueryRecipeSql("fan-in");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: false,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-in",
+      groupBy: "owner",
+    });
+  });
+
+  it("errors when --group-by has no mode", () => {
+    const r = parseQueryRest(["query", "--group-by"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--group-by");
+  });
+
+  it("errors on unknown --group-by mode", () => {
+    const r = parseQueryRest(["query", "--group-by", "branch", "SELECT 1"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("unknown --group-by");
   });
 
   it("errors when --changed-since has no ref", () => {
@@ -159,6 +212,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample-json",
+      groupBy: undefined,
     });
   });
 
@@ -173,6 +227,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -187,6 +242,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample",
+      groupBy: undefined,
     });
   });
 
@@ -201,6 +257,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -215,6 +272,7 @@ describe("parseQueryRest", () => {
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
