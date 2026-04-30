@@ -174,20 +174,17 @@ LIMIT 50`,
    */
   "visibility-tags": {
     description:
-      "Symbols tagged @internal / @private / @alpha / @beta in JSDoc",
-    sql: `SELECT name, kind, file_path, line_start, signature, doc_comment
+      "Symbols carrying a JSDoc visibility tag (public / private / internal / alpha / beta)",
+    sql: `SELECT name, kind, visibility, file_path, line_start, signature, doc_comment
 FROM symbols
-WHERE doc_comment LIKE '%@internal%'
-   OR doc_comment LIKE '%@private%'
-   OR doc_comment LIKE '%@alpha%'
-   OR doc_comment LIKE '%@beta%'
+WHERE visibility IS NOT NULL
 ORDER BY file_path ASC, line_start ASC
 LIMIT 100`,
     actions: [
       {
         type: "flag-non-public",
         description:
-          "Treat as not part of the public API: don't import from package consumers; check the visibility tag before extending re-exports.",
+          "Treat as not part of the public API unless visibility = 'public': don't import from package consumers; check the visibility tag before extending re-exports.",
       },
     ],
   },

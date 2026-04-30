@@ -154,6 +154,7 @@ export function extractFileData(
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
         parent_name: currentParent(),
+        visibility: null,
       });
 
       scopePush(name);
@@ -203,6 +204,7 @@ export function extractFileData(
           doc_comment: findJsDoc(jsDocComments, node.start, source),
           value: isArrowOrFn ? null : extractLiteralValue(init),
           parent_name: currentParent(),
+          visibility: null,
         });
 
         if (isArrowOrFn) {
@@ -252,6 +254,7 @@ export function extractFileData(
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
         parent_name: currentParent(),
+        visibility: null,
       });
       if (node.typeAnnotation?.type === "TSTypeLiteral") {
         extractObjectMembers(
@@ -297,6 +300,7 @@ export function extractFileData(
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
         parent_name: currentParent(),
+        visibility: null,
       });
       extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
@@ -335,6 +339,7 @@ export function extractFileData(
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
         parent_name: currentParent(),
+        visibility: null,
       });
     },
 
@@ -381,6 +386,7 @@ export function extractFileData(
         doc_comment: findJsDoc(jsDocComments, node.start, source),
         value: null,
         parent_name: currentParent(),
+        visibility: null,
       });
       scopePush(name);
       extractClassMembers(
@@ -485,6 +491,11 @@ export function extractFileData(
       is_default_export: isDefault ? 1 : 0,
     });
   }
+
+  // Single post-processing pass keeps the per-push code in this file
+  // free of doc/visibility derivation — every symbol's `visibility` is a
+  // pure function of its already-extracted `doc_comment`.
+  for (const s of symbols) s.visibility = extractVisibility(s.doc_comment);
 
   return { symbols, imports, exports, components, markers, typeMembers, calls };
 }
@@ -706,6 +717,29 @@ function cleanJsDoc(raw: string): string {
     .trim();
 }
 
+// Tag must start its own line (after the `*` prefix that cleanJsDoc strips).
+// Anchoring on line-start avoids matching backticked references inside prose
+// like "Extract @public / @private from ..." which describe tags rather than
+// declare them. Trailing word-boundary keeps `@betaTwo` from matching `@beta`.
+const VISIBILITY_TAG_RE =
+  /(?:^|\n)\s*@(public|private|internal|alpha|beta)(?![A-Za-z0-9_])/;
+
+/**
+ * Extract a JSDoc visibility tag from a doc comment. First match in document
+ * order wins when multiple line-leading tags are present.
+ *
+ * Returned values match the JSDoc keywords minus the `@` prefix:
+ * `"public" | "private" | "internal" | "alpha" | "beta"`. Returns `null` when
+ * no tag is present or the doc is empty/null. Tags inside prose (e.g.
+ * backticked references that don't start a line) intentionally don't match —
+ * those are descriptions of tags, not declarations of one.
+ */
+export function extractVisibility(doc: string | null): string | null {
+  if (doc === null || doc === "") return null;
+  const m = VISIBILITY_TAG_RE.exec(doc);
+  return m?.[1] ?? null;
+}
+
 function findJsDoc(
   docs: JsDocEntry[],
   nodeStart: number,
@@ -771,6 +805,7 @@ function extractClassMembers(
         doc_comment: findJsDoc(jsDocComments, m.start, source),
         value: null,
         parent_name: className,
+        visibility: null,
       });
     } else if (m.type === "PropertyDefinition") {
       let prefix = "";
@@ -795,6 +830,7 @@ function extractClassMembers(
         doc_comment: findJsDoc(jsDocComments, m.start, source),
         value: extractLiteralValue(m.value),
         parent_name: className,
+        visibility: null,
       });
     }
   }

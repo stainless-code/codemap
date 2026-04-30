@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { extractFileData } from "./parser";
+import { extractFileData, extractVisibility } from "./parser";
 
 describe("extractFileData", () => {
   describe("TS / JS extension variants (oxc lang + symbols)", () => {
@@ -201,6 +201,72 @@ describe("extractFileData", () => {
       const src = `export const x = 42;\n`;
       const d = extractFileData("/proj/x.ts", src, "x.ts");
       expect(d.symbols.find((s) => s.name === "x")?.doc_comment).toBeNull();
+    });
+  });
+
+  describe("visibility extraction", () => {
+    it("extractVisibility returns null for null/empty doc", () => {
+      expect(extractVisibility(null)).toBeNull();
+      expect(extractVisibility("")).toBeNull();
+      expect(extractVisibility("Just prose, no tags.")).toBeNull();
+    });
+
+    it("extractVisibility recognises each canonical tag at line start", () => {
+      expect(extractVisibility("@public")).toBe("public");
+      expect(extractVisibility("@private foo")).toBe("private");
+      expect(extractVisibility("Helper.\n@internal")).toBe("internal");
+      expect(extractVisibility("\n  @alpha")).toBe("alpha");
+      expect(extractVisibility("Body line.\n@beta release")).toBe("beta");
+    });
+
+    it("extractVisibility ignores in-prose mentions of tags", () => {
+      // Tags inside a paragraph (e.g. backticked references) describe tags,
+      // they don't declare one. Anchor-on-line-start avoids the false positive.
+      expect(
+        extractVisibility("Reads `@public` / `@private` from doc."),
+      ).toBeNull();
+      expect(extractVisibility("foo @beta bar")).toBeNull();
+    });
+
+    it("extractVisibility takes the first tag in document order", () => {
+      expect(extractVisibility("@internal helper.\n@beta release")).toBe(
+        "internal",
+      );
+    });
+
+    it("extractVisibility ignores look-alike longer words", () => {
+      expect(extractVisibility("@betaTwo")).toBeNull();
+      expect(extractVisibility("@publicly")).toBeNull();
+    });
+
+    it("symbol rows expose visibility derived from doc_comment", () => {
+      const src = `/**\n * Helper.\n * @internal\n */\nexport function helper(): void {}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const sym = d.symbols.find((s) => s.name === "helper");
+      expect(sym?.visibility).toBe("internal");
+    });
+
+    it("symbols without a visibility tag have null visibility", () => {
+      const src = `/** Just prose. */\nexport function plain(): void {}\nexport const undocumented = 1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "plain")?.visibility).toBeNull();
+      expect(
+        d.symbols.find((s) => s.name === "undocumented")?.visibility,
+      ).toBeNull();
+    });
+
+    it("class methods inherit per-method visibility, not class-level", () => {
+      const src = `/** @public */\nexport class Svc {\n  /** @internal */\n  helper(): void {}\n  exposed(): void {}\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "Svc")?.visibility).toBe(
+        "public",
+      );
+      expect(d.symbols.find((s) => s.name === "helper")?.visibility).toBe(
+        "internal",
+      );
+      expect(
+        d.symbols.find((s) => s.name === "exposed")?.visibility,
+      ).toBeNull();
     });
   });
 
