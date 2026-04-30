@@ -18,7 +18,7 @@ export function parseQueryRest(
 ):
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; sql: string; json: boolean }
+  | { kind: "run"; sql: string; json: boolean; summary: boolean }
   | { kind: "recipesCatalog" }
   | { kind: "printRecipeSql"; id: string } {
   if (rest[0] !== "query") {
@@ -28,12 +28,13 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] "<SQL>" | codemap query [--json] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] "<SQL>" | codemap query [--json] [--summary] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
     };
   }
 
   let i = 1;
   let json = false;
+  let summary = false;
   let recipeId: string | undefined;
   let recipesJson = false;
   let printSqlId: string | undefined;
@@ -45,6 +46,11 @@ export function parseQueryRest(
     }
     if (a === "--json") {
       json = true;
+      i++;
+      continue;
+    }
+    if (a === "--summary") {
+      summary = true;
       i++;
       continue;
     }
@@ -140,7 +146,7 @@ export function parseQueryRest(
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    return { kind: "run", sql, json };
+    return { kind: "run", sql, json, summary };
   }
 
   const sql = rest.slice(i).join(" ").trim();
@@ -148,10 +154,10 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] "<SQL>" | codemap query [--json] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] "<SQL>" | codemap query [--json] [--summary] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
     };
   }
-  return { kind: "run", sql, json };
+  return { kind: "run", sql, json, summary };
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -185,8 +191,8 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] "<SQL>"
-       codemap query [--json] --recipe <id>     (alias: -r)
+  console.log(`Usage: codemap query [--json] [--summary] "<SQL>"
+       codemap query [--json] [--summary] --recipe <id>     (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
 
@@ -196,6 +202,8 @@ The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a 
 Flags:
   --json              Print a JSON array of row objects to stdout (for agents and scripts).
                       On error, prints a single object: {"error":"<message>"} to stdout.
+  --summary           Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
+                      Useful for dashboards and agent context windows where the rows are noise.
   --recipe, -r <id>   Run bundled SQL (no SQL string on the command line).
   --recipes-json      Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
   --print-sql <id>    Print one recipe's SQL text to stdout (does not run the query). No DB.
@@ -214,6 +222,10 @@ Examples:
   codemap query -r fan-out
   codemap query --json -r deprecated-symbols
 
+  # Counts only (skip the rows)
+  codemap query --json --summary -r deprecated-symbols
+  codemap query --summary "SELECT * FROM symbols WHERE doc_comment LIKE '%@todo%'"
+
   # Inspect recipes without touching the DB
   codemap query --recipes-json
   codemap query --print-sql fan-out
@@ -229,12 +241,16 @@ export async function runQueryCmd(opts: {
   configFile: string | undefined;
   sql: string;
   json?: boolean;
+  summary?: boolean;
 }): Promise<void> {
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
     initCodemap(resolveCodemapConfig(opts.root, user));
     configureResolver(getProjectRoot(), getTsconfigPath());
-    const code = printQueryResult(opts.sql, { json: opts.json });
+    const code = printQueryResult(opts.sql, {
+      json: opts.json,
+      summary: opts.summary,
+    });
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

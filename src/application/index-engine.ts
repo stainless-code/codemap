@@ -527,18 +527,28 @@ export async function targetedReindex(
 /**
  * Run read-only SQL and print results to stdout (`console.table`, or JSON when `opts.json`).
  * Does not throw on invalid SQL: prints an error and returns **1** (CLI-style). With **`json`**, errors are printed as **`{"error":"<message>"}`** on stdout.
+ *
+ * When `opts.summary` is true, only the row count is emitted — `{"count": N}` with `--json`,
+ * `count: N` otherwise. The SQL still executes against the index; `--summary` filters output, not work.
  * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
   sql: string,
-  opts?: { json?: boolean },
+  opts?: { json?: boolean; summary?: boolean },
 ): number {
   const json = opts?.json === true;
+  const summary = opts?.summary === true;
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
     const rows = db.query(sql).all();
-    if (json) {
+    if (summary) {
+      if (json) {
+        console.log(JSON.stringify({ count: rows.length }));
+      } else {
+        console.log(`count: ${rows.length}`);
+      }
+    } else if (json) {
       console.log(JSON.stringify(rows));
     } else if (rows.length === 0) {
       console.log("(no results)");

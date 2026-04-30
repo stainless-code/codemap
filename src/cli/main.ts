@@ -140,6 +140,7 @@ Copies bundled agent templates into .agents/ under the project root.
       configFile,
       sql: parsed.sql,
       json: parsed.json,
+      summary: parsed.summary,
     });
     return;
   }

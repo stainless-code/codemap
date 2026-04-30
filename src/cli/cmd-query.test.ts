@@ -17,12 +17,54 @@ describe("parseQueryRest", () => {
 
   it("parses SQL after query", () => {
     const r = parseQueryRest(["query", "SELECT", "1"]);
-    expect(r).toEqual({ kind: "run", sql: "SELECT 1", json: false });
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: false,
+    });
   });
 
   it("parses --json and SQL", () => {
     const r = parseQueryRest(["query", "--json", "SELECT", "1"]);
-    expect(r).toEqual({ kind: "run", sql: "SELECT 1", json: true });
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: true,
+      summary: false,
+    });
+  });
+
+  it("parses --summary and SQL", () => {
+    const r = parseQueryRest(["query", "--summary", "SELECT", "1"]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: true,
+    });
+  });
+
+  it("parses --json --summary and SQL", () => {
+    const r = parseQueryRest(["query", "--json", "--summary", "SELECT", "1"]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: true,
+      summary: true,
+    });
+  });
+
+  it("parses --summary --recipe fan-out", () => {
+    const r = parseQueryRest(["query", "--summary", "-r", "fan-out"]);
+    const sql = getQueryRecipeSql("fan-out");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: false,
+      summary: true,
+    });
   });
 
   it("errors when --json has no SQL", () => {
@@ -45,6 +87,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      summary: false,
     });
   });
 
@@ -56,6 +99,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      summary: false,
     });
   });
 
@@ -67,6 +111,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
     });
   });
 
@@ -78,6 +123,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
     });
   });
 
@@ -89,6 +135,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
     });
   });
 
