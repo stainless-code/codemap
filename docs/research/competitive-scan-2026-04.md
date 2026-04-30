@@ -2,6 +2,8 @@
 
 > Inspiration scan from three sibling tools in the "AI-friendly code intelligence" space.
 > Captured **2026-04-27** during PR [#23](https://github.com/stainless-code/codemap/pull/23). Most adopt items shipped in that PR; remaining items moved to [docs/roadmap.md](../roadmap.md).
+>
+> **Fallow updates (post-scan):** fallow ships rapidly. Ongoing capability tracking — what fallow has shipped since this snapshot, what remains adoption-worthy, and where it explicitly should _not_ be copied — lives in [`research/fallow.md`](./fallow.md). AZidan and JordanCoin haven't moved meaningfully; they stay in this dated snapshot.
 
 Sources:
 
