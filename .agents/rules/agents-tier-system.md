@@ -31,6 +31,7 @@ Genuinely cross-cutting. Apply to every turn regardless of file:
 - `docs-governance` — Tier-2 priming layer for the docs framework (see § Reference)
 - `lessons` — read at session start, append after corrections
 - `no-bypass-hooks` — never `--no-verify` on `git commit`
+- `pr-comment-fact-check` — fires the fact-check skill on PR-comment intent triggers
 - `preserve-comments` — never silently delete TODOs / commented-out code
 - `tracer-bullets` — small end-to-end slices, not horizontal layers
 - `verify-after-each-step` — run the project's checks per milestone, not at commit time
