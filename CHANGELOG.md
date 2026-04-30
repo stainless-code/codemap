@@ -1,5 +1,17 @@
 # @stainless-code/codemap
 
+## 0.4.0
+
+### Minor Changes
+
+- [#28](https://github.com/stainless-code/codemap/pull/28) [`91598bc`](https://github.com/stainless-code/codemap/commit/91598bc90889d092fae04e9b51b637e61f6058e4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `symbols.visibility` column — JSDoc visibility tag (`@public` / `@private` / `@internal` / `@alpha` / `@beta`) extracted at parse time and stored as a real column. Replaces the `LIKE '%@beta%'` regex in the `visibility-tags` recipe. `SCHEMA_VERSION` bumps from 3 to 4 — `.codemap.db` rebuilds automatically on next index. Helper `extractVisibility(doc)` exported from `parser.ts`. New partial index `idx_symbols_visibility` covers `WHERE visibility IS NOT NULL` queries.
+
+### Patch Changes
+
+- [#29](https://github.com/stainless-code/codemap/pull/29) [`03fbddf`](https://github.com/stainless-code/codemap/commit/03fbddfc06f0eb3d7d390d3288ee290d9c4285be) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Update bundled `templates/agents/` rule and skill to cover the recent CLI surface — `codemap query --summary` / `--changed-since <ref>` / `--group-by owner|directory|package`, per-row recipe `actions`, and the new `symbols.visibility` column. The dev-side `.agents/` mirror is updated in lockstep so this clone stays self-consistent.
+
+- [#26](https://github.com/stainless-code/codemap/pull/26) [`c32f052`](https://github.com/stainless-code/codemap/commit/c32f0522321040358dcd0f2d89946dfbb533b9ca) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap query` Tier A flags — `--summary`, `--changed-since <ref>`, `--group-by owner|directory|package`, plus per-row `actions` templates on bundled recipes. All output filters; the SQL still executes against the index. Ad-hoc SQL and the `cm.query()` programmatic API stay unchanged.
+
 ## 0.3.0
 
 ### Minor Changes

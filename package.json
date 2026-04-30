@@ -1,6 +1,6 @@
 {
   "name": "@stainless-code/codemap",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Query your codebase — structural SQLite index for AI agents",
   "keywords": [
     "agents",
