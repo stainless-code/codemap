@@ -1,8 +1,20 @@
-import { printQueryResult } from "../application/index-engine";
+import { printQueryResult, queryRows } from "../application/index-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
+import { filterRowsByChangedFiles, getFilesChangedSince } from "../git-changed";
+import type { Bucketizer, GroupByMode } from "../group-by";
+import {
+  discoverWorkspaceRoots,
+  firstDirectory,
+  GROUP_BY_MODES,
+  groupRowsBy,
+  isGroupByMode,
+  loadCodeowners,
+  makePackageBucketizer,
+} from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import {
+  getQueryRecipeActions,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
@@ -13,12 +25,18 @@ import {
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
  * Supports `--json`, `--recipe <id>`, `--recipes-json`, `--print-sql <id>`, and raw SQL (see {@link printQueryCmdHelp}).
  */
-export function parseQueryRest(
-  rest: string[],
-):
+export function parseQueryRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; sql: string; json: boolean }
+  | {
+      kind: "run";
+      sql: string;
+      json: boolean;
+      summary: boolean;
+      changedSince: string | undefined;
+      recipeId: string | undefined;
+      groupBy: GroupByMode | undefined;
+    }
   | { kind: "recipesCatalog" }
   | { kind: "printRecipeSql"; id: string } {
   if (rest[0] !== "query") {
@@ -28,15 +46,18 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] "<SQL>" | codemap query [--json] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
     };
   }
 
   let i = 1;
   let json = false;
+  let summary = false;
+  let changedSince: string | undefined;
   let recipeId: string | undefined;
   let recipesJson = false;
   let printSqlId: string | undefined;
+  let groupBy: GroupByMode | undefined;
 
   while (i < rest.length) {
     const a = rest[i];
@@ -46,6 +67,42 @@ export function parseQueryRest(
     if (a === "--json") {
       json = true;
       i++;
+      continue;
+    }
+    if (a === "--summary") {
+      summary = true;
+      i++;
+      continue;
+    }
+    if (a === "--changed-since") {
+      const ref = rest[i + 1];
+      if (ref === undefined || ref.startsWith("-")) {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--changed-since" requires a git ref. Example: codemap query --changed-since origin/main -r fan-out',
+        };
+      }
+      changedSince = ref;
+      i += 2;
+      continue;
+    }
+    if (a === "--group-by") {
+      const mode = rest[i + 1];
+      if (mode === undefined || mode.startsWith("-")) {
+        return {
+          kind: "error",
+          message: `codemap: "--group-by" requires a mode (${GROUP_BY_MODES.join(" | ")}).`,
+        };
+      }
+      if (!isGroupByMode(mode)) {
+        return {
+          kind: "error",
+          message: `codemap: unknown --group-by mode "${mode}". Known modes: ${GROUP_BY_MODES.join(", ")}.`,
+        };
+      }
+      groupBy = mode;
+      i += 2;
       continue;
     }
     if (a === "--recipes-json") {
@@ -140,7 +197,7 @@ export function parseQueryRest(
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    return { kind: "run", sql, json };
+    return { kind: "run", sql, json, summary, changedSince, recipeId, groupBy };
   }
 
   const sql = rest.slice(i).join(" ").trim();
@@ -148,10 +205,18 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] "<SQL>" | codemap query [--json] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
     };
   }
-  return { kind: "run", sql, json };
+  return {
+    kind: "run",
+    sql,
+    json,
+    summary,
+    changedSince,
+    recipeId: undefined,
+    groupBy,
+  };
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -185,8 +250,8 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] "<SQL>"
-       codemap query [--json] --recipe <id>     (alias: -r)
+  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>"
+       codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] --recipe <id>   (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
 
@@ -194,12 +259,27 @@ Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json              Print a JSON array of row objects to stdout (for agents and scripts).
-                      On error, prints a single object: {"error":"<message>"} to stdout.
-  --recipe, -r <id>   Run bundled SQL (no SQL string on the command line).
-  --recipes-json      Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
-  --print-sql <id>    Print one recipe's SQL text to stdout (does not run the query). No DB.
-  --help, -h          Show this help.
+  --json                  Print a JSON array of row objects to stdout (for agents and scripts).
+                          On error, prints a single object: {"error":"<message>"} to stdout.
+  --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
+                          With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
+                          Useful for dashboards and agent context windows where the rows are noise.
+  --changed-since <ref>   Filter result rows to those touching files changed since <ref>. The ref can be
+                          any committish (origin/main, HEAD~5, a sha, a tag). Rows are kept if any of
+                          path / file_path / from_path / to_path / resolved_path matches the changed set.
+                          Rows with no path column pass through (pair with --summary if a count matters).
+  --group-by <mode>       Partition result rows by mode = owner | directory | package and print as
+                          {"group_by": "<mode>", "groups": [{key, count, rows}]} (with --json) or a
+                          two-column table (without). Mode definitions:
+                            owner     CODEOWNERS first-listed owner (last matching rule wins).
+                                      Looked up in .github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS.
+                            directory First path segment (src/cli/foo.ts → src).
+                            package   Workspace dir from package.json/workspaces or pnpm-workspace.yaml;
+                                      out-of-workspace paths bucket to "<root>".
+  --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
+  --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
+  --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
+  --help, -h              Show this help.
 
 Bundled recipes:
 ${recipeBlock}
@@ -213,6 +293,19 @@ Examples:
   codemap query --recipe fan-out
   codemap query -r fan-out
   codemap query --json -r deprecated-symbols
+
+  # Counts only (skip the rows)
+  codemap query --json --summary -r deprecated-symbols
+  codemap query --summary "SELECT * FROM symbols WHERE doc_comment LIKE '%@todo%'"
+
+  # PR-scoped: rows touching files changed since main
+  codemap query --json --changed-since origin/main -r fan-out
+  codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM symbols"
+
+  # Group by directory / owner / workspace package
+  codemap query --json --group-by directory -r fan-in
+  codemap query --json --summary --group-by owner -r deprecated-symbols
+  codemap query --json --summary --group-by package "SELECT file_path FROM symbols"
 
   # Inspect recipes without touching the DB
   codemap query --recipes-json
@@ -229,20 +322,154 @@ export async function runQueryCmd(opts: {
   configFile: string | undefined;
   sql: string;
   json?: boolean;
+  summary?: boolean;
+  changedSince?: string | undefined;
+  recipeId?: string | undefined;
+  groupBy?: GroupByMode | undefined;
 }): Promise<void> {
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
     initCodemap(resolveCodemapConfig(opts.root, user));
     configureResolver(getProjectRoot(), getTsconfigPath());
-    const code = printQueryResult(opts.sql, { json: opts.json });
+
+    let changedFiles: Set<string> | undefined;
+    if (opts.changedSince !== undefined) {
+      const result = getFilesChangedSince(opts.changedSince, getProjectRoot());
+      if (!result.ok) {
+        emitErrorMaybeJson(result.error, opts.json);
+        return;
+      }
+      changedFiles = result.files;
+    }
+
+    const recipeActions =
+      opts.recipeId !== undefined
+        ? getQueryRecipeActions(opts.recipeId)
+        : undefined;
+
+    if (opts.groupBy !== undefined) {
+      runGroupedQuery({
+        sql: opts.sql,
+        json: opts.json === true,
+        summary: opts.summary === true,
+        groupBy: opts.groupBy,
+        changedFiles,
+        recipeActions,
+        root: getProjectRoot(),
+      });
+      return;
+    }
+
+    const code = printQueryResult(opts.sql, {
+      json: opts.json,
+      summary: opts.summary,
+      changedFiles,
+      recipeActions,
+    });
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (opts.json) {
-      console.log(JSON.stringify({ error: msg }));
-    } else {
-      console.error(msg);
-    }
-    process.exitCode = 1;
+    emitErrorMaybeJson(msg, opts.json);
   }
+}
+
+function emitErrorMaybeJson(message: string, json: boolean | undefined) {
+  if (json === true) {
+    console.log(JSON.stringify({ error: message }));
+  } else {
+    console.error(message);
+  }
+  process.exitCode = 1;
+}
+
+function runGroupedQuery(opts: {
+  sql: string;
+  json: boolean;
+  summary: boolean;
+  groupBy: GroupByMode;
+  changedFiles: Set<string> | undefined;
+  recipeActions: ReadonlyArray<unknown> | undefined;
+  root: string;
+}) {
+  let bucketize: Bucketizer;
+  if (opts.groupBy === "owner") {
+    const ownerBucketize = loadCodeowners(opts.root);
+    if (ownerBucketize === null) {
+      emitErrorMaybeJson(
+        "--group-by owner: no CODEOWNERS file found (looked in .github/CODEOWNERS, CODEOWNERS, docs/CODEOWNERS).",
+        opts.json,
+      );
+      return;
+    }
+    bucketize = ownerBucketize;
+  } else if (opts.groupBy === "package") {
+    const roots = discoverWorkspaceRoots(opts.root);
+    bucketize = makePackageBucketizer(roots);
+  } else {
+    bucketize = (path: string) => firstDirectory(path);
+  }
+
+  let rows: unknown[];
+  try {
+    rows = queryRows(opts.sql);
+  } catch (err) {
+    emitErrorMaybeJson(
+      err instanceof Error ? err.message : String(err),
+      opts.json,
+    );
+    return;
+  }
+
+  if (opts.changedFiles !== undefined) {
+    rows = filterRowsByChangedFiles(rows, opts.changedFiles);
+  }
+
+  const enriched =
+    opts.recipeActions !== undefined && opts.recipeActions.length > 0
+      ? rows.map((row) => attachActionsForGrouped(row, opts.recipeActions!))
+      : rows;
+
+  const noBucketLabel = opts.groupBy === "owner" ? "<no-owner>" : "<unknown>";
+  const grouped = groupRowsBy(enriched, bucketize, noBucketLabel);
+
+  if (opts.json) {
+    if (opts.summary) {
+      console.log(
+        JSON.stringify({
+          group_by: opts.groupBy,
+          groups: grouped.map((g) => ({ key: g.key, count: g.count })),
+        }),
+      );
+    } else {
+      console.log(
+        JSON.stringify({
+          group_by: opts.groupBy,
+          groups: grouped,
+        }),
+      );
+    }
+    return;
+  }
+
+  if (grouped.length === 0) {
+    console.log("(no results)");
+    return;
+  }
+  if (opts.summary) {
+    console.log(`group_by: ${opts.groupBy}`);
+    for (const g of grouped) console.log(`  ${g.key}: ${g.count}`);
+    return;
+  }
+  console.log(`group_by: ${opts.groupBy}`);
+  console.table(grouped.map((g) => ({ key: g.key, count: g.count })));
+}
+
+function attachActionsForGrouped(
+  row: unknown,
+  actions: ReadonlyArray<unknown>,
+): unknown {
+  if (typeof row !== "object" || row === null) return row;
+  const obj = row as Record<string, unknown>;
+  if ("actions" in obj) return obj;
+  return { ...obj, actions };
 }

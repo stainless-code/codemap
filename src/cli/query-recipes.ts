@@ -1,18 +1,40 @@
 /**
- * One bundled recipe: id, human description, and SQL (canonical source for CLI and `--recipes-json`).
+ * One agent-facing follow-up suggested for every row of a recipe's result.
+ * Recipe authors hand-write this alongside the SQL (predictable: every row gets
+ * the same template). Ad-hoc SQL never carries actions — recipe-only feature.
+ *
+ * `auto_fixable` defaults to `false` when omitted. `description` is human prose
+ * for the agent to surface; `type` is a stable kebab-case verb the agent can
+ * key off (`delete-file`, `split-barrel`, `flag-caller`, …).
+ */
+export interface RecipeAction {
+  type: string;
+  auto_fixable?: boolean;
+  description?: string;
+}
+
+/**
+ * One bundled recipe: id, human description, SQL, and optional per-row actions
+ * (canonical source for CLI, `--recipes-json`, and the JSON output enrichment).
  */
 export interface QueryRecipeCatalogEntry {
   id: string;
   description: string;
   sql: string;
+  actions?: RecipeAction[];
 }
 
 /**
  * Bundled read-only SQL for `codemap query --recipe <id>`. Keys match **`codemap query --help`**.
+ *
+ * `actions` (optional) is appended to each row in `--json` output so agents see
+ * the recommended follow-up alongside the data. Add an `actions` array on a
+ * recipe only when there's a concrete next step the agent should consider for
+ * every row — counts-by-kind and similar aggregates intentionally omit it.
  */
 export const QUERY_RECIPES: Record<
   string,
-  { sql: string; description: string }
+  { sql: string; description: string; actions?: RecipeAction[] }
 > = {
   "fan-out": {
     description: "Top 10 files by dependency fan-out (edge count)",
@@ -21,6 +43,13 @@ FROM dependencies
 GROUP BY from_path
 ORDER BY deps DESC, from_path ASC
 LIMIT 10`,
+    actions: [
+      {
+        type: "review-coupling",
+        description:
+          "High fan-out usually means orchestrator role; consider extracting helpers or splitting responsibilities.",
+      },
+    ],
   },
   "fan-out-sample": {
     description:
@@ -62,6 +91,13 @@ FROM dependencies
 GROUP BY to_path
 ORDER BY fan_in DESC, to_path ASC
 LIMIT 15`,
+    actions: [
+      {
+        type: "review-stability",
+        description:
+          "High fan-in: changes here ripple through many consumers. Protect with tests before refactoring.",
+      },
+    ],
   },
   "index-summary": {
     description:
@@ -79,6 +115,13 @@ LIMIT 15`,
 FROM files
 ORDER BY line_count DESC, path ASC
 LIMIT 20`,
+    actions: [
+      {
+        type: "split-file",
+        description:
+          "Files this large are typical refactor candidates. Look for cohesive sub-modules to extract.",
+      },
+    ],
   },
   /**
    * Hook count uses comma tally + 1 on the stored JSON array (Codemap emits flat
@@ -116,6 +159,13 @@ FROM symbols
 WHERE doc_comment LIKE '%@deprecated%'
 ORDER BY file_path ASC, line_start ASC
 LIMIT 50`,
+    actions: [
+      {
+        type: "flag-caller",
+        description:
+          "Warn before suggesting changes that depend on this symbol; check callers via the calls table.",
+      },
+    ],
   },
   /**
    * Symbols carrying JSDoc visibility tags (`@internal`, `@private`, `@alpha`,
@@ -133,6 +183,13 @@ WHERE doc_comment LIKE '%@internal%'
    OR doc_comment LIKE '%@beta%'
 ORDER BY file_path ASC, line_start ASC
 LIMIT 100`,
+    actions: [
+      {
+        type: "flag-non-public",
+        description:
+          "Treat as not part of the public API: don't import from package consumers; check the visibility tag before extending re-exports.",
+      },
+    ],
   },
   /**
    * All indexed file paths with their content hash. Powers the \`codemap validate\`
@@ -159,6 +216,13 @@ FROM exports
 GROUP BY file_path
 ORDER BY exports DESC, file_path ASC
 LIMIT 20`,
+    actions: [
+      {
+        type: "split-barrel",
+        description:
+          "Confirm this is an intentional public-API surface; if it's accidental fan-out, consider splitting into smaller barrels.",
+      },
+    ],
   },
 };
 
@@ -175,7 +239,13 @@ export function listQueryRecipeIds(): string[] {
 export function listQueryRecipeCatalog(): QueryRecipeCatalogEntry[] {
   return listQueryRecipeIds().map((id) => {
     const meta = QUERY_RECIPES[id]!;
-    return { id, description: meta.description, sql: meta.sql };
+    const entry: QueryRecipeCatalogEntry = {
+      id,
+      description: meta.description,
+      sql: meta.sql,
+    };
+    if (meta.actions !== undefined) entry.actions = meta.actions;
+    return entry;
   });
 }
 
@@ -184,4 +254,13 @@ export function listQueryRecipeCatalog(): QueryRecipeCatalogEntry[] {
  */
 export function getQueryRecipeSql(id: string): string | undefined {
   return QUERY_RECIPES[id]?.sql;
+}
+
+/**
+ * Returns the per-row {@link RecipeAction} template for a recipe id, or
+ * `undefined` if the recipe is unknown OR carries no actions. Recipe-only:
+ * ad-hoc SQL never gets actions.
+ */
+export function getQueryRecipeActions(id: string): RecipeAction[] | undefined {
+  return QUERY_RECIPES[id]?.actions;
 }

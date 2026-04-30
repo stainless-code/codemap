@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import { parseQueryRest } from "./cmd-query";
-import { getQueryRecipeSql, listQueryRecipeCatalog } from "./query-recipes";
+import {
+  getQueryRecipeActions,
+  getQueryRecipeSql,
+  listQueryRecipeCatalog,
+} from "./query-recipes";
 
 describe("parseQueryRest", () => {
   it("errors when only query", () => {
@@ -17,12 +21,172 @@ describe("parseQueryRest", () => {
 
   it("parses SQL after query", () => {
     const r = parseQueryRest(["query", "SELECT", "1"]);
-    expect(r).toEqual({ kind: "run", sql: "SELECT 1", json: false });
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: false,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: undefined,
+    });
   });
 
   it("parses --json and SQL", () => {
     const r = parseQueryRest(["query", "--json", "SELECT", "1"]);
-    expect(r).toEqual({ kind: "run", sql: "SELECT 1", json: true });
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --summary and SQL", () => {
+    const r = parseQueryRest(["query", "--summary", "SELECT", "1"]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: true,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --json --summary and SQL", () => {
+    const r = parseQueryRest(["query", "--json", "--summary", "SELECT", "1"]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: true,
+      summary: true,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --summary --recipe fan-out", () => {
+    const r = parseQueryRest(["query", "--summary", "-r", "fan-out"]);
+    const sql = getQueryRecipeSql("fan-out");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: false,
+      summary: true,
+      changedSince: undefined,
+      recipeId: "fan-out",
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --changed-since <ref> with SQL", () => {
+    const r = parseQueryRest([
+      "query",
+      "--changed-since",
+      "origin/main",
+      "SELECT 1",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: false,
+      changedSince: "origin/main",
+      recipeId: undefined,
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --json --changed-since HEAD~3 -r fan-out", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--changed-since",
+      "HEAD~3",
+      "-r",
+      "fan-out",
+    ]);
+    const sql = getQueryRecipeSql("fan-out");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: true,
+      summary: false,
+      changedSince: "HEAD~3",
+      recipeId: "fan-out",
+      groupBy: undefined,
+    });
+  });
+
+  it("parses --group-by directory with SQL", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--group-by",
+      "directory",
+      "SELECT * FROM symbols",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT * FROM symbols",
+      json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: undefined,
+      groupBy: "directory",
+    });
+  });
+
+  it("parses --group-by owner --recipe fan-in", () => {
+    const r = parseQueryRest(["query", "--group-by", "owner", "-r", "fan-in"]);
+    const sql = getQueryRecipeSql("fan-in");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: false,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-in",
+      groupBy: "owner",
+    });
+  });
+
+  it("errors when --group-by has no mode", () => {
+    const r = parseQueryRest(["query", "--group-by"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--group-by");
+  });
+
+  it("errors on unknown --group-by mode", () => {
+    const r = parseQueryRest(["query", "--group-by", "branch", "SELECT 1"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("unknown --group-by");
+  });
+
+  it("errors when --changed-since has no ref", () => {
+    const r = parseQueryRest(["query", "--changed-since"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--changed-since");
+  });
+
+  it("errors when --changed-since ref looks like another flag", () => {
+    const r = parseQueryRest([
+      "query",
+      "--changed-since",
+      "--json",
+      "SELECT 1",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--changed-since");
   });
 
   it("errors when --json has no SQL", () => {
@@ -45,6 +209,10 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-out-sample-json",
+      groupBy: undefined,
     });
   });
 
@@ -56,6 +224,10 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -67,6 +239,10 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-out-sample",
+      groupBy: undefined,
     });
   });
 
@@ -78,6 +254,10 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -89,6 +269,10 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      summary: false,
+      changedSince: undefined,
+      recipeId: "fan-out",
+      groupBy: undefined,
     });
   });
 
@@ -176,5 +360,40 @@ describe("listQueryRecipeCatalog", () => {
       expect(getQueryRecipeSql(row.id)).toBe(row.sql);
       expect(row.description.length).toBeGreaterThan(0);
     }
+  });
+
+  it("includes actions templates on recipes that define them", () => {
+    const cat = listQueryRecipeCatalog();
+    const fanOut = cat.find((r) => r.id === "fan-out");
+    expect(fanOut?.actions).toBeDefined();
+    expect(fanOut?.actions?.[0]).toMatchObject({ type: "review-coupling" });
+
+    const deprecated = cat.find((r) => r.id === "deprecated-symbols");
+    expect(deprecated?.actions?.[0]).toMatchObject({ type: "flag-caller" });
+  });
+
+  it("omits actions when the recipe doesn't define them", () => {
+    const cat = listQueryRecipeCatalog();
+    const indexSummary = cat.find((r) => r.id === "index-summary");
+    expect(indexSummary).toBeDefined();
+    expect(indexSummary?.actions).toBeUndefined();
+  });
+});
+
+describe("getQueryRecipeActions", () => {
+  it("returns the action template for a recipe with actions", () => {
+    const actions = getQueryRecipeActions("barrel-files");
+    expect(actions).toBeDefined();
+    expect(actions?.[0]?.type).toBe("split-barrel");
+    expect(actions?.[0]?.description).toMatch(/barrel/i);
+  });
+
+  it("returns undefined for recipes without actions", () => {
+    expect(getQueryRecipeActions("index-summary")).toBeUndefined();
+    expect(getQueryRecipeActions("markers-by-kind")).toBeUndefined();
+  });
+
+  it("returns undefined for unknown recipes", () => {
+    expect(getQueryRecipeActions("nope-not-real")).toBeUndefined();
   });
 });
