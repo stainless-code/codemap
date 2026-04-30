@@ -39,6 +39,10 @@ These rules are normative — cite them by number in PR review. Ordered by how o
 7. **No line-number references** — line numbers (e.g. `parser.ts:241`) rot on every edit. Reference by function name, section heading, or symbol from `codemap query` instead. Methodology tables in [benchmark.md](./benchmark.md) are exempt.
 8. **Research notes get closed** — when a research scan's adopt items ship, slim the note to a "What shipped" appendix linking to canonical homes (see [research/competitive-scan-2026-04.md](./research/competitive-scan-2026-04.md) as the precedent). Rejected items keep a `Status: Rejected (date) — <one-line reason>` header.
 9. **New term ⇒ update [glossary.md](./glossary.md) in the same PR** — when a PR introduces a new domain noun / verb / acronym (table name, recipe id, parser name, schema column), add or update its entry. Disambiguations (e.g. `FileRow` TS shape vs `files` SQLite table) take priority over single defs.
+10. **Core surface change ⇒ update bundled agent rule + skill in the same PR** — when a PR adds / changes a CLI flag, recipe id, recipe `actions` template, schema column, or any other surface an agent would query, update **both** copies of the codemap rule + skill so installed agents and this clone stay in lockstep:
+    - **`templates/agents/rules/codemap.md`** + **`templates/agents/skills/codemap/SKILL.md`** (ships to npm via `codemap agents init`).
+    - **`.agents/rules/codemap.md`** + **`.agents/skills/codemap/SKILL.md`** (this clone's dev-side mirror — keeps my own session view of the CLI accurate).
+      Drift between the two pairs should be **CLI-prefix-only** (`codemap` vs `bun src/index.ts`) — anything else means content has diverged. Schema-version bumps and new recipes are the most common trigger; output flags (e.g. `--summary`, `--changed-since`, `--group-by`) come second. Patch changeset suffices when the underlying feature already shipped its own changeset (templates/agents/ is the only ship-affecting surface in such a PR).
 
 ---
 
