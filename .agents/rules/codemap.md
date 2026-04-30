@@ -19,6 +19,11 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                           |
 | Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**) |
 | Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`     |
+| Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                            |
+| PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                     |
+| Bucket by owner / dir / pkg    | —                  | `bun src/index.ts query --json --group-by directory -r fan-in`                             |
+
+**Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
 After **`bun run build`**, **`node dist/index.mjs`** matches the published **`codemap`** binary (same flags). **`bun link`** / global **`codemap`** also work when testing the packaged CLI.
 
@@ -58,6 +63,7 @@ If the question looks like any of these → use the index:
 | "What keyframe animations exist?"                            | `css_keyframes`                                          |
 | "What fields does interface/type X have?"                    | `type_members`                                           |
 | "Is symbol X deprecated?" / "What does X do?"                | `symbols` (`doc_comment`)                                |
+| "What's `@internal` / `@beta` / `@alpha` / `@private`?"      | `symbols.visibility` (parsed JSDoc tag — not regex)      |
 | "Who calls X?" / "What does X call?"                         | `calls`                                                  |
 
 ## When Grep / Read IS appropriate
@@ -98,6 +104,7 @@ bun src/index.ts query --json "<SQL>"
 | CSS keyframes             | `SELECT name, file_path FROM css_keyframes`                                                                  |
 | Type/interface shape      | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                    |
 | Deprecated symbols        | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`              |
+| Visibility-tagged symbols | `SELECT name, kind, visibility, file_path FROM symbols WHERE visibility IS NOT NULL` (or `= 'beta'`, etc.)   |
 | Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`            |
 | Const values              | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
 | Class members             | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                        |

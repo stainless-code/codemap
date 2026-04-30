@@ -34,7 +34,14 @@ Use **`codemap --root /path/to/project`** (or **`CODEMAP_ROOT`**) to index anoth
 
 Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
-**CLI shortcuts:** **`codemap query --json --recipe <id>`** runs bundled SQL (preferred for agents). **`codemap query --recipe <id>`** without **`--json`** prints a table. **`codemap query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**) as JSON (no index / DB required). **`codemap query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`** — see **`codemap query --help`**.
+**CLI shortcuts:** **`codemap query --json --recipe <id>`** runs bundled SQL (preferred for agents). **`codemap query --recipe <id>`** without **`--json`** prints a table. **`codemap query --recipes-json`** prints every bundled recipe (**`id`**, **`description`**, **`sql`**, optional **`actions`**) as JSON (no index / DB required). **`codemap query --print-sql <id>`** prints one recipe’s SQL only. Ids include **`fan-out`**, **`fan-out-sample`** (**`GROUP_CONCAT`** samples), **`fan-out-sample-json`** (same, but **`json_group_array`** — needs SQLite JSON1), **`fan-in`**, **`index-summary`**, **`files-largest`**, **`components-by-hooks`**, **`markers-by-kind`**, **`deprecated-symbols`**, **`visibility-tags`**, **`barrel-files`**, **`files-hashes`** — see **`codemap query --help`**.
+
+**Output flags** (compose with **`--recipe`** or ad-hoc SQL):
+
+- **`--summary`** — counts only. With **`--json`**: **`{"count": N}`**. With **`--group-by`**: **`{"group_by": "<mode>", "groups": [{key, count}]}`**.
+- **`--changed-since <ref>`** — post-filter rows by **`path`** / **`file_path`** / **`from_path`** / **`to_path`** / **`resolved_path`** against **`git diff --name-only <ref>...HEAD ∪ git status --porcelain`**. Rows with no recognised path column pass through.
+- **`--group-by owner|directory|package`** — partition into buckets and emit **`{"group_by", "groups": [{key, count, rows}]}`**. **`owner`** reads CODEOWNERS (last matching rule wins); **`directory`** is the first path segment; **`package`** uses **`package.json`** **`workspaces`** or **`pnpm-workspace.yaml`**.
+- **Per-row recipe `actions`** — recipes that define an **`actions: [{type, auto_fixable?, description?}]`** template append it to every row in **`--json`** output (recipe-only; ad-hoc SQL never carries actions). Inspect via **`--recipes-json`**.
 
 **Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is whatever **`codemap query --print-sql <id>`** or **`codemap query --recipes-json`** returns (single source in the CLI).
 
@@ -82,21 +89,22 @@ LIMIT 10
 
 ### `symbols` — Functions, types, interfaces, enums, constants, classes
 
-| Column            | Type       | Description                                               |
-| ----------------- | ---------- | --------------------------------------------------------- |
-| id                | INTEGER PK | Auto-increment ID                                         |
-| file_path         | TEXT FK    | References `files(path)`                                  |
-| name              | TEXT       | Symbol name                                               |
-| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const` |
-| line_start        | INTEGER    | Start line (1-based)                                      |
-| line_end          | INTEGER    | End line (1-based)                                        |
-| signature         | TEXT       | Reconstructed signature with generics and return types    |
-| is_exported       | INTEGER    | 1 if exported                                             |
-| is_default_export | INTEGER    | 1 if default export                                       |
-| members           | TEXT       | JSON enum members (NULL for non-enums)                    |
-| doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent            |
-| value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)   |
-| parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level  |
+| Column            | Type       | Description                                                                                                                        |
+| ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| id                | INTEGER PK | Auto-increment ID                                                                                                                  |
+| file_path         | TEXT FK    | References `files(path)`                                                                                                           |
+| name              | TEXT       | Symbol name                                                                                                                        |
+| kind              | TEXT       | `function`, `class`, `type`, `interface`, `enum`, `const`                                                                          |
+| line_start        | INTEGER    | Start line (1-based)                                                                                                               |
+| line_end          | INTEGER    | End line (1-based)                                                                                                                 |
+| signature         | TEXT       | Reconstructed signature with generics and return types                                                                             |
+| is_exported       | INTEGER    | 1 if exported                                                                                                                      |
+| is_default_export | INTEGER    | 1 if default export                                                                                                                |
+| members           | TEXT       | JSON enum members (NULL for non-enums)                                                                                             |
+| doc_comment       | TEXT       | Leading JSDoc text (cleaned), NULL when absent                                                                                     |
+| value             | TEXT       | Literal value for consts (`"ok"`, `42`, `true`, `null`)                                                                            |
+| parent_name       | TEXT       | Enclosing symbol name (class/function), NULL = top-level                                                                           |
+| visibility        | TEXT       | Line-leading JSDoc tag: `public` / `private` / `internal` / `alpha` / `beta`; NULL when absent. First match in document order wins |
 
 ### `calls` — Function-scoped call edges (deduped per file)
 
@@ -232,6 +240,13 @@ WHERE symbol_name = 'UserSession';
 -- Deprecated symbols (find @deprecated via JSDoc)
 SELECT name, kind, file_path, doc_comment FROM symbols
 WHERE doc_comment LIKE '%@deprecated%';
+
+-- Visibility-tagged symbols (parsed JSDoc tag — single column, no regex)
+SELECT name, kind, visibility, file_path
+FROM symbols WHERE visibility IS NOT NULL ORDER BY visibility, file_path;
+
+-- Just the @beta surface (filter on the parsed tag, not doc_comment LIKE)
+SELECT name, kind, file_path FROM symbols WHERE visibility = 'beta';
 
 -- Symbol documentation
 SELECT name, signature, doc_comment FROM symbols
