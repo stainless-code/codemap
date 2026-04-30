@@ -78,6 +78,9 @@ codemap query --json --recipe fan-out
 codemap query --json --recipe fan-out-sample
 # Counts only (skip the rows) — pairs well with --recipe for dashboards / agent context windows
 codemap query --json --summary -r deprecated-symbols
+# PR-scoped: filter result rows to those touching files changed since <ref>
+codemap query --json --changed-since origin/main -r fan-out
+codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM symbols"
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out

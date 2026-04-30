@@ -22,6 +22,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: false,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -32,6 +33,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: true,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -42,6 +44,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: false,
       summary: true,
+      changedSince: undefined,
     });
   });
 
@@ -52,6 +55,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: true,
       summary: true,
+      changedSince: undefined,
     });
   });
 
@@ -64,7 +68,61 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: false,
       summary: true,
+      changedSince: undefined,
     });
+  });
+
+  it("parses --changed-since <ref> with SQL", () => {
+    const r = parseQueryRest([
+      "query",
+      "--changed-since",
+      "origin/main",
+      "SELECT 1",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      sql: "SELECT 1",
+      json: false,
+      summary: false,
+      changedSince: "origin/main",
+    });
+  });
+
+  it("parses --json --changed-since HEAD~3 -r fan-out", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--changed-since",
+      "HEAD~3",
+      "-r",
+      "fan-out",
+    ]);
+    const sql = getQueryRecipeSql("fan-out");
+    expect(sql).toBeDefined();
+    expect(r).toEqual({
+      kind: "run",
+      sql: sql!,
+      json: true,
+      summary: false,
+      changedSince: "HEAD~3",
+    });
+  });
+
+  it("errors when --changed-since has no ref", () => {
+    const r = parseQueryRest(["query", "--changed-since"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--changed-since");
+  });
+
+  it("errors when --changed-since ref looks like another flag", () => {
+    const r = parseQueryRest([
+      "query",
+      "--changed-since",
+      "--json",
+      "SELECT 1",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--changed-since");
   });
 
   it("errors when --json has no SQL", () => {
@@ -88,6 +146,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: false,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -100,6 +159,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: false,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -112,6 +172,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: true,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -124,6 +185,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: true,
       summary: false,
+      changedSince: undefined,
     });
   });
 
@@ -136,6 +198,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: true,
       summary: false,
+      changedSince: undefined,
     });
   });
 

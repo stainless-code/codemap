@@ -30,6 +30,7 @@ import {
   SCHEMA_VERSION,
 } from "../db";
 import type { CodemapDatabase, FileRow } from "../db";
+import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
 import { extractMarkers } from "../markers";
@@ -530,18 +531,31 @@ export async function targetedReindex(
  *
  * When `opts.summary` is true, only the row count is emitted — `{"count": N}` with `--json`,
  * `count: N` otherwise. The SQL still executes against the index; `--summary` filters output, not work.
+ *
+ * When `opts.changedFiles` is provided, rows are post-filtered to those whose path columns
+ * (`path`, `file_path`, `from_path`, `to_path`, `resolved_path`) match at least one entry.
+ * Rows with no recognised path column pass through (the filter cannot decide; pair with `--summary`
+ * if the count of changed-touching rows is what's wanted).
  * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
   sql: string,
-  opts?: { json?: boolean; summary?: boolean },
+  opts?: {
+    json?: boolean;
+    summary?: boolean;
+    changedFiles?: Set<string> | undefined;
+  },
 ): number {
   const json = opts?.json === true;
   const summary = opts?.summary === true;
+  const changedFiles = opts?.changedFiles;
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
-    const rows = db.query(sql).all();
+    let rows = db.query(sql).all();
+    if (changedFiles !== undefined) {
+      rows = filterRowsByChangedFiles(rows, changedFiles);
+    }
     if (summary) {
       if (json) {
         console.log(JSON.stringify({ count: rows.length }));

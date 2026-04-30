@@ -141,6 +141,7 @@ Copies bundled agent templates into .agents/ under the project root.
       sql: parsed.sql,
       json: parsed.json,
       summary: parsed.summary,
+      changedSince: parsed.changedSince,
     });
     return;
   }

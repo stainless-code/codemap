@@ -1,5 +1,6 @@
 import { printQueryResult } from "../application/index-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
+import { getFilesChangedSince } from "../git-changed";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import {
@@ -13,12 +14,16 @@ import {
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
  * Supports `--json`, `--recipe <id>`, `--recipes-json`, `--print-sql <id>`, and raw SQL (see {@link printQueryCmdHelp}).
  */
-export function parseQueryRest(
-  rest: string[],
-):
+export function parseQueryRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; sql: string; json: boolean; summary: boolean }
+  | {
+      kind: "run";
+      sql: string;
+      json: boolean;
+      summary: boolean;
+      changedSince: string | undefined;
+    }
   | { kind: "recipesCatalog" }
   | { kind: "printRecipeSql"; id: string } {
   if (rest[0] !== "query") {
@@ -28,13 +33,14 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] "<SQL>" | codemap query [--json] [--summary] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
     };
   }
 
   let i = 1;
   let json = false;
   let summary = false;
+  let changedSince: string | undefined;
   let recipeId: string | undefined;
   let recipesJson = false;
   let printSqlId: string | undefined;
@@ -52,6 +58,19 @@ export function parseQueryRest(
     if (a === "--summary") {
       summary = true;
       i++;
+      continue;
+    }
+    if (a === "--changed-since") {
+      const ref = rest[i + 1];
+      if (ref === undefined || ref.startsWith("-")) {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--changed-since" requires a git ref. Example: codemap query --changed-since origin/main -r fan-out',
+        };
+      }
+      changedSince = ref;
+      i += 2;
       continue;
     }
     if (a === "--recipes-json") {
@@ -146,7 +165,7 @@ export function parseQueryRest(
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    return { kind: "run", sql, json, summary };
+    return { kind: "run", sql, json, summary, changedSince };
   }
 
   const sql = rest.slice(i).join(" ").trim();
@@ -154,10 +173,10 @@ export function parseQueryRest(
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] "<SQL>" | codemap query [--json] [--summary] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
     };
   }
-  return { kind: "run", sql, json, summary };
+  return { kind: "run", sql, json, summary, changedSince };
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -191,8 +210,8 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] [--summary] "<SQL>"
-       codemap query [--json] [--summary] --recipe <id>     (alias: -r)
+  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] "<SQL>"
+       codemap query [--json] [--summary] [--changed-since <ref>] --recipe <id>   (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
 
@@ -200,14 +219,18 @@ Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json              Print a JSON array of row objects to stdout (for agents and scripts).
-                      On error, prints a single object: {"error":"<message>"} to stdout.
-  --summary           Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
-                      Useful for dashboards and agent context windows where the rows are noise.
-  --recipe, -r <id>   Run bundled SQL (no SQL string on the command line).
-  --recipes-json      Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
-  --print-sql <id>    Print one recipe's SQL text to stdout (does not run the query). No DB.
-  --help, -h          Show this help.
+  --json                  Print a JSON array of row objects to stdout (for agents and scripts).
+                          On error, prints a single object: {"error":"<message>"} to stdout.
+  --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
+                          Useful for dashboards and agent context windows where the rows are noise.
+  --changed-since <ref>   Filter result rows to those touching files changed since <ref>. The ref can be
+                          any committish (origin/main, HEAD~5, a sha, a tag). Rows are kept if any of
+                          path / file_path / from_path / to_path / resolved_path matches the changed set.
+                          Rows with no path column pass through (pair with --summary if a count matters).
+  --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
+  --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
+  --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
+  --help, -h              Show this help.
 
 Bundled recipes:
 ${recipeBlock}
@@ -226,6 +249,10 @@ Examples:
   codemap query --json --summary -r deprecated-symbols
   codemap query --summary "SELECT * FROM symbols WHERE doc_comment LIKE '%@todo%'"
 
+  # PR-scoped: rows touching files changed since main
+  codemap query --json --changed-since origin/main -r fan-out
+  codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM symbols"
+
   # Inspect recipes without touching the DB
   codemap query --recipes-json
   codemap query --print-sql fan-out
@@ -242,14 +269,32 @@ export async function runQueryCmd(opts: {
   sql: string;
   json?: boolean;
   summary?: boolean;
+  changedSince?: string | undefined;
 }): Promise<void> {
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
     initCodemap(resolveCodemapConfig(opts.root, user));
     configureResolver(getProjectRoot(), getTsconfigPath());
+
+    let changedFiles: Set<string> | undefined;
+    if (opts.changedSince !== undefined) {
+      const result = getFilesChangedSince(opts.changedSince, getProjectRoot());
+      if (!result.ok) {
+        if (opts.json) {
+          console.log(JSON.stringify({ error: result.error }));
+        } else {
+          console.error(result.error);
+        }
+        process.exitCode = 1;
+        return;
+      }
+      changedFiles = result.files;
+    }
+
     const code = printQueryResult(opts.sql, {
       json: opts.json,
       summary: opts.summary,
+      changedFiles,
     });
     if (code !== 0) process.exitCode = code;
   } catch (err) {
