@@ -45,9 +45,12 @@ Default: the user names a surface (e.g. "sweep `docs/research/`"). If they say "
 ### 1. Enumerate the surface
 
 ```bash
-find docs -name '*.md' -type f          # Tier B
-find .agents/rules .agents/skills -name '*.md' -type f   # Tier 0
+find docs -name '*.md' -type f                                # Tier B
+find .agents/rules .agents/skills -name '*.md' -type f        # Tier 0 (source-of-truth rules + skills)
+find templates/agents -name '*.md' -type f                    # Tier 0 (bundled npm templates — separate authoring surface)
 ```
+
+`.cursor/` is intentionally excluded — it's symlinks back to `.agents/` per [`agents-first-convention`](../../rules/agents-first-convention.md), so sweeping it would double-count. `scripts/` is .ts only (no docs to sweep). If either grows tracked `.md` files in the future, add them here.
 
 Map each file to one of the 5 lifecycle types per [docs-governance § 1](../docs-governance/SKILL.md#1-five-lifecycle-types). If a file fits no type, that itself is a finding (rogue doc — fold + delete).
 
@@ -116,4 +119,3 @@ If the user wants a durable record, promote it to a one-time entry in `roadmap.m
 - [`docs-governance` rule](../../rules/docs-governance.md) — Tier-2 priming on every doc-touching edit.
 - [`audit-pr-architecture`](../audit-pr-architecture/SKILL.md) — natural caller; closes audits and triggers a sweep on the surrounding `audits/` folder.
 - [`agents-tier-system`](../../rules/agents-tier-system.md) — applies when sweeping Tier 0 (`.agents/rules/`, `.agents/skills/`).
-- Adapted from `PaySpace/merchant-dashboard-v2` `.agents/skills/docs-lifecycle-sweep/SKILL.md` (2026-04). Trimmed to codemap's actual surfaces (Tier B + Tier 0); examples updated for codemap paths.

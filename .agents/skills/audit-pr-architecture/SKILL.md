@@ -25,7 +25,7 @@ User intent (any of these phrases is enough):
 
 Also fire **proactively** when:
 
-- A PR moves ≥5 files between top-level `src/` modules (e.g. `src/cli/` → `src/application/`, `src/parsers/` → `src/adapters/`).
+- A PR moves ≥5 files between top-level `src/` modules (e.g. `src/cli/` → `src/application/`, or any sibling-folder migration).
 - A PR introduces a new `src/<X>/` subfolder.
 - A PR closes a structural STOP signal (so the closure is recorded with evidence).
 
@@ -38,7 +38,7 @@ bun run codemap   # or: codemap (from outside the repo)
 git diff --name-status origin/main...HEAD
 ```
 
-Note: the affected source modules (`src/cli/`, `src/application/`, `src/adapters/`, `src/parsers/`, `src/db.ts`, etc.), the PR's intent commit (the lift / extract / share), and the surrounding subtrees.
+Note: the affected source modules (re-derive the live set from `docs/architecture.md` § Layering — today's layers include `src/cli/`, `src/application/`, `src/adapters/`, `src/db.ts`, plus runtime / config / parser modules), the PR's intent commit (the lift / extract / share), and the surrounding subtrees.
 
 ### 2. Derive the boundary-leak SQL kit from the repo's own architecture
 
@@ -84,7 +84,7 @@ Each query should return `[]`. Non-empty = **boundary regression**, primary find
 
 #### Shape examples (don't depend on specific audit filenames)
 
-Codemap's `docs/architecture.md` declares a layering: `src/cli/` (entry), `src/application/` (orchestration), `src/adapters/` (per-language extraction), `src/parsers/` (CSS / TS), `src/db.ts` (SQLite), `src/index.ts` (programmatic API). That shape maps to roughly **3–4 forbidden-edge queries** (e.g. `parsers/ ↛ cli/`, `db.ts ↛ adapters/`, `adapters/ ↛ application/` direction, `cli/ ↛ db.ts` direction) **+ 1 primitive-layer query** (whatever stays as the most-leaf module). Derive from `architecture.md` — don't invent.
+Read [`docs/architecture.md` § Layering](../../../docs/architecture.md#layering) and derive forbidden-edge queries from the layers it actually declares (today: `cli/`, `api.ts`, `application/`, `adapters/`, plus runtime / config / db modules — re-check before deriving since the table evolves). Each one-directional layering relationship maps to one forbidden-edge query; each pair of mutually-isolated subtrees maps to one symmetric query. **Hypothetical illustrations** (not constraints declared by `architecture.md`): `adapters/ ↛ cli/`, `db.ts ↛ application/`. Re-derive from the live layering table — don't paste these examples in.
 
 For a re-runnable kit, find the most recent open or recently-closed audit under `docs/audits/` and copy its § Boundary verification block. **Don't cite a specific audit file by name from this skill** — audits are mortal under [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md), and naming one couples this skill's durability to its lifecycle.
 
@@ -113,13 +113,13 @@ The thresholds (≥40 / ≥3) are **seed values** from fallow's own calibration.
 
 Walk a STOP-signal table appropriate to codemap. The default set:
 
-| Signal                                                                                       | Verdict                                                                                                                                                                                                                                 |
-| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Adding a new top-level `src/<X>/` folder**                                                 | Did the PR confirm the folder has a planned public surface (an `index.ts` barrel re-exporting only the consumed bits) and isn't a horizontal `services/` + `utils/` + `types/` split? If not, propose a fix.                            |
-| **Cross-module import that crosses a layer** (e.g. `src/parsers/` importing from `src/cli/`) | Per `docs/architecture.md` § Layering — usually a regression. Query is the §-2 forbidden-edge SQL.                                                                                                                                      |
-| **New shared utility under `src/utils/`** projected to have **3+ consumers**                 | Shared modules are the most expensive-to-move once adopted. Propose 2–3 alternative interfaces in the findings doc; don't just accept the one shipped.                                                                                  |
-| **A folder grows past ~15 files** without an `index.ts` public surface                       | Either splitting or a barrel. Document which the PR took, or flag if it took neither.                                                                                                                                                   |
-| **Moving files across module boundaries** (out of `src/parsers/` into `src/adapters/`, etc.) | The "frame the problem space" step exists for this — what's the new owner, what's the contract, who else needs to know. If the PR moved files without that framing, propose a one-paragraph rationale lift into `docs/architecture.md`. |
+| Signal                                                                                              | Verdict                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Adding a new top-level `src/<X>/` folder**                                                        | Did the PR confirm the folder has a planned public surface (an `index.ts` barrel re-exporting only the consumed bits) and isn't a horizontal `services/` + `utils/` + `types/` split? If not, propose a fix.                            |
+| **Cross-module import that crosses a layer** (e.g. `src/adapters/` importing from `src/cli/`)       | Per `docs/architecture.md` § Layering — usually a regression. Query is the §-2 forbidden-edge SQL.                                                                                                                                      |
+| **New shared utility under `src/utils/`** projected to have **3+ consumers**                        | Shared modules are the most expensive-to-move once adopted. Propose 2–3 alternative interfaces in the findings doc; don't just accept the one shipped.                                                                                  |
+| **A folder grows past ~15 files** without an `index.ts` public surface                              | Either splitting or a barrel. Document which the PR took, or flag if it took neither.                                                                                                                                                   |
+| **Moving files across module boundaries** (e.g. into or out of `src/adapters/`, `src/application/`) | The "frame the problem space" step exists for this — what's the new owner, what's the contract, who else needs to know. If the PR moved files without that framing, propose a one-paragraph rationale lift into `docs/architecture.md`. |
 
 For each signal: did this PR trigger it? If yes, did the PR address it correctly? If a signal was triggered and missed, that's a finding.
 
@@ -214,4 +214,3 @@ Once findings are shipped (or deferred to `roadmap.md`):
 - [`codemap`](../codemap/SKILL.md) — query patterns; the boundary-leak kit lives in § 2 here.
 - [`docs/architecture.md`](../../../docs/architecture.md) — the canonical source of codemap's layering; every audit derives its boundary kit from this file.
 - [fallow](https://github.com/fallow-rs/fallow) — `bunx fallow audit --base origin/main` thresholds.
-- Adapted from `PaySpace/merchant-dashboard-v2` `.agents/skills/audit-pr-architecture/SKILL.md` (2026-04). Trimmed to codemap's stack (no React-feature concerns); STOP-signal table re-derived for codemap's `src/` shape.

@@ -43,5 +43,3 @@ Related:
 
 - [`agents-tier-system`](./agents-tier-system.md) — the framework that justified pairing this skill with a rule (skill has hard "never" clauses → deserves a rule).
 - [`docs-governance`](./docs-governance.md) — fact-checking comments about docs uses the same lifecycle / cross-ref discipline (Rule 7 anchor preservation, etc.).
-
-Adapted from `PaySpace/merchant-dashboard-v2` `.agents/rules/pr-comment-fact-check.md` (2026-04). The "Why this is Tier 1" rationale and trigger phrases are universal; references trimmed to codemap's actual rule set (no `architecture-priming` rule here).

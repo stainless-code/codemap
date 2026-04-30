@@ -229,4 +229,3 @@ If you find yourself copying sections from this skill into a per-surface README,
 - [`agents-first-convention`](../../rules/agents-first-convention.md) — file-layout discipline (`.agents/` source of truth, `.cursor/` symlinks).
 - [`agents-tier-system`](../../rules/agents-tier-system.md) — rules vs skills, when each tier applies.
 - [`docs/README.md`](../../../docs/README.md) — the canonical Rules + ownership table this skill describes the framework around.
-- Adapted from `PaySpace/merchant-dashboard-v2` `.agents/skills/docs-governance/SKILL.md` (2026-04). Trimmed to codemap's surface (Tier B + Tier 0 only); Tier C / Tier A omitted with a note in § Surface tiers explaining when they'd be added.

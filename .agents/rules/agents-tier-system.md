@@ -28,7 +28,6 @@ Genuinely cross-cutting. Apply to every turn regardless of file:
 - `codemap` — STOP-before-grep
 - `concise-comments` — sweep your own new comments before reporting
 - `concise-reporting` — extreme concision in agent reports
-- `docs-governance` — Tier-2 priming layer for the docs framework (see § Reference)
 - `lessons` — read at session start, append after corrections
 - `no-bypass-hooks` — never `--no-verify` on `git commit`
 - `pr-comment-fact-check` — fires the fact-check skill on PR-comment intent triggers
@@ -42,7 +41,10 @@ Glob-attached. Each is a thin priming layer (~30–50 lines: top-N principles + 
 
 Skills get a paired Tier-2 rule when they have **always-on principles** that should fire whenever the relevant files are in scope (e.g. when codemap grows a TS-specific style rule, it would attach to `**/*.{ts,tsx}`).
 
-Today, `agents-tier-system` (this rule) is the only Tier-2 rule — it auto-attaches when authoring under `.agents/**` or `.cursor/**`.
+Today's Tier-2 rules:
+
+- `agents-tier-system` (this rule) — auto-attaches when authoring under `.agents/**` or `.cursor/**`.
+- `docs-governance` — primes the docs framework when authoring under `docs/**` or `.agents/**` (paired with [`docs-governance` skill](../skills/docs-governance/SKILL.md)).
 
 ### Tier 3 — Discoverable skills (no rule)
 
@@ -91,4 +93,3 @@ When reviewing an existing rule:
 
 - File-layout convention: [`agents-first-convention.md`](./agents-first-convention.md).
 - The docs-governance pair this tier system was first applied to in this repo: [`docs-governance.md` rule](./docs-governance.md) (Tier-2 priming) + [`docs-governance` skill](../skills/docs-governance/SKILL.md) (deep reference).
-- Adapted from `PaySpace/merchant-dashboard-v2` `.agents/rules/agents-tier-system.md` (2026-04). Tier-1 examples re-listed for codemap's actual rules; Tier-2 / Tier-3 sections trimmed to codemap's actual surfaces.
