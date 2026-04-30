@@ -4,6 +4,7 @@ import { getFilesChangedSince } from "../git-changed";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import {
+  getQueryRecipeActions,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
@@ -23,6 +24,7 @@ export function parseQueryRest(rest: string[]):
       json: boolean;
       summary: boolean;
       changedSince: string | undefined;
+      recipeId: string | undefined;
     }
   | { kind: "recipesCatalog" }
   | { kind: "printRecipeSql"; id: string } {
@@ -165,7 +167,7 @@ export function parseQueryRest(rest: string[]):
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    return { kind: "run", sql, json, summary, changedSince };
+    return { kind: "run", sql, json, summary, changedSince, recipeId };
   }
 
   const sql = rest.slice(i).join(" ").trim();
@@ -176,7 +178,14 @@ export function parseQueryRest(rest: string[]):
         'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
     };
   }
-  return { kind: "run", sql, json, summary, changedSince };
+  return {
+    kind: "run",
+    sql,
+    json,
+    summary,
+    changedSince,
+    recipeId: undefined,
+  };
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -270,6 +279,7 @@ export async function runQueryCmd(opts: {
   json?: boolean;
   summary?: boolean;
   changedSince?: string | undefined;
+  recipeId?: string | undefined;
 }): Promise<void> {
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
@@ -291,10 +301,16 @@ export async function runQueryCmd(opts: {
       changedFiles = result.files;
     }
 
+    const recipeActions =
+      opts.recipeId !== undefined
+        ? getQueryRecipeActions(opts.recipeId)
+        : undefined;
+
     const code = printQueryResult(opts.sql, {
       json: opts.json,
       summary: opts.summary,
       changedFiles,
+      recipeActions,
     });
     if (code !== 0) process.exitCode = code;
   } catch (err) {

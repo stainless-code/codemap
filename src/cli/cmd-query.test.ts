@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
 import { parseQueryRest } from "./cmd-query";
-import { getQueryRecipeSql, listQueryRecipeCatalog } from "./query-recipes";
+import {
+  getQueryRecipeActions,
+  getQueryRecipeSql,
+  listQueryRecipeCatalog,
+} from "./query-recipes";
 
 describe("parseQueryRest", () => {
   it("errors when only query", () => {
@@ -23,6 +27,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: false,
       changedSince: undefined,
+      recipeId: undefined,
     });
   });
 
@@ -34,6 +39,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: false,
       changedSince: undefined,
+      recipeId: undefined,
     });
   });
 
@@ -45,6 +51,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: true,
       changedSince: undefined,
+      recipeId: undefined,
     });
   });
 
@@ -56,6 +63,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: true,
       changedSince: undefined,
+      recipeId: undefined,
     });
   });
 
@@ -69,6 +77,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: true,
       changedSince: undefined,
+      recipeId: "fan-out",
     });
   });
 
@@ -85,6 +94,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: false,
       changedSince: "origin/main",
+      recipeId: undefined,
     });
   });
 
@@ -105,6 +115,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: false,
       changedSince: "HEAD~3",
+      recipeId: "fan-out",
     });
   });
 
@@ -147,6 +158,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: false,
       changedSince: undefined,
+      recipeId: "fan-out-sample-json",
     });
   });
 
@@ -160,6 +172,7 @@ describe("parseQueryRest", () => {
       json: false,
       summary: false,
       changedSince: undefined,
+      recipeId: "fan-out",
     });
   });
 
@@ -173,6 +186,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: false,
       changedSince: undefined,
+      recipeId: "fan-out-sample",
     });
   });
 
@@ -186,6 +200,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: false,
       changedSince: undefined,
+      recipeId: "fan-out",
     });
   });
 
@@ -199,6 +214,7 @@ describe("parseQueryRest", () => {
       json: true,
       summary: false,
       changedSince: undefined,
+      recipeId: "fan-out",
     });
   });
 
@@ -286,5 +302,40 @@ describe("listQueryRecipeCatalog", () => {
       expect(getQueryRecipeSql(row.id)).toBe(row.sql);
       expect(row.description.length).toBeGreaterThan(0);
     }
+  });
+
+  it("includes actions templates on recipes that define them", () => {
+    const cat = listQueryRecipeCatalog();
+    const fanOut = cat.find((r) => r.id === "fan-out");
+    expect(fanOut?.actions).toBeDefined();
+    expect(fanOut?.actions?.[0]).toMatchObject({ type: "review-coupling" });
+
+    const deprecated = cat.find((r) => r.id === "deprecated-symbols");
+    expect(deprecated?.actions?.[0]).toMatchObject({ type: "flag-caller" });
+  });
+
+  it("omits actions when the recipe doesn't define them", () => {
+    const cat = listQueryRecipeCatalog();
+    const indexSummary = cat.find((r) => r.id === "index-summary");
+    expect(indexSummary).toBeDefined();
+    expect(indexSummary?.actions).toBeUndefined();
+  });
+});
+
+describe("getQueryRecipeActions", () => {
+  it("returns the action template for a recipe with actions", () => {
+    const actions = getQueryRecipeActions("barrel-files");
+    expect(actions).toBeDefined();
+    expect(actions?.[0]?.type).toBe("split-barrel");
+    expect(actions?.[0]?.description).toMatch(/barrel/i);
+  });
+
+  it("returns undefined for recipes without actions", () => {
+    expect(getQueryRecipeActions("index-summary")).toBeUndefined();
+    expect(getQueryRecipeActions("markers-by-kind")).toBeUndefined();
+  });
+
+  it("returns undefined for unknown recipes", () => {
+    expect(getQueryRecipeActions("nope-not-real")).toBeUndefined();
   });
 });

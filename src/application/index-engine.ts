@@ -536,6 +536,10 @@ export async function targetedReindex(
  * (`path`, `file_path`, `from_path`, `to_path`, `resolved_path`) match at least one entry.
  * Rows with no recognised path column pass through (the filter cannot decide; pair with `--summary`
  * if the count of changed-touching rows is what's wanted).
+ *
+ * When `opts.recipeActions` is provided AND `opts.json` is true, each row gets an `actions`
+ * key set to the same template (recipe-only feature; ad-hoc SQL never carries actions).
+ * Rows that already define their own `actions` column are not overwritten.
  * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
@@ -544,11 +548,13 @@ export function printQueryResult(
     json?: boolean;
     summary?: boolean;
     changedFiles?: Set<string> | undefined;
+    recipeActions?: ReadonlyArray<unknown> | undefined;
   },
 ): number {
   const json = opts?.json === true;
   const summary = opts?.summary === true;
   const changedFiles = opts?.changedFiles;
+  const recipeActions = opts?.recipeActions;
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
@@ -563,7 +569,11 @@ export function printQueryResult(
         console.log(`count: ${rows.length}`);
       }
     } else if (json) {
-      console.log(JSON.stringify(rows));
+      const enriched =
+        recipeActions !== undefined && recipeActions.length > 0
+          ? rows.map((row) => attachRecipeActions(row, recipeActions))
+          : rows;
+      console.log(JSON.stringify(enriched));
     } else if (rows.length === 0) {
       console.log("(no results)");
     } else {
@@ -583,6 +593,19 @@ export function printQueryResult(
   } finally {
     if (db !== undefined) closeDb(db, { readonly: true });
   }
+}
+
+// Append the recipe's action template to a row without overwriting a pre-existing
+// `actions` column from the SQL itself (recipe authors should never collide, but
+// defensive: keep the SQL output authoritative).
+function attachRecipeActions(
+  row: unknown,
+  actions: ReadonlyArray<unknown>,
+): unknown {
+  if (typeof row !== "object" || row === null) return row;
+  const obj = row as Record<string, unknown>;
+  if ("actions" in obj) return obj;
+  return { ...obj, actions };
 }
 
 /**

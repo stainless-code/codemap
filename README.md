@@ -81,6 +81,8 @@ codemap query --json --summary -r deprecated-symbols
 # PR-scoped: filter result rows to those touching files changed since <ref>
 codemap query --json --changed-since origin/main -r fan-out
 codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM symbols"
+# Recipes append per-row "actions" hints (kebab-case verb + description) in --json output;
+# ad-hoc SQL never carries actions. Inspect a recipe's actions via --recipes-json.
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out
