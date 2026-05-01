@@ -61,12 +61,10 @@ export interface LoadRecipesOpts {
  */
 export function loadAllRecipes(opts: LoadRecipesOpts): LoadedRecipe[] {
   const bundled = readRecipesFromDir(opts.bundledDir, "bundled");
-
-  // Tracer 1: project loader is a stub. Tracer 3 implements it + the
-  // shadow-flag merge logic (project wins; sets shadows: true when
-  // an id matches a bundled recipe).
-  const project: LoadedRecipe[] = [];
-
+  const project =
+    opts.projectDir !== undefined
+      ? readRecipesFromDir(opts.projectDir, "project")
+      : [];
   return mergeRecipes(bundled, project);
 }
 

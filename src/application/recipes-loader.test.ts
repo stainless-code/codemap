@@ -170,25 +170,54 @@ describe("mergeRecipes", () => {
   });
 });
 
-describe("loadAllRecipes (Tracer 1 — bundled-only path)", () => {
-  it("loads bundled, ignores projectDir stub", () => {
-    const dir = makeRecipeDir("bundled-stub");
+describe("loadAllRecipes — bundled + project composition", () => {
+  it("loads bundled-only when projectDir is undefined", () => {
+    const dir = makeRecipeDir("bundled-only");
     writeFileSync(join(dir, "fan-out.sql"), "SELECT 1\n");
     const r = loadAllRecipes({ bundledDir: dir, projectDir: undefined });
     expect(r).toHaveLength(1);
     expect(r[0]!.source).toBe("bundled");
   });
 
-  it("ignores a projectDir argument in Tracer 1 (project loader stubbed)", () => {
+  it("loads bundled + project, sorted by id", () => {
     const bundledDir = makeRecipeDir("bundled");
     const projectDir = makeRecipeDir("project");
-    writeFileSync(join(bundledDir, "x.sql"), "SELECT 1\n");
+    writeFileSync(join(bundledDir, "fan-out.sql"), "SELECT 1\n");
     writeFileSync(
-      join(projectDir, "y.sql"),
-      "SELECT 2\n",
-      // Will load in Tracer 3; for now project recipes are silently dropped.
+      join(projectDir, "internal-flaky-tests.sql"),
+      "SELECT path FROM files\n",
     );
     const r = loadAllRecipes({ bundledDir, projectDir });
-    expect(r.map((x) => x.id)).toEqual(["x"]);
+    expect(r.map((x) => `${x.id}:${x.source}`)).toEqual([
+      "fan-out:bundled",
+      "internal-flaky-tests:project",
+    ]);
+  });
+
+  it("project recipe shadows bundled with same id (project wins, shadows: true)", () => {
+    const bundledDir = makeRecipeDir("bundled-shadowed");
+    const projectDir = makeRecipeDir("project-shadowing");
+    writeFileSync(join(bundledDir, "fan-out.sql"), "SELECT 1\n");
+    writeFileSync(
+      join(projectDir, "fan-out.sql"),
+      "SELECT 'project version'\n",
+    );
+    const r = loadAllRecipes({ bundledDir, projectDir });
+    expect(r).toHaveLength(1);
+    const recipe = r[0]!;
+    expect(recipe.source).toBe("project");
+    expect(recipe.shadows).toBe(true);
+    expect(recipe.sql).toContain("project version");
+  });
+
+  it("missing .codemap/recipes/ directory is not an error", () => {
+    const bundledDir = makeRecipeDir("bundled");
+    writeFileSync(join(bundledDir, "x.sql"), "SELECT 1\n");
+    const r = loadAllRecipes({
+      bundledDir,
+      projectDir: join(workDir, "does-not-exist"),
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]!.source).toBe("bundled");
   });
 });

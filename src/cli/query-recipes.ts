@@ -1,8 +1,10 @@
+import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadAllRecipes } from "../application/recipes-loader";
 import type { LoadedRecipe } from "../application/recipes-loader";
+import { getProjectRoot } from "../runtime";
 
 export type { RecipeAction } from "../application/recipes-loader";
 import type { RecipeAction } from "../application/recipes-loader";
@@ -36,6 +38,20 @@ export function resolveBundledRecipesDir(): string {
     "templates",
     "recipes",
   );
+}
+
+/**
+ * Returns `<projectRoot>/.codemap/recipes/` if it exists as a directory,
+ * else `undefined`. Per plan §9 Q-C, root-only — no walk-up; same root
+ * the CLI's `--root` / `CODEMAP_ROOT` resolves to.
+ */
+export function resolveProjectRecipesDir(
+  projectRoot: string,
+): string | undefined {
+  const dir = join(projectRoot, ".codemap", "recipes");
+  if (!existsSync(dir)) return undefined;
+  if (!statSync(dir).isDirectory()) return undefined;
+  return dir;
 }
 
 /**
@@ -96,24 +112,39 @@ const BUNDLED_RECIPE_ACTIONS: Record<string, RecipeAction[]> = {
 /**
  * Module-cached registry — populated lazily on first access (loader is pure;
  * the cache means we pay the filesystem read once per process lifetime per
- * plan §9 Q-B). Project recipes (Tracer 3) will wire `projectDir` here once
- * the bootstrap layer can pass it in.
+ * plan §9 Q-B). Cache key includes `projectDir` so that a process running
+ * against multiple roots (test fixtures, multi-root MCP sessions later)
+ * re-resolves when the root changes.
  */
 let cachedRegistry: LoadedRecipe[] | undefined;
+let cachedRegistryProjectDir: string | undefined;
 
 function getRegistry(): LoadedRecipe[] {
-  if (cachedRegistry === undefined) {
-    cachedRegistry = loadAllRecipes({
-      bundledDir: resolveBundledRecipesDir(),
-      projectDir: undefined,
-    }).map((r) => ({
-      ...r,
-      // Stitch in the bundled actions map until Tracer 5 lifts them into
-      // frontmatter on each `.md` file.
-      actions:
-        r.source === "bundled" ? BUNDLED_RECIPE_ACTIONS[r.id] : r.actions,
-    }));
+  // `getProjectRoot()` throws if `initCodemap()` hasn't run; that only
+  // happens for direct unit tests of this module pre-bootstrap. Treat
+  // that as "no project recipes" — bundled-only registry.
+  let projectDir: string | undefined;
+  try {
+    projectDir = resolveProjectRecipesDir(getProjectRoot());
+  } catch {
+    projectDir = undefined;
   }
+
+  if (cachedRegistry !== undefined && cachedRegistryProjectDir === projectDir) {
+    return cachedRegistry;
+  }
+
+  cachedRegistry = loadAllRecipes({
+    bundledDir: resolveBundledRecipesDir(),
+    projectDir,
+  }).map((r) => ({
+    ...r,
+    // Stitch in the bundled actions map until Tracer 5 lifts them into
+    // frontmatter on each `.md` file. Project recipes get `actions: undefined`
+    // until Tracer 5 plugs the YAML frontmatter parser.
+    actions: r.source === "bundled" ? BUNDLED_RECIPE_ACTIONS[r.id] : r.actions,
+  }));
+  cachedRegistryProjectDir = projectDir;
   return cachedRegistry;
 }
 
@@ -122,6 +153,7 @@ function getRegistry(): LoadedRecipe[] {
  */
 export function _resetRecipesCacheForTests(): void {
   cachedRegistry = undefined;
+  cachedRegistryProjectDir = undefined;
 }
 
 /**
