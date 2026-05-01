@@ -206,11 +206,10 @@ Estimated total: ~1 day across ~6 commits.
 
 ### Settled
 
-_None yet._
+- **Q-A. Storage layout for bundled recipes?** ✅ **(i) `templates/recipes/<id>.{sql,md}` file-pair.** Uniformity with project recipes wins: one loader code path (no `if (source === "bundled")` branches), `.sql` files get SQLite syntax highlighting in every editor (today's `QUERY_RECIPES` template literals get none), single-file diffs for SQL changes, and `sqlite3 .codemap.db ".read …"` works for ad-hoc testing. Migration cost is one-time (~15 entries → ~15 `.sql` files); the shim layer in `cli/query-recipes.ts` preserves backwards-compat for `getQueryRecipeSql` / `getQueryRecipeActions` / `QUERY_RECIPES` re-exports. Rejected (ii) "code-map + sibling .md only" — smaller initial diff but two storage shapes that compound debt every time the recipe surface evolves.
 
 ### Still open
 
-- **Q-A. Storage layout for bundled recipes.** Two options: (i) `templates/recipes/<id>.{sql,md}` (proposed in § 3.1) — uniform with project layout, simpler loader. (ii) Keep `QUERY_RECIPES` as code, add `templates/recipes/<id>.md` only for descriptions — less file churn but two storage shapes to maintain. Bias toward (i) — uniformity wins.
 - **Q-B. Loading time.** Eager (load at every CLI invocation, ~10ms) vs lazy (on first `--recipe <id>` / `--recipes-json` / `codemap://recipes` access). Eager is simpler; lazy saves cycles on `codemap query "<SQL>"` invocations that never touch a recipe. Bias toward eager — startup cost is ms-scale and the simplicity of "registry is always populated" pays for itself.
 - **Q-C. Project recipes — discovery walk-up?** Today `.codemap.db` is created in the project root only. Should `.codemap/recipes/` also be project-root-only, OR walk up like `.git` does (find nearest ancestor `.codemap/recipes/` directory)? Walk-up matches monorepo intuition; root-only matches everything else codemap does today.
 - **Q-D. `actions` for project-local recipes — and how specified?** Three options: (i) skip for v1 (project recipes can't have actions; bundled-only feature). (ii) YAML frontmatter on `<id>.md` (one parser dependency, e.g. `gray-matter` or hand-rolled). (iii) Sibling `<id>.actions.json` file (no parser; another file per recipe). (i) keeps v1 lean; (ii) is most ergonomic for recipe authors; (iii) is the "no new dep" middle ground.
