@@ -10,18 +10,27 @@ export type { RecipeAction } from "../application/recipes-loader";
 import type { RecipeAction } from "../application/recipes-loader";
 
 /**
- * One bundled recipe: id, human description, SQL, and optional per-row actions
- * (canonical source for CLI, `--recipes-json`, and the JSON output enrichment).
+ * Catalog entry surfaced to `--recipes-json`, the `codemap://recipes` MCP
+ * resource, and the per-id `codemap://recipes/{id}` lookup. Backwards-compat
+ * shape with three extensions added in Tracer 4:
  *
- * NOTE: Kept for backwards-compat with callers that destructure the legacy
- * shape. `LoadedRecipe` (from `application/recipes-loader`) is the new
- * canonical type — has `body`, `source`, `shadows` in addition.
+ * - **`body`** — full Markdown body of the sibling `<id>.md` (when present);
+ *   description is the first non-empty line of that body.
+ * - **`source`** — `"bundled"` (ships with the npm package) or `"project"`
+ *   (loaded from `<projectRoot>/.codemap/recipes/`).
+ * - **`shadows`** — `true` when a project recipe overrides a bundled recipe
+ *   of the same id (per plan §9 Q-E — agents read this at session start to
+ *   know when a recipe behaves differently from the documented bundled
+ *   version). Absent / `false` for non-shadowing entries.
  */
 export interface QueryRecipeCatalogEntry {
   id: string;
   description: string;
+  body?: string;
   sql: string;
   actions?: RecipeAction[];
+  source: "bundled" | "project";
+  shadows?: boolean;
 }
 
 /**
@@ -206,22 +215,38 @@ export function listQueryRecipeIds(): string[] {
 }
 
 /**
- * Full catalog for **`codemap query --recipes-json`**.
- *
- * Tracer 2 returns the legacy shape (id / description / sql / actions?).
- * Tracer 4 will extend the catalog payload to include `body`, `source`,
- * and `shadows` from the {@link LoadedRecipe} shape.
+ * Full catalog for **`codemap query --recipes-json`** and the
+ * `codemap://recipes` MCP resource. Per Tracer 4, includes `body`,
+ * `source`, and `shadows` fields on each entry.
  */
 export function listQueryRecipeCatalog(): QueryRecipeCatalogEntry[] {
-  return getRegistry().map((r) => {
-    const entry: QueryRecipeCatalogEntry = {
-      id: r.id,
-      description: r.description ?? r.id,
-      sql: r.sql,
-    };
-    if (r.actions !== undefined) entry.actions = r.actions;
-    return entry;
-  });
+  return getRegistry().map((r) => buildCatalogEntry(r));
+}
+
+/**
+ * Single-entry lookup for the `codemap://recipes/{id}` MCP resource and any
+ * future `--recipe-json <id>` CLI shape. Returns `undefined` for unknown
+ * ids; otherwise the same {@link QueryRecipeCatalogEntry} shape as the
+ * full-catalog listing.
+ */
+export function getQueryRecipeCatalogEntry(
+  id: string,
+): QueryRecipeCatalogEntry | undefined {
+  const recipe = getRegistry().find((r) => r.id === id);
+  return recipe === undefined ? undefined : buildCatalogEntry(recipe);
+}
+
+function buildCatalogEntry(r: LoadedRecipe): QueryRecipeCatalogEntry {
+  const entry: QueryRecipeCatalogEntry = {
+    id: r.id,
+    description: r.description ?? r.id,
+    sql: r.sql,
+    source: r.source,
+  };
+  if (r.body !== undefined) entry.body = r.body;
+  if (r.actions !== undefined) entry.actions = r.actions;
+  if (r.shadows) entry.shadows = true;
+  return entry;
 }
 
 /**

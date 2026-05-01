@@ -8,6 +8,7 @@ import { initCodemap } from "../runtime";
 import {
   _resetRecipesCacheForTests,
   getQueryRecipeActions,
+  getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
@@ -95,5 +96,56 @@ describe("query-recipes shim — project recipes via runtime root", () => {
     const ids = catalog.map((c) => c.id);
     expect(ids).toContain("owner-fanout");
     expect(ids).toContain("fan-out");
+  });
+});
+
+describe("query-recipes shim — catalog source / shadows / body fields (Tracer 4)", () => {
+  it("bundled entries carry source: 'bundled' and no shadows flag", () => {
+    const fanOut = listQueryRecipeCatalog().find((c) => c.id === "fan-out");
+    expect(fanOut?.source).toBe("bundled");
+    expect(fanOut?.shadows).toBeUndefined();
+  });
+
+  it("bundled entries carry body when sibling .md exists", () => {
+    const fanOut = listQueryRecipeCatalog().find((c) => c.id === "fan-out");
+    expect(fanOut?.body).toBeDefined();
+    expect(fanOut?.body).toContain("Top 10 files by dependency fan-out");
+  });
+
+  it("project entries carry source: 'project' (no bundled clash → no shadows)", () => {
+    const recipesDir = join(projectRoot, ".codemap", "recipes");
+    mkdirSync(recipesDir, { recursive: true });
+    writeFileSync(join(recipesDir, "internal-fizz.sql"), "SELECT 1\n");
+    _resetRecipesCacheForTests();
+
+    const fizz = listQueryRecipeCatalog().find((c) => c.id === "internal-fizz");
+    expect(fizz?.source).toBe("project");
+    expect(fizz?.shadows).toBeUndefined();
+  });
+
+  it("project recipe shadowing bundled carries shadows: true", () => {
+    const recipesDir = join(projectRoot, ".codemap", "recipes");
+    mkdirSync(recipesDir, { recursive: true });
+    writeFileSync(
+      join(recipesDir, "fan-out.sql"),
+      "SELECT 'project override' AS marker\n",
+    );
+    _resetRecipesCacheForTests();
+
+    const fanOut = listQueryRecipeCatalog().find((c) => c.id === "fan-out");
+    expect(fanOut?.source).toBe("project");
+    expect(fanOut?.shadows).toBe(true);
+  });
+});
+
+describe("getQueryRecipeCatalogEntry (single-id lookup)", () => {
+  it("returns the same entry shape as listQueryRecipeCatalog for known id", () => {
+    const fromList = listQueryRecipeCatalog().find((c) => c.id === "fan-out");
+    const fromGet = getQueryRecipeCatalogEntry("fan-out");
+    expect(fromGet).toEqual(fromList);
+  });
+
+  it("returns undefined for unknown id", () => {
+    expect(getQueryRecipeCatalogEntry("no-such-recipe")).toBeUndefined();
   });
 });
