@@ -192,3 +192,77 @@ describe("MCP server — query_batch tool", () => {
     }
   });
 });
+
+describe("MCP server — query_recipe tool", () => {
+  it("lists query_recipe in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("query_recipe");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns isError for unknown recipe id", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "this-recipe-does-not-exist" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("this-recipe-does-not-exist"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("attaches per-row recipe actions to output rows", async () => {
+    // Seed a deprecated symbol so deprecated-symbols recipe returns it.
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated use newFn */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols" },
+      });
+      const json = readJson(r);
+      expect(Array.isArray(json)).toBe(true);
+      expect(json.length).toBeGreaterThan(0);
+      // Every row carries the recipe's actions template.
+      expect(json[0]).toMatchObject({
+        name: "oldFn",
+        actions: [{ type: "flag-caller" }],
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("composes summary flag with recipe", async () => {
+    const { client, server } = await makeClient();
+    try {
+      // No deprecated symbols seeded for this test instance — should yield {count: 0}.
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", summary: true },
+      });
+      expect(readJson(r)).toEqual({ count: 0 });
+    } finally {
+      await server.close();
+    }
+  });
+});

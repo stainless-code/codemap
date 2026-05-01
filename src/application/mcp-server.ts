@@ -2,6 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// Layer note: `query-recipes` lives in `src/cli/` because the CLI verb owns the
+// recipe catalog today. We import it here as a pure data registry (no execution
+// flow crosses cli → application). A future refactor may lift it to
+// `src/application/` once a second consumer (HTTP API) needs it.
+import { getQueryRecipeActions, getQueryRecipeSql } from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { getFilesChangedSince } from "../git-changed";
 import { GROUP_BY_MODES } from "../group-by";
@@ -95,6 +100,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
 
   registerQueryTool(server, opts);
   registerQueryBatchTool(server, opts);
+  registerQueryRecipeTool(server, opts);
 
   return server;
 }
@@ -124,6 +130,57 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
           summary: args.summary,
           changedFiles: changed as Set<string> | undefined,
           groupBy: args.group_by,
+          root: opts.root,
+        });
+        if (
+          payload !== null &&
+          typeof payload === "object" &&
+          !Array.isArray(payload) &&
+          "error" in payload
+        ) {
+          return jsonError(payload.error as string);
+        }
+        return jsonResult(payload);
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "query_recipe",
+    {
+      description:
+        "Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Compose with `summary` / `changed_since` / `group_by` exactly like `query`. List available recipes via the `codemap://recipes` resource.",
+      inputSchema: {
+        recipe: z.string().min(1, "recipe must be a non-empty string"),
+        summary: z.boolean().optional(),
+        changed_since: z.string().optional(),
+        group_by: groupByEnum.optional(),
+      },
+    },
+    (args) => {
+      try {
+        const sql = getQueryRecipeSql(args.recipe);
+        if (sql === undefined) {
+          return jsonError(
+            `codemap: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
+          );
+        }
+        const recipeActions = getQueryRecipeActions(args.recipe);
+        const resolveChanged = makeChangedFilesResolver(opts.root);
+        const changed = resolveChanged(args.changed_since);
+        if (changed && typeof changed === "object" && "error" in changed) {
+          return jsonError(changed.error);
+        }
+        const payload = executeQuery({
+          sql,
+          summary: args.summary,
+          changedFiles: changed as Set<string> | undefined,
+          groupBy: args.group_by,
+          recipeActions,
           root: opts.root,
         });
         if (
