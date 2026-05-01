@@ -1,5 +1,17 @@
-import { printQueryResult, queryRows } from "../application/index-engine";
+import {
+  getCurrentCommit,
+  printQueryResult,
+  queryRows,
+} from "../application/index-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
+import {
+  closeDb,
+  deleteQueryBaseline,
+  getQueryBaseline,
+  listQueryBaselines,
+  openDb,
+  upsertQueryBaseline,
+} from "../db";
 import { filterRowsByChangedFiles, getFilesChangedSince } from "../git-changed";
 import type { Bucketizer, GroupByMode } from "../group-by";
 import {
@@ -36,9 +48,13 @@ export function parseQueryRest(rest: string[]):
       changedSince: string | undefined;
       recipeId: string | undefined;
       groupBy: GroupByMode | undefined;
+      saveBaseline: string | true | undefined;
+      baseline: string | true | undefined;
     }
   | { kind: "recipesCatalog" }
-  | { kind: "printRecipeSql"; id: string } {
+  | { kind: "printRecipeSql"; id: string }
+  | { kind: "listBaselines"; json: boolean }
+  | { kind: "dropBaseline"; name: string; json: boolean } {
   if (rest[0] !== "query") {
     throw new Error("parseQueryRest: expected query");
   }
@@ -58,6 +74,10 @@ export function parseQueryRest(rest: string[]):
   let recipesJson = false;
   let printSqlId: string | undefined;
   let groupBy: GroupByMode | undefined;
+  let listBaselines = false;
+  let dropBaselineName: string | undefined;
+  let saveBaseline: string | true | undefined;
+  let baseline: string | true | undefined;
 
   while (i < rest.length) {
     const a = rest[i];
@@ -102,6 +122,74 @@ export function parseQueryRest(rest: string[]):
         };
       }
       groupBy = mode;
+      i += 2;
+      continue;
+    }
+    if (a === "--save-baseline" || a.startsWith("--save-baseline=")) {
+      const eq = a.indexOf("=");
+      if (eq !== -1) {
+        const v = a.slice(eq + 1);
+        if (!v) {
+          return {
+            kind: "error",
+            message:
+              'codemap: "--save-baseline=<name>" requires a non-empty name. Drop the "=" to use the recipe id as the default name.',
+          };
+        }
+        saveBaseline = v;
+        i++;
+        continue;
+      }
+      const next = rest[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        saveBaseline = next;
+        i += 2;
+        continue;
+      }
+      saveBaseline = true;
+      i++;
+      continue;
+    }
+    if (a === "--baseline" || a.startsWith("--baseline=")) {
+      const eq = a.indexOf("=");
+      if (eq !== -1) {
+        const v = a.slice(eq + 1);
+        if (!v) {
+          return {
+            kind: "error",
+            message:
+              'codemap: "--baseline=<name>" requires a non-empty name. Drop the "=" to use the recipe id as the default name.',
+          };
+        }
+        baseline = v;
+        i++;
+        continue;
+      }
+      const next = rest[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        baseline = next;
+        i += 2;
+        continue;
+      }
+      baseline = true;
+      i++;
+      continue;
+    }
+    if (a === "--baselines") {
+      listBaselines = true;
+      i++;
+      continue;
+    }
+    if (a === "--drop-baseline") {
+      const name = rest[i + 1];
+      if (name === undefined || name.startsWith("-")) {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--drop-baseline" requires a name. Example: codemap query --drop-baseline pre-refactor',
+        };
+      }
+      dropBaselineName = name;
       i += 2;
       continue;
     }
@@ -156,6 +244,65 @@ export function parseQueryRest(rest: string[]):
     return { kind: "recipesCatalog" };
   }
 
+  if (listBaselines) {
+    if (
+      recipeId !== undefined ||
+      printSqlId !== undefined ||
+      saveBaseline !== undefined ||
+      baseline !== undefined ||
+      dropBaselineName !== undefined ||
+      summary ||
+      changedSince !== undefined ||
+      groupBy !== undefined ||
+      i < rest.length
+    ) {
+      return {
+        kind: "error",
+        message:
+          "codemap: --baselines is a list-only operation; it does not take SQL or any other --recipe / --save-baseline / --baseline / --drop-baseline / --summary / --changed-since / --group-by flag.",
+      };
+    }
+    return { kind: "listBaselines", json };
+  }
+
+  if (dropBaselineName !== undefined) {
+    if (
+      recipeId !== undefined ||
+      printSqlId !== undefined ||
+      saveBaseline !== undefined ||
+      baseline !== undefined ||
+      summary ||
+      changedSince !== undefined ||
+      groupBy !== undefined ||
+      i < rest.length
+    ) {
+      return {
+        kind: "error",
+        message:
+          "codemap: --drop-baseline only takes a name; it does not compose with SQL or any other --recipe / --save-baseline / --baseline / --summary / --changed-since / --group-by flag.",
+      };
+    }
+    return { kind: "dropBaseline", name: dropBaselineName, json };
+  }
+
+  if (saveBaseline !== undefined && baseline !== undefined) {
+    return {
+      kind: "error",
+      message:
+        "codemap: --save-baseline and --baseline are mutually exclusive in one run.",
+    };
+  }
+  if (
+    groupBy !== undefined &&
+    (saveBaseline !== undefined || baseline !== undefined)
+  ) {
+    return {
+      kind: "error",
+      message:
+        "codemap: --group-by cannot be combined with --save-baseline or --baseline (different output shapes).",
+    };
+  }
+
   if (printSqlId !== undefined) {
     if (recipeId !== undefined) {
       return {
@@ -197,7 +344,17 @@ export function parseQueryRest(rest: string[]):
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    return { kind: "run", sql, json, summary, changedSince, recipeId, groupBy };
+    return {
+      kind: "run",
+      sql,
+      json,
+      summary,
+      changedSince,
+      recipeId,
+      groupBy,
+      saveBaseline,
+      baseline,
+    };
   }
 
   const sql = rest.slice(i).join(" ").trim();
@@ -205,7 +362,22 @@ export function parseQueryRest(rest: string[]):
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
+    };
+  }
+  // Ad-hoc SQL needs an explicit baseline name (no recipe id default).
+  if (saveBaseline === true) {
+    return {
+      kind: "error",
+      message:
+        'codemap: "--save-baseline" needs an explicit name when used without --recipe (recipe id is the default name otherwise). Use --save-baseline=<name>.',
+    };
+  }
+  if (baseline === true) {
+    return {
+      kind: "error",
+      message:
+        'codemap: "--baseline" needs an explicit name when used without --recipe. Use --baseline=<name>.',
     };
   }
   return {
@@ -216,6 +388,8 @@ export function parseQueryRest(rest: string[]):
     changedSince,
     recipeId: undefined,
     groupBy,
+    saveBaseline,
+    baseline,
   };
 }
 
@@ -250,10 +424,12 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>"
-       codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] --recipe <id>   (alias: -r)
+  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>"
+       codemap query [...] --recipe <id>   (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
+       codemap query --baselines
+       codemap query --drop-baseline <name>
 
 Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
@@ -263,6 +439,7 @@ Flags:
                           On error, prints a single object: {"error":"<message>"} to stdout.
   --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
                           With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
+                          With --baseline, collapses to {baseline, current_row_count, added: N, removed: N}.
                           Useful for dashboards and agent context windows where the rows are noise.
   --changed-since <ref>   Filter result rows to those touching files changed since <ref>. The ref can be
                           any committish (origin/main, HEAD~5, a sha, a tag). Rows are kept if any of
@@ -276,6 +453,19 @@ Flags:
                             directory First path segment (src/cli/foo.ts → src).
                             package   Workspace dir from package.json/workspaces or pnpm-workspace.yaml;
                                       out-of-workspace paths bucket to "<root>".
+  --save-baseline[=<name>]
+                          Snapshot the result rows to the query_baselines table inside .codemap.db
+                          for later --baseline diffs. Name defaults to the --recipe id; ad-hoc SQL
+                          must pass an explicit =<name>. Stores SQL, rows, row count, current git
+                          HEAD (when available), and a timestamp. Re-saving with the same name
+                          overwrites in place. Survives --full and SCHEMA_VERSION rebuilds.
+  --baseline[=<name>]     Diff the current result against the saved baseline of the same name.
+                          Output: {baseline:{...}, current_row_count, added: [...], removed: [...]}
+                          (with --json) or a two-section terminal dump. Set membership uses
+                          JSON.stringify(row) — exact-match identity, no fuzzy "changed" category.
+                          Recipe actions, when defined, attach to the added rows only.
+  --baselines             List saved baselines (name, recipe_id, row_count, git_ref, created_at).
+  --drop-baseline <name>  Delete a saved baseline. Exits 1 if the name doesn't exist.
   --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
   --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
   --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
@@ -307,6 +497,16 @@ Examples:
   codemap query --json --summary --group-by owner -r deprecated-symbols
   codemap query --json --summary --group-by package "SELECT file_path FROM symbols"
 
+  # Snapshot a result, refactor, then diff
+  codemap query --save-baseline -r visibility-tags          # save under name "visibility-tags"
+  # ... refactor ...
+  codemap query --json --baseline -r visibility-tags        # full diff
+  codemap query --json --summary --baseline -r visibility-tags   # counts only
+  codemap query --save-baseline=pre-refactor "SELECT name, file_path FROM symbols WHERE visibility = 'beta'"
+  codemap query --baseline=pre-refactor "SELECT name, file_path FROM symbols WHERE visibility = 'beta'"
+  codemap query --baselines                                 # list
+  codemap query --drop-baseline pre-refactor                # delete
+
   # Inspect recipes without touching the DB
   codemap query --recipes-json
   codemap query --print-sql fan-out
@@ -326,6 +526,8 @@ export async function runQueryCmd(opts: {
   changedSince?: string | undefined;
   recipeId?: string | undefined;
   groupBy?: GroupByMode | undefined;
+  saveBaseline?: string | true | undefined;
+  baseline?: string | true | undefined;
 }): Promise<void> {
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
@@ -347,6 +549,35 @@ export async function runQueryCmd(opts: {
         ? getQueryRecipeActions(opts.recipeId)
         : undefined;
 
+    // Baseline ops branch off here — they don't compose with --group-by because
+    // the diff semantics are about row identity, not bucketing. (--summary still
+    // composes: collapses the diff to {added: N, removed: N}.)
+    if (opts.saveBaseline !== undefined) {
+      runSaveBaseline({
+        sql: opts.sql,
+        json: opts.json === true,
+        recipeId: opts.recipeId,
+        baselineName:
+          opts.saveBaseline === true
+            ? (opts.recipeId as string)
+            : opts.saveBaseline,
+        changedFiles,
+      });
+      return;
+    }
+    if (opts.baseline !== undefined) {
+      runBaselineDiff({
+        sql: opts.sql,
+        json: opts.json === true,
+        summary: opts.summary === true,
+        baselineName:
+          opts.baseline === true ? (opts.recipeId as string) : opts.baseline,
+        changedFiles,
+        recipeActions,
+      });
+      return;
+    }
+
     if (opts.groupBy !== undefined) {
       runGroupedQuery({
         sql: opts.sql,
@@ -367,6 +598,70 @@ export async function runQueryCmd(opts: {
       recipeActions,
     });
     if (code !== 0) process.exitCode = code;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    emitErrorMaybeJson(msg, opts.json);
+  }
+}
+
+/** Bootstrap a DB connection and run the list-baselines command. */
+export async function runListBaselinesCmd(opts: {
+  root: string;
+  configFile: string | undefined;
+  json: boolean;
+}): Promise<void> {
+  try {
+    const user = await loadUserConfig(opts.root, opts.configFile);
+    initCodemap(resolveCodemapConfig(opts.root, user));
+    configureResolver(getProjectRoot(), getTsconfigPath());
+    const db = openDb();
+    try {
+      const rows = listQueryBaselines(db);
+      if (opts.json) {
+        console.log(JSON.stringify(rows));
+      } else if (rows.length === 0) {
+        console.log("(no baselines)");
+      } else {
+        console.table(rows);
+      }
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    emitErrorMaybeJson(msg, opts.json);
+  }
+}
+
+/** Bootstrap a DB connection and drop the named baseline; exits 1 on miss. */
+export async function runDropBaselineCmd(opts: {
+  root: string;
+  configFile: string | undefined;
+  name: string;
+  json: boolean;
+}): Promise<void> {
+  try {
+    const user = await loadUserConfig(opts.root, opts.configFile);
+    initCodemap(resolveCodemapConfig(opts.root, user));
+    configureResolver(getProjectRoot(), getTsconfigPath());
+    const db = openDb();
+    try {
+      const dropped = deleteQueryBaseline(db, opts.name);
+      if (!dropped) {
+        emitErrorMaybeJson(
+          `codemap: no baseline named "${opts.name}". Use --baselines to list saved baselines.`,
+          opts.json,
+        );
+        return;
+      }
+      if (opts.json) {
+        console.log(JSON.stringify({ dropped: opts.name }));
+      } else {
+        console.log(`Dropped baseline: ${opts.name}`);
+      }
+    } finally {
+      closeDb(db);
+    }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
@@ -472,4 +767,232 @@ function attachActionsForGrouped(
   const obj = row as Record<string, unknown>;
   if ("actions" in obj) return obj;
   return { ...obj, actions };
+}
+
+// `git rev-parse HEAD` may legitimately fail (no git, detached worktree, etc.).
+// Baselines just record git_ref = NULL in that case — no fatal error.
+function tryGetGitRef(): string | null {
+  try {
+    const sha = getCurrentCommit();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
+function runSaveBaseline(opts: {
+  sql: string;
+  json: boolean;
+  recipeId: string | undefined;
+  baselineName: string;
+  changedFiles: Set<string> | undefined;
+}) {
+  let rows: unknown[];
+  try {
+    rows = queryRows(opts.sql);
+  } catch (err) {
+    emitErrorMaybeJson(
+      err instanceof Error ? err.message : String(err),
+      opts.json,
+    );
+    return;
+  }
+  if (opts.changedFiles !== undefined) {
+    rows = filterRowsByChangedFiles(rows, opts.changedFiles);
+  }
+
+  const db = openDb();
+  let savedAt: number;
+  let gitRef: string | null;
+  try {
+    savedAt = Date.now();
+    gitRef = tryGetGitRef();
+    upsertQueryBaseline(db, {
+      name: opts.baselineName,
+      recipe_id: opts.recipeId ?? null,
+      sql: opts.sql,
+      rows_json: JSON.stringify(rows),
+      row_count: rows.length,
+      git_ref: gitRef,
+      created_at: savedAt,
+    });
+  } finally {
+    closeDb(db);
+  }
+
+  if (opts.json) {
+    console.log(
+      JSON.stringify({
+        saved: opts.baselineName,
+        recipe_id: opts.recipeId ?? null,
+        row_count: rows.length,
+        git_ref: gitRef,
+        created_at: savedAt,
+      }),
+    );
+  } else {
+    const ref = gitRef ? ` @ ${gitRef.slice(0, 8)}` : "";
+    console.log(
+      `Saved baseline "${opts.baselineName}" (${rows.length} rows${ref}).`,
+    );
+  }
+}
+
+interface BaselineDiff {
+  baseline: {
+    name: string;
+    recipe_id: string | null;
+    row_count: number;
+    git_ref: string | null;
+    created_at: number;
+  };
+  current_row_count: number;
+  added: unknown[];
+  removed: unknown[];
+}
+
+// Multiset diff keyed on canonical JSON.stringify(row). Naive set-diff would
+// collapse duplicates: a baseline of [A, A] vs current [A] would report no
+// removal even though one A is gone. Frequency maps preserve cardinality so
+// non-DISTINCT queries (e.g. `SELECT name FROM symbols`) diff correctly.
+// Still no "changed" category — that needs a row-key heuristic; agents can
+// derive richer diffs from the raw row sets if needed.
+export function diffRows(
+  baseline: unknown[],
+  current: unknown[],
+): { added: unknown[]; removed: unknown[] } {
+  const countKeys = (rows: unknown[]) => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const k = JSON.stringify(r);
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  };
+  const baseCounts = countKeys(baseline);
+  const curCounts = countKeys(current);
+
+  const added: unknown[] = [];
+  for (const r of current) {
+    const k = JSON.stringify(r);
+    const remaining = baseCounts.get(k) ?? 0;
+    if (remaining > 0) baseCounts.set(k, remaining - 1);
+    else added.push(r);
+  }
+  const removed: unknown[] = [];
+  for (const r of baseline) {
+    const k = JSON.stringify(r);
+    const remaining = curCounts.get(k) ?? 0;
+    if (remaining > 0) curCounts.set(k, remaining - 1);
+    else removed.push(r);
+  }
+  return { added, removed };
+}
+
+function runBaselineDiff(opts: {
+  sql: string;
+  json: boolean;
+  summary: boolean;
+  baselineName: string;
+  changedFiles: Set<string> | undefined;
+  recipeActions: ReadonlyArray<unknown> | undefined;
+}) {
+  const db = openDb();
+  let baseline: ReturnType<typeof getQueryBaseline>;
+  try {
+    baseline = getQueryBaseline(db, opts.baselineName);
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+
+  if (baseline === undefined) {
+    emitErrorMaybeJson(
+      `codemap: no baseline named "${opts.baselineName}". Use --baselines to list saved baselines.`,
+      opts.json,
+    );
+    return;
+  }
+
+  let baselineRows: unknown[];
+  try {
+    baselineRows = JSON.parse(baseline.rows_json) as unknown[];
+  } catch {
+    emitErrorMaybeJson(
+      `codemap: baseline "${opts.baselineName}" has corrupt rows_json — drop and re-save.`,
+      opts.json,
+    );
+    return;
+  }
+
+  let currentRows: unknown[];
+  try {
+    currentRows = queryRows(opts.sql);
+  } catch (err) {
+    emitErrorMaybeJson(
+      err instanceof Error ? err.message : String(err),
+      opts.json,
+    );
+    return;
+  }
+  if (opts.changedFiles !== undefined) {
+    currentRows = filterRowsByChangedFiles(currentRows, opts.changedFiles);
+  }
+
+  const { added, removed } = diffRows(baselineRows, currentRows);
+
+  // Recipe actions enrich `added` only — they're the rows the agent should act on.
+  const enrichedAdded =
+    opts.recipeActions !== undefined && opts.recipeActions.length > 0
+      ? added.map((row) => attachActionsForGrouped(row, opts.recipeActions!))
+      : added;
+
+  const diff: BaselineDiff = {
+    baseline: {
+      name: baseline.name,
+      recipe_id: baseline.recipe_id,
+      row_count: baseline.row_count,
+      git_ref: baseline.git_ref,
+      created_at: baseline.created_at,
+    },
+    current_row_count: currentRows.length,
+    added: enrichedAdded,
+    removed,
+  };
+
+  if (opts.summary) {
+    const payload = {
+      baseline: diff.baseline,
+      current_row_count: diff.current_row_count,
+      added: added.length,
+      removed: removed.length,
+    };
+    if (opts.json) {
+      console.log(JSON.stringify(payload));
+    } else {
+      console.log(
+        `baseline "${diff.baseline.name}": ${diff.baseline.row_count} rows → ${diff.current_row_count} rows  (+${added.length} / -${removed.length})`,
+      );
+    }
+    return;
+  }
+
+  if (opts.json) {
+    console.log(JSON.stringify(diff));
+    return;
+  }
+
+  console.log(
+    `baseline "${diff.baseline.name}": ${diff.baseline.row_count} rows → ${diff.current_row_count} rows  (+${added.length} / -${removed.length})`,
+  );
+  if (added.length > 0) {
+    console.log(`\n  added (+${added.length}):`);
+    console.table(enrichedAdded);
+  }
+  if (removed.length > 0) {
+    console.log(`\n  removed (-${removed.length}):`);
+    console.table(removed);
+  }
+  if (added.length === 0 && removed.length === 0) {
+    console.log("  no diff.");
+  }
 }

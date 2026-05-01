@@ -114,6 +114,8 @@ Copies bundled agent templates into .agents/ under the project root.
       printQueryCmdHelp,
       printRecipesCatalogJson,
       printRecipeSqlToStdout,
+      runDropBaselineCmd,
+      runListBaselinesCmd,
       runQueryCmd,
     } = await import("./cmd-query.js");
     const parsed = parseQueryRest(rest);
@@ -135,6 +137,19 @@ Copies bundled agent templates into .agents/ under the project root.
       }
       return;
     }
+    if (parsed.kind === "listBaselines") {
+      await runListBaselinesCmd({ root, configFile, json: parsed.json });
+      return;
+    }
+    if (parsed.kind === "dropBaseline") {
+      await runDropBaselineCmd({
+        root,
+        configFile,
+        name: parsed.name,
+        json: parsed.json,
+      });
+      return;
+    }
     await runQueryCmd({
       root,
       configFile,
@@ -144,6 +159,8 @@ Copies bundled agent templates into .agents/ under the project root.
       changedSince: parsed.changedSince,
       recipeId: parsed.recipeId,
       groupBy: parsed.groupBy,
+      saveBaseline: parsed.saveBaseline,
+      baseline: parsed.baseline,
     });
     return;
   }

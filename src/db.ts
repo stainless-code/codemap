@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export type { CodemapDatabase };
 
@@ -138,6 +138,22 @@ export function createTables(db: CodemapDatabase) {
       key TEXT PRIMARY KEY,
       value TEXT
     ) STRICT, WITHOUT ROWID;
+
+    -- User-data table: query result snapshots for --save-baseline / --baseline.
+    -- Lives next to the index tables so the entire codemap state is one SQLite file
+    -- (no parallel JSON files / new gitignore entries). Intentionally absent from
+    -- dropAll() so --full and SCHEMA_VERSION rebuilds preserve baselines (only
+    -- index tables get dropped). Future schema bumps that change THIS tables shape
+    -- need an in-place migration rather than relying on the schema-mismatch rebuild.
+    CREATE TABLE IF NOT EXISTS query_baselines (
+      name TEXT PRIMARY KEY,
+      recipe_id TEXT,
+      sql TEXT NOT NULL,
+      rows_json TEXT NOT NULL,
+      row_count INTEGER NOT NULL,
+      git_ref TEXT,
+      created_at INTEGER NOT NULL
+    ) STRICT;
   `);
 }
 
@@ -620,4 +636,96 @@ export function getAllFileHashes(db: CodemapDatabase): Map<string, string> {
     map.set(rows[i].path, rows[i].content_hash);
   }
   return map;
+}
+
+/**
+ * Snapshot of a `query --recipe <id>` (or ad-hoc SQL) result, captured by
+ * `--save-baseline` and replayed by `--baseline`. `rows_json` is the
+ * canonical JSON.stringify of the row array — set-diff happens in JS by
+ * stringifying current rows and comparing membership.
+ */
+export interface QueryBaselineRow {
+  name: string;
+  recipe_id: string | null;
+  sql: string;
+  rows_json: string;
+  row_count: number;
+  git_ref: string | null;
+  created_at: number;
+}
+
+export function upsertQueryBaseline(
+  db: CodemapDatabase,
+  baseline: QueryBaselineRow,
+) {
+  db.run(
+    `INSERT INTO query_baselines (name, recipe_id, sql, rows_json, row_count, git_ref, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(name) DO UPDATE SET
+       recipe_id  = excluded.recipe_id,
+       sql        = excluded.sql,
+       rows_json  = excluded.rows_json,
+       row_count  = excluded.row_count,
+       git_ref    = excluded.git_ref,
+       created_at = excluded.created_at`,
+    [
+      baseline.name,
+      baseline.recipe_id,
+      baseline.sql,
+      baseline.rows_json,
+      baseline.row_count,
+      baseline.git_ref,
+      baseline.created_at,
+    ],
+  );
+}
+
+export function getQueryBaseline(
+  db: CodemapDatabase,
+  name: string,
+): QueryBaselineRow | undefined {
+  // bun:sqlite returns null for misses; better-sqlite3 returns undefined. Coerce here.
+  return (
+    db
+      .query<QueryBaselineRow>(
+        `SELECT name, recipe_id, sql, rows_json, row_count, git_ref, created_at
+       FROM query_baselines WHERE name = ?`,
+      )
+      .get(name) ?? undefined
+  );
+}
+
+/** Lightweight metadata view of every saved baseline (omits `rows_json`). */
+export interface QueryBaselineSummaryRow {
+  name: string;
+  recipe_id: string | null;
+  row_count: number;
+  git_ref: string | null;
+  created_at: number;
+}
+
+export function listQueryBaselines(
+  db: CodemapDatabase,
+): QueryBaselineSummaryRow[] {
+  return db
+    .query<QueryBaselineSummaryRow>(
+      `SELECT name, recipe_id, row_count, git_ref, created_at
+       FROM query_baselines ORDER BY created_at DESC, name ASC`,
+    )
+    .all();
+}
+
+/** @returns true if a baseline with that name was deleted. */
+export function deleteQueryBaseline(
+  db: CodemapDatabase,
+  name: string,
+): boolean {
+  const before = db
+    .query<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM query_baselines WHERE name = ?",
+    )
+    .get(name);
+  if (!before || before.n === 0) return false;
+  db.run("DELETE FROM query_baselines WHERE name = ?", [name]);
+  return true;
 }

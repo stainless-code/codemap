@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseQueryRest } from "./cmd-query";
+import { diffRows, parseQueryRest } from "./cmd-query";
 import {
   getQueryRecipeActions,
   getQueryRecipeSql,
@@ -29,6 +29,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: undefined,
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -42,6 +44,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: undefined,
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -55,6 +59,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: undefined,
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -68,6 +74,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: undefined,
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -83,6 +91,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -101,6 +111,8 @@ describe("parseQueryRest", () => {
       changedSince: "origin/main",
       recipeId: undefined,
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -123,6 +135,8 @@ describe("parseQueryRest", () => {
       changedSince: "HEAD~3",
       recipeId: "fan-out",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -142,6 +156,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: undefined,
       groupBy: "directory",
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -157,6 +173,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-in",
       groupBy: "owner",
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -170,6 +188,198 @@ describe("parseQueryRest", () => {
     const r = parseQueryRest(["query", "--group-by", "branch", "SELECT 1"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("unknown --group-by");
+  });
+
+  // ---------- baseline flags ----------
+
+  it("parses bare --save-baseline + --recipe (default name = recipe id)", () => {
+    const r = parseQueryRest(["query", "--save-baseline", "-r", "fan-out"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.recipeId).toBe("fan-out");
+    expect(r.saveBaseline).toBe(true);
+    expect(r.baseline).toBeUndefined();
+  });
+
+  it("parses --save-baseline=<name> with ad-hoc SQL", () => {
+    const r = parseQueryRest([
+      "query",
+      "--save-baseline=pre-refactor",
+      "SELECT 1",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.saveBaseline).toBe("pre-refactor");
+  });
+
+  it("errors when bare --save-baseline meets ad-hoc SQL with no following name", () => {
+    const r = parseQueryRest(["query", "--save-baseline"]);
+    expect(r.kind).toBe("error");
+  });
+
+  it("errors when --save-baseline= has empty name", () => {
+    const r = parseQueryRest(["query", "--save-baseline=", "SELECT 1"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("non-empty name");
+  });
+
+  it("parses --baseline=<name> with ad-hoc SQL", () => {
+    const r = parseQueryRest(["query", "--baseline=pre-refactor", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.baseline).toBe("pre-refactor");
+  });
+
+  it("parses bare --baseline + --recipe", () => {
+    const r = parseQueryRest(["query", "--baseline", "-r", "fan-out"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.baseline).toBe(true);
+    expect(r.recipeId).toBe("fan-out");
+  });
+
+  it("errors when --save-baseline and --baseline are combined", () => {
+    const r = parseQueryRest([
+      "query",
+      "--save-baseline",
+      "--baseline",
+      "-r",
+      "fan-out",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("mutually exclusive");
+  });
+
+  it("parses --baselines as a list operation", () => {
+    expect(parseQueryRest(["query", "--baselines"])).toEqual({
+      kind: "listBaselines",
+      json: false,
+    });
+    expect(parseQueryRest(["query", "--json", "--baselines"])).toEqual({
+      kind: "listBaselines",
+      json: true,
+    });
+  });
+
+  it("rejects --baselines combined with SQL or other flags", () => {
+    expect(parseQueryRest(["query", "--baselines", "SELECT 1"]).kind).toBe(
+      "error",
+    );
+    expect(parseQueryRest(["query", "--baselines", "-r", "fan-out"]).kind).toBe(
+      "error",
+    );
+  });
+
+  it("parses --drop-baseline <name>", () => {
+    expect(
+      parseQueryRest(["query", "--drop-baseline", "pre-refactor"]),
+    ).toEqual({
+      kind: "dropBaseline",
+      name: "pre-refactor",
+      json: false,
+    });
+  });
+
+  it("errors when --drop-baseline has no name", () => {
+    const r = parseQueryRest(["query", "--drop-baseline"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--drop-baseline");
+  });
+
+  it("errors when --group-by is combined with --save-baseline or --baseline", () => {
+    const r1 = parseQueryRest([
+      "query",
+      "--group-by",
+      "directory",
+      "--save-baseline",
+      "-r",
+      "fan-out",
+    ]);
+    expect(r1.kind).toBe("error");
+    if (r1.kind === "error") expect(r1.message).toContain("--group-by");
+
+    const r2 = parseQueryRest([
+      "query",
+      "--group-by",
+      "directory",
+      "--baseline",
+      "-r",
+      "fan-out",
+    ]);
+    expect(r2.kind).toBe("error");
+    if (r2.kind === "error") expect(r2.message).toContain("--group-by");
+  });
+
+  it("errors when --baselines is combined with no-op flags", () => {
+    expect(parseQueryRest(["query", "--summary", "--baselines"]).kind).toBe(
+      "error",
+    );
+    expect(
+      parseQueryRest(["query", "--changed-since", "main", "--baselines"]).kind,
+    ).toBe("error");
+    expect(
+      parseQueryRest(["query", "--group-by", "directory", "--baselines"]).kind,
+    ).toBe("error");
+  });
+
+  it("errors when --drop-baseline is combined with no-op flags", () => {
+    expect(
+      parseQueryRest(["query", "--summary", "--drop-baseline", "x"]).kind,
+    ).toBe("error");
+    expect(
+      parseQueryRest([
+        "query",
+        "--group-by",
+        "directory",
+        "--drop-baseline",
+        "x",
+      ]).kind,
+    ).toBe("error");
+  });
+});
+
+describe("diffRows (multiset)", () => {
+  it("reports no diff when baseline equals current", () => {
+    expect(diffRows([{ a: 1 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [],
+    });
+  });
+
+  it("reports added rows as the new ones not in baseline", () => {
+    expect(diffRows([{ a: 1 }], [{ a: 1 }, { a: 2 }])).toEqual({
+      added: [{ a: 2 }],
+      removed: [],
+    });
+  });
+
+  it("reports removed rows as those gone from current", () => {
+    expect(diffRows([{ a: 1 }, { a: 2 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [{ a: 2 }],
+    });
+  });
+
+  it("preserves duplicate-row cardinality (multiset, not set)", () => {
+    // Baseline [A, A] vs current [A]: one A is removed, NOT zero.
+    expect(diffRows([{ a: 1 }, { a: 1 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [{ a: 1 }],
+    });
+  });
+
+  it("matches three-of-three duplicates", () => {
+    expect(
+      diffRows([{ a: 1 }, { a: 1 }, { a: 1 }], [{ a: 1 }, { a: 1 }]),
+    ).toEqual({ added: [], removed: [{ a: 1 }] });
+  });
+
+  it("handles per-key independence in mixed multisets", () => {
+    expect(
+      diffRows(
+        [{ k: "x" }, { k: "x" }, { k: "y" }],
+        [{ k: "x" }, { k: "y" }, { k: "y" }, { k: "z" }],
+      ),
+    ).toEqual({
+      added: [{ k: "y" }, { k: "z" }],
+      removed: [{ k: "x" }],
+    });
   });
 
   it("errors when --changed-since has no ref", () => {
@@ -213,6 +423,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out-sample-json",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -228,6 +440,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -243,6 +457,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out-sample",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -258,6 +474,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 
@@ -273,6 +491,8 @@ describe("parseQueryRest", () => {
       changedSince: undefined,
       recipeId: "fan-out",
       groupBy: undefined,
+      saveBaseline: undefined,
+      baseline: undefined,
     });
   });
 

@@ -85,6 +85,15 @@ codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM sym
 codemap query --json --summary --group-by directory -r fan-in
 codemap query --json --group-by owner -r deprecated-symbols
 codemap query --json --summary --group-by package "SELECT file_path FROM symbols"
+# Snapshot a result, refactor, then diff (saved inside .codemap.db, no JSON files)
+codemap query --save-baseline -r visibility-tags                # save under name "visibility-tags"
+codemap query --json --baseline -r visibility-tags              # full diff: {baseline, current_row_count, added, removed}
+codemap query --json --summary --baseline -r visibility-tags    # counts only: {baseline, current_row_count, added: N, removed: N}
+codemap query --save-baseline=pre-refactor "SELECT file_path FROM symbols"   # ad-hoc SQL needs an explicit =<name>
+codemap query --baseline=pre-refactor "SELECT file_path FROM symbols"
+codemap query --baselines                                       # list saved baselines
+codemap query --drop-baseline visibility-tags                   # delete
+# --group-by is mutually exclusive with --save-baseline / --baseline (different output shapes)
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)

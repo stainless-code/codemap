@@ -40,8 +40,11 @@ Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
 - **`--summary`** — counts only. With **`--json`**: **`{"count": N}`**. With **`--group-by`**: **`{"group_by": "<mode>", "groups": [{key, count}]}`**.
 - **`--changed-since <ref>`** — post-filter rows by **`path`** / **`file_path`** / **`from_path`** / **`to_path`** / **`resolved_path`** against **`git diff --name-only <ref>...HEAD ∪ git status --porcelain`**. Rows with no recognised path column pass through.
-- **`--group-by owner|directory|package`** — partition into buckets and emit **`{"group_by", "groups": [{key, count, rows}]}`**. **`owner`** reads CODEOWNERS (last matching rule wins); **`directory`** is the first path segment; **`package`** uses **`package.json`** **`workspaces`** or **`pnpm-workspace.yaml`**.
-- **Per-row recipe `actions`** — recipes that define an **`actions: [{type, auto_fixable?, description?}]`** template append it to every row in **`--json`** output (recipe-only; ad-hoc SQL never carries actions). Inspect via **`--recipes-json`**.
+- **`--group-by owner|directory|package`** — partition into buckets and emit **`{"group_by", "groups": [{key, count, rows}]}`**. **`owner`** reads CODEOWNERS (last matching rule wins); **`directory`** is the first path segment; **`package`** uses **`package.json`** **`workspaces`** or **`pnpm-workspace.yaml`**. **Mutually exclusive with `--save-baseline` / `--baseline`.**
+- **`--save-baseline[=<name>]`** — snapshot the result rows to the **`query_baselines`** table inside `.codemap.db` (no parallel JSON files; survives `--full` and SCHEMA bumps). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Re-saving with the same name overwrites in place.
+- **`--baseline[=<name>]`** — diff the current result against the saved baseline. Output `{baseline:{...}, current_row_count, added: [...], removed: [...]}` (with `--json`) or a two-section terminal dump. Identity = per-row multiset equality (canonical `JSON.stringify` keyed frequency map; duplicates preserved). Pair with `--summary` for `{baseline:{...}, current_row_count, added: N, removed: N}`. **Mutually exclusive with `--group-by`.**
+- **`--baselines`** lists saved baselines (no `rows_json` payload); **`--drop-baseline <name>`** deletes one. Both reject every other flag — they're list-only / drop-only operations.
+- **Per-row recipe `actions`** — recipes that define an **`actions: [{type, auto_fixable?, description?}]`** template append it to every row in **`--json`** output (recipe-only; ad-hoc SQL never carries actions). Under `--baseline`, actions attach to the **`added`** rows only (the rows the agent should act on). Inspect via **`--recipes-json`**.
 
 **Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is whatever **`codemap query --print-sql <id>`** or **`codemap query --recipes-json`** returns (single source in the CLI).
 
@@ -211,6 +214,20 @@ LIMIT 10
 | `file_count`          | Total files indexed               |
 | `project_root`        | Absolute path to project          |
 | `schema_version`      | Schema version number             |
+
+### `query_baselines` — Saved query result snapshots (user data)
+
+User-facing baselines saved by `codemap query --save-baseline`, replayed by `codemap query --baseline`. **Survives `--full` and SCHEMA bumps** — intentionally absent from `dropAll()`.
+
+| Column     | Type    | Description                                                                              |
+| ---------- | ------- | ---------------------------------------------------------------------------------------- |
+| name       | TEXT PK | User-supplied name; defaults to the `--recipe` id (ad-hoc SQL requires an explicit name) |
+| recipe_id  | TEXT    | The `--recipe` id when known; NULL for ad-hoc SQL                                        |
+| sql        | TEXT    | The SQL that produced the snapshot                                                       |
+| rows_json  | TEXT    | Canonical `JSON.stringify(rows)` — multiset diff identity (duplicate rows preserved)     |
+| row_count  | INTEGER | Cached number of rows in the saved result set                                            |
+| git_ref    | TEXT    | `git rev-parse HEAD` at save time, or NULL when not a git working tree                   |
+| created_at | INTEGER | `Date.now()` at save time (epoch ms)                                                     |
 
 ## Query patterns
 
