@@ -18,23 +18,26 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 
 **Examples below use `codemap`** — prefix with **`npx @stainless-code/codemap`** (or **`pnpm dlx`**, **`yarn dlx`**, **`bunx`**) when the CLI is not on your **`PATH`**.
 
-| Action                            | Command                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Incremental index                 | `codemap`                                                                                        |
-| Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                                                   |
-| Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                                          |
-| Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**)                         |
-| Recipe catalog (JSON)             | `codemap query --recipes-json`                                                                   |
-| Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                                              |
-| Counts only                       | `codemap query --json --summary -r deprecated-symbols`                                           |
-| PR-scoped rows                    | `codemap query --json --changed-since origin/main -r fan-out`                                    |
-| Bucket by owner / dir / pkg       | `codemap query --json --group-by directory -r fan-in`                                            |
-| Save / diff a baseline            | `codemap query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags` |
-| List / drop baselines             | `codemap query --baselines` · `codemap query --drop-baseline <name>`                             |
+| Action                            | Command                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Incremental index                 | `codemap`                                                                                                     |
+| Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                                                                |
+| Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                                                       |
+| Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**)                                      |
+| Recipe catalog (JSON)             | `codemap query --recipes-json`                                                                                |
+| Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                                                           |
+| Counts only                       | `codemap query --json --summary -r deprecated-symbols`                                                        |
+| PR-scoped rows                    | `codemap query --json --changed-since origin/main -r fan-out`                                                 |
+| Bucket by owner / dir / pkg       | `codemap query --json --group-by directory -r fan-in`                                                         |
+| Save / diff a baseline            | `codemap query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`              |
+| List / drop baselines             | `codemap query --baselines` · `codemap query --drop-baseline <name>`                                          |
+| Per-delta audit                   | `codemap audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
 **Baselines** (`query_baselines` table inside `.codemap.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
+
+**Audit (`codemap audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Reuses B.6 baselines as the snapshot source. Two CLI shapes — `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`; `--<delta>-baseline <name>` is the explicit per-delta override. v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).
 
 **Bundled rules/skills:** **`codemap agents init`** writes **`.agents/`** from the package (see [docs/agents.md](../../../docs/agents.md)).
 

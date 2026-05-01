@@ -50,6 +50,27 @@ describe("CLI --help", () => {
     expect(err).toBe("");
   });
 
+  test("audit --help exits 0 and documents the v1 surface", async () => {
+    const { exitCode, out, err } = await runCli(["audit", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap audit");
+    expect(out).toContain("--baseline <prefix>");
+    expect(out).toContain("--files-baseline <name>");
+    expect(out).toContain("--dependencies-baseline <name>");
+    expect(out).toContain("--deprecated-baseline <name>");
+    expect(out).toContain("--no-index");
+    expect(out).toContain("--summary");
+    expect(out).toContain("query_baselines");
+    expect(err).toBe("");
+  });
+
+  test("audit with no flags exits 1 and points at the snapshot sources", async () => {
+    const { exitCode, err } = await runCli(["audit"]);
+    expect(exitCode).toBe(1);
+    expect(err).toContain("missing snapshot source");
+    expect(err).toContain("--baseline");
+  });
+
   test("query with no SQL exits 1", async () => {
     const { exitCode, err } = await runCli(["query"]);
     expect(exitCode).toBe(1);

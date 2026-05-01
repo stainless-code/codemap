@@ -52,6 +52,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "query") return;
   if (rest[0] === "validate") return;
   if (rest[0] === "context") return;
+  if (rest[0] === "audit") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;

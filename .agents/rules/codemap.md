@@ -12,22 +12,25 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 
 ## CLI (this repository)
 
-| Context                        | Incremental index  | Query                                                                                                     |
-| ------------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------- |
-| **Default** — from this clone  | `bun src/index.ts` | `bun src/index.ts query --json "<SQL>"`                                                                   |
-| Same entry                     | `bun run dev`      | (same as first row)                                                                                       |
-| Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                                          |
-| Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**)                |
-| Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`                    |
-| Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                                           |
-| PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                                    |
-| Bucket by owner / dir / pkg    | —                  | `bun src/index.ts query --json --group-by directory -r fan-in`                                            |
-| Save / diff a baseline         | —                  | `bun src/index.ts query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags` |
-| List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                    |
+| Context                        | Incremental index  | Query                                                                                                                  |
+| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **Default** — from this clone  | `bun src/index.ts` | `bun src/index.ts query --json "<SQL>"`                                                                                |
+| Same entry                     | `bun run dev`      | (same as first row)                                                                                                    |
+| Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                                                       |
+| Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**)                             |
+| Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`                                 |
+| Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                                                        |
+| PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                                                 |
+| Bucket by owner / dir / pkg    | —                  | `bun src/index.ts query --json --group-by directory -r fan-in`                                                         |
+| Save / diff a baseline         | —                  | `bun src/index.ts query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`              |
+| List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                                 |
+| Per-delta audit                | —                  | `bun src/index.ts audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
 **Baselines** (`query_baselines` table inside `.codemap.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
+
+**Audit (`bun src/index.ts audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Reuses B.6 baselines as the snapshot source. Two CLI shapes — `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`; `--<delta>-baseline <name>` is the explicit per-delta override. v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).
 
 After **`bun run build`**, **`node dist/index.mjs`** matches the published **`codemap`** binary (same flags). **`bun link`** / global **`codemap`** also work when testing the packaged CLI.
 
