@@ -2,19 +2,27 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-// Layer note: `query-recipes` lives in `src/cli/` because the CLI verb owns the
-// recipe catalog today. We import it here as a pure data registry (no execution
-// flow crosses cli → application). A future refactor may lift it to
-// `src/application/` once a second consumer (HTTP API) needs it.
+// Layer note: several modules below live under `src/cli/` because their CLI
+// verb owns them today (`query-recipes`, `cmd-audit`'s baseline resolver,
+// `cmd-context`'s envelope builder, `cmd-validate`'s row computer). We import
+// them here as pure data / pure functions (no execution flow crosses
+// cli → application). A future refactor may lift them to `src/application/`
+// once a second consumer (HTTP API) needs them.
+import { resolveAuditBaselines } from "../cli/cmd-audit";
+import { buildContextEnvelope } from "../cli/cmd-context";
+import { computeValidateRows } from "../cli/cmd-validate";
 import { getQueryRecipeActions, getQueryRecipeSql } from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
+import { closeDb, openDb } from "../db";
 import { getFilesChangedSince } from "../git-changed";
 import { GROUP_BY_MODES } from "../group-by";
 import type { GroupByMode } from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { runAudit } from "./audit-engine";
 import { executeQuery, executeQueryBatch } from "./query-engine";
 import type { BatchStatementResolved } from "./query-engine";
+import { runCodemapIndex } from "./run-index";
 
 /**
  * MCP server engine — owns the tool/resource registry. The CLI shell
@@ -101,6 +109,9 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerQueryTool(server, opts);
   registerQueryBatchTool(server, opts);
   registerQueryRecipeTool(server, opts);
+  registerAuditTool(server, opts);
+  registerContextTool(server, opts);
+  registerValidateTool(server, opts);
 
   return server;
 }
@@ -274,6 +285,136 @@ function mergeBatchItem(
     changed_since: item.changed_since ?? defaults.changed_since,
     group_by: item.group_by ?? defaults.group_by,
   };
+}
+
+function registerAuditTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "audit",
+    {
+      description:
+        "Structural-drift audit. Composes per-delta baselines (files / dependencies / deprecated) into a {head, deltas} envelope. Pass `baseline_prefix` to auto-resolve <prefix>-{files,dependencies,deprecated} from query_baselines, OR `baselines: {<deltaKey>: <name>}` for explicit per-delta overrides (composes with prefix). `summary: true` collapses each delta to {added: N, removed: N}. `no_index: true` skips the auto-incremental-index prelude (default re-indexes first so head reflects current source).",
+      inputSchema: {
+        baseline_prefix: z.string().optional(),
+        baselines: z
+          .object({
+            files: z.string().optional(),
+            dependencies: z.string().optional(),
+            deprecated: z.string().optional(),
+          })
+          .optional(),
+        summary: z.boolean().optional(),
+        no_index: z.boolean().optional(),
+      },
+    },
+    async (args) => {
+      try {
+        const db = openDb();
+        try {
+          if (!args.no_index) {
+            await runCodemapIndex(db, { mode: "incremental", quiet: true });
+          }
+          const perDelta: Record<string, string> = {};
+          if (args.baselines) {
+            for (const [k, v] of Object.entries(args.baselines)) {
+              if (typeof v === "string") perDelta[k] = v;
+            }
+          }
+          const baselines = resolveAuditBaselines({
+            db,
+            baselinePrefix: args.baseline_prefix,
+            perDelta,
+          });
+          const result = runAudit({ db, baselines });
+          if ("error" in result) {
+            return jsonError(result.error);
+          }
+          if (args.summary) {
+            const counts: Record<
+              string,
+              {
+                base: (typeof result.deltas)[string]["base"];
+                added: number;
+                removed: number;
+              }
+            > = {};
+            for (const [key, delta] of Object.entries(result.deltas)) {
+              counts[key] = {
+                base: delta.base,
+                added: delta.added.length,
+                removed: delta.removed.length,
+              };
+            }
+            return jsonResult({ head: result.head, deltas: counts });
+          }
+          return jsonResult(result);
+        } finally {
+          closeDb(db, { readonly: args.no_index === true });
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerContextTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "context",
+    {
+      description:
+        "Project bootstrap snapshot — returns the same envelope `codemap context --json` prints (project root, schema version, file/symbol counts, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
+      inputSchema: {
+        compact: z.boolean().optional(),
+        intent: z.string().optional(),
+      },
+    },
+    (args) => {
+      try {
+        const db = openDb();
+        try {
+          const envelope = buildContextEnvelope(db, getProjectRoot(), {
+            compact: args.compact === true,
+            intent: args.intent ?? null,
+          });
+          return jsonResult(envelope);
+        } finally {
+          closeDb(db, { readonly: true });
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerValidateTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "validate",
+    {
+      description:
+        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns rows with status ('ok' / 'changed' / 'missing'). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose stale .codemap.db before issuing structural queries.",
+      inputSchema: {
+        paths: z.array(z.string()).optional(),
+      },
+    },
+    (args) => {
+      try {
+        const db = openDb();
+        try {
+          const rows = computeValidateRows(
+            db,
+            getProjectRoot(),
+            args.paths ?? [],
+          );
+          return jsonResult(rows);
+        } finally {
+          closeDb(db, { readonly: true });
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
 }
 
 /**

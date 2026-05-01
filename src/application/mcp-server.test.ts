@@ -7,7 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb } from "../db";
+import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import { createMcpServer } from "./mcp-server";
 
@@ -261,6 +261,110 @@ describe("MCP server — query_recipe tool", () => {
         arguments: { recipe: "deprecated-symbols", summary: true },
       });
       expect(readJson(r)).toEqual({ count: 0 });
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("MCP server — audit / context / validate tools", () => {
+  it("lists audit, context, validate in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("audit");
+      expect(names).toContain("context");
+      expect(names).toContain("validate");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("audit returns isError when no baseline slot resolves", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "audit",
+        arguments: { baseline_prefix: "nonexistent", no_index: true },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("baseline"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("audit returns {head, deltas} envelope for a real baseline (no_index)", async () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "snap-files",
+        recipe_id: null,
+        sql: "SELECT path FROM files ORDER BY path",
+        rows_json: JSON.stringify([
+          { path: "docs/c.md" },
+          { path: "src/a.ts" },
+          { path: "src/b.ts" },
+        ]),
+        row_count: 3,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "audit",
+        arguments: { baseline_prefix: "snap", no_index: true },
+      });
+      const json = readJson(r) as {
+        head: unknown;
+        deltas: Record<string, { added: unknown[]; removed: unknown[] }>;
+      };
+      // No source change → no drift on files delta.
+      const filesDelta = json.deltas.files;
+      expect(filesDelta).toBeDefined();
+      expect(filesDelta.added).toEqual([]);
+      expect(filesDelta.removed).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context returns the envelope shape (file count etc.)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: {},
+      });
+      const json = readJson(r);
+      // The context envelope's exact shape lives in cmd-context.ts; smoke-check
+      // a couple of fields that should always be present.
+      expect(json).toMatchObject({
+        codemap: { schema_version: expect.any(Number) },
+        project: { root: expect.any(String), file_count: expect.any(Number) },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("validate runs without error on the seeded files", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "validate",
+        arguments: { paths: [] },
+      });
+      const json = readJson(r);
+      expect(Array.isArray(json)).toBe(true);
     } finally {
       await server.close();
     }
