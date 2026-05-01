@@ -187,7 +187,7 @@ JSON Schema for each tool mirrors the CLI flag set. Sketch for the three v1 keys
 }
 ```
 
-CLI flag → JSON property: kebab-case → snake_case (idiomatic JSON Schema; matches MCP spec examples).
+CLI flag → JSON property: kebab-case → snake_case. Tool names also snake_case. Rationale: every MCP reference implementation (spec examples, GitHub MCP, Cursor's built-ins) uses snake; snake input keys allow dot-notation in JSON-consuming agent code; the CLI-vs-MCP convention split is intentional (kebab is shell-idiomatic, snake is JSON-idiomatic — different audiences). The translation is the one-line "kebab → snake" rule documented in § 8.
 
 ## 6. Audit composition over MCP
 
@@ -268,9 +268,10 @@ Estimated total: ~1 day across ~7 commits.
 
 - **Resource caching strategy?** ✅ **Lazy (memoize on first `read_resource`).** All four resources are constant per server-process lifetime, so eager-vs-lazy produce identical observable behavior — only difference is when the I/O happens. Lazy keeps boot lean (sessions that never call `read_resource` pay nothing) and the first-call cost is one small file read. Cache lives for the server process; never invalidated.
 
+- **Tool naming convention?** ✅ **snake_case for both tool names and input properties.** Every MCP reference implementation (spec examples, GitHub MCP, Cursor built-ins) uses snake. Kebab input keys would force agents into bracket notation in JS/TS contexts. CLI stays kebab (shell-idiomatic) — the kebab→snake translation lives at the MCP-arg layer and is documented in § 8.
+
 ### Still open
 
-- **Tool naming convention.** snake_case (matches MCP spec examples) vs kebab-case (matches CLI flags). Picked snake_case in §5; reconsider.
 - **`save_baseline` argument shape.** Two sub-shapes: `{name, sql}` and `{name, recipe}`. One tool with optional fields, or two tools (`save_baseline_sql` / `save_baseline_recipe`)?
 
 ## 13. Non-goals (v1)
