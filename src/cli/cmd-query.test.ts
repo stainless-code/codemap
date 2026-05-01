@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseQueryRest } from "./cmd-query";
+import { diffRows, parseQueryRest } from "./cmd-query";
 import {
   getQueryRecipeActions,
   getQueryRecipeSql,
@@ -280,6 +280,106 @@ describe("parseQueryRest", () => {
     const r = parseQueryRest(["query", "--drop-baseline"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("--drop-baseline");
+  });
+
+  it("errors when --group-by is combined with --save-baseline or --baseline", () => {
+    const r1 = parseQueryRest([
+      "query",
+      "--group-by",
+      "directory",
+      "--save-baseline",
+      "-r",
+      "fan-out",
+    ]);
+    expect(r1.kind).toBe("error");
+    if (r1.kind === "error") expect(r1.message).toContain("--group-by");
+
+    const r2 = parseQueryRest([
+      "query",
+      "--group-by",
+      "directory",
+      "--baseline",
+      "-r",
+      "fan-out",
+    ]);
+    expect(r2.kind).toBe("error");
+    if (r2.kind === "error") expect(r2.message).toContain("--group-by");
+  });
+
+  it("errors when --baselines is combined with no-op flags", () => {
+    expect(parseQueryRest(["query", "--summary", "--baselines"]).kind).toBe(
+      "error",
+    );
+    expect(
+      parseQueryRest(["query", "--changed-since", "main", "--baselines"]).kind,
+    ).toBe("error");
+    expect(
+      parseQueryRest(["query", "--group-by", "directory", "--baselines"]).kind,
+    ).toBe("error");
+  });
+
+  it("errors when --drop-baseline is combined with no-op flags", () => {
+    expect(
+      parseQueryRest(["query", "--summary", "--drop-baseline", "x"]).kind,
+    ).toBe("error");
+    expect(
+      parseQueryRest([
+        "query",
+        "--group-by",
+        "directory",
+        "--drop-baseline",
+        "x",
+      ]).kind,
+    ).toBe("error");
+  });
+});
+
+describe("diffRows (multiset)", () => {
+  it("reports no diff when baseline equals current", () => {
+    expect(diffRows([{ a: 1 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [],
+    });
+  });
+
+  it("reports added rows as the new ones not in baseline", () => {
+    expect(diffRows([{ a: 1 }], [{ a: 1 }, { a: 2 }])).toEqual({
+      added: [{ a: 2 }],
+      removed: [],
+    });
+  });
+
+  it("reports removed rows as those gone from current", () => {
+    expect(diffRows([{ a: 1 }, { a: 2 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [{ a: 2 }],
+    });
+  });
+
+  it("preserves duplicate-row cardinality (multiset, not set)", () => {
+    // Baseline [A, A] vs current [A]: one A is removed, NOT zero.
+    expect(diffRows([{ a: 1 }, { a: 1 }], [{ a: 1 }])).toEqual({
+      added: [],
+      removed: [{ a: 1 }],
+    });
+  });
+
+  it("matches three-of-three duplicates", () => {
+    expect(
+      diffRows([{ a: 1 }, { a: 1 }, { a: 1 }], [{ a: 1 }, { a: 1 }]),
+    ).toEqual({ added: [], removed: [{ a: 1 }] });
+  });
+
+  it("handles per-key independence in mixed multisets", () => {
+    expect(
+      diffRows(
+        [{ k: "x" }, { k: "x" }, { k: "y" }],
+        [{ k: "x" }, { k: "y" }, { k: "y" }, { k: "z" }],
+      ),
+    ).toEqual({
+      added: [{ k: "y" }, { k: "z" }],
+      removed: [{ k: "x" }],
+    });
   });
 
   it("errors when --changed-since has no ref", () => {

@@ -5,6 +5,7 @@ import {
   createIndexes,
   createTables,
   deleteQueryBaseline,
+  dropAll,
   getMeta,
   getAllFileHashes,
   getQueryBaseline,
@@ -182,6 +183,33 @@ describe("SQLite layer (in-memory)", () => {
       expect(deleteQueryBaseline(db, "pre-refactor")).toBe(true);
       expect(deleteQueryBaseline(db, "pre-refactor")).toBe(false); // already gone
       expect(listQueryBaselines(db).map((b) => b.name)).toEqual(["fan-out"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("query_baselines survives dropAll() — the schema-rebuild contract", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      upsertQueryBaseline(db, {
+        name: "fan-out",
+        recipe_id: "fan-out",
+        sql: "SELECT 1",
+        rows_json: "[]",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+
+      // dropAll() is what `--full` and SCHEMA_VERSION-mismatch rebuilds invoke.
+      // The headline contract of B.6 is that user baselines survive that path —
+      // exercise it explicitly so a future schema refactor can't silently break it.
+      dropAll(db);
+      createTables(db);
+
+      expect(listQueryBaselines(db).map((b) => b.name)).toEqual(["fan-out"]);
+      expect(getQueryBaseline(db, "fan-out")?.recipe_id).toBe("fan-out");
     } finally {
       closeDb(db);
     }

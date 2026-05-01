@@ -251,12 +251,15 @@ export function parseQueryRest(rest: string[]):
       saveBaseline !== undefined ||
       baseline !== undefined ||
       dropBaselineName !== undefined ||
+      summary ||
+      changedSince !== undefined ||
+      groupBy !== undefined ||
       i < rest.length
     ) {
       return {
         kind: "error",
         message:
-          "codemap: --baselines does not take SQL, --recipe, --save-baseline, --baseline, or --drop-baseline.",
+          "codemap: --baselines is a list-only operation; it does not take SQL or any other --recipe / --save-baseline / --baseline / --drop-baseline / --summary / --changed-since / --group-by flag.",
       };
     }
     return { kind: "listBaselines", json };
@@ -268,12 +271,15 @@ export function parseQueryRest(rest: string[]):
       printSqlId !== undefined ||
       saveBaseline !== undefined ||
       baseline !== undefined ||
+      summary ||
+      changedSince !== undefined ||
+      groupBy !== undefined ||
       i < rest.length
     ) {
       return {
         kind: "error",
         message:
-          "codemap: --drop-baseline does not take SQL or other baseline / recipe flags.",
+          "codemap: --drop-baseline only takes a name; it does not compose with SQL or any other --recipe / --save-baseline / --baseline / --summary / --changed-since / --group-by flag.",
       };
     }
     return { kind: "dropBaseline", name: dropBaselineName, json };
@@ -284,6 +290,16 @@ export function parseQueryRest(rest: string[]):
       kind: "error",
       message:
         "codemap: --save-baseline and --baseline are mutually exclusive in one run.",
+    };
+  }
+  if (
+    groupBy !== undefined &&
+    (saveBaseline !== undefined || baseline !== undefined)
+  ) {
+    return {
+      kind: "error",
+      message:
+        "codemap: --group-by cannot be combined with --save-baseline or --baseline (different output shapes).",
     };
   }
 
@@ -835,20 +851,41 @@ interface BaselineDiff {
   removed: unknown[];
 }
 
-// Set-membership = canonical JSON.stringify(row). For v1 we don't compute a
-// "changed" category — it requires a row-key heuristic and the agent can
-// re-derive richer diffs from the underlying rows if needed.
-function diffRows(
+// Multiset diff keyed on canonical JSON.stringify(row). Naive set-diff would
+// collapse duplicates: a baseline of [A, A] vs current [A] would report no
+// removal even though one A is gone. Frequency maps preserve cardinality so
+// non-DISTINCT queries (e.g. `SELECT name FROM symbols`) diff correctly.
+// Still no "changed" category — that needs a row-key heuristic; agents can
+// derive richer diffs from the raw row sets if needed.
+export function diffRows(
   baseline: unknown[],
   current: unknown[],
-): {
-  added: unknown[];
-  removed: unknown[];
-} {
-  const baseSet = new Set(baseline.map((r) => JSON.stringify(r)));
-  const curSet = new Set(current.map((r) => JSON.stringify(r)));
-  const added = current.filter((r) => !baseSet.has(JSON.stringify(r)));
-  const removed = baseline.filter((r) => !curSet.has(JSON.stringify(r)));
+): { added: unknown[]; removed: unknown[] } {
+  const countKeys = (rows: unknown[]) => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const k = JSON.stringify(r);
+      m.set(k, (m.get(k) ?? 0) + 1);
+    }
+    return m;
+  };
+  const baseCounts = countKeys(baseline);
+  const curCounts = countKeys(current);
+
+  const added: unknown[] = [];
+  for (const r of current) {
+    const k = JSON.stringify(r);
+    const remaining = baseCounts.get(k) ?? 0;
+    if (remaining > 0) baseCounts.set(k, remaining - 1);
+    else added.push(r);
+  }
+  const removed: unknown[] = [];
+  for (const r of baseline) {
+    const k = JSON.stringify(r);
+    const remaining = curCounts.get(k) ?? 0;
+    if (remaining > 0) curCounts.set(k, remaining - 1);
+    else removed.push(r);
+  }
   return { added, removed };
 }
 
