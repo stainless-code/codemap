@@ -25,6 +25,9 @@ Context (project snapshot envelope for any agent):
 Agents:
   codemap agents init [--force] [--interactive|-i]
 
+MCP server (Model Context Protocol — for agent hosts):
+  codemap mcp                                        # stdio JSON-RPC, one tool per CLI verb
+
 Other:
   codemap version
   codemap --version, -V
@@ -53,6 +56,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "validate") return;
   if (rest[0] === "context") return;
   if (rest[0] === "audit") return;
+  if (rest[0] === "mcp") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
