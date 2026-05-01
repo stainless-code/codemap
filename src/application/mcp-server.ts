@@ -1,7 +1,14 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { resolveAgentsTemplateDir } from "../agents-init";
 // Layer note: several modules below live under `src/cli/` because their CLI
 // verb owns them today (`query-recipes`, `cmd-audit`'s baseline resolver,
 // `cmd-context`'s envelope builder, `cmd-validate`'s row computer). We import
@@ -11,7 +18,13 @@ import { z } from "zod";
 import { resolveAuditBaselines } from "../cli/cmd-audit";
 import { buildContextEnvelope } from "../cli/cmd-context";
 import { computeValidateRows } from "../cli/cmd-validate";
-import { getQueryRecipeActions, getQueryRecipeSql } from "../cli/query-recipes";
+import {
+  getQueryRecipeActions,
+  getQueryRecipeSql,
+  listQueryRecipeCatalog,
+  listQueryRecipeIds,
+  QUERY_RECIPES,
+} from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
@@ -122,6 +135,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerSaveBaselineTool(server, opts);
   registerListBaselinesTool(server, opts);
   registerDropBaselineTool(server, opts);
+  registerResources(server);
 
   return server;
 }
@@ -550,6 +564,173 @@ function registerDropBaselineTool(server: McpServer, _opts: ServerOpts): void {
       } catch (err) {
         return jsonError(err instanceof Error ? err.message : String(err));
       }
+    },
+  );
+}
+
+/**
+ * MCP resources are addressable read-only data the host can fetch ahead of
+ * tool calls. Plan § 7 + grill round Q3 settled on **lazy memoisation**:
+ * resources are constant for the server-process lifetime, so eager-vs-lazy
+ * produce identical observable behavior — lazy keeps boot lean for sessions
+ * that never call read_resource.
+ */
+function registerResources(server: McpServer): void {
+  // codemap://recipes — full catalog (same as CLI's --recipes-json)
+  let recipesCache: string | undefined;
+  server.registerResource(
+    "recipes",
+    "codemap://recipes",
+    {
+      description:
+        "Bundled SQL recipes catalog (id, description, sql, optional per-row actions). Same payload as `codemap query --recipes-json`.",
+      mimeType: "application/json",
+    },
+    () => {
+      if (recipesCache === undefined) {
+        recipesCache = JSON.stringify(listQueryRecipeCatalog());
+      }
+      return {
+        contents: [
+          {
+            uri: "codemap://recipes",
+            mimeType: "application/json",
+            text: recipesCache,
+          },
+        ],
+      };
+    },
+  );
+
+  // codemap://recipes/{id} — one recipe (template form)
+  const oneRecipeCache = new Map<string, string>();
+  server.registerResource(
+    "recipe",
+    new ResourceTemplate("codemap://recipes/{id}", {
+      list: () => ({
+        resources: listQueryRecipeIds().map((id) => ({
+          uri: `codemap://recipes/${id}`,
+          name: id,
+          description: QUERY_RECIPES[id]!.description,
+          mimeType: "application/json",
+        })),
+      }),
+    }),
+    {
+      description:
+        "Single recipe by id: {id, description, sql, actions?}. Replaces `codemap query --print-sql <id>` for agents.",
+      mimeType: "application/json",
+    },
+    (uri, variables) => {
+      const id =
+        typeof variables.id === "string" ? variables.id : String(variables.id);
+      const cached = oneRecipeCache.get(id);
+      if (cached !== undefined) {
+        return {
+          contents: [
+            { uri: uri.toString(), mimeType: "application/json", text: cached },
+          ],
+        };
+      }
+      const meta = QUERY_RECIPES[id];
+      if (meta === undefined) {
+        // Resources can't return structured errors the way tools do; throw so
+        // the SDK surfaces a JSON-RPC error to the host.
+        throw new Error(
+          `codemap: unknown recipe "${id}". Read codemap://recipes for the catalog.`,
+        );
+      }
+      const payload = JSON.stringify({
+        id,
+        description: meta.description,
+        sql: meta.sql,
+        ...(meta.actions !== undefined ? { actions: meta.actions } : {}),
+      });
+      oneRecipeCache.set(id, payload);
+      return {
+        contents: [
+          {
+            uri: uri.toString(),
+            mimeType: "application/json",
+            text: payload,
+          },
+        ],
+      };
+    },
+  );
+
+  // codemap://schema — DDL of every indexed table (queried live from sqlite_schema)
+  let schemaCache: string | undefined;
+  server.registerResource(
+    "schema",
+    "codemap://schema",
+    {
+      description:
+        "DDL of every table in .codemap.db (queried live from sqlite_schema). Tells the agent what tables and columns exist.",
+      mimeType: "application/json",
+    },
+    () => {
+      if (schemaCache === undefined) {
+        const db = openDb();
+        try {
+          const rows = db
+            .query(
+              "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            )
+            .all() as { name: string; sql: string | null }[];
+          schemaCache = JSON.stringify(
+            rows
+              .filter((r) => r.sql !== null)
+              .map((r) => ({
+                name: r.name,
+                ddl: r.sql,
+              })),
+          );
+        } finally {
+          closeDb(db, { readonly: true });
+        }
+      }
+      return {
+        contents: [
+          {
+            uri: "codemap://schema",
+            mimeType: "application/json",
+            text: schemaCache,
+          },
+        ],
+      };
+    },
+  );
+
+  // codemap://skill — bundled SKILL.md text
+  let skillCache: string | undefined;
+  server.registerResource(
+    "skill",
+    "codemap://skill",
+    {
+      description:
+        "Full text of the bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.",
+      mimeType: "text/markdown",
+    },
+    () => {
+      if (skillCache === undefined) {
+        const skillPath = join(
+          resolveAgentsTemplateDir(),
+          "skills",
+          "codemap",
+          "SKILL.md",
+        );
+        skillCache = readFileSync(skillPath, "utf8");
+      }
+      return {
+        contents: [
+          {
+            uri: "codemap://skill",
+            mimeType: "text/markdown",
+            text: skillCache,
+          },
+        ],
+      };
     },
   );
 }

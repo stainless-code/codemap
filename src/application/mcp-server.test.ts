@@ -503,3 +503,99 @@ describe("MCP server — baseline tools", () => {
     }
   });
 });
+
+function readResourceText(r: { contents: unknown[] }): string {
+  const first = r.contents[0] as { text?: string };
+  if (typeof first.text !== "string") {
+    throw new Error("expected text resource content");
+  }
+  return first.text;
+}
+
+describe("MCP server — resources", () => {
+  it("lists all four resources via resources/list (one as template)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const list = await client.listResources();
+      const uris = list.resources.map((r) => r.uri);
+      // Static resources surface in resources/list directly.
+      expect(uris).toContain("codemap://recipes");
+      expect(uris).toContain("codemap://schema");
+      expect(uris).toContain("codemap://skill");
+      // The recipe-by-id resource is a template — surfaced via list-template
+      // callback as one entry per recipe id.
+      const recipeUris = uris.filter((u) => u.startsWith("codemap://recipes/"));
+      expect(recipeUris.length).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://recipes returns the catalog as JSON", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({ uri: "codemap://recipes" });
+      expect(r.contents).toHaveLength(1);
+      const first = r.contents[0] as { mimeType?: string };
+      expect(first.mimeType).toBe("application/json");
+      const parsed = JSON.parse(readResourceText(r));
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed.length).toBeGreaterThan(0);
+      expect(parsed[0]).toMatchObject({
+        id: expect.any(String),
+        description: expect.any(String),
+        sql: expect.any(String),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://recipes/{id} resolves a single recipe", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({
+        uri: "codemap://recipes/deprecated-symbols",
+      });
+      const parsed = JSON.parse(readResourceText(r));
+      expect(parsed).toMatchObject({
+        id: "deprecated-symbols",
+        description: expect.any(String),
+        sql: expect.stringContaining("@deprecated"),
+        actions: expect.any(Array),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://schema returns DDL for live tables", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({ uri: "codemap://schema" });
+      const parsed = JSON.parse(readResourceText(r));
+      expect(Array.isArray(parsed)).toBe(true);
+      const filesEntry = parsed.find(
+        (t: { name: string }) => t.name === "files",
+      );
+      expect(filesEntry).toBeDefined();
+      expect(filesEntry.ddl).toContain("content_hash");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://skill returns the bundled SKILL.md text", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({ uri: "codemap://skill" });
+      const first = r.contents[0] as { mimeType?: string };
+      expect(first.mimeType).toBe("text/markdown");
+      const text = readResourceText(r);
+      // SKILL.md begins with the YAML frontmatter convention.
+      expect(text.startsWith("---")).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+});
