@@ -52,14 +52,15 @@ The wins:
 
 **Decision: one MCP tool per CLI top-level operation.** Names mirror the CLI verb; `inputSchema` mirrors the CLI flag set.
 
-| MCP tool                                                          | Wraps                                           | Notes                                                                                        |
-| ----------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `query`                                                           | `codemap query --json "<SQL>"`                  | Pure SQL execution; identical error-shape semantics.                                         |
-| `query_recipe`                                                    | `codemap query --json --recipe <id>`            | Separate tool (vs `query` + recipe param) so agents see the recipe surface in tool listings. |
-| `audit`                                                           | `codemap audit --json --baseline <prefix> ...`  | Composes per-delta baseline mapping (see § 6).                                               |
-| `save_baseline` / `baseline` / `list_baselines` / `drop_baseline` | `codemap query --save-baseline=<name> ...` etc. | Each is a distinct verb the agent should pick deliberately.                                  |
-| `context`                                                         | `codemap context --json`                        | Read-only; same JSON envelope.                                                               |
-| `validate`                                                        | `codemap validate --json [<paths>]`             | Optional `paths` array.                                                                      |
+| MCP tool                                                          | Wraps                                           | Notes                                                                                                                          |
+| ----------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `query`                                                           | `codemap query --json "<SQL>"`                  | Pure SQL execution; identical error-shape semantics.                                                                           |
+| `query_batch`                                                     | (no CLI counterpart — MCP-only)                 | Batched SQL: `statements: (string \| {sql, ...overrides})[]` with batch-wide flag defaults + per-statement overrides. See § 5. |
+| `query_recipe`                                                    | `codemap query --json --recipe <id>`            | Separate tool (vs `query` + recipe param) so agents see the recipe surface in tool listings.                                   |
+| `audit`                                                           | `codemap audit --json --baseline <prefix> ...`  | Composes per-delta baseline mapping (see § 6).                                                                                 |
+| `save_baseline` / `baseline` / `list_baselines` / `drop_baseline` | `codemap query --save-baseline=<name> ...` etc. | Each is a distinct verb the agent should pick deliberately.                                                                    |
+| `context`                                                         | `codemap context --json`                        | Read-only; same JSON envelope.                                                                                                 |
+| `validate`                                                        | `codemap validate --json [<paths>]`             | Optional `paths` array.                                                                                                        |
 
 **Rejected alternatives:**
 
@@ -105,6 +106,44 @@ JSON Schema for each tool mirrors the CLI flag set. Sketch for the three v1 keys
       "group_by": {"type": "string", "enum": ["owner", "directory", "package"]}
     },
     "required": ["sql"]
+  }
+}
+
+// query_batch — MCP-only, no CLI counterpart. Each item inherits the
+// batch-wide flag defaults; per-statement object form overrides them.
+// Output: array of N elements, each shaped like single-`query` output
+// for the effective flag set on that item.
+{
+  "name": "query_batch",
+  "description": "Run N read-only SQL statements in one round-trip. Per-statement output mirrors single `query`'s shape under the effective flag set.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "statements": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "oneOf": [
+            {"type": "string", "description": "SQL only — uses batch-wide flags as-is."},
+            {
+              "type": "object",
+              "properties": {
+                "sql": {"type": "string"},
+                "summary": {"type": "boolean"},
+                "changed_since": {"type": "string"},
+                "group_by": {"type": "string", "enum": ["owner", "directory", "package"]}
+              },
+              "required": ["sql"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "summary": {"type": "boolean", "default": false, "description": "Batch-wide default — overridden per-statement."},
+      "changed_since": {"type": "string", "description": "Batch-wide default — overridden per-statement."},
+      "group_by": {"type": "string", "enum": ["owner", "directory", "package"], "description": "Batch-wide default — overridden per-statement."}
+    },
+    "required": ["statements"]
   }
 }
 
@@ -210,7 +249,7 @@ codemap serve [--port 0] [--host 127.0.0.1] [--token <t>] [--root <dir>] [--conf
 Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) and the codemap-audit precedent (~6 commits ship-end-to-end):
 
 1. **CLI scaffold** — `cmd-mcp.ts` + `mcp-server.ts` skeletons. `codemap mcp --help` works; `runMcpCmd` boots `@modelcontextprotocol/sdk` server with one stub tool (e.g. `version` returning `{version: "..."}`). Smoke-test via `npx @modelcontextprotocol/inspector`. Commit.
-2. **First tool — `query`** — wires the server to the existing `runQueryCmd` / `printQueryResult` logic; captures stdout into the MCP response body. Tests via SDK in-process. Commit.
+2. **First tools — `query` + `query_batch`** — `query` wires the server to existing `runQueryCmd` logic; `query_batch` loops over the same with batch-wide-defaults + per-statement-overrides shape (see § 5). Tests via SDK in-process. Commit.
 3. **`query_recipe`** — separate tool surfacing the recipe catalog. Composes `--summary` / `--changed-since` / `--group-by` via JSON args. Commit.
 4. **`audit`** — wraps `runAuditCmd` / `runAudit`; the `baselines` arg becomes the `AuditBaselineMap` directly via `resolveAuditBaselines`. Auto-incremental-index prelude stays. Commit.
 5. **Baseline tools** — `save_baseline` / `list_baselines` / `drop_baseline` round-trip via existing helpers. Commit.
@@ -221,8 +260,14 @@ Estimated total: ~1 day across ~7 commits.
 
 ## 12. Open questions (worth a `grill-me` round before code)
 
-- **`context` and `validate` as MCP tools?** Both are CLI commands today. `context` is agent-shaped (returns the existing JSON envelope). `validate` is more dev-shaped (CI gate for stale indices). Worth surfacing both? Just `context`?
-- **Should `query` accept multi-statement SQL?** Today's CLI rejects it (one statement per call). MCP could batch — but that's a real semantic shift.
+### Settled
+
+- **`context` and `validate` as MCP tools?** ✅ **Both.** `context` is the obvious agent-shaped bootstrap call (saves 4-5 `query` calls at session start). `validate` is dev-shaped today, but exposing it costs ~10 lines (it's a thin wrapper over an existing CLI verb) and unlocks "codemap doctor" agents that diagnose stale indices. Defer-by-default would only save the wrapping cost; the value-of-information from a future consumer is higher than the maintenance cost. Tracer 4 ships both alongside `audit`.
+
+- **Multi-statement SQL over `query`?** ✅ **Ship `query` (one-statement, CLI parity) + `query_batch` (MCP-only, no CLI counterpart).** Rejected: making `query` accept `;`-delimited batches (would require a real SQL tokenizer and would diverge from CLI output shape — violates plan § 4). `query_batch` uses **batch-wide-defaults + per-statement-overrides**: items are `string | {sql, summary?, changed_since?, group_by?}`. Per-statement object form overrides batch-wide flags; string form inherits them. Output is an array of N elements where each is shaped exactly like single-`query`'s output for the effective flag set. Lock-in cost: once shipped, `query_batch` is a stable contract — backward-compatible to add new per-statement overrides later, but not to remove. SQL-only (no recipe polymorphism); `query_recipe_batch` is an additive future change if a real consumer asks. See § 5 for the schema.
+
+### Still open
+
 - **Resource caching strategy.** Recipes are constant per server boot. Schema is constant per `SCHEMA_VERSION`. Skill text is constant per package version. Cache once at startup vs per-`read_resource` call?
 - **Tool naming convention.** snake_case (matches MCP spec examples) vs kebab-case (matches CLI flags). Picked snake_case in §5; reconsider.
 - **`save_baseline` argument shape.** Two sub-shapes: `{name, sql}` and `{name, recipe}`. One tool with optional fields, or two tools (`save_baseline_sql` / `save_baseline_recipe`)?
