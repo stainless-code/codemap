@@ -50,7 +50,7 @@ Today's Tier-2 rules:
 
 Pure intent-triggered. The skill description is detailed enough that Cursor surfaces it on relevant phrases. No always-on cost.
 
-Skills stay rule-less when the work is **explicitly invoked** by the user, not pattern-triggered (e.g. `audit-pr-architecture`, `docs-lifecycle-sweep` in this repo; `improve-codebase-architecture`, `gritql-codemods`, `ubiquitous-language` in larger codebases).
+Skills stay rule-less when the work is **explicitly invoked** by the user, not pattern-triggered. Today: `audit-pr-architecture`, `docs-governance`, `docs-lifecycle-sweep`, `grill-me`, `improve-codebase-architecture`. (Skills like `gritql-codemods` and `ubiquitous-language` would also fit this tier if adopted.)
 
 ## Authoring guidelines
 
