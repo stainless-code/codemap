@@ -14,7 +14,7 @@
 Agents (Claude Code, Cursor, Codex, generic MCP / HTTP clients) call codemap's structural-query surface **without a Bash round-trip**. Today every agent invocation looks like:
 
 ```bash
-$ codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'X'"
+codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'X'"
 ```
 
 After v1:
@@ -170,7 +170,7 @@ Resources don't take input — they're constant-per-server-instance data. The se
 ## 8. Composition with existing CLI
 
 | CLI flag                                 | MCP equivalent                                                                                    |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------- |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `--json`                                 | Always-on (MCP responses are structured). The CLI's terminal-mode renderer is dead code over MCP. |
 | `--summary`                              | `summary: true` in tool args.                                                                     |
 | `--changed-since <ref>`                  | `changed_since: "<ref>"` in tool args.                                                            |
@@ -182,7 +182,7 @@ Resources don't take input — they're constant-per-server-instance data. The se
 | `--print-sql <id>`                       | `codemap://recipes/{id}` resource.                                                                |
 | `--recipes-json`                         | `codemap://recipes` resource.                                                                     |
 | `--baselines` / `--drop-baseline <name>` | `list_baselines` / `drop_baseline` tools.                                                         |
-| `--save-baseline[=<name>]`               | `save_baseline` tool with `name` + (`recipe`                                                      | `sql`) inputs. |
+| `--save-baseline[=<name>]`               | `save_baseline` tool with `name` + (`recipe` \| `sql`) inputs.                                    |
 
 ## 9. CLI surface
 
@@ -211,7 +211,7 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) and the codemap-au
 
 1. **CLI scaffold** — `cmd-mcp.ts` + `mcp-server.ts` skeletons. `codemap mcp --help` works; `runMcpCmd` boots `@modelcontextprotocol/sdk` server with one stub tool (e.g. `version` returning `{version: "..."}`). Smoke-test via `npx @modelcontextprotocol/inspector`. Commit.
 2. **First tool — `query`** — wires the server to the existing `runQueryCmd` / `printQueryResult` logic; captures stdout into the MCP response body. Tests via SDK in-process. Commit.
-3. **`query_recipe`** — separate tool surfaceing the recipe catalog. Composes `--summary` / `--changed-since` / `--group-by` via JSON args. Commit.
+3. **`query_recipe`** — separate tool surfacing the recipe catalog. Composes `--summary` / `--changed-since` / `--group-by` via JSON args. Commit.
 4. **`audit`** — wraps `runAuditCmd` / `runAudit`; the `baselines` arg becomes the `AuditBaselineMap` directly via `resolveAuditBaselines`. Auto-incremental-index prelude stays. Commit.
 5. **Baseline tools** — `save_baseline` / `list_baselines` / `drop_baseline` round-trip via existing helpers. Commit.
 6. **Resources** — `codemap://recipes`, `codemap://recipes/{id}`, `codemap://schema`, `codemap://skill`. Commit.
