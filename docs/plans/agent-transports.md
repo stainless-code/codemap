@@ -270,9 +270,11 @@ Estimated total: ~1 day across ~7 commits.
 
 - **Tool naming convention?** ✅ **snake_case for both tool names and input properties.** Every MCP reference implementation (spec examples, GitHub MCP, Cursor built-ins) uses snake. Kebab input keys would force agents into bracket notation in JS/TS contexts. CLI stays kebab (shell-idiomatic) — the kebab→snake translation lives at the MCP-arg layer and is documented in § 8.
 
+- **`save_baseline` argument shape?** ✅ **One polymorphic tool: `save_baseline({name, sql?, recipe?})` with runtime validation that exactly one of `sql` / `recipe` is set.** Mirrors the CLI's single `--save-baseline=<name>` verb (which itself accepts either a positional SQL string or `--recipe <id>`); splitting into two MCP tools would diverge from the CLI's mental model. Rejected: schema-`oneOf` envelope (`{name, source: {sql} \| {recipe}}`) — schema-purer but operationally noisy (agents have to write the wrapper); most MCP clients don't expose `oneOf` UX-meaningfully anyway. Rejected: two tools (`save_baseline_sql` / `save_baseline_recipe`) — same reasoning that rejected mega-`cli` in § 3 cuts the other way: one conceptual operation = one tool. Runtime check is one line; error message is more controllable than `oneOf` validation output.
+
 ### Still open
 
-- **`save_baseline` argument shape.** Two sub-shapes: `{name, sql}` and `{name, recipe}`. One tool with optional fields, or two tools (`save_baseline_sql` / `save_baseline_recipe`)?
+_None — all 5 questions settled. Ready to start tracer 2._
 
 ## 13. Non-goals (v1)
 
