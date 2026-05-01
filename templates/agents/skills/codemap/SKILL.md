@@ -53,6 +53,29 @@ Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
 Each emitted delta carries its own `base` metadata so mixed-baseline audits are first-class. `--summary` collapses each delta to `{added: N, removed: N}`. `--no-index` skips the auto-incremental-index prelude (default is to re-index first so `head` reflects current source). v1 ships no `verdict` / threshold config — `codemap audit --json | jq -e '.deltas.dependencies.added | length <= 50'` is the CI exit-code idiom until v1.x ships native thresholds. Each delta pins a canonical SQL projection and validates baseline column-set membership before diffing — schema-bump-resilient (extras dropped, missing columns surface a clean re-save command).
 
+**MCP server (`codemap mcp`)** — separate top-level command that exposes the entire CLI surface to agent hosts (Claude Code, Cursor, Codex, generic MCP clients) as JSON-RPC tools over stdio. Eliminates the bash round-trip on every agent call. Bootstrap once at server boot; tool handlers reuse the existing engine entry-points so output shape is verbatim from each tool's CLI counterpart's `--json` envelope.
+
+**Tools (snake_case throughout — CLI stays kebab; translation lives at the MCP-arg layer):**
+
+- **`query`** — one SQL statement. Args: `{sql, summary?, changed_since?, group_by?}`. Same envelope as `codemap query --json`.
+- **`query_batch`** — MCP-only, no CLI counterpart. Args: `{statements: (string | {sql, summary?, changed_since?, group_by?})[], summary?, changed_since?, group_by?}`. Items are bare SQL strings (inherit batch-wide flag defaults) or objects (override on a per-key basis). Output is N-element array; per-element shape mirrors single-`query`'s output for that statement's effective flag set. Per-statement errors are isolated — failed statements return `{error}` in their slot; siblings still execute. SQL-only (no `recipe` polymorphism in items).
+- **`query_recipe`** — `{recipe, summary?, changed_since?, group_by?}`. Resolves the recipe id to SQL + per-row actions, then executes like `query`. Unknown recipe id returns a structured `{error}` pointing at the `codemap://recipes` resource.
+- **`audit`** — `{baseline_prefix?, baselines?: {files?, dependencies?, deprecated?}, summary?, no_index?}`. Composes per-delta baselines into the `{head, deltas}` envelope. Auto-runs incremental index unless `no_index: true`.
+- **`save_baseline`** — polymorphic `{name, sql? | recipe?}` with runtime exclusivity check (mirrors the CLI's single `--save-baseline=<name>` verb). Pass exactly one of `sql` or `recipe`.
+- **`list_baselines`** — no args; returns the array `codemap query --baselines --json` would print.
+- **`drop_baseline`** — `{name}`. Returns `{dropped: <name>}` on success or `isError` if the name doesn't exist.
+- **`context`** — `{compact?, intent?}`. Returns the project-bootstrap envelope (codemap version, schema version, file count, language breakdown, hubs, sample markers). Designed for agent session-start — one call replaces 4-5 `query` calls.
+- **`validate`** — `{paths?: string[]}`. Compares on-disk SHA-256 to indexed `files.content_hash`; empty `paths` validates everything. Returns rows with status (`ok`/`stale`/`missing`/`unindexed`).
+
+**Resources (lazy-cached on first `read_resource`; constant for server-process lifetime):**
+
+- **`codemap://recipes`** — full catalog JSON (same as `--recipes-json`).
+- **`codemap://recipes/{id}`** — single recipe `{id, description, sql, actions?}`. Replaces `--print-sql <id>`.
+- **`codemap://schema`** — DDL of every table in `.codemap.db` (queried live from `sqlite_schema`).
+- **`codemap://skill`** — full text of this skill file. Agents that don't preload the skill at session start can fetch it here.
+
+**Launching:** point your agent host at `codemap mcp` as the stdio command. Most hosts (Claude Code, Cursor, Codex) accept `{command: "codemap", args: ["mcp"], cwd: "/path/to/project"}`. The server inherits `cwd` as the project root unless `--root` overrides it.
+
 **Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is whatever **`codemap query --print-sql <id>`** or **`codemap query --recipes-json`** returns (single source in the CLI).
 
 The blocks below match **`fan-out`** and **`fan-out-sample`** in the bundled catalog; other recipes align with “Conditional aggregation”, “Codebase statistics”, and component sections later in this skill.

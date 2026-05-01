@@ -243,6 +243,14 @@ Rust-based CSS parser (NAPI bindings). Codemap's `src/css-parser.ts` uses its vi
 
 ## M
 
+### `codemap mcp` / MCP server
+
+Stdio MCP (Model Context Protocol) server exposing codemap's structural-query surface to agent hosts (Claude Code, Cursor, Codex, generic MCP clients) as JSON-RPC tools — eliminates the bash round-trip on every agent invocation. v1 ships one tool per CLI verb (`query`, `query_batch`, `query_recipe`, `audit`, `save_baseline`, `list_baselines`, `drop_baseline`, `context`, `validate`) plus four lazy-cached resources (`codemap://recipes`, `codemap://recipes/{id}`, `codemap://schema`, `codemap://skill`). Tool input/output keys are snake_case (matches MCP spec; CLI stays kebab — translation at the MCP-arg layer). Output shape is verbatim from the CLI's `--json` envelope (no re-mapping). Bootstrap once at server boot; tool handlers reuse engine entry-points (`executeQuery` / `runAudit` / etc.). Distinct from `codemap serve` (HTTP API — v1.x backlog). Implementation: `src/cli/cmd-mcp.ts` (CLI shell) + `src/application/mcp-server.ts` (engine). See [`architecture.md` § MCP wiring](./architecture.md#cli-usage).
+
+### `query_batch` (MCP-only tool)
+
+MCP tool with no CLI counterpart — runs N read-only SQL statements in one round-trip. Items are `string | {sql, summary?, changed_since?, group_by?}`: bare strings inherit batch-wide flag defaults; object form overrides on a per-key basis. Output is an N-element array; per-element shape mirrors single-`query`'s output for that statement's effective flag set. Per-statement errors are isolated (failed statement returns `{error}` in its slot; siblings still execute). Distinct from making `query` accept `;`-delimited batches (rejected — would need a SQL tokenizer and would diverge `query`'s output shape from its CLI counterpart). SQL-only (no `recipe` polymorphism); `query_recipe_batch` is an additive future change if a real consumer asks.
+
 ### markers
 
 `TODO` / `FIXME` / `HACK` / `NOTE` comments extracted from any indexed file (TS, CSS, Markdown, JSON, YAML, …). Stored in the `markers` table; surfaced by the `markers-by-kind` recipe. See `MarkerRow`.

@@ -32,12 +32,23 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | Save / diff a baseline            | `codemap query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`              |
 | List / drop baselines             | `codemap query --baselines` · `codemap query --drop-baseline <name>`                                          |
 | Per-delta audit                   | `codemap audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
+| MCP server (for agent hosts)      | `codemap mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
 **Baselines** (`query_baselines` table inside `.codemap.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
 
 **Audit (`codemap audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Reuses B.6 baselines as the snapshot source. Two CLI shapes — `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`; `--<delta>-baseline <name>` is the explicit per-delta override. v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).
+
+**MCP server (`codemap mcp`)**: stdio MCP (Model Context Protocol) server — agents call codemap as JSON-RPC tools instead of shelling out to the CLI on every read. v1 ships one tool per CLI verb plus four lazy-cached resources:
+
+- **Tools:** `query` / `query_batch` / `query_recipe` / `audit` / `save_baseline` / `list_baselines` / `drop_baseline` / `context` / `validate`. Snake_case keys throughout (CLI stays kebab — translation at the MCP-arg layer).
+- **`query_batch` (MCP-only):** N statements in one round-trip. Items are `string | {sql, summary?, changed_since?, group_by?}` — string form inherits batch-wide flag defaults, object form overrides on a per-key basis. Per-statement errors are isolated.
+- **`save_baseline` (polymorphic):** one tool, `{name, sql? | recipe?}` with runtime exclusivity check (mirrors the CLI's single `--save-baseline=<name>` verb).
+- **Resources:** `codemap://recipes` (catalog), `codemap://recipes/{id}` (one recipe), `codemap://schema` (live DDL from `sqlite_schema`), `codemap://skill` (bundled SKILL.md text). Lazy-cached on first `read_resource`.
+- **Output shape uniformity:** every tool returns the JSON envelope its CLI counterpart's `--json` would print — no re-mapping.
+
+To use from your agent host: launch `codemap mcp` as the MCP server command. Most hosts (Claude Code, Cursor, Codex) accept a stdio command + working directory; codemap will index the working directory's project root.
 
 **Bundled rules/skills:** **`codemap agents init`** writes **`.agents/`** from the package (see [docs/agents.md](../../../docs/agents.md)).
 

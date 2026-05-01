@@ -45,15 +45,11 @@ import type { BatchStatementResolved } from "./query-engine";
 import { runCodemapIndex } from "./run-index";
 
 /**
- * MCP server engine — owns the tool/resource registry. The CLI shell
- * (`src/cli/cmd-mcp.ts`) only handles argv parsing and lifecycle; this
- * module is the thin wrapper around `@modelcontextprotocol/sdk` that
- * registers codemap's tools (one per CLI verb — see plan § 3) and
- * resources (see plan § 7).
- *
- * Ships incrementally per plan § 11. Tracer 2 wires `query` + `query_batch`;
- * subsequent tracers add `query_recipe`, `audit`, baseline tools, and
- * resources.
+ * MCP server engine — owns the tool / resource registry. CLI shell
+ * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
+ * the thin wrapper around `@modelcontextprotocol/sdk` that registers
+ * one tool per CLI verb (plus MCP-only `query_batch`) and the four
+ * `codemap://` resources. See [`docs/architecture.md` § MCP wiring].
  */
 
 interface ServerOpts {
@@ -98,6 +94,19 @@ function jsonError(message: string) {
       { type: "text" as const, text: JSON.stringify({ error: message }) },
     ],
   };
+}
+
+// Engine helpers (executeQuery / runAudit) return either a result payload OR
+// `{error}` for in-band failures. Narrows that union cheaply for the tool
+// handlers; centralised so the type-guard logic stays in one place.
+function isEnginePayloadError(payload: unknown): payload is { error: string } {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    "error" in payload &&
+    typeof (payload as { error: unknown }).error === "string"
+  );
 }
 
 /**
@@ -167,14 +176,7 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
           groupBy: args.group_by,
           root: opts.root,
         });
-        if (
-          payload !== null &&
-          typeof payload === "object" &&
-          !Array.isArray(payload) &&
-          "error" in payload
-        ) {
-          return jsonError(payload.error as string);
-        }
+        if (isEnginePayloadError(payload)) return jsonError(payload.error);
         return jsonResult(payload);
       } catch (err) {
         return jsonError(err instanceof Error ? err.message : String(err));
@@ -218,14 +220,7 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
           recipeActions,
           root: opts.root,
         });
-        if (
-          payload !== null &&
-          typeof payload === "object" &&
-          !Array.isArray(payload) &&
-          "error" in payload
-        ) {
-          return jsonError(payload.error as string);
-        }
+        if (isEnginePayloadError(payload)) return jsonError(payload.error);
         return jsonResult(payload);
       } catch (err) {
         return jsonError(err instanceof Error ? err.message : String(err));
@@ -299,10 +294,7 @@ function mergeBatchItem(
       group_by: defaults.group_by,
     };
   }
-  // Object form: per-statement keys override batch-wide defaults.
-  // Missing keys inherit; explicit `undefined` is treated as "inherit"
-  // since Zod `.optional()` produces missing-key indistinguishable
-  // from explicit-undefined here.
+  // Per-key override; undefined or missing key inherits batch-wide.
   return {
     sql: item.sql,
     summary: item.summary ?? defaults.summary,
@@ -475,14 +467,7 @@ function registerSaveBaselineTool(server: McpServer, _opts: ServerOpts): void {
           sql = args.sql!;
         }
         const payload = executeQuery({ sql, root: _opts.root });
-        if (
-          payload !== null &&
-          typeof payload === "object" &&
-          !Array.isArray(payload) &&
-          "error" in payload
-        ) {
-          return jsonError(payload.error as string);
-        }
+        if (isEnginePayloadError(payload)) return jsonError(payload.error);
         const rows = payload as unknown[];
         const db = openDb();
         const savedAt = Date.now();

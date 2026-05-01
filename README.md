@@ -110,6 +110,12 @@ codemap query --recipes-json
 codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
 
+# MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
+codemap mcp                                                     # JSON-RPC on stdio, one tool per CLI verb
+# Tools: query, query_batch, query_recipe, audit, save_baseline, list_baselines, drop_baseline, context, validate
+# Resources: codemap://recipes, codemap://recipes/{id}, codemap://schema, codemap://skill (lazy-cached)
+# Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
+
 # Another project
 codemap --root /path/to/repo --full
 
