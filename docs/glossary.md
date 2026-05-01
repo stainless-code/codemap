@@ -31,6 +31,10 @@ See **language adapter**.
 
 A `.agents/rules/<name>.md` file with YAML frontmatter. Distinct from a **skill** (longer, scenario-specific). Distinct from a **bundled recipe** (which is SQL, not Markdown).
 
+### audit
+
+Two-snapshot structural-drift command: `codemap audit --baseline <prefix>` (or `--<delta>-baseline <name>`) diffs the live `.codemap.db` against per-delta saved baselines (B.6) and emits `{head, deltas}` where each `deltas[<key>]` carries `{base, added, removed}`. v1 ships three deltas: `files`, `dependencies`, `deprecated`. Each delta pins a canonical SQL projection (in `V1_DELTAS`) and a required-columns list — projects baseline rows down to that subset before diffing so schema bumps that add columns don't break pre-bump baselines. Distinct from `codemap query --baseline` (that's one query, one diff; audit composes multiple per-delta diffs into one envelope). Distinct from `fallow audit` (that runs code-quality verdicts — dead code, dupes, complexity — which are explicit non-goals per [`roadmap.md` § Non-goals (v1)](./roadmap.md#non-goals-v1); codemap audit stays structural).
+
 ---
 
 ## B
