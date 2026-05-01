@@ -171,6 +171,32 @@ describe("MCP server — query_batch tool", () => {
     }
   });
 
+  it("isolates changed_since failures per slot — siblings still succeed", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_batch",
+        arguments: {
+          statements: [
+            // ref that doesn't exist anywhere — git lookup should fail
+            {
+              sql: "SELECT path FROM files",
+              changed_since: "definitely-not-a-real-ref-xyz123",
+            },
+            "SELECT path FROM files WHERE language='markdown'",
+          ],
+        },
+      });
+      const json = readJson(r);
+      expect(json).toHaveLength(2);
+      expect(json[0]).toMatchObject({ error: expect.any(String) });
+      // Sibling statement still ran despite slot 0's git failure.
+      expect(json[1]).toEqual([{ path: "docs/c.md" }]);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("isolates per-statement errors — siblings still succeed", async () => {
     const { client, server } = await makeClient();
     try {

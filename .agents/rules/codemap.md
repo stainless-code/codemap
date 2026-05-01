@@ -35,7 +35,7 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 
 **MCP server (`bun src/index.ts mcp`)**: stdio MCP (Model Context Protocol) server — agents call codemap as JSON-RPC tools instead of shelling out to the CLI on every read. v1 ships one tool per CLI verb plus four lazy-cached resources:
 
-- **Tools:** `query` / `query_batch` / `query_recipe` / `audit` / `save_baseline` / `list_baselines` / `drop_baseline` / `context` / `validate`. Snake_case keys throughout (CLI stays kebab — translation at the MCP-arg layer).
+- **Tools:** `query` / `query_batch` / `query_recipe` / `audit` / `save_baseline` / `list_baselines` / `drop_baseline` / `context` / `validate`. Snake_case keys (Codemap convention matching MCP spec examples + reference servers — spec is convention-agnostic; CLI stays kebab).
 - **`query_batch` (MCP-only):** N statements in one round-trip. Items are `string | {sql, summary?, changed_since?, group_by?}` — string form inherits batch-wide flag defaults, object form overrides on a per-key basis. Per-statement errors are isolated.
 - **`save_baseline` (polymorphic):** one tool, `{name, sql? | recipe?}` with runtime exclusivity check (mirrors the CLI's single `--save-baseline=<name>` verb).
 - **Resources:** `codemap://recipes` (catalog), `codemap://recipes/{id}` (one recipe), `codemap://schema` (live DDL from `sqlite_schema`), `codemap://skill` (bundled SKILL.md text). Lazy-cached on first `read_resource`.

@@ -77,6 +77,34 @@ describe("executeQuery", () => {
     });
     expect(r).toEqual([{ path: "src/a.ts" }]);
   });
+
+  it("rejects DML — read-only enforcement via PRAGMA query_only", () => {
+    const r = executeQuery({
+      sql: "DELETE FROM files WHERE language='markdown'",
+      root: benchDir,
+    });
+    expect(r).toMatchObject({ error: expect.any(String) });
+    // Confirm the row wasn't actually deleted.
+    const after = executeQuery({
+      sql: "SELECT COUNT(*) AS n FROM files WHERE language='markdown'",
+      root: benchDir,
+    });
+    expect(after).toEqual([{ n: 1 }]);
+  });
+
+  it("rejects DDL — DROP TABLE blocked by query_only", () => {
+    const r = executeQuery({
+      sql: "DROP TABLE files",
+      root: benchDir,
+    });
+    expect(r).toMatchObject({ error: expect.any(String) });
+    // Confirm the table still exists.
+    const after = executeQuery({
+      sql: "SELECT COUNT(*) AS n FROM files",
+      root: benchDir,
+    });
+    expect(after).toEqual([{ n: 3 }]);
+  });
 });
 
 describe("executeQueryBatch", () => {

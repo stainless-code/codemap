@@ -55,7 +55,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 
 **MCP server (`codemap mcp`)** — separate top-level command that exposes the entire CLI surface to agent hosts (Claude Code, Cursor, Codex, generic MCP clients) as JSON-RPC tools over stdio. Eliminates the bash round-trip on every agent call. Bootstrap once at server boot; tool handlers reuse the existing engine entry-points so output shape is verbatim from each tool's CLI counterpart's `--json` envelope.
 
-**Tools (snake_case throughout — CLI stays kebab; translation lives at the MCP-arg layer):**
+**Tools (snake_case keys — Codemap convention matching MCP spec examples + reference servers; spec is convention-agnostic. CLI stays kebab; translation lives at the MCP-arg layer.):**
 
 - **`query`** — one SQL statement. Args: `{sql, summary?, changed_since?, group_by?}`. Same envelope as `codemap query --json`.
 - **`query_batch`** — MCP-only, no CLI counterpart. Args: `{statements: (string | {sql, summary?, changed_since?, group_by?})[], summary?, changed_since?, group_by?}`. Items are bare SQL strings (inherit batch-wide flag defaults) or objects (override on a per-key basis). Output is N-element array; per-element shape mirrors single-`query`'s output for that statement's effective flag set. Per-statement errors are isolated — failed statements return `{error}` in their slot; siblings still execute. SQL-only (no `recipe` polymorphism in items).

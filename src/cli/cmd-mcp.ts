@@ -29,13 +29,29 @@ export function printMcpCmdHelp(): void {
   console.log(`Usage: codemap mcp
 
 Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
-launched by an agent host (Claude Code, Cursor, Codex, etc.) — JSON-RPC
-in on stdin, JSON-RPC out on stdout, logs on stderr.
+launched by an agent host (Claude Code, Cursor, Codex, generic MCP
+clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Each MCP tool wraps a codemap CLI verb (query / query_recipe / audit /
-baseline ops / context / validate) — see docs/plans/agent-transports.md
-for the surface design. Tracer 1 only ships the \`ping\` stub tool;
-real tools land in subsequent commits.
+Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
+  query                One read-only SQL statement.
+  query_batch          N statements in one round-trip (MCP-only).
+  query_recipe         Bundled SQL recipe by id; per-row \`actions\` hints.
+  audit                Structural-drift audit ({head, deltas} envelope).
+  save_baseline        Snapshot rows under a name (sql or recipe).
+  list_baselines       Catalog of saved baselines.
+  drop_baseline        Delete a baseline.
+  context              Project bootstrap envelope.
+  validate             On-disk hash vs indexed hash.
+
+Resources (lazy-cached on first read):
+  codemap://recipes              Full recipe catalog.
+  codemap://recipes/{id}         Single recipe (id, description, sql).
+  codemap://schema               Live DDL of every table.
+  codemap://skill                Bundled SKILL.md.
+
+Output shape is verbatim from each tool's CLI counterpart \`--json\`
+envelope (no re-mapping). See docs/architecture.md § MCP wiring for
+the engine seam and the agent rule + skill for query examples.
 
 Global flags (parsed by bootstrap, forwarded to the server):
   --root <dir>      Project root (defaults to cwd; respects CODEMAP_ROOT).

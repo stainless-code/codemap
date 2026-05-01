@@ -40,8 +40,7 @@ import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { runAudit } from "./audit-engine";
 import { getCurrentCommit } from "./index-engine";
-import { executeQuery, executeQueryBatch } from "./query-engine";
-import type { BatchStatementResolved } from "./query-engine";
+import { executeQuery } from "./query-engine";
 import { runCodemapIndex } from "./run-index";
 
 /**
@@ -129,6 +128,18 @@ function makeChangedFilesResolver(
   };
 }
 
+/**
+ * Build a fully-configured `McpServer` instance with every codemap tool
+ * and resource registered. Doesn't connect to a transport — caller owns
+ * lifecycle (production: `runMcpServer` attaches stdio; tests:
+ * `InMemoryTransport.createLinkedPair()` for in-process driving).
+ *
+ * `opts.root` is the indexed project root (forwarded to tool handlers
+ * for `--changed-since` git lookups, `group_by package` workspace
+ * discovery, etc.); `opts.version` populates MCP `Implementation.version`
+ * for the `tools/list` self-description; `opts.configFile` is unused at
+ * registration time but threaded through for symmetry with bootstrap.
+ */
 export function createMcpServer(opts: ServerOpts): McpServer {
   const server = new McpServer({
     name: "codemap",
@@ -244,24 +255,31 @@ function registerQueryBatchTool(server: McpServer, opts: ServerOpts): void {
     },
     (args) => {
       try {
+        // `changed_since` resolution can fail per-item (bad ref, git missing
+        // for that branch, etc.). Run the resolver inline so a failure for
+        // statement i lands in slot i instead of aborting the whole batch —
+        // matches the per-statement isolation contract documented in
+        // `executeQueryBatch` and plan § 5.
         const resolveChanged = makeChangedFilesResolver(opts.root);
-        const resolved: BatchStatementResolved[] = [];
-        for (const item of args.statements) {
-          const merged = mergeBatchItem(item, args);
-          const changed = resolveChanged(merged.changed_since);
-          if (changed && typeof changed === "object" && "error" in changed) {
-            return jsonError(changed.error);
+        const results = args.statements.map((item) => {
+          try {
+            const merged = mergeBatchItem(item, args);
+            const changed = resolveChanged(merged.changed_since);
+            if (changed && typeof changed === "object" && "error" in changed) {
+              return { error: changed.error };
+            }
+            return executeQuery({
+              sql: merged.sql,
+              summary: merged.summary,
+              changedFiles: changed as Set<string> | undefined,
+              groupBy: merged.group_by,
+              root: opts.root,
+            });
+          } catch (err) {
+            return {
+              error: err instanceof Error ? err.message : String(err),
+            };
           }
-          resolved.push({
-            sql: merged.sql,
-            summary: merged.summary,
-            changedFiles: changed as Set<string> | undefined,
-            groupBy: merged.group_by,
-          });
-        }
-        const results = executeQueryBatch({
-          statements: resolved,
-          root: opts.root,
         });
         return jsonResult(results);
       } catch (err) {

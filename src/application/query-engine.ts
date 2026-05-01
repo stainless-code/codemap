@@ -37,6 +37,13 @@ export interface ExecuteQueryOpts {
   root: string;
 }
 
+/**
+ * The JSON envelope `executeQuery` returns on success — same shape
+ * `codemap query --json` prints. Discriminated by which flags were set:
+ * raw `unknown[]` for default reads, `{count}` under `summary`,
+ * `{group_by, groups}` under `groupBy` (groups carry full row arrays
+ * by default; counts only when `summary` is also true).
+ */
 export type QueryResultPayload =
   | unknown[]
   | { count: number }
@@ -46,6 +53,12 @@ export type QueryResultPayload =
       groups: Array<{ key: string; count: number }>;
     };
 
+/**
+ * In-band failure shape returned for SQL errors, group_by misconfig,
+ * and other recoverable failures. Mirrors the `{"error":"…"}` shape the
+ * CLI's `--json` flag emits — callers that care can narrow with
+ * `"error" in payload` (or use `isEnginePayloadError` from `mcp-server`).
+ */
 export interface ExecuteQueryError {
   error: string;
 }
@@ -61,6 +74,14 @@ export function executeQuery(
 ): QueryResultPayload | ExecuteQueryError {
   const db = openDb();
   try {
+    // SQLite-level read-only enforcement — rejects DML / DDL (DELETE, DROP,
+    // UPDATE, ATTACH, …) on this connection regardless of the SQL the caller
+    // passes. Defence in depth: every consumer of `executeQuery` (MCP `query`,
+    // `query_recipe`, `query_batch`, `save_baseline`'s row capture) is
+    // contractually read-only; this guard turns the contract into a parser-
+    // proof boundary. Doesn't bleed across calls — `closeDb()` discards the
+    // connection.
+    db.run("PRAGMA query_only = 1");
     let rows = db.query(opts.sql).all() as unknown[];
 
     if (opts.changedFiles !== undefined) {
