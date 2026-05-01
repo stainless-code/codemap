@@ -204,7 +204,7 @@ MCP resources are addressable read-only data the host can fetch ahead of tool ca
 | `codemap://schema`       | DDL / column descriptions (lifted from `architecture.md § Schema`)  | Tells the agent what tables exist.                                      |
 | `codemap://skill`        | Full text of the bundled `templates/agents/skills/codemap/SKILL.md` | Agents that don't preload the bundled skill can `read_resource` for it. |
 
-Resources don't take input — they're constant-per-server-instance data. The server caches them at startup.
+Resources don't take input — they're constant-per-server-instance data. **Caching: lazy (memoize on first `read_resource`).** Eager-at-boot would pay I/O for resources many sessions never request; per-call would re-read constant data. First-call cost is a single small file read + JSON serialization (negligible). Cache invalidation: never (the server process is short-lived; agent host respawns it on package update or session restart).
 
 ## 8. Composition with existing CLI
 
@@ -266,9 +266,10 @@ Estimated total: ~1 day across ~7 commits.
 
 - **Multi-statement SQL over `query`?** ✅ **Ship `query` (one-statement, CLI parity) + `query_batch` (MCP-only, no CLI counterpart).** Rejected: making `query` accept `;`-delimited batches (would require a real SQL tokenizer and would diverge from CLI output shape — violates plan § 4). `query_batch` uses **batch-wide-defaults + per-statement-overrides**: items are `string | {sql, summary?, changed_since?, group_by?}`. Per-statement object form overrides batch-wide flags; string form inherits them. Output is an array of N elements where each is shaped exactly like single-`query`'s output for the effective flag set. Lock-in cost: once shipped, `query_batch` is a stable contract — backward-compatible to add new per-statement overrides later, but not to remove. SQL-only (no recipe polymorphism); `query_recipe_batch` is an additive future change if a real consumer asks. See § 5 for the schema.
 
+- **Resource caching strategy?** ✅ **Lazy (memoize on first `read_resource`).** All four resources are constant per server-process lifetime, so eager-vs-lazy produce identical observable behavior — only difference is when the I/O happens. Lazy keeps boot lean (sessions that never call `read_resource` pay nothing) and the first-call cost is one small file read. Cache lives for the server process; never invalidated.
+
 ### Still open
 
-- **Resource caching strategy.** Recipes are constant per server boot. Schema is constant per `SCHEMA_VERSION`. Skill text is constant per package version. Cache once at startup vs per-`read_resource` call?
 - **Tool naming convention.** snake_case (matches MCP spec examples) vs kebab-case (matches CLI flags). Picked snake_case in §5; reconsider.
 - **`save_baseline` argument shape.** Two sub-shapes: `{name, sql}` and `{name, recipe}`. One tool with optional fields, or two tools (`save_baseline_sql` / `save_baseline_recipe`)?
 
