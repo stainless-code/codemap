@@ -13,13 +13,20 @@ import { buildContextEnvelope } from "../cli/cmd-context";
 import { computeValidateRows } from "../cli/cmd-validate";
 import { getQueryRecipeActions, getQueryRecipeSql } from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
-import { closeDb, openDb } from "../db";
+import {
+  closeDb,
+  deleteQueryBaseline,
+  listQueryBaselines,
+  openDb,
+  upsertQueryBaseline,
+} from "../db";
 import { getFilesChangedSince } from "../git-changed";
 import { GROUP_BY_MODES } from "../group-by";
 import type { GroupByMode } from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { runAudit } from "./audit-engine";
+import { getCurrentCommit } from "./index-engine";
 import { executeQuery, executeQueryBatch } from "./query-engine";
 import type { BatchStatementResolved } from "./query-engine";
 import { runCodemapIndex } from "./run-index";
@@ -112,6 +119,9 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerAuditTool(server, opts);
   registerContextTool(server, opts);
   registerValidateTool(server, opts);
+  registerSaveBaselineTool(server, opts);
+  registerListBaselinesTool(server, opts);
+  registerDropBaselineTool(server, opts);
 
   return server;
 }
@@ -415,6 +425,145 @@ function registerValidateTool(server: McpServer, _opts: ServerOpts): void {
       }
     },
   );
+}
+
+function registerSaveBaselineTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "save_baseline",
+    {
+      description:
+        "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (bundled recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
+      inputSchema: {
+        name: z.string().min(1, "name must be a non-empty string"),
+        sql: z.string().optional(),
+        recipe: z.string().optional(),
+      },
+    },
+    (args) => {
+      try {
+        if ((args.sql == null) === (args.recipe == null)) {
+          return jsonError(
+            "save_baseline: pass exactly one of `sql` or `recipe`.",
+          );
+        }
+        let sql: string;
+        let recipeId: string | null = null;
+        if (args.recipe != null) {
+          const recipeSql = getQueryRecipeSql(args.recipe);
+          if (recipeSql === undefined) {
+            return jsonError(
+              `save_baseline: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
+            );
+          }
+          sql = recipeSql;
+          recipeId = args.recipe;
+        } else {
+          sql = args.sql!;
+        }
+        const payload = executeQuery({ sql, root: _opts.root });
+        if (
+          payload !== null &&
+          typeof payload === "object" &&
+          !Array.isArray(payload) &&
+          "error" in payload
+        ) {
+          return jsonError(payload.error as string);
+        }
+        const rows = payload as unknown[];
+        const db = openDb();
+        const savedAt = Date.now();
+        const gitRef = tryGetGitRefSafe();
+        try {
+          upsertQueryBaseline(db, {
+            name: args.name,
+            recipe_id: recipeId,
+            sql,
+            rows_json: JSON.stringify(rows),
+            row_count: rows.length,
+            git_ref: gitRef,
+            created_at: savedAt,
+          });
+        } finally {
+          closeDb(db);
+        }
+        return jsonResult({
+          saved: args.name,
+          recipe_id: recipeId,
+          row_count: rows.length,
+          git_ref: gitRef,
+          created_at: savedAt,
+        });
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerListBaselinesTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "list_baselines",
+    {
+      description:
+        "List all saved baselines (no rows_json payload — use the audit tool with a baseline_prefix to compare against current). Returns the same array `codemap query --baselines --json` prints.",
+      inputSchema: {},
+    },
+    () => {
+      try {
+        const db = openDb();
+        try {
+          return jsonResult(listQueryBaselines(db));
+        } finally {
+          closeDb(db, { readonly: true });
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerDropBaselineTool(server: McpServer, _opts: ServerOpts): void {
+  server.registerTool(
+    "drop_baseline",
+    {
+      description:
+        "Delete the named baseline. Returns {dropped: <name>} on success or {error} if the name doesn't exist.",
+      inputSchema: {
+        name: z.string().min(1, "name must be a non-empty string"),
+      },
+    },
+    (args) => {
+      try {
+        const db = openDb();
+        try {
+          const dropped = deleteQueryBaseline(db, args.name);
+          if (!dropped) {
+            return jsonError(
+              `drop_baseline: no baseline named "${args.name}". Call list_baselines for the catalog.`,
+            );
+          }
+          return jsonResult({ dropped: args.name });
+        } finally {
+          closeDb(db);
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+// `git rev-parse HEAD` may legitimately fail (no git, detached worktree, etc.);
+// baselines just record git_ref = NULL in that case. Mirrors the same helper
+// in cmd-query.ts (kept local to avoid a cli → application import).
+function tryGetGitRefSafe(): string | null {
+  try {
+    const sha = getCurrentCommit();
+    return sha || null;
+  } catch {
+    return null;
+  }
 }
 
 /**

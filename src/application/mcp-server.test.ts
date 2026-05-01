@@ -370,3 +370,136 @@ describe("MCP server — audit / context / validate tools", () => {
     }
   });
 });
+
+describe("MCP server — baseline tools", () => {
+  it("lists save_baseline / list_baselines / drop_baseline in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("save_baseline");
+      expect(names).toContain("list_baselines");
+      expect(names).toContain("drop_baseline");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("save_baseline rejects passing both sql and recipe", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "save_baseline",
+        arguments: { name: "x", sql: "SELECT 1", recipe: "fan-out" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("exactly one"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("save_baseline rejects passing neither sql nor recipe", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "save_baseline",
+        arguments: { name: "x" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("exactly one"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("save_baseline saves SQL rows then list_baselines surfaces it", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const saved = await client.callTool({
+        name: "save_baseline",
+        arguments: {
+          name: "snap-files",
+          sql: "SELECT path FROM files ORDER BY path",
+        },
+      });
+      expect(readJson(saved)).toMatchObject({
+        saved: "snap-files",
+        recipe_id: null,
+        row_count: 3,
+      });
+
+      const listed = await client.callTool({
+        name: "list_baselines",
+        arguments: {},
+      });
+      const json = readJson(listed) as Array<{ name: string }>;
+      expect(json.some((b) => b.name === "snap-files")).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("save_baseline saves a recipe (recipe_id surfaces in payload)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const saved = await client.callTool({
+        name: "save_baseline",
+        arguments: { name: "snap-deprecated", recipe: "deprecated-symbols" },
+      });
+      expect(readJson(saved)).toMatchObject({
+        saved: "snap-deprecated",
+        recipe_id: "deprecated-symbols",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("save_baseline returns isError for unknown recipe id", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "save_baseline",
+        arguments: { name: "x", recipe: "nope" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("nope"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("drop_baseline removes the saved baseline; second drop returns isError", async () => {
+    const { client, server } = await makeClient();
+    try {
+      await client.callTool({
+        name: "save_baseline",
+        arguments: { name: "to-drop", sql: "SELECT 1" },
+      });
+
+      const first = await client.callTool({
+        name: "drop_baseline",
+        arguments: { name: "to-drop" },
+      });
+      expect(readJson(first)).toEqual({ dropped: "to-drop" });
+
+      const second = await client.callTool({
+        name: "drop_baseline",
+        arguments: { name: "to-drop" },
+      });
+      expect((second as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(second)).toMatchObject({
+        error: expect.stringContaining("to-drop"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+});
