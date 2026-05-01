@@ -84,7 +84,22 @@ Each `.sql` is the recipe's SQL verbatim (one statement, no `;` terminator neede
 
 `<projectRoot>` is the same root the CLI's `--root` / `CODEMAP_ROOT` resolves to. `.codemap/` is the conventional location for codemap-related project artifacts — same parent as a future user-config might use.
 
-### 3.3 Single-file form (rejected for v1)
+**Gitignore note (verified, not just assumed).** Codemap's bundled `.gitignore` line `.codemap.*` is the literal-dot glob `.codemap.<chars>` — it matches `.codemap.db` but NOT the `.codemap/` directory or files inside it. Confirmed via `git check-ignore -v .codemap/recipes/foo.sql` returning no match. So project recipes are checked into git by default, which is the intended behavior (recipes are source code authored for human review). Consumer-side risk: if a user's `.gitignore` ignores `.codemap*` (no dot — common defensive pattern), their project recipes will be silently dropped on clone — the shipped agent rule + skill calls this out and recommends `!.codemap/recipes/` as the un-ignore.
+
+### 3.3 Why filesystem and not `.codemap.db`
+
+`query_baselines` lives inside `.codemap.db` (see [`architecture.md` § Query wiring](../architecture.md#cli-usage)) — same project, opposite call. The deciding tests:
+
+|                                                 | `query_baselines` (in DB)                                      | recipes (in filesystem)                                                     |
+| ----------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Nature                                          | Output — captured query results                                | Input — SQL the user wrote                                                  |
+| Tied to a specific index state?                 | Yes (rows are valid only against the index that produced them) | No (same SQL runs against any project with the schema)                      |
+| Authored by humans for human review?            | No (codemap captures them on `--save-baseline`)                | Yes (PR-reviewed source code)                                               |
+| Meaningful outside one project's `.codemap.db`? | No                                                             | Yes (copy-paste from docs, lift from a colleague's PR, share via submodule) |
+
+If a user wants to send a recipe to a colleague, the file-based answer is "send the `.sql`." The DB-based answer would be `codemap recipes export foo > foo.sql; … import foo.sql` — reinventing files. Plus bundled recipes ship in the npm package as files (`templates/recipes/`); putting them in DB would require a migration step and an exception to `dropAll()` for every codemap upgrade.
+
+### 3.4 Single-file form (rejected for v1)
 
 YAML-frontmatter Markdown with the SQL in a code block (Astro / Hugo style) was considered:
 
@@ -208,10 +223,10 @@ Estimated total: ~1 day across ~6 commits.
 
 - **Q-A. Storage layout for bundled recipes?** ✅ **(i) `templates/recipes/<id>.{sql,md}` file-pair.** Uniformity with project recipes wins: one loader code path (no `if (source === "bundled")` branches), `.sql` files get SQLite syntax highlighting in every editor (today's `QUERY_RECIPES` template literals get none), single-file diffs for SQL changes, and `sqlite3 .codemap.db ".read …"` works for ad-hoc testing. Migration cost is one-time (~15 entries → ~15 `.sql` files); the shim layer in `cli/query-recipes.ts` preserves backwards-compat for `getQueryRecipeSql` / `getQueryRecipeActions` / `QUERY_RECIPES` re-exports. Rejected (ii) "code-map + sibling .md only" — smaller initial diff but two storage shapes that compound debt every time the recipe surface evolves.
 - **Q-B. Loading time?** ✅ **Eager at startup.** Cost is negligible (~15-20 small file reads, sub-millisecond on warm SSD — rounding error vs node/bun startup, oxc, bun:sqlite). "Registry is always populated" eliminates per-call `if (notLoadedYet)` guards. Surfaces malformed-recipe errors at startup instead of 30-minutes-into-a-session. Rejected (ii) lazy — its win ("don't pay for what you don't use") is hypothetical for filesystem reads of static files; matters for DB connections / network calls, not 20 small files. Rejected (iii) eager-with-disk-cache — over-engineered; introduces invalidation problem for no measurable win.
+- **Q-C. Project recipes — discovery walk-up?** ✅ **Root-only — `<projectRoot>/.codemap/recipes/`.** Same root the CLI's `--root` / `CODEMAP_ROOT` resolves to; same root `.codemap.db` lives in. Adding walk-up for _just_ recipes would make them the only piece of codemap that resolves differently from everything else (DB, indexer, resolver) — confusing inconsistency. Monorepos are well-served today via `--root packages/foo` (recipes load from `packages/foo/.codemap/recipes/`); shared recipes can use a filesystem symlink. Walk-up is additive (forward-compatible), so we can revisit if real consumer demand emerges; root-only-→-walk-up is a non-breaking expansion. Rejected (iii) workspace-cascade — `.eslintrc`-style cascading is appropriate when a workspace primitive exists; codemap's workspace concept is a separate roadmap item, so cascading would pre-commit to a design before its dependency lands.
 
 ### Still open
 
-- **Q-C. Project recipes — discovery walk-up?** Today `.codemap.db` is created in the project root only. Should `.codemap/recipes/` also be project-root-only, OR walk up like `.git` does (find nearest ancestor `.codemap/recipes/` directory)? Walk-up matches monorepo intuition; root-only matches everything else codemap does today.
 - **Q-D. `actions` for project-local recipes — and how specified?** Three options: (i) skip for v1 (project recipes can't have actions; bundled-only feature). (ii) YAML frontmatter on `<id>.md` (one parser dependency, e.g. `gray-matter` or hand-rolled). (iii) Sibling `<id>.actions.json` file (no parser; another file per recipe). (i) keeps v1 lean; (ii) is most ergonomic for recipe authors; (iii) is the "no new dep" middle ground.
 - **Q-E. Conflict resolution loud or quiet?** When a project recipe shadows a bundled one, do we (i) silently let project win (clean), (ii) emit a one-time stderr warning ("project recipe `fan-out` shadows the bundled `fan-out`"), or (iii) require an explicit `--allow-shadow` flag? Bias toward (i) — user code wins is the convention; warnings risk noise.
 - **Q-F. Validation strictness.** Reject project recipes that contain DML / DDL at load time (mirrors the `PRAGMA query_only` defence we shipped in PR #35), or let them fail at run time? Load-time rejection is more agent-friendly (fails fast on save_baseline-style misuse); run-time falls back to the engine's existing safeguard. Bias toward load-time — same lexical sanity check that's already proposed for empty-file detection.
