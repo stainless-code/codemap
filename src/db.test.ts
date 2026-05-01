@@ -4,12 +4,16 @@ import {
   closeDb,
   createIndexes,
   createTables,
+  deleteQueryBaseline,
   getMeta,
   getAllFileHashes,
+  getQueryBaseline,
   insertFile,
   insertSymbols,
+  listQueryBaselines,
   SCHEMA_VERSION,
   setMeta,
+  upsertQueryBaseline,
 } from "./db";
 import { openCodemapDatabase } from "./sqlite-db";
 
@@ -113,6 +117,71 @@ describe("SQLite layer (in-memory)", () => {
         )
         .all() as Array<{ name: string }>;
       expect(tagged.map((r) => r.name)).toEqual(["internalFn", "publicFn"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("query_baselines round-trips upsert / get / list / delete", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      expect(listQueryBaselines(db)).toEqual([]);
+      expect(getQueryBaseline(db, "fan-out")).toBeUndefined();
+
+      upsertQueryBaseline(db, {
+        name: "fan-out",
+        recipe_id: "fan-out",
+        sql: "SELECT 1",
+        rows_json: JSON.stringify([{ a: 1 }, { a: 2 }]),
+        row_count: 2,
+        git_ref: "abc1234",
+        created_at: 1_700_000_000_000,
+      });
+
+      const got = getQueryBaseline(db, "fan-out");
+      expect(got).toEqual({
+        name: "fan-out",
+        recipe_id: "fan-out",
+        sql: "SELECT 1",
+        rows_json: JSON.stringify([{ a: 1 }, { a: 2 }]),
+        row_count: 2,
+        git_ref: "abc1234",
+        created_at: 1_700_000_000_000,
+      });
+
+      // Re-saving with the same name overwrites in place.
+      upsertQueryBaseline(db, {
+        name: "fan-out",
+        recipe_id: "fan-out",
+        sql: "SELECT 1",
+        rows_json: JSON.stringify([{ a: 1 }]),
+        row_count: 1,
+        git_ref: "def5678",
+        created_at: 1_700_000_001_000,
+      });
+      expect(getQueryBaseline(db, "fan-out")?.row_count).toBe(1);
+      expect(getQueryBaseline(db, "fan-out")?.git_ref).toBe("def5678");
+
+      // Second baseline coexists.
+      upsertQueryBaseline(db, {
+        name: "pre-refactor",
+        recipe_id: null,
+        sql: "SELECT name FROM symbols",
+        rows_json: "[]",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1_700_000_002_000,
+      });
+
+      const list = listQueryBaselines(db);
+      // Sorted DESC by created_at — pre-refactor first.
+      expect(list.map((b) => b.name)).toEqual(["pre-refactor", "fan-out"]);
+      expect(list[0]).not.toHaveProperty("rows_json"); // summary view omits payload
+
+      expect(deleteQueryBaseline(db, "pre-refactor")).toBe(true);
+      expect(deleteQueryBaseline(db, "pre-refactor")).toBe(false); // already gone
+      expect(listQueryBaselines(db).map((b) => b.name)).toEqual(["fan-out"]);
     } finally {
       closeDb(db);
     }

@@ -299,6 +299,10 @@ A managed root-level file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copil
 
 Any SQL run against `.codemap.db` — either a **recipe** (bundled SQL) or ad-hoc. Distinct from **query-recipes.ts** (the file that holds bundled recipe SQL strings).
 
+### query baseline
+
+A snapshot of a query result set saved by `codemap query --save-baseline[=<name>]` and replayed by `codemap query --baseline[=<name>]` for added/removed diffs. Stored in the `query_baselines` table inside `.codemap.db` (no parallel JSON files; survives `--full` and `SCHEMA_VERSION` rebuilds because the table is intentionally absent from `dropAll()`). Default name = `--recipe` id; ad-hoc SQL must pass an explicit name. Diff identity is per-row `JSON.stringify` equality — exact match, no fuzzy "changed" category in v1.
+
 ### query recipe
 
 See **recipe**.
