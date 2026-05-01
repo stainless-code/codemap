@@ -283,8 +283,6 @@ function emitAuditError(message: string, json: boolean) {
   process.exitCode = 1;
 }
 
-// Tracer 3: stub renderer — emits the envelope as-is. Tracer 5 ships the
-// terminal-mode polish (no-drift / drift sections / --summary one-liner per §7.1).
 function renderAudit(
   envelope: AuditEnvelope,
   opts: { json: boolean; summary: boolean },
@@ -312,13 +310,59 @@ function renderAudit(
     }
     return;
   }
-  // Terminal stub — Tracer 5 replaces with the §7.1 layout.
-  const requested = Object.keys(envelope.deltas);
-  if (requested.length === 0) {
-    console.log("audit: no deltas requested");
+  renderAuditTerminal(envelope, opts.summary);
+}
+
+// Terminal-mode renderer per plan §7.1, adapted for per-delta `base`:
+// - Header line summarises how many deltas ran and how many drifted
+// - One line per delta with its baseline name + sha + counts
+// - --summary stops there
+// - Without --summary, drifting deltas get added / removed `console.table` blocks
+function renderAuditTerminal(envelope: AuditEnvelope, summary: boolean): void {
+  const entries = Object.entries(envelope.deltas);
+  if (entries.length === 0) {
+    console.log("audit: no deltas requested.");
     return;
   }
-  console.log(
-    `audit: ${requested.length} delta(s) ran — ${requested.map((k) => `${k} (+${envelope.deltas[k]!.added.length}/-${envelope.deltas[k]!.removed.length})`).join(", ")}`,
-  );
+
+  const driftCount = entries.filter(
+    ([, d]) => d.added.length > 0 || d.removed.length > 0,
+  ).length;
+  const totalAdded = entries.reduce((n, [, d]) => n + d.added.length, 0);
+  const totalRemoved = entries.reduce((n, [, d]) => n + d.removed.length, 0);
+
+  if (driftCount === 0) {
+    console.log(
+      `audit: ${entries.length} delta(s), no drift across ${entries.map(([k]) => k).join(" / ")}.`,
+    );
+  } else {
+    console.log(
+      `audit: ${entries.length} delta(s), drift in ${driftCount} (+${totalAdded} / -${totalRemoved})`,
+    );
+  }
+
+  const keyWidth = entries.reduce((n, [k]) => Math.max(n, k.length), 0);
+  for (const [key, delta] of entries) {
+    const sha = delta.base.sha ? ` @ ${delta.base.sha.slice(0, 8)}` : "";
+    const provenance = `← ${delta.base.name}${sha}`;
+    const counts =
+      delta.added.length === 0 && delta.removed.length === 0
+        ? "(no drift)"
+        : `(+${delta.added.length} / -${delta.removed.length})`;
+    console.log(`  ${key.padEnd(keyWidth)}  ${provenance}  ${counts}`);
+  }
+
+  if (summary) return;
+
+  for (const [key, delta] of entries) {
+    if (delta.added.length === 0 && delta.removed.length === 0) continue;
+    if (delta.added.length > 0) {
+      console.log(`\n  ${key} added (+${delta.added.length}):`);
+      console.table(delta.added);
+    }
+    if (delta.removed.length > 0) {
+      console.log(`\n  ${key} removed (-${delta.removed.length}):`);
+      console.table(delta.removed);
+    }
+  }
 }
