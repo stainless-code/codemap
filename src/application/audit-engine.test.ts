@@ -142,6 +142,53 @@ describe("runAudit (engine)", () => {
     }
   });
 
+  it("rejects a baseline whose rows_json parses to non-array (null)", () => {
+    const db = freshDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "null-rows",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "null",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+      const result = runAudit({ db, baselines: { files: "null-rows" } });
+      expect(result).toHaveProperty("error");
+      if ("error" in result) {
+        expect(result.error).toContain('"null-rows"');
+        expect(result.error).toContain("invalid rows_json");
+        expect(result.error).toContain("null");
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects a baseline whose rows_json parses to non-array (object)", () => {
+    const db = freshDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "object-rows",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "{}",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+      const result = runAudit({ db, baselines: { files: "object-rows" } });
+      expect(result).toHaveProperty("error");
+      if ("error" in result) {
+        expect(result.error).toContain("invalid rows_json");
+        expect(result.error).toContain("object");
+      }
+    } finally {
+      db.close();
+    }
+  });
+
   it("propagates a column-mismatch error from a delta", () => {
     const db = freshDb();
     try {

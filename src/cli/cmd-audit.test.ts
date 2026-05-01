@@ -132,6 +132,18 @@ describe("parseAuditRest", () => {
     if (r.kind === "error") expect(r.message).toContain("--files-baseline");
   });
 
+  it("errors when --baseline gets an empty-string value (two-token form)", () => {
+    const r = parseAuditRest(["audit", "--baseline", ""]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--baseline");
+  });
+
+  it("errors when --files-baseline gets a whitespace-only value", () => {
+    const r = parseAuditRest(["audit", "--files-baseline", "   "]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--files-baseline");
+  });
+
   it("errors on unknown options", () => {
     const r = parseAuditRest(["audit", "--unknown", "x", "--baseline", "n"]);
     expect(r.kind).toBe("error");

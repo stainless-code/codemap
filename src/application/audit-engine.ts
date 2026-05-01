@@ -160,7 +160,13 @@ export function runAudit(opts: {
 
     let baselineRows: unknown[];
     try {
-      baselineRows = JSON.parse(baseline.rows_json) as unknown[];
+      const parsed = JSON.parse(baseline.rows_json) as unknown;
+      if (!Array.isArray(parsed)) {
+        return {
+          error: `codemap audit: baseline "${baseline.name}" (delta "${spec.key}") has invalid rows_json (expected JSON array, got ${parsed === null ? "null" : typeof parsed}) — drop and re-save.`,
+        };
+      }
+      baselineRows = parsed;
     } catch {
       return {
         error: `codemap audit: baseline "${baseline.name}" (delta "${spec.key}") has corrupt rows_json — drop and re-save.`,

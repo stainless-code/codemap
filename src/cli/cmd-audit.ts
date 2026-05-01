@@ -128,7 +128,16 @@ function consumeFlagValue(
     return { kind: "value", value: v, next: i + 1 };
   }
   const next = rest[i + 1];
-  if (next === undefined || next.startsWith("-")) {
+  // `next === ""` catches the two-token empty-string case (`--flag ""`); the
+  // `--flag=` case is already caught above. Trim-zero check covers whitespace-
+  // only values (`--flag " "`) — those would silently sneak through to a
+  // baseline lookup that fails further downstream with a less clear error.
+  if (
+    next === undefined ||
+    next === "" ||
+    next.trim().length === 0 ||
+    next.startsWith("-")
+  ) {
     return {
       kind: "error",
       message: `codemap audit: "${flagName}" requires a value.`,

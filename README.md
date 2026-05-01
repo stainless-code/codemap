@@ -101,6 +101,7 @@ codemap query --save-baseline=base-deprecated   -r deprecated-symbols
 codemap audit --baseline base                                   # auto-resolves base-{files,dependencies,deprecated}
 codemap audit --json --summary --baseline base                  # counts-only — useful for CI dashboards
 codemap audit --files-baseline base-files                       # explicit per-delta — runs only the slots provided
+codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto-resolve deps + deprecated; override files
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
