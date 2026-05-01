@@ -66,14 +66,14 @@ All shipped under PR [#23](https://github.com/stainless-code/codemap/pull/23) as
 
 ## 4. What moved to the roadmap
 
-Items the scan called out as "watch / defer / future" that are now tracked in [docs/roadmap.md § Backlog](../roadmap.md#backlog) — go there for the latest status, not here:
+Items the scan called out as "watch / defer / future" — most still live in [docs/roadmap.md § Backlog](../roadmap.md#backlog); items shipped after this scan are linked to their PRs.
 
-- MCP server wrapping `query`
-- HTTP API (`codemap serve`)
-- Recipes-as-content registry + project-local recipes (`.codemap/recipes/`)
-- Targeted-read CLI (`codemap show <symbol>`)
-- Watch mode (`codemap watch`)
-- Cross-agent handoff artifact (speculative)
+- ✅ **MCP server wrapping `query`** — shipped as `codemap mcp` (agent-transports v1) in PR [#35](https://github.com/stainless-code/codemap/pull/35). Tool taxonomy, output shape, and resource catalog reserved for HTTP API to inherit. See [`research/fallow.md` § Status snapshot](./fallow.md#status-snapshot-as-of-2026-05-01) for the full ship summary.
+- HTTP API (`codemap serve`) — still backlog
+- Recipes-as-content registry + project-local recipes (`.codemap/recipes/`) — still backlog
+- Targeted-read CLI (`codemap show <symbol>`) — still backlog
+- Watch mode (`codemap watch`) — still backlog
+- Cross-agent handoff artifact (speculative) — still backlog
 
 The scan's "PASS" list (dead-code / dupes / complexity / boundaries / fix actions, runtime/V8 coverage merging, framework plugins, PageRank summarization, skyline visualization, daemon process, embedded intent classification) has been folded into [roadmap.md § Non-goals](../roadmap.md#non-goals-v1) — that's the canonical home; do not duplicate here.
 
