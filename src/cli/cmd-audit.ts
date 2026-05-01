@@ -1,21 +1,34 @@
-import { runAudit } from "../application/audit-engine";
-import type { AuditEnvelope } from "../application/audit-engine";
+import { runAudit, V1_DELTAS } from "../application/audit-engine";
+import type {
+  AuditBaselineMap,
+  AuditEnvelope,
+} from "../application/audit-engine";
 import { runCodemapIndex } from "../application/run-index";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
-import { closeDb, openDb } from "../db";
+import { closeDb, getQueryBaseline, openDb } from "../db";
+import type { CodemapDatabase } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 
+// Per-delta CLI flag → delta key. Generated from V1_DELTAS so adding a delta
+// in the engine surfaces a `--<key>-baseline` flag automatically.
+const PER_DELTA_FLAGS: Record<string, string> = Object.fromEntries(
+  V1_DELTAS.map((d) => [`--${d.key}-baseline`, d.key]),
+);
+
 /**
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"audit"`.
- * v1 supports `--baseline <name>`, `--json`, `--summary`, `--no-index`.
+ * v1 supports `--baseline <prefix>` (auto-resolve sugar), per-delta
+ * `--<key>-baseline <name>` flags (explicit), `--json`, `--summary`,
+ * `--no-index`.
  */
 export function parseAuditRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
   | {
       kind: "run";
-      baselineName: string;
+      baselinePrefix: string | undefined;
+      perDelta: Record<string, string>;
       json: boolean;
       summary: boolean;
       noIndex: boolean;
@@ -28,7 +41,8 @@ export function parseAuditRest(rest: string[]):
   let json = false;
   let summary = false;
   let noIndex = false;
-  let baselineName: string | undefined;
+  let baselinePrefix: string | undefined;
+  const perDelta: Record<string, string> = {};
 
   while (i < rest.length) {
     const a = rest[i];
@@ -48,66 +62,138 @@ export function parseAuditRest(rest: string[]):
       i++;
       continue;
     }
+
+    // `--baseline <prefix>` (auto-resolve sugar) — must be checked BEFORE the
+    // per-delta loop because `--baseline` is a prefix of `--baseline-…` flags
+    // (which don't exist today, but the explicit-match guard keeps it safe).
     if (a === "--baseline" || a.startsWith("--baseline=")) {
-      const eq = a.indexOf("=");
-      if (eq !== -1) {
-        const v = a.slice(eq + 1);
-        if (!v) {
-          return {
-            kind: "error",
-            message:
-              'codemap audit: "--baseline=<name>" requires a non-empty name.',
-          };
-        }
-        baselineName = v;
-        i++;
-        continue;
-      }
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message:
-            'codemap audit: "--baseline" requires a name. Example: codemap audit --baseline pre-refactor',
-        };
-      }
-      baselineName = next;
-      i += 2;
+      const value = consumeFlagValue(rest, i, "--baseline");
+      if (value.kind === "error") return value;
+      baselinePrefix = value.value;
+      i = value.next;
       continue;
     }
+
+    // Per-delta `--<key>-baseline <name>` (explicit).
+    let matchedPerDelta = false;
+    for (const [flag, key] of Object.entries(PER_DELTA_FLAGS)) {
+      if (a === flag || a.startsWith(`${flag}=`)) {
+        const value = consumeFlagValue(rest, i, flag);
+        if (value.kind === "error") return value;
+        perDelta[key] = value.value;
+        i = value.next;
+        matchedPerDelta = true;
+        break;
+      }
+    }
+    if (matchedPerDelta) continue;
+
     return {
       kind: "error",
       message: `codemap audit: unknown option "${a}". Run \`codemap audit --help\` for usage.`,
     };
   }
 
-  if (baselineName === undefined) {
+  if (baselinePrefix === undefined && Object.keys(perDelta).length === 0) {
     return {
       kind: "error",
       message:
-        "codemap audit: missing snapshot source. v1 requires --baseline <name>; --base <ref> ships in v1.x. Example: codemap audit --baseline pre-refactor",
+        "codemap audit: missing snapshot source. Pass --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta. v1.x adds --base <ref>.",
     };
   }
 
-  return { kind: "run", baselineName, json, summary, noIndex };
+  return { kind: "run", baselinePrefix, perDelta, json, summary, noIndex };
+}
+
+// Eat either `--flag value` (two tokens) or `--flag=value` (one). Returns the
+// value + the next index to advance to, or an error if value is empty / starts
+// with a dash (would be the next flag).
+function consumeFlagValue(
+  rest: string[],
+  i: number,
+  flagName: string,
+):
+  | { kind: "value"; value: string; next: number }
+  | { kind: "error"; message: string } {
+  const a = rest[i];
+  const eq = a.indexOf("=");
+  if (eq !== -1) {
+    const v = a.slice(eq + 1);
+    if (!v) {
+      return {
+        kind: "error",
+        message: `codemap audit: "${flagName}=<value>" requires a non-empty value.`,
+      };
+    }
+    return { kind: "value", value: v, next: i + 1 };
+  }
+  const next = rest[i + 1];
+  if (next === undefined || next.startsWith("-")) {
+    return {
+      kind: "error",
+      message: `codemap audit: "${flagName}" requires a value.`,
+    };
+  }
+  return { kind: "value", value: next, next: i + 2 };
+}
+
+/**
+ * Compose the `AuditBaselineMap` from a CLI parse result. Per-delta explicit
+ * flags override auto-resolved slots. Auto-resolved slots that don't exist in
+ * `query_baselines` are silently absent (the slot just has no baseline → the
+ * delta doesn't run).
+ */
+export function resolveAuditBaselines(opts: {
+  db: CodemapDatabase;
+  baselinePrefix: string | undefined;
+  perDelta: Record<string, string>;
+}): AuditBaselineMap {
+  const map: AuditBaselineMap = {};
+  for (const spec of V1_DELTAS) {
+    if (opts.baselinePrefix !== undefined) {
+      const candidate = `${opts.baselinePrefix}-${spec.key}`;
+      if (getQueryBaseline(opts.db, candidate) !== undefined) {
+        map[spec.key] = candidate;
+      }
+    }
+  }
+  // Per-delta flags override the auto-resolved slot for that key.
+  for (const [key, name] of Object.entries(opts.perDelta)) {
+    map[key] = name;
+  }
+  return map;
 }
 
 /**
  * Print **`codemap audit`** usage + flags to stdout.
  */
 export function printAuditCmdHelp(): void {
-  console.log(`Usage: codemap audit --baseline <name> [--json] [--summary] [--no-index]
+  const perDeltaLines = V1_DELTAS.map(
+    (d) =>
+      `  --${d.key}-baseline <name>  Explicit baseline for the ${d.key} delta.`,
+  ).join("\n");
 
-Diff the current .codemap.db against a saved baseline (B.6) and emit the structural deltas
-as a {base, head, deltas} envelope. v1 ships three deltas: files, dependencies, deprecated.
-No verdict / threshold / non-zero exit codes in v1 — compose --json + jq for CI exit codes.
+  console.log(`Usage: codemap audit [--baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
 
-Flags:
-  --baseline <name>   Required. Name must exist in query_baselines (saved by
-                      \`codemap query --save-baseline\`). The baseline's recorded SQL
-                      must satisfy each delta's required columns; mismatches surface
-                      a clean error pointing at the right re-save command.
-  --json              Emit the {base, head, deltas} envelope as JSON to stdout
+Diff the current .codemap.db against per-delta baselines (saved by \`codemap query --save-baseline\`)
+and emit the structural deltas as a {head, deltas} envelope. Each delta carries its own \`base\`
+metadata. v1 ships three deltas: files, dependencies, deprecated. No verdict / threshold / non-zero
+exit codes in v1 — compose --json + jq for CI exit codes.
+
+Snapshot sources (at least one delta-baseline must resolve):
+
+  --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
+                               <prefix>-dependencies, <prefix>-deprecated in
+                               query_baselines. Slots that don't exist are
+                               silently absent (no error per missing slot).
+
+${perDeltaLines}
+                               Each per-delta flag overrides the auto-resolved
+                               slot for that delta. Names must exist in
+                               query_baselines or audit exits 1.
+
+Other flags:
+  --json              Emit the {head, deltas} envelope as JSON to stdout
                       (default for agents). On error: {"error":"<message>"}.
   --summary           Collapse rows to counts. With --json: deltas.<key>.{added: N, removed: N}.
                       Without: a single line "drift: files +1/-0, dependencies +3/-2, ...".
@@ -116,19 +202,27 @@ Flags:
   --help, -h          Show this help.
 
 Examples:
-  # Save a baseline before a refactor, then audit after
-  codemap query --save-baseline=pre-refactor "SELECT path FROM files"
-  codemap audit --baseline pre-refactor
 
-  # Recipe-saved baseline (uses recipe id as default name)
-  codemap query --save-baseline -r deprecated-symbols
-  codemap audit --baseline deprecated-symbols
+  # Convention: save with the <prefix>-<delta> naming, then audit by prefix
+  codemap query --save-baseline=base-files "SELECT path FROM files"
+  codemap query --save-baseline=base-dependencies "SELECT from_path, to_path FROM dependencies"
+  codemap query --save-baseline=base-deprecated -r deprecated-symbols
+  codemap audit --baseline base
+
+  # Explicit per-delta — mix-and-match across saved snapshots
+  codemap audit \\
+    --files-baseline pre-refactor-files \\
+    --dependencies-baseline yesterday-deps \\
+    --deprecated-baseline release-deprecated
+
+  # Mixed — auto-resolve files + deprecated, override dependencies
+  codemap audit --baseline base --dependencies-baseline experimental-deps
 
   # Counts-only summary — useful for CI dashboards
-  codemap audit --json --summary --baseline pre-refactor
+  codemap audit --json --summary --baseline base
 
-  # Audit a frozen DB without re-indexing first (e.g. CI fetched a prebuilt artifact)
-  codemap audit --baseline pre-refactor --no-index
+  # Audit a frozen DB without re-indexing first
+  codemap audit --baseline base --no-index
 `);
 }
 
@@ -139,7 +233,8 @@ Examples:
 export async function runAuditCmd(opts: {
   root: string;
   configFile: string | undefined;
-  baselineName: string;
+  baselinePrefix: string | undefined;
+  perDelta: Record<string, string>;
   json: boolean;
   summary: boolean;
   noIndex: boolean;
@@ -159,7 +254,13 @@ export async function runAuditCmd(opts: {
         await runCodemapIndex(db, { mode: "incremental", quiet: true });
       }
 
-      const result = runAudit({ db, baselineName: opts.baselineName });
+      const baselines = resolveAuditBaselines({
+        db,
+        baselinePrefix: opts.baselinePrefix,
+        perDelta: opts.perDelta,
+      });
+
+      const result = runAudit({ db, baselines });
       if ("error" in result) {
         emitAuditError(result.error, opts.json);
         return;
@@ -182,7 +283,7 @@ function emitAuditError(message: string, json: boolean) {
   process.exitCode = 1;
 }
 
-// Tracer 1: stub renderer — emits the envelope as-is. Tracer 5 ships the
+// Tracer 3: stub renderer — emits the envelope as-is. Tracer 5 ships the
 // terminal-mode polish (no-drift / drift sections / --summary one-liner per §7.1).
 function renderAudit(
   envelope: AuditEnvelope,
@@ -190,27 +291,34 @@ function renderAudit(
 ): void {
   if (opts.json) {
     if (opts.summary) {
-      const counts: Record<string, { added: number; removed: number }> = {};
+      const counts: Record<
+        string,
+        {
+          base: AuditEnvelope["deltas"][string]["base"];
+          added: number;
+          removed: number;
+        }
+      > = {};
       for (const [key, delta] of Object.entries(envelope.deltas)) {
         counts[key] = {
+          base: delta.base,
           added: delta.added.length,
           removed: delta.removed.length,
         };
       }
-      console.log(
-        JSON.stringify({
-          base: envelope.base,
-          head: envelope.head,
-          deltas: counts,
-        }),
-      );
+      console.log(JSON.stringify({ head: envelope.head, deltas: counts }));
     } else {
       console.log(JSON.stringify(envelope));
     }
     return;
   }
   // Terminal stub — Tracer 5 replaces with the §7.1 layout.
+  const requested = Object.keys(envelope.deltas);
+  if (requested.length === 0) {
+    console.log("audit: no deltas requested");
+    return;
+  }
   console.log(
-    `audit "${envelope.base.name}" (${Object.keys(envelope.deltas).length} deltas)`,
+    `audit: ${requested.length} delta(s) ran — ${requested.map((k) => `${k} (+${envelope.deltas[k]!.added.length}/-${envelope.deltas[k]!.removed.length})`).join(", ")}`,
   );
 }

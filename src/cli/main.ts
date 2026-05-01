@@ -123,7 +123,8 @@ Copies bundled agent templates into .agents/ under the project root.
     await runAuditCmd({
       root,
       configFile,
-      baselineName: parsed.baselineName,
+      baselinePrefix: parsed.baselinePrefix,
+      perDelta: parsed.perDelta,
       json: parsed.json,
       summary: parsed.summary,
       noIndex: parsed.noIndex,

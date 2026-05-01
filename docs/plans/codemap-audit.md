@@ -64,9 +64,18 @@ Earlier draft included a third "on-demand snapshot table" hybrid. Killed during 
 
 ### v1 `--baseline` mechanics
 
-- The baseline must already exist in `query_baselines` (saved by `codemap query --save-baseline`). If not, exit 1 with `codemap: no baseline named "<name>". Use --baselines to list.` (same error shape as `codemap query --baseline`).
+A baseline saved from `SELECT path FROM files` satisfies the `files` delta but **not** `dependencies` (needs `from_path` + `to_path`) or `deprecated` (needs `name` + `kind` + `file_path`). One baseline can't naturally satisfy every delta, so v1 ships a **per-delta baseline mapping** with two CLI shapes:
+
+| Layer                    | Flag(s)                                                                                       | Behaviour                                                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Primary — explicit**   | `--files-baseline <name>` · `--dependencies-baseline <name>` · `--deprecated-baseline <name>` | Each delta runs only when its baseline is provided. Skipped deltas are absent from the output envelope (terminal mode notes them).                                                               |
+| **Sugar — auto-resolve** | `--baseline <prefix>`                                                                         | Auto-resolves to `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`. One name to remember when the user adopts the naming convention. Per-delta flags override individual slots. |
+
+Required: at least one delta-baseline (explicit or auto-resolved). Bare `codemap audit` exits 1 with usage. Auto-resolved names that don't exist in `query_baselines` are silently absent (the slot is just "no baseline → no delta") — no error per missing slot, only on the all-empty case.
+
+- Each named baseline must already exist in `query_baselines` (saved by `codemap query --save-baseline`). Missing baselines from explicit flags exit 1 with `codemap audit: no baseline named "<name>". Use --baselines to list.` (same error shape as `codemap query --baseline`).
 - Audit doesn't introduce its own baseline-save side effect — the user explicitly opts in via `--save-baseline`. Single source of truth for "snapshot lives here" stays the B.6 surface.
-- The verdict's `base.source` is `"baseline"`; `base.name` is the baseline name; `base.sha` is the baseline's recorded `git_ref`; `base.indexed_at` is the baseline's `created_at`.
+- The envelope's `base.source` is `"baseline"`; `base.name` is the per-delta baseline name; `base.sha` is the baseline's recorded `git_ref`; `base.indexed_at` is the baseline's `created_at`. Different deltas can have different `base` metadata if they reference different baselines.
 
 ### v1.x `--base <ref>` mechanics (when shipped later)
 
@@ -170,34 +179,42 @@ Validated via existing `codemapUserConfigSchema` (Zod) — see [`docs/architectu
 
 ## 6. Composition with existing flags
 
-| Flag                | Behaviour with `audit`                                                                                                                                                                 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--json`            | Emits the `{base, head, deltas}` envelope. See [§7.1 Output shapes](#71-output-shapes) for the terminal-mode (no `--json`) layout.                                                     |
-| `--summary`         | Collapses every delta in the output to counts: with `--json` → `deltas.<key>.{added: N, removed: N}`; without → a single line. See [§7.1](#71-output-shapes).                          |
-| `--baseline <name>` | **Snapshot source** — diff against the named B.6 baseline. v1 default mode.                                                                                                            |
-| `--base <ref>`      | **Snapshot source** — diff against a worktree+reindex of `<ref>`. v1.x. **Mutex with `--baseline`** (one snapshot source per invocation).                                              |
-| `--save-baseline`   | **N/A** — audit doesn't save baselines. Use `codemap query --save-baseline -r <recipe>` first, then `codemap audit --baseline <name>`. Single source of truth for snapshots stays B.6. |
-| `--changed-since`   | **Mutex** — `audit` is itself a "changed-since" operation; combining would be confusing.                                                                                               |
-| `--group-by`        | **Mutex** — output shape is already structured; bucketing is the consumer's job on the output JSON.                                                                                    |
-| `--no-index`        | **Skip the auto-incremental-index prelude.** Default is to re-index first so `head` is fresh; `--no-index` audits the DB as-is.                                                        |
-| `--recipe`          | N/A — `audit` isn't a `query` subcommand. The v1 deltas internally pin canonical SQL (per §4) — not user-selectable.                                                                   |
+| Flag                        | Behaviour with `audit`                                                                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--json`                    | Emits the `{base, head, deltas}` envelope. See [§7.1 Output shapes](#71-output-shapes) for the terminal-mode (no `--json`) layout.                                    |
+| `--summary`                 | Collapses every delta in the output to counts: with `--json` → `deltas.<key>.{added: N, removed: N}`; without → a single line. See [§7.1](#71-output-shapes).         |
+| `--<delta>-baseline <name>` | **Per-delta snapshot source** — `--files-baseline`, `--dependencies-baseline`, `--deprecated-baseline`. Each delta runs only when its baseline is provided.           |
+| `--baseline <prefix>`       | **Auto-resolve sugar** — looks up `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated` in `query_baselines`. Per-delta flags override individual slots. |
+| `--base <ref>`              | **Snapshot strategy** — diff against a worktree+reindex of `<ref>`. v1.x. **Mutex with `--baseline` / `--<delta>-baseline`** (one snapshot strategy per invocation).  |
+| `--save-baseline`           | **N/A** — audit doesn't save baselines. Use `codemap query --save-baseline -r <recipe>` first. Single source of truth for snapshots stays B.6.                        |
+| `--changed-since`           | **Mutex** — `audit` is itself a "changed-since" operation; combining would be confusing.                                                                              |
+| `--group-by`                | **Mutex** — output shape is already structured; bucketing is the consumer's job on the output JSON.                                                                   |
+| `--no-index`                | **Skip the auto-incremental-index prelude.** Default is to re-index first so `head` is fresh; `--no-index` audits the DB as-is.                                       |
+| `--recipe`                  | N/A — `audit` isn't a `query` subcommand. The v1 deltas internally pin canonical SQL (per §4) — not user-selectable.                                                  |
 
 ## 7. CLI surface
 
 ```text
 # v1 (ships first):
-codemap audit --baseline <name> [--json] [--summary] [--no-index] [--root <dir>] [--config <file>]
+codemap audit
+  [--baseline <prefix>]                # auto-resolve <prefix>-{files,dependencies,deprecated}
+  [--files-baseline <name>]            # explicit per-delta override
+  [--dependencies-baseline <name>]
+  [--deprecated-baseline <name>]
+  [--json] [--summary] [--no-index] [--root <dir>] [--config <file>]
 
 # v1.x (ships after v1 validates the delta shape):
-codemap audit --base <ref>      [--json] [--summary] [--no-index] [--root <dir>] [--config <file>]
+codemap audit --base <ref>
+  [--json] [--summary] [--no-index] [--root <dir>] [--config <file>]
 ```
 
-- `--baseline <name>` — v1. Required (or `--base <ref>` once shipped). Name must exist in `query_baselines`; saved by `codemap query --save-baseline`.
-- `--base <ref>` — v1.x. Any committish (`origin/main`, `HEAD~5`, sha, tag).
-- **`--baseline` and `--base` are mutex** — exactly one snapshot source per invocation.
+- **At least one delta-baseline** must resolve (explicit flag OR auto-resolved name in `query_baselines`). Bare `codemap audit` with no flags exits 1 with usage.
+- `--baseline <prefix>` — sugar. Auto-resolves to `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`. Auto-resolved names that don't exist in `query_baselines` are silently absent (the slot just has no baseline → no delta runs for it).
+- `--<delta>-baseline <name>` — explicit. Each must exist in `query_baselines`; missing names exit 1. Overrides any auto-resolved slot for the same delta.
+- `--base <ref>` — v1.x. Any committish (`origin/main`, `HEAD~5`, sha, tag). **Mutex** with `--baseline` / `--<delta>-baseline` — one snapshot strategy per invocation.
 - `--no-index` — skip the auto-incremental-index prelude (see below). Default audits a fresh `head` snapshot.
 - `--root` / `--config` / `--help` / `-h` — same shape as the rest of the CLI (handled by `bootstrap`).
-- **Exit codes (v1):** `0` on success, `1` on bootstrap / DB / baseline-not-found errors. No verdict-driven exit codes until v1.x ships `verdict`.
+- **Exit codes (v1):** `0` on success (including the "all auto-resolved slots empty" case — that's a valid no-op when the convention isn't followed), `1` on bootstrap / DB / explicit-baseline-not-found / no-deltas-requested errors.
 
 ### Auto-incremental-index prelude
 
@@ -297,7 +314,7 @@ The split:
 
 ### v1 tracer-bullet sequence — `--baseline <name>`
 
-1. **CLI scaffold** — `cmd-audit.ts` + `audit-engine.ts` skeletons. `codemap audit --help` works; `--baseline <name>` and `--no-index` parsed; auto-incremental-index prelude wired (calls `runCodemapIndex({ mode: "incremental" })` unless `--no-index`); `runAudit` returns `{base: {source: "baseline", ...}, head: {...}, deltas: {}}` stub. Smoke + commit.
+1. **CLI scaffold** — `cmd-audit.ts` + `audit-engine.ts` skeletons. `codemap audit --help` works; `--baseline <prefix>`, `--<delta>-baseline <name>`, and `--no-index` parsed; auto-incremental-index prelude wired (calls `runCodemapIndex({ mode: "incremental" })` unless `--no-index`); `runAudit` returns a stub envelope. Smoke + commit.
 2. **Delta registry + first delta — `files`** — engine grows the canonical-projection registry (`{key, sql, requiredColumns}`); `files` delta implements load-baseline → validate-columns → project → diff via `diffRows`. CLI renders one terminal-mode block. Commit.
 3. **Remaining deltas** — `dependencies`, `deprecated` — each as a separate commit. Each adds one registry entry + one delta function + tests. Renderer extends naturally.
 4. **Terminal-mode polish** — implement the no-drift / drift / `--summary` output shapes from §7.1; `cmd-audit.test.ts` covers all three.

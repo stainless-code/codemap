@@ -23,56 +23,126 @@ function seedFile(db: CodemapDatabase, path: string) {
   });
 }
 
+function saveFilesBaseline(
+  db: CodemapDatabase,
+  name: string,
+  paths: string[],
+  gitRef: string | null = "abc1234",
+  createdAt = 1_700_000_000_000,
+) {
+  upsertQueryBaseline(db, {
+    name,
+    recipe_id: null,
+    sql: "SELECT path FROM files",
+    rows_json: JSON.stringify(paths.map((p) => ({ path: p }))),
+    row_count: paths.length,
+    git_ref: gitRef,
+    created_at: createdAt,
+  });
+}
+
 const filesSpec = V1_DELTAS.find((d) => d.key === "files")!;
 
 describe("runAudit (engine)", () => {
-  it("returns an error envelope when the named baseline doesn't exist", () => {
+  it("returns an error envelope when the baselines map is empty", () => {
     const db = freshDb();
     try {
-      const result = runAudit({ db, baselineName: "missing" });
+      const result = runAudit({ db, baselines: {} });
       expect(result).toHaveProperty("error");
       if ("error" in result) {
-        expect(result.error).toContain('no baseline named "missing"');
+        expect(result.error).toContain("no delta baselines provided");
       }
     } finally {
       db.close();
     }
   });
 
-  it("emits {base, head, deltas} when baseline matches all delta contracts", () => {
+  it("returns an error envelope when an explicit baseline doesn't exist", () => {
     const db = freshDb();
     try {
-      seedFile(db, "src/a.ts");
-      seedFile(db, "src/b.ts");
-      upsertQueryBaseline(db, {
-        name: "pre-refactor",
-        recipe_id: null,
-        sql: "SELECT path FROM files",
-        rows_json: JSON.stringify([{ path: "src/a.ts" }, { path: "src/b.ts" }]),
-        row_count: 2,
-        git_ref: "abc1234",
-        created_at: 1_700_000_000_000,
+      const result = runAudit({
+        db,
+        baselines: { files: "missing" },
       });
-
-      const result = runAudit({ db, baselineName: "pre-refactor" });
-      if ("error" in result)
-        throw new Error(`unexpected error: ${result.error}`);
-
-      expect(result.base).toEqual({
-        source: "baseline",
-        name: "pre-refactor",
-        sha: "abc1234",
-        indexed_at: 1_700_000_000_000,
-      });
-      expect(result.head.indexed_at).toBeGreaterThan(0);
-      expect(result.deltas).toHaveProperty("files");
-      expect(result.deltas.files).toEqual({ added: [], removed: [] });
+      expect(result).toHaveProperty("error");
+      if ("error" in result) {
+        expect(result.error).toContain('no baseline named "missing"');
+        expect(result.error).toContain('delta "files"');
+      }
     } finally {
       db.close();
     }
   });
 
-  it("propagates a delta error envelope when one baseline doesn't match a delta contract", () => {
+  it("runs only the requested deltas (others are absent from the envelope)", () => {
+    const db = freshDb();
+    try {
+      seedFile(db, "src/a.ts");
+      saveFilesBaseline(db, "files-snap", ["src/a.ts"]);
+
+      const result = runAudit({
+        db,
+        baselines: { files: "files-snap" },
+      });
+      if ("error" in result)
+        throw new Error(`unexpected error: ${result.error}`);
+
+      expect(Object.keys(result.deltas)).toEqual(["files"]);
+      expect(result.deltas.files).toMatchObject({
+        base: {
+          source: "baseline",
+          name: "files-snap",
+          sha: "abc1234",
+          indexed_at: 1_700_000_000_000,
+        },
+        added: [],
+        removed: [],
+      });
+      expect(result.head.indexed_at).toBeGreaterThan(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("each delta carries its own base metadata (mixed-baseline support)", () => {
+    const db = freshDb();
+    try {
+      seedFile(db, "src/a.ts");
+      saveFilesBaseline(
+        db,
+        "files-snap-yesterday",
+        ["src/a.ts"],
+        "yesterday-sha",
+        1_700_000_000_000,
+      );
+      saveFilesBaseline(
+        db,
+        "files-snap-today",
+        ["src/a.ts", "src/b.ts"],
+        "today-sha",
+        1_700_000_001_000,
+      );
+
+      const r1 = runAudit({
+        db,
+        baselines: { files: "files-snap-yesterday" },
+      });
+      const r2 = runAudit({
+        db,
+        baselines: { files: "files-snap-today" },
+      });
+
+      if ("error" in r1 || "error" in r2) throw new Error("unexpected error");
+      expect(r1.deltas.files!.base.name).toBe("files-snap-yesterday");
+      expect(r1.deltas.files!.base.sha).toBe("yesterday-sha");
+      expect(r2.deltas.files!.base.name).toBe("files-snap-today");
+      expect(r2.deltas.files!.base.sha).toBe("today-sha");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("propagates a column-mismatch error from a delta", () => {
     const db = freshDb();
     try {
       seedFile(db, "src/a.ts");
@@ -86,7 +156,10 @@ describe("runAudit (engine)", () => {
         created_at: 1_700_000_000_000,
       });
 
-      const result = runAudit({ db, baselineName: "wrong-shape" });
+      const result = runAudit({
+        db,
+        baselines: { files: "wrong-shape" },
+      });
       expect(result).toHaveProperty("error");
       if ("error" in result) {
         expect(result.error).toContain("missing required columns");
@@ -142,11 +215,6 @@ describe("computeDelta — files", () => {
     const db = freshDb();
     try {
       seedFile(db, "src/a.ts");
-      // Baseline saved from `--recipe files-hashes` returns extra columns
-      // (content_hash, language, line_count). Delta projects down to `path`
-      // before diffing — so adding columns to the underlying table later
-      // (e.g. SCHEMA_VERSION 4 → 5 added symbols.visibility) doesn't break
-      // pre-bump baselines.
       const result = computeDelta(
         db,
         "x",
@@ -182,9 +250,6 @@ describe("computeDelta — files", () => {
         expect(result.error).toContain('delta "files"');
         expect(result.error).toContain("[name]");
         expect(result.error).toContain("[path]");
-        expect(result.error).toContain(
-          "codemap query --save-baseline=wrong-shape",
-        );
       }
     } finally {
       db.close();

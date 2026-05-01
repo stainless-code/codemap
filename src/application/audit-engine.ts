@@ -4,17 +4,24 @@ import { diffRows } from "../diff-rows";
 import { getCurrentCommit } from "./index-engine";
 
 /**
- * Per-delta diff payload — the rows that drifted between baseline and current.
- * Empty arrays mean "no drift on this delta key" (not "delta wasn't computed").
+ * Per-delta diff payload — the rows that drifted between baseline and current,
+ * plus the snapshot metadata for that specific delta. Each delta carries its
+ * own `base` because audits can mix baselines (one prefix auto-resolved across
+ * three deltas, or three explicit per-delta overrides). Empty `added`/`removed`
+ * arrays mean "no drift on this delta key" (not "delta wasn't computed" — that
+ * key would be absent from the envelope's `deltas` map entirely).
  */
 export interface AuditDelta {
+  base: AuditBase;
   added: unknown[];
   removed: unknown[];
 }
 
 /**
- * Snapshot the audit was diffed against. v1 always has `source: "baseline"`
- * (B.6 reuse); v1.x adds `source: "ref"` for the worktree+reindex path.
+ * Per-delta snapshot metadata. v1 always has `source: "baseline"` (B.6 reuse);
+ * v1.x adds `source: "ref"` for the worktree+reindex path. Each delta carries
+ * its own `base` because audits can mix baselines (e.g. `--files-baseline X
+ * --dependencies-baseline Y`).
  */
 export interface AuditBase {
   source: "baseline";
@@ -34,12 +41,15 @@ export interface AuditHead {
 }
 
 /**
- * The audit envelope shape — `{base, head, deltas}`. v1 ships no `verdict`
- * field; consumers compose `--json` + `jq` for CI exit codes. v1.x adds
- * `verdict: "pass" | "warn" | "fail"` driven by `codemap.config.audit`.
+ * The audit envelope shape — `{head, deltas}`. Each delta in the map carries
+ * its own `base` (per-delta baseline; see {@link AuditDelta}). Deltas the user
+ * didn't request (no baseline → no entry) are absent from the map.
+ *
+ * v1 ships no `verdict` field; consumers compose `--json` + `jq` for CI exit
+ * codes. v1.x adds `verdict: "pass" | "warn" | "fail"` driven by
+ * `codemap.config.audit`.
  */
 export interface AuditEnvelope {
-  base: AuditBase;
   head: AuditHead;
   deltas: Record<string, AuditDelta>;
 }
@@ -85,51 +95,93 @@ export const V1_DELTAS: readonly AuditDeltaSpec[] = [
     recipeIdHint:
       'a query that returns `path` (e.g. `--recipe files-hashes` or `"SELECT path FROM files"`)',
   },
+  {
+    key: "dependencies",
+    sql: "SELECT from_path, to_path FROM dependencies ORDER BY from_path, to_path",
+    requiredColumns: ["from_path", "to_path"],
+    recipeIdHint:
+      'a query that returns `from_path` and `to_path` (e.g. `"SELECT from_path, to_path FROM dependencies"`)',
+  },
+  {
+    key: "deprecated",
+    sql: "SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%' ORDER BY file_path, name",
+    requiredColumns: ["name", "kind", "file_path"],
+    recipeIdHint:
+      "the `deprecated-symbols` recipe (`--recipe deprecated-symbols`)",
+  },
 ] as const;
 
 /**
- * Run an audit against the named baseline. Returns the structured envelope
- * on success or an `AuditError` when the baseline is missing / malformed /
- * fails a delta's column-set contract.
+ * Map of delta key → baseline name. Caller assembles this from CLI flags:
+ * explicit `--<delta>-baseline <name>` and/or auto-resolved `--baseline <prefix>`
+ * (which probes `<prefix>-<delta-key>` for each known delta). Deltas absent
+ * from the map don't run.
+ */
+export type AuditBaselineMap = Partial<Record<string, string>>;
+
+/**
+ * Run an audit against the per-delta baseline mapping. Each requested delta
+ * (key present in `baselines`) loads its baseline, validates column-set
+ * membership, runs the canonical SQL, and emits a per-delta diff. Deltas
+ * absent from the map are absent from the envelope's `deltas` map.
  *
- * Caller owns the DB connection lifecycle. Caller is also responsible for
- * deciding whether to run an index prelude — the audit reads whatever the
- * DB currently holds.
+ * Returns an `AuditError` when:
+ * - The map is empty (caller should have already errored at parse time, but
+ *   defensive).
+ * - A delta's named baseline doesn't exist in `query_baselines`.
+ * - A baseline's `rows_json` is corrupt or its column set doesn't satisfy the
+ *   delta's contract.
+ *
+ * Caller owns the DB connection lifecycle and the index-prelude decision.
  */
 export function runAudit(opts: {
   db: CodemapDatabase;
-  baselineName: string;
+  baselines: AuditBaselineMap;
 }): AuditEnvelope | AuditError {
-  const baseline = getQueryBaseline(opts.db, opts.baselineName);
-  if (baseline === undefined) {
+  const requested = Object.keys(opts.baselines);
+  if (requested.length === 0) {
     return {
-      error: `codemap audit: no baseline named "${opts.baselineName}". Use \`codemap query --baselines\` to list saved baselines.`,
-    };
-  }
-
-  let baselineRows: unknown[];
-  try {
-    baselineRows = JSON.parse(baseline.rows_json) as unknown[];
-  } catch {
-    return {
-      error: `codemap audit: baseline "${baseline.name}" has corrupt rows_json — drop and re-save.`,
+      error:
+        "codemap audit: no delta baselines provided. Pass --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
     };
   }
 
   const deltas: Record<string, AuditDelta> = {};
   for (const spec of V1_DELTAS) {
-    const result = computeDelta(opts.db, baseline.name, baselineRows, spec);
-    if ("error" in result) return result;
-    deltas[spec.key] = result;
+    const baselineName = opts.baselines[spec.key];
+    if (baselineName === undefined) continue;
+
+    const baseline = getQueryBaseline(opts.db, baselineName);
+    if (baseline === undefined) {
+      return {
+        error: `codemap audit: no baseline named "${baselineName}" (requested for delta "${spec.key}"). Use \`codemap query --baselines\` to list saved baselines.`,
+      };
+    }
+
+    let baselineRows: unknown[];
+    try {
+      baselineRows = JSON.parse(baseline.rows_json) as unknown[];
+    } catch {
+      return {
+        error: `codemap audit: baseline "${baseline.name}" (delta "${spec.key}") has corrupt rows_json — drop and re-save.`,
+      };
+    }
+
+    const diff = computeDelta(opts.db, baseline.name, baselineRows, spec);
+    if ("error" in diff) return diff;
+
+    deltas[spec.key] = {
+      base: {
+        source: "baseline",
+        name: baseline.name,
+        sha: baseline.git_ref,
+        indexed_at: baseline.created_at,
+      },
+      ...diff,
+    };
   }
 
   return {
-    base: {
-      source: "baseline",
-      name: baseline.name,
-      sha: baseline.git_ref,
-      indexed_at: baseline.created_at,
-    },
     head: {
       sha: tryGetGitRef(),
       indexed_at: Date.now(),
@@ -141,14 +193,15 @@ export function runAudit(opts: {
 /**
  * Validate baseline column-set + project + run live SQL + diff.
  * Pure function over `(db, baselineName, baselineRows, spec)` — easy to test
- * in isolation against an in-memory DB.
+ * in isolation against an in-memory DB. Returns just the `{added, removed}`
+ * payload; `runAudit` wraps it with the per-delta `base` metadata.
  */
 export function computeDelta(
   db: CodemapDatabase,
   baselineName: string,
   baselineRows: unknown[],
   spec: AuditDeltaSpec,
-): AuditDelta | AuditError {
+): { added: unknown[]; removed: unknown[] } | AuditError {
   // Empty baselines pass — every required column is "trivially present"
   // because there are no rows to validate. Live rows are still real `added`s.
   if (baselineRows.length > 0) {
