@@ -125,7 +125,6 @@ export function parseQueryRest(rest: string[]):
       i += 2;
       continue;
     }
-    // --save-baseline | --save-baseline=<name> | --save-baseline <name>
     if (a === "--save-baseline" || a.startsWith("--save-baseline=")) {
       const eq = a.indexOf("=");
       if (eq !== -1) {
@@ -151,7 +150,6 @@ export function parseQueryRest(rest: string[]):
       i++;
       continue;
     }
-    // --baseline | --baseline=<name> | --baseline <name>
     if (a === "--baseline" || a.startsWith("--baseline=")) {
       const eq = a.indexOf("=");
       if (eq !== -1) {
@@ -946,7 +944,6 @@ function runBaselineDiff(opts: {
     return;
   }
 
-  // Terminal mode — readable two-section dump.
   console.log(
     `baseline "${diff.baseline.name}": ${diff.baseline.row_count} rows → ${diff.current_row_count} rows  (+${added.length} / -${removed.length})`,
   );
