@@ -36,6 +36,7 @@ Codemap stays a structural-index primitive that other tools can consume. Out of 
 
 ## Backlog
 
+- [ ] **`codemap audit --base <ref>`** — two-snapshot structural-drift verdict for a PR / branch (new files / deps / `@deprecated` / visibility / barrel / hot-file deltas; `pass`/`warn`/`fail` exit codes). Plan: [`plans/codemap-audit.md`](./plans/codemap-audit.md). Builds on B.6 (snapshot primitive), B.7 (`visibility`), Tier A flags (composition).
 - [ ] **MCP** server wrapping `query` — single stdio tool first (`query` SQL string → JSON rows), then expand to `recipe`, `list_recipes`, `schema`, `index`. Resources expose the bundled `SKILL.md` and recipe catalog
 - [ ] **HTTP API** — `codemap serve [--port] [--host 127.0.0.1]` exposing `POST /query`, `GET /recipes`, `GET /recipes/:id`, `GET /schema`, `GET /context`. Bind to loopback by default; reject non-loopback unless `--host` overridden. Unblocks tools that don't speak MCP yet
 - [ ] **Recipes-as-content registry** — pair every bundled recipe in `src/cli/query-recipes.ts` with a sibling `.md` (or YAML frontmatter) describing _when to use, follow-up SQL_; surface in `--recipes-json`. Plus **project-local recipes** loaded from `.codemap/recipes/*.{sql,md}` so teams can ship internal SQL without an adapter API
