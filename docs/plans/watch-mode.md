@@ -91,7 +91,7 @@ Why it wins for codemap specifically:
 
 CLI surface (mirrors existing patterns):
 
-```
+```bash
 codemap watch [--root DIR] [--config FILE] [--debounce MS]
               [--quiet]   # no per-event log lines; just startup + errors
               [--files only<glob>]   # optional narrowing (defaults to project glob)
