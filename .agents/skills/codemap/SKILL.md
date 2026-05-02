@@ -79,7 +79,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`codemap://schema`** — DDL of every table in `.codemap.db` (queried live from `sqlite_schema`).
 - **`codemap://skill`** — full text of bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.
 
-**Implementation:** `src/cli/cmd-mcp.ts` (CLI shell — argv + lifecycle) + `src/application/mcp-server.ts` (engine — tool registry, resource handlers). Mirrors the `cmd-audit.ts ↔ audit-engine.ts` seam. `--changed-since` git lookups are memoised per `(root, ref)` pair across batch items so a `query_batch` of N items sharing the same ref does one git invocation, not N. v1.x backlog: `codemap serve` (HTTP API) reuses the same tool taxonomy + output shape.
+**Implementation:** `src/cli/cmd-mcp.ts` (CLI shell — argv + lifecycle) + `src/application/mcp-server.ts` (transport — SDK glue). Tool bodies live in `src/application/tool-handlers.ts` (pure transport-agnostic — same handlers `codemap serve` dispatches over HTTP); resource fetchers in `src/application/resource-handlers.ts`. Mirrors the `cmd-audit.ts ↔ audit-engine.ts` seam. `--changed-since` git lookups are memoised per `(root, ref)` pair across batch items so a `query_batch` of N items sharing the same ref does one git invocation, not N.
 
 **Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is **`src/cli/query-recipes.ts`** (`QUERY_RECIPES`).
 

@@ -134,12 +134,15 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
   POST /tool/save_baseline
   POST /tool/list_baselines
   POST /tool/drop_baseline
-  GET  /health                        Liveness probe.
+  GET  /health                        Liveness probe (auth-exempt).
   GET  /tools                         Tool catalog.
+  GET  /resources                     Resource catalog.
   GET  /resources/{encoded-uri}       Mirror of MCP resources
                                       (codemap://recipes, schema, skill, ...).
 
-Errors are JSON: {"error": "<msg>"} with HTTP status 400 / 401 / 404 / 500.
+Errors are JSON: {"error": "<msg>"} with HTTP status 400 (bad input)
+/ 401 (auth) / 403 (cross-origin / DNS rebinding) / 404 (unknown
+tool, recipe, or baseline) / 500 (engine fault).
 Every response carries X-Codemap-Version: <semver>.
 
 Examples:

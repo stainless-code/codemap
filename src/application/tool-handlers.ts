@@ -53,19 +53,29 @@ import { computeValidateRows, toProjectRelative } from "./validate-engine";
  * formatted text payloads (SARIF doc / GH-annotation lines) so the HTTP
  * wrapper can pick the right `Content-Type` (`application/sarif+json` /
  * `text/plain`) without parsing the payload.
+ *
+ * Error arm carries an optional `status` so the HTTP transport can map
+ * to distinct codes (404 for not-found, 500 for engine-throws); MCP
+ * ignores it (everything is `isError: true` on the wire). Default 400
+ * — matches the existing CLI `{"error": ...}` semantics where
+ * unparseable / invalid input was always the assumption.
  */
 export type ToolResult =
   | { ok: true; format: "json"; payload: unknown }
   | { ok: true; format: "sarif"; payload: string }
   | { ok: true; format: "annotations"; payload: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; status?: 400 | 404 | 500 };
 
 const ok = (payload: unknown): ToolResult => ({
   ok: true,
   format: "json",
   payload,
 });
-const err = (error: string): ToolResult => ({ ok: false, error });
+const err = (error: string, status: 400 | 404 | 500 = 400): ToolResult => ({
+  ok: false,
+  error,
+  status,
+});
 
 /**
  * Resolve `changed_since: <ref>` to a Set of project-relative paths.
@@ -179,7 +189,7 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
     if (isEnginePayloadError(payload)) return err(payload.error);
     return ok(payload);
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -210,6 +220,7 @@ export function handleQueryRecipe(
     if (sql === undefined) {
       return err(
         `codemap: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
+        404,
       );
     }
     const recipeActions = getQueryRecipeActions(args.recipe);
@@ -241,7 +252,7 @@ export function handleQueryRecipe(
     if (isEnginePayloadError(payload)) return err(payload.error);
     return ok(payload);
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -287,7 +298,7 @@ export function handleQueryBatch(
     });
     return ok(results);
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -389,7 +400,7 @@ export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
       closeDb(db, { readonly: args.no_index === true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -418,7 +429,7 @@ export function handleContext(args: ContextArgs): ToolResult {
       closeDb(db, { readonly: true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -442,7 +453,7 @@ export function handleValidate(args: ValidateArgs): ToolResult {
       closeDb(db, { readonly: true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -475,6 +486,7 @@ export function handleSaveBaseline(
       if (recipeSql === undefined) {
         return err(
           `save_baseline: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
+          404,
         );
       }
       sql = recipeSql;
@@ -509,7 +521,7 @@ export function handleSaveBaseline(
       created_at: savedAt,
     });
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -527,7 +539,7 @@ export function handleListBaselines(): ToolResult {
       closeDb(db, { readonly: true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -549,6 +561,7 @@ export function handleDropBaseline(args: DropBaselineArgs): ToolResult {
       if (!dropped) {
         return err(
           `drop_baseline: no baseline named "${args.name}". Call list_baselines for the catalog.`,
+          404,
         );
       }
       return ok({ dropped: args.name });
@@ -556,7 +569,7 @@ export function handleDropBaseline(args: DropBaselineArgs): ToolResult {
       closeDb(db);
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -592,7 +605,7 @@ export function handleShow(args: ShowArgs, root: string): ToolResult {
       closeDb(db, { readonly: true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 
@@ -628,7 +641,7 @@ export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
       closeDb(db, { readonly: true });
     }
   } catch (e) {
-    return err(e instanceof Error ? e.message : String(e));
+    return err(e instanceof Error ? e.message : String(e), 500);
   }
 }
 

@@ -1,11 +1,17 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { z } from "zod";
+import type { ZodRawShape } from "zod";
+
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { listResources, readResource } from "./resource-handlers";
 import {
+  auditArgsSchema,
+  contextArgsSchema,
+  dropBaselineArgsSchema,
   handleAudit,
   handleContext,
   handleDropBaseline,
@@ -17,6 +23,14 @@ import {
   handleShow,
   handleSnippet,
   handleValidate,
+  listBaselinesArgsSchema,
+  queryArgsSchema,
+  queryBatchArgsSchema,
+  queryRecipeArgsSchema,
+  saveBaselineArgsSchema,
+  showArgsSchema,
+  snippetArgsSchema,
+  validateArgsSchema,
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
 
@@ -120,7 +134,13 @@ export async function handleRequest(
   res: ServerResponse,
   opts: HttpServerOpts,
 ): Promise<void> {
-  const url = new URL(req.url ?? "/", `http://${opts.host}:${opts.port}`);
+  // IPv6 literals (`::1`, `::`) must be bracketed in URLs per RFC 3986;
+  // `new URL("/", "http://::1:7878")` throws otherwise.
+  const baseHost =
+    opts.host.includes(":") && !opts.host.startsWith("[")
+      ? `[${opts.host}]`
+      : opts.host;
+  const url = new URL(req.url ?? "/", `http://${baseHost}:${opts.port}`);
   const method = req.method ?? "GET";
   const path = url.pathname;
 
@@ -285,7 +305,12 @@ function writeToolResult(
   version: string,
 ): void {
   if (!result.ok) {
-    return writeJson(res, 400, { error: result.error }, version);
+    return writeJson(
+      res,
+      result.status ?? 400,
+      { error: result.error },
+      version,
+    );
   }
   if (result.format === "json") {
     return writeJson(res, 200, result.payload, version);
@@ -317,55 +342,78 @@ async function dispatchTool(
   if (!body.ok) return writeJson(res, 400, { error: body.error }, opts.version);
   const args = body.value as Record<string, unknown>;
 
-  // Per-tool dispatch. Each branch casts `args` to the handler's typed
-  // shape — the handler's Zod-validated boundary still applies inside
-  // tool-handlers.ts; HTTP just forwards the parsed JSON.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- runtime shape validated by zod inside each handler
-  const a = args as any;
+  // Per-tool dispatch. Each branch validates the body against the
+  // tool's exported Zod schema (same schema MCP uses via inputSchema)
+  // and short-circuits to 400 on validation failure — HTTP boundary
+  // matches MCP's contract instead of letting handlers fail deep with
+  // generic errors. Schemas are `ZodRawShape` (record of Zod fields),
+  // so wrap with `z.object(...)` before `.safeParse(...)`.
   let result: ToolResult;
   switch (name) {
     case "query": {
-      result = handleQuery(a, opts.root);
+      const r = validate(queryArgsSchema, args, "query");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleQuery(r.value, opts.root);
       break;
     }
     case "query_recipe": {
-      result = handleQueryRecipe(a, opts.root);
+      const r = validate(queryRecipeArgsSchema, args, "query_recipe");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleQueryRecipe(r.value, opts.root);
       break;
     }
     case "query_batch": {
-      result = handleQueryBatch(a, opts.root);
+      const r = validate(queryBatchArgsSchema, args, "query_batch");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleQueryBatch(r.value, opts.root);
       break;
     }
     case "audit": {
-      result = await handleAudit(a);
+      const r = validate(auditArgsSchema, args, "audit");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = await handleAudit(r.value);
       break;
     }
     case "context": {
-      result = handleContext(a);
+      const r = validate(contextArgsSchema, args, "context");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleContext(r.value);
       break;
     }
     case "validate": {
-      result = handleValidate(a);
+      const r = validate(validateArgsSchema, args, "validate");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleValidate(r.value);
       break;
     }
     case "show": {
-      result = handleShow(a, opts.root);
+      const r = validate(showArgsSchema, args, "show");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleShow(r.value, opts.root);
       break;
     }
     case "snippet": {
-      result = handleSnippet(a, opts.root);
+      const r = validate(snippetArgsSchema, args, "snippet");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleSnippet(r.value, opts.root);
       break;
     }
     case "save_baseline": {
-      result = handleSaveBaseline(a, opts.root);
+      const r = validate(saveBaselineArgsSchema, args, "save_baseline");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleSaveBaseline(r.value, opts.root);
       break;
     }
     case "list_baselines": {
+      const r = validate(listBaselinesArgsSchema, args, "list_baselines");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleListBaselines();
       break;
     }
     case "drop_baseline": {
-      result = handleDropBaseline(a);
+      const r = validate(dropBaselineArgsSchema, args, "drop_baseline");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleDropBaseline(r.value);
       break;
     }
     default: {
@@ -382,6 +430,29 @@ async function dispatchTool(
     }
   }
   return writeToolResult(res, result, opts.version);
+}
+
+/**
+ * Wrap a tool's `ZodRawShape` (record of `key: ZodType`) with `z.object`
+ * and parse the request body. On failure, format every Zod issue as
+ * `<path>: <message>` joined with `; ` for a single-line error suitable
+ * for the `{"error": "..."}` HTTP response. Same format `mcp-server.ts`
+ * gets for free via the SDK's `inputSchema` validation.
+ */
+function validate<T extends ZodRawShape>(
+  shape: T,
+  value: unknown,
+  toolName: string,
+): { ok: true; value: z.infer<z.ZodObject<T>> } | { ok: false; error: string } {
+  const parsed = z.object(shape).safeParse(value);
+  if (parsed.success) return { ok: true, value: parsed.data };
+  const issues = parsed.error.issues
+    .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+    .join("; ");
+  return {
+    ok: false,
+    error: `codemap serve: invalid args for tool "${toolName}" — ${issues}`,
+  };
 }
 
 /**

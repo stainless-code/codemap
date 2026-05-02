@@ -113,7 +113,8 @@ codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
 # HTTP API — same tool taxonomy as `codemap mcp`, exposed over POST /tool/{name} for
 # non-MCP consumers (CI scripts, curl, IDE plugins). Loopback default; optional --token.
-codemap serve --port 7878 --token $(openssl rand -hex 32) &
+TOKEN=$(openssl rand -hex 32)
+codemap serve --port 7878 --token "$TOKEN" &
 curl -s -X POST http://127.0.0.1:7878/tool/query \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \

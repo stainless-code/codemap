@@ -220,12 +220,12 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json[0]).toMatchObject({ name: "bar" });
   });
 
-  it("query_recipe returns 400 for unknown recipe", async () => {
+  it("query_recipe returns 404 for unknown recipe (not 400 — semantics matter)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "query_recipe", {
       recipe: "does-not-exist",
     });
-    expect(r.status).toBe(400);
+    expect(r.status).toBe(404);
     expect(r.json.error).toContain("does-not-exist");
   });
 
@@ -271,6 +271,122 @@ describe("http-server — POST /tool/{other tools}", () => {
     const r = await postTool(serverHandle.port, "bogus", {});
     expect(r.status).toBe(404);
     expect(r.json.error).toContain("unknown tool");
+  });
+
+  it("drop_baseline returns 404 for unknown name (not 400)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "drop_baseline", {
+      name: "does-not-exist",
+    });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toContain("does-not-exist");
+  });
+
+  it("save_baseline returns 404 for unknown recipe", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "save_baseline", {
+      name: "x",
+      recipe: "does-not-exist",
+    });
+    expect(r.status).toBe(404);
+  });
+});
+
+describe("http-server — IPv6 host bracketing", () => {
+  // Regression test for CodeRabbit finding: opts.host like '::1' was
+  // interpolated raw into `http://${host}:${port}`, throwing in
+  // new URL(). The fix wraps IPv6 literals in brackets per RFC 3986.
+  it("does not throw for IPv6 host in opts (the URL parse path)", async () => {
+    // We don't actually bind to ::1 in test (CI loopback config varies);
+    // this just exercises the URL-construction path with an IPv6-looking
+    // opts.host value to confirm new URL() doesn't throw.
+    // The real bind-and-serve smoke would need a CI matrix with IPv6.
+    const { createServer } = await import("node:http");
+    const { handleRequest } = await import("./http-server");
+    const server = createServer((req, res) => {
+      void handleRequest(req, res, {
+        version: "0.0.0-test",
+        root: benchDir,
+        host: "::1", // would have thrown before the fix
+        port: 7879,
+        token: undefined,
+      }).catch((err: unknown) => {
+        res.statusCode = 500;
+        res.end(String(err));
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const addr = server.address();
+    if (typeof addr !== "object" || addr === null) {
+      throw new Error("expected AddressInfo");
+    }
+    const r = await fetch(`http://127.0.0.1:${addr.port}/health`);
+    expect(r.status).toBe(200);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+});
+
+describe("http-server — Zod input validation at HTTP boundary", () => {
+  // CodeRabbit caught: HTTP path was casting to `any` and forwarding
+  // unvalidated bodies to handlers. These tests lock the per-tool
+  // safeParse step that now runs before each dispatch.
+
+  it("query without sql → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {});
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("sql");
+    expect(r.json.error).toContain('"query"');
+  });
+
+  it("query with sql=number → 400 with type-mismatch error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", { sql: 42 });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("sql");
+  });
+
+  it("show with name=number → 400 (not deep handler crash)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "show", { name: 1 });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("name");
+  });
+
+  it("query_recipe without recipe → 400", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query_recipe", {});
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("recipe");
+  });
+
+  it("save_baseline without name → 400", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "save_baseline", {
+      sql: "SELECT 1",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("name");
+  });
+
+  it("query_batch with empty statements → 400 (.min(1) fires)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query_batch", {
+      statements: [],
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("statements");
+  });
+
+  it("validation error message names the offending tool + path", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "snippet", {});
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"snippet"');
+    expect(r.json.error).toContain("name");
   });
 });
 
