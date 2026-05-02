@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { listResources, readResource } from "./resource-handlers";
 import {
   handleAudit,
   handleContext,
@@ -157,6 +158,44 @@ export async function handleRequest(
       { tools: TOOL_NAMES.map((name) => ({ name })) },
       opts.version,
     );
+  }
+
+  if (method === "GET" && path === "/resources") {
+    return writeJson(res, 200, { resources: listResources() }, opts.version);
+  }
+
+  if (method === "GET" && path.startsWith("/resources/")) {
+    // URI is percent-encoded after /resources/ — decode then dispatch.
+    // Single decodeURIComponent: tests pass the slash-bearing form
+    // (e.g. /resources/codemap%3A%2F%2Frecipes%2Ffan-out → codemap://recipes/fan-out).
+    const encoded = path.slice("/resources/".length);
+    let uri: string;
+    try {
+      uri = decodeURIComponent(encoded);
+    } catch {
+      return writeJson(
+        res,
+        400,
+        { error: `codemap serve: invalid percent-encoding in resource URI.` },
+        opts.version,
+      );
+    }
+    const payload = readResource(uri);
+    if (payload === undefined) {
+      return writeJson(
+        res,
+        404,
+        {
+          error: `codemap serve: unknown resource "${uri}". GET /resources for the catalog.`,
+        },
+        opts.version,
+      );
+    }
+    res.statusCode = 200;
+    res.setHeader("Content-Type", payload.mimeType);
+    res.setHeader("X-Codemap-Version", opts.version);
+    res.end(payload.text);
+    return;
   }
 
   if (method === "POST" && path.startsWith("/tool/")) {

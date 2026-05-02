@@ -274,6 +274,66 @@ describe("http-server — POST /tool/{other tools}", () => {
   });
 });
 
+describe("http-server — GET /resources", () => {
+  it("GET /resources returns the catalog", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/resources`);
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { resources: { uri: string }[] };
+    const uris = body.resources.map((x) => x.uri);
+    expect(uris).toContain("codemap://recipes");
+    expect(uris).toContain("codemap://schema");
+    expect(uris).toContain("codemap://skill");
+  });
+
+  it("GET /resources/{encoded uri} returns the recipes catalog", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/resources/${encodeURIComponent("codemap://recipes")}`,
+    );
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("application/json");
+    const body = (await r.json()) as { id: string }[];
+    expect(Array.isArray(body)).toBe(true);
+  });
+
+  it("GET /resources/{encoded uri} returns one recipe by id", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/resources/${encodeURIComponent("codemap://recipes/fan-out")}`,
+    );
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { id: string };
+    expect(body.id).toBe("fan-out");
+  });
+
+  it("GET /resources/{encoded uri} returns the schema DDL", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/resources/${encodeURIComponent("codemap://schema")}`,
+    );
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { name: string; ddl: string }[];
+    expect(body.find((t) => t.name === "files")).toBeDefined();
+  });
+
+  it("GET /resources/{encoded uri} 404s on unknown URI", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/resources/${encodeURIComponent("codemap://nope")}`,
+    );
+    expect(r.status).toBe(404);
+  });
+
+  it("GET /resources/{encoded uri} 404s on unknown recipe id", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/resources/${encodeURIComponent("codemap://recipes/does-not-exist")}`,
+    );
+    expect(r.status).toBe(404);
+  });
+});
+
 describe("http-server — --token auth", () => {
   it("rejects POST without Authorization when token set (401)", async () => {
     serverHandle = await startServer({ token: "secret" });
