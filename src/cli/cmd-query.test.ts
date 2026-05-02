@@ -619,6 +619,110 @@ describe("parseQueryRest — --format flag", () => {
     const r = parseQueryRest(["query", "--format=", "SELECT 1"]);
     expect(r.kind).toBe("error");
   });
+
+  // Combo-guard regression suite — locks the parse-time rejection of
+  // `--format sarif|annotations` with flags that change the output shape
+  // (different shapes — sarif/annotations only support flat row lists).
+  // Mirrors the formatToolIncompatibility check on the MCP side.
+  describe("combo guards (--format sarif|annotations + summary/group-by/baseline)", () => {
+    it("rejects --format sarif + --summary on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--summary",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("sarif");
+        expect(r.message).toContain("--summary");
+      }
+    });
+
+    it("rejects --format annotations + --group-by on a recipe", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "annotations",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("annotations");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
+    it("rejects --format sarif + --baseline=<name> on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("sarif");
+        expect(r.message).toContain("--baseline");
+      }
+    });
+
+    it("rejects --format annotations + --save-baseline=<name> on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "annotations",
+        "--save-baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("annotations");
+        expect(r.message).toContain("--save-baseline");
+      }
+    });
+
+    it("rejects --format sarif + --baseline on a recipe (default-name form)", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--baseline",
+        "-r",
+        "deprecated-symbols",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") expect(r.message).toContain("sarif");
+    });
+
+    it("--format text composes freely with --summary (text/json don't trigger the guard)", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "text",
+        "--summary",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("run");
+    });
+
+    it("--format json composes freely with --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "json",
+        "--group-by",
+        "directory",
+        "SELECT file_path FROM symbols",
+      ]);
+      expect(r.kind).toBe("run");
+    });
+  });
 });
 
 describe("listQueryRecipeCatalog", () => {
