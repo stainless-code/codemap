@@ -7,7 +7,7 @@
 
 ---
 
-## Status snapshot (as of 2026-05-01)
+## Status snapshot (as of 2026-05-02)
 
 Adoption-candidate ship status. The tier tables in § 1 are preserved as the original assessment record; this snapshot is the single source of truth for "what's open." Update on every PR that closes a row.
 
@@ -32,6 +32,7 @@ Adoption-candidate ship status. The tier tables in § 1 are preserved as the ori
 - **Recipes-as-content registry** — bundled recipes are now `<id>.{sql,md}` file pairs in `templates/recipes/`; project teams ship internal SQL via git-tracked `<projectRoot>/.codemap/recipes/<id>.{sql,md}`. PR [#37](https://github.com/stainless-code/codemap/pull/37). Catalog gains `source` / `body` / `shadows` fields so agents see project overrides at session start; YAML frontmatter actions on `.md` mean project recipes feel first-class. Load-time DML/DDL deny-list + runtime `PRAGMA query_only=1` backstop.
 - **Targeted-read CLI** — `codemap show <name>` + `codemap snippet <name>` for precise lookup-by-symbol-name without composing SQL. PR [#39](https://github.com/stainless-code/codemap/pull/39). Both verbs share the same flag set (`--kind`, `--in <path>`) and an agent-friendly `{matches, disambiguation?}` envelope; `snippet` adds `source` / `stale` / `missing` per match (read + flag, no auto-reindex side-effects). Registered as MCP tools too — every read verb maps to a tool. PR also shipped defence-in-depth security fixes (LIKE-wildcard escape on `--in`, path-traversal rejection in `agents-init`, non-blocking `bun audit` CI job).
 - **Doc-governance Rule 10** added during PR [#29](https://github.com/stainless-code/codemap/pull/29) — every core-surface change must update both `templates/agents/` (ships to npm) and `.agents/` (this clone) in lockstep.
+- **`cli/*` → `application/*` engine lift (internal)** — PR [#41](https://github.com/stainless-code/codemap/pull/41) closed the last layer-reversal imports `application/mcp-server.ts` had on `cli/*` (called out in the PR #35 self-audit). New engines `context-engine` / `validate-engine`; `query-recipes` moved to `application/`; envelope builders + helpers consolidated in `audit-engine` / `show-engine`. Pure refactor — no behavior or public API change — but unblocks the HTTP transport (B-tier `serve`) since that engine reuse is now clean.
 
 **Open-questions resolution** (from § 6 below):
 
