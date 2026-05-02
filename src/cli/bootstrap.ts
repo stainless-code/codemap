@@ -29,7 +29,8 @@ MCP server (Model Context Protocol — for agent hosts):
   codemap mcp                                        # stdio JSON-RPC, one tool per CLI verb
 
 Targeted reads (precise lookup by symbol name):
-  codemap show <name> [--kind <k>] [--in <path>] [--json]   # metadata: file:line + signature
+  codemap show <name> [--kind <k>] [--in <path>] [--json]      # metadata: file:line + signature
+  codemap snippet <name> [--kind <k>] [--in <path>] [--json]   # source text from disk + stale flag
 
 Other:
   codemap version
@@ -61,6 +62,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "audit") return;
   if (rest[0] === "mcp") return;
   if (rest[0] === "show") return;
+  if (rest[0] === "snippet") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
