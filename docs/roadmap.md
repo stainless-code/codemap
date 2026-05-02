@@ -8,7 +8,6 @@ Forward-looking plans only — **not** a mirror of `src/`. **Doc index:** [READM
 
 - **Community language adapters** — optional packages (e.g. Tree-sitter) with a **peerDependency** on `@stainless-code/codemap` and a public **registration** API beyond built-ins in [`src/adapters/`](../src/adapters/).
 - **Agent tooling** — evaluate [TanStack Intent](https://tanstack.com/intent/latest/docs/overview) for versioned skills in `node_modules` (optional; **`codemap agents init`** remains the default).
-- **Golden queries** — design & policy: [golden-queries.md](./golden-queries.md); Tier A in CI, Tier B via `CODEMAP_*` (see [benchmark § Fixtures](./benchmark.md#fixtures)).
 
 ---
 
