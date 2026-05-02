@@ -118,6 +118,14 @@ echo "SELECT path FROM files WHERE language IN ('ts', 'tsx') AND line_count > 50
   > .codemap/recipes/big-ts-files.sql
 codemap query --recipe big-ts-files                              # auto-discovered alongside bundled
 
+# Targeted reads — precise lookup by symbol name without composing SQL
+codemap show runQueryCmd                                        # metadata: file:line + signature
+codemap show foo --kind function --in src/cli                   # narrow ambiguous matches
+codemap snippet runQueryCmd                                     # same lookup + source text from disk
+codemap snippet foo --json                                      # {matches: [{...metadata, source, stale, missing}]}
+# Output envelope is always {matches, disambiguation?} — single match → {matches: [{...}]};
+# multi-match adds disambiguation: {n, by_kind, files, hint} for agent-friendly narrowing.
+
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,

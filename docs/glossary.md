@@ -368,6 +368,14 @@ Conceptually, the structure of the SQLite database — every table, column, cons
 
 Integer constant in `src/db.ts`. Bumped whenever the DDL changes. `createSchema()` reads `meta.schema_version` and triggers a full rebuild on mismatch.
 
+### show
+
+`codemap show <name>` — one-step lookup that returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for the symbol(s) matching `<name>` (exact, case-sensitive). Output is the `{matches, disambiguation?}` envelope (single match → `{matches: [{...}]}`; multi-match adds `disambiguation: {n, by_kind, files, hint}` so agents narrow without scanning every row). Flags: `--kind <kind>` (filter by `symbols.kind`), `--in <path>` (file-scope filter — directory prefix or exact file). Distinct from **snippet** (returns source text, not just metadata) and from `query` with `WHERE name = ?` (one verb vs SQL composition; see [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage)).
+
+### snippet
+
+`codemap snippet <name>` — same lookup as **show**, but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since last index — line range may have shifted), and `missing` (true when file is gone). Per-execution shape mirrors `show`'s envelope; source/stale/missing are additive fields. Stale-file behavior: `source` is ALWAYS returned when the file exists; `stale: true` is metadata the agent reads (no refusal, no auto-reindex side-effects from a read tool — agent decides whether to act on possibly-shifted lines or run `codemap` first). See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+
 ### skill
 
 A `.agents/skills/<name>/SKILL.md` file with YAML frontmatter. Longer than a rule; describes a complete agent workflow. Distinct from a **rule** (shorter, normative).
