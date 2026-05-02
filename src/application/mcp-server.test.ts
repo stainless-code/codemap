@@ -625,3 +625,193 @@ describe("MCP server — resources", () => {
     }
   });
 });
+
+describe("MCP server — show + snippet tools", () => {
+  function seedSymbol(opts: {
+    file: string;
+    name: string;
+    kind?: string;
+    lineStart?: number;
+    lineEnd?: number;
+  }) {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES (?, ?, ?, ?, ?, ?, 1, 0)`,
+        [
+          opts.file,
+          opts.name,
+          opts.kind ?? "function",
+          opts.lineStart ?? 1,
+          opts.lineEnd ?? 1,
+          `${opts.kind ?? "function"} ${opts.name}(): void`,
+        ],
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists show + snippet in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("show");
+      expect(names).toContain("snippet");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show returns {matches} envelope for single match", async () => {
+    seedSymbol({ file: "src/a.ts", name: "myFn", lineStart: 5, lineEnd: 10 });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "myFn" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0]).toMatchObject({
+        name: "myFn",
+        file_path: "src/a.ts",
+        line_start: 5,
+        line_end: 10,
+      });
+      expect(json.disambiguation).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show adds disambiguation block for multi-match", async () => {
+    seedSymbol({ file: "src/a.ts", name: "shared", kind: "function" });
+    seedSymbol({ file: "src/b.ts", name: "shared", kind: "const" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "shared" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(2);
+      expect(json.disambiguation).toMatchObject({
+        n: 2,
+        by_kind: { function: 1, const: 1 },
+        files: ["src/a.ts", "src/b.ts"],
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show with `in` filter narrows to one file", async () => {
+    seedSymbol({ file: "src/a.ts", name: "shared" });
+    seedSymbol({ file: "src/b.ts", name: "shared" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "shared", in: "src/a.ts" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].file_path).toBe("src/a.ts");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show returns empty matches when name unknown", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "definitely-not-a-real-symbol-xyz" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("snippet returns source text from disk + stale: false on fresh file", async () => {
+    // Write a real file matching the seeded `files` row in the bench setup
+    // (src/a.ts already exists with hash 'h1' but content "export const A = 1;\n").
+    // Seed a symbol pointing at line 1.
+    seedSymbol({
+      file: "src/a.ts",
+      name: "A",
+      kind: "const",
+      lineStart: 1,
+      lineEnd: 1,
+    });
+    // The bench uses content_hash = 'h1' which DOES NOT match hashContent("export const A = 1;\n"),
+    // so the engine will report stale: true. To test stale: false we'd need to update the row's hash.
+    const db = openDb();
+    try {
+      const realHash = (
+        require("../hash") as typeof import("../hash")
+      ).hashContent("export const A = 1;\n");
+      db.run("UPDATE files SET content_hash = ? WHERE path = ?", [
+        realHash,
+        "src/a.ts",
+      ]);
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "snippet",
+        arguments: { name: "A" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].source).toBe("export const A = 1;");
+      expect(json.matches[0].stale).toBe(false);
+      expect(json.matches[0].missing).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("snippet flags stale: true when on-disk content drifts from indexed hash", async () => {
+    // Bench file content is "export const A = 1;\n" but indexed hash is 'h1' (mismatch).
+    seedSymbol({ file: "src/a.ts", name: "A", lineStart: 1, lineEnd: 1 });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "snippet",
+        arguments: { name: "A" },
+      });
+      const json = readJson(r);
+      expect(json.matches[0].stale).toBe(true);
+      // Source is still returned per Q-6 settled.
+      expect(json.matches[0].source).toBe("export const A = 1;");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("snippet flags missing: true when file is gone on disk", async () => {
+    seedSymbol({ file: "src/b.ts", name: "B", lineStart: 1, lineEnd: 1 });
+    // src/b.ts is in the indexed `files` but no actual file on disk in bench setup.
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "snippet",
+        arguments: { name: "B" },
+      });
+      const json = readJson(r);
+      expect(json.matches[0].missing).toBe(true);
+      expect(json.matches[0].source).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+});
