@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { classifyIntent, parseContextRest } from "./cmd-context";
+import { classifyIntent } from "../application/context-engine";
+import { parseContextRest } from "./cmd-context";
 
 describe("parseContextRest", () => {
   it("returns help for --help / -h", () => {
