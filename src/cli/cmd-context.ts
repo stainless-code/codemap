@@ -1,10 +1,10 @@
+import { QUERY_RECIPES } from "../application/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, getMeta, openDb, SCHEMA_VERSION } from "../db";
 import type { CodemapDatabase } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { CODEMAP_VERSION } from "../version";
-import { QUERY_RECIPES } from "./query-recipes";
 
 /**
  * Snapshot envelope emitted by `codemap context`. Stable JSON shape any agent

@@ -2,12 +2,12 @@ import { existsSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadAllRecipes } from "../application/recipes-loader";
-import type { LoadedRecipe } from "../application/recipes-loader";
 import { getProjectRoot } from "../runtime";
+import { loadAllRecipes } from "./recipes-loader";
+import type { LoadedRecipe } from "./recipes-loader";
 
-export type { RecipeAction } from "../application/recipes-loader";
-import type { RecipeAction } from "../application/recipes-loader";
+export type { RecipeAction } from "./recipes-loader";
+import type { RecipeAction } from "./recipes-loader";
 
 /**
  * Catalog entry surfaced to `--recipes-json`, the `codemap://recipes` MCP

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseQueryRest } from "./cmd-query";
 import {
   getQueryRecipeActions,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
-} from "./query-recipes";
+} from "../application/query-recipes";
+import { parseQueryRest } from "./cmd-query";
 
 describe("parseQueryRest", () => {
   it("errors when only query", () => {

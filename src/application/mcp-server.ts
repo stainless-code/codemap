@@ -19,12 +19,6 @@ import { buildContextEnvelope } from "../cli/cmd-context";
 import { buildShowResult } from "../cli/cmd-show";
 import { buildSnippetResult } from "../cli/cmd-snippet";
 import { computeValidateRows, toProjectRelative } from "../cli/cmd-validate";
-import {
-  getQueryRecipeActions,
-  getQueryRecipeCatalogEntry,
-  getQueryRecipeSql,
-  listQueryRecipeCatalog,
-} from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
@@ -41,6 +35,12 @@ import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { resolveAuditBaselines, runAudit } from "./audit-engine";
 import { getCurrentCommit } from "./index-engine";
 import { executeQuery } from "./query-engine";
+import {
+  getQueryRecipeActions,
+  getQueryRecipeCatalogEntry,
+  getQueryRecipeSql,
+  listQueryRecipeCatalog,
+} from "./query-recipes";
 import { runCodemapIndex } from "./run-index";
 import { findSymbolsByName } from "./show-engine";
 

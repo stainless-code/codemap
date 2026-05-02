@@ -3,6 +3,13 @@ import {
   printQueryResult,
   queryRows,
 } from "../application/index-engine";
+import {
+  getQueryRecipeActions,
+  getQueryRecipeSql,
+  listQueryRecipeCatalog,
+  listQueryRecipeIds,
+  QUERY_RECIPES,
+} from "../application/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
@@ -26,13 +33,6 @@ import {
 } from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-import {
-  getQueryRecipeActions,
-  getQueryRecipeSql,
-  listQueryRecipeCatalog,
-  listQueryRecipeIds,
-  QUERY_RECIPES,
-} from "./query-recipes";
 
 /**
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
