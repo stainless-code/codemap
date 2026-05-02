@@ -23,12 +23,6 @@ import type { GroupByMode } from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { resolveAuditBaselines, runAudit } from "./audit-engine";
-// Layer note: several modules below live under `src/cli/` because their CLI
-// verb owns them today (`query-recipes`, `cmd-audit`'s baseline resolver,
-// `cmd-context`'s envelope builder, `cmd-validate`'s row computer). We import
-// them here as pure data / pure functions (no execution flow crosses
-// cli → application). A future refactor may lift them to `src/application/`
-// once a second consumer (HTTP API) needs them.
 import { buildContextEnvelope } from "./context-engine";
 import { getCurrentCommit } from "./index-engine";
 import { executeQuery } from "./query-engine";
