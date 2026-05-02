@@ -20,10 +20,9 @@ import { buildContextEnvelope } from "../cli/cmd-context";
 import { computeValidateRows } from "../cli/cmd-validate";
 import {
   getQueryRecipeActions,
+  getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
-  listQueryRecipeIds,
-  QUERY_RECIPES,
 } from "../cli/query-recipes";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
@@ -605,23 +604,26 @@ function registerResources(server: McpServer): void {
     },
   );
 
-  // codemap://recipes/{id} — one recipe (template form)
+  // codemap://recipes/{id} — one recipe (template form). Per Tracer 4 the
+  // payload includes `body` / `source` / `shadows` from the catalog entry —
+  // session-start agents check `shadows` to know when a project recipe
+  // overrides the documented bundled version.
   const oneRecipeCache = new Map<string, string>();
   server.registerResource(
     "recipe",
     new ResourceTemplate("codemap://recipes/{id}", {
       list: () => ({
-        resources: listQueryRecipeIds().map((id) => ({
-          uri: `codemap://recipes/${id}`,
-          name: id,
-          description: QUERY_RECIPES[id]!.description,
+        resources: listQueryRecipeCatalog().map((entry) => ({
+          uri: `codemap://recipes/${entry.id}`,
+          name: entry.id,
+          description: entry.description,
           mimeType: "application/json",
         })),
       }),
     }),
     {
       description:
-        "Single recipe by id: {id, description, sql, actions?}. Replaces `codemap query --print-sql <id>` for agents.",
+        "Single recipe by id: {id, description, body?, sql, actions?, source, shadows?}. Replaces `codemap query --print-sql <id>` for agents; carries provenance fields so agents see when a project-local recipe overrides a bundled one.",
       mimeType: "application/json",
     },
     (uri, variables) => {
@@ -635,20 +637,15 @@ function registerResources(server: McpServer): void {
           ],
         };
       }
-      const meta = QUERY_RECIPES[id];
-      if (meta === undefined) {
+      const entry = getQueryRecipeCatalogEntry(id);
+      if (entry === undefined) {
         // Resources can't return structured errors the way tools do; throw so
         // the SDK surfaces a JSON-RPC error to the host.
         throw new Error(
           `codemap: unknown recipe "${id}". Read codemap://recipes for the catalog.`,
         );
       }
-      const payload = JSON.stringify({
-        id,
-        description: meta.description,
-        sql: meta.sql,
-        ...(meta.actions !== undefined ? { actions: meta.actions } : {}),
-      });
+      const payload = JSON.stringify(entry);
       oneRecipeCache.set(id, payload);
       return {
         contents: [

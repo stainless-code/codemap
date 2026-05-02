@@ -36,6 +36,21 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
+**Project-local recipes:** drop `<id>.sql` (and optional `<id>.md` for description + actions) into **`<projectRoot>/.codemap/recipes/`** — auto-discovered, runs via `codemap query --recipe <id>` like bundled. Project recipes win on id collision; check `codemap query --recipes-json` for **`shadows: true`** entries to know when a project recipe overrides the documented bundled version. `<id>.md` supports YAML frontmatter for the per-row action template — block-list shape only (the loader's hand-rolled parser doesn't accept inline-flow `[{...}]`):
+
+```markdown
+---
+actions:
+  - type: review-coupling
+    auto_fixable: false
+    description: "High fan-out usually means orchestrator role."
+---
+
+(Markdown body — first non-empty line becomes the catalog description.)
+```
+
+Validation: SQL is rejected at load time if it starts with DML/DDL (DELETE/DROP/UPDATE/etc.); the runtime `PRAGMA query_only=1` is the parser-proof backstop.
+
 **Baselines** (`query_baselines` table inside `.codemap.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
 
 **Audit (`codemap audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Reuses B.6 baselines as the snapshot source. Two CLI shapes — `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`; `--<delta>-baseline <name>` is the explicit per-delta override. v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).

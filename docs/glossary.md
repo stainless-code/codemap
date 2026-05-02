@@ -12,7 +12,7 @@ Alphabetical, lowercase. Disambiguation pairs link to each other.
 
 - **TS shape** = a TypeScript interface or type alias.
 - **SQLite table** = an actual on-disk table in `.codemap.db`.
-- **Recipe** = a bundled SQL string in `src/cli/query-recipes.ts`, exposed via `codemap query --recipe <id>`.
+- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (project-local). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
 - **Query** = any SQL run against the index (recipe or ad-hoc).
 
 ---
@@ -325,7 +325,16 @@ See **recipe**.
 
 ### recipe
 
-A bundled SQL string in `src/cli/query-recipes.ts`, identified by id (e.g. `fan-in`, `deprecated-symbols`, `files-hashes`). Run via `codemap query --recipe <id>` (alias `-r`). Distinct from an ad-hoc **query** (which is any SQL string the agent composes itself).
+A SQL file (plus optional sibling `.md` description) loaded into the catalog by `src/application/recipes-loader.ts`. Two sources, same shape:
+
+- **Bundled** — ships in the npm package as `templates/recipes/<id>.{sql,md}`. Examples: `fan-in`, `deprecated-symbols`, `files-hashes`.
+- **Project-local** — loaded from `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (root-only resolution; not gitignored — meant to be checked in for team review).
+
+Run via `codemap query --recipe <id>` (alias `-r`). Project recipes win on id collision with bundled ones (entries carry `shadows: true` in the catalog so agents reading `codemap://recipes` at session start see when a recipe behaves differently from the documented bundled version). Per-row `actions` templates (kebab-case verb + description) live in YAML frontmatter on each `<id>.md` — uniform between bundled and project. Load-time validation rejects empty SQL and DML / DDL keywords; runtime `PRAGMA query_only=1` (PR #35) is the parser-proof backstop. Distinct from an ad-hoc **query** (any SQL string the agent composes itself; ad-hoc SQL never carries actions).
+
+### `recipe shadows`
+
+Boolean flag on a project-local recipe entry that has the same `id` as a bundled recipe — `shadows: true` means "this project recipe overrides what the bundled version would have done." Surfaces in `--recipes-json`, `codemap://recipes`, and `codemap://recipes/{id}` so agents can see overrides without parsing per-execution responses (per-execution shape stays unchanged for plan § 4 uniformity). Silent at runtime — the agent-facing skill prompt is the channel that tells agents to check the flag at session start.
 
 ### research
 

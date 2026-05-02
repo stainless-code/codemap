@@ -45,6 +45,7 @@ Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 - **`--baseline[=<name>]`** — diff the current result against the saved baseline. Output `{baseline:{...}, current_row_count, added: [...], removed: [...]}` (with `--json`) or a two-section terminal dump. Identity = per-row multiset equality (canonical `JSON.stringify` keyed frequency map; duplicates preserved). Pair with `--summary` for `{baseline:{...}, current_row_count, added: N, removed: N}`. **Mutually exclusive with `--group-by`.**
 - **`--baselines`** lists saved baselines (no `rows_json` payload); **`--drop-baseline <name>`** deletes one. Both reject every other flag — they're list-only / drop-only operations.
 - **Per-row recipe `actions`** — recipes that define an **`actions: [{type, auto_fixable?, description?}]`** template append it to every row in **`--json`** output (recipe-only; ad-hoc SQL never carries actions). Under `--baseline`, actions attach to the **`added`** rows only (the rows the agent should act on). Inspect via **`--recipes-json`**.
+- **Project-local recipes** — drop **`<id>.sql`** (and optional **`<id>.md`** for description body + actions) into **`<projectRoot>/.codemap/recipes/`** to make team-internal SQL a first-class CLI verb. `--recipes-json` and the `codemap://recipes` MCP resource list project recipes alongside bundled ones with **`source: "bundled" | "project"`** discriminating them. Project recipes win on id collision; entries that override a bundled id carry **`shadows: true`** so agents reading the catalog at session start know when a recipe behaves differently from the documented bundled version. `<id>.md` supports YAML frontmatter for the per-row action template — **block-list shape only** (loader's hand-rolled parser; no inline-flow `[{...}]`): `---\nactions:\n  - type: my-verb\n    auto_fixable: false\n    description: "..."\n---`. Validation: SQL is rejected at load time if it starts with DML/DDL (DELETE/DROP/UPDATE/etc.); the runtime `PRAGMA query_only=1` is the parser-proof backstop. `.codemap.db` is gitignored; **`.codemap/recipes/` is NOT** — recipes are git-tracked source code authored for human review.
 
 **Audit (`codemap audit`)** — separate top-level command for structural-drift verdicts. Composes B.6 baselines into a per-delta `{head, deltas}` envelope; v1 ships `files` / `dependencies` / `deprecated`. Two snapshot-source shapes:
 
@@ -69,8 +70,8 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 
 **Resources (lazy-cached on first `read_resource`; constant for server-process lifetime):**
 
-- **`codemap://recipes`** — full catalog JSON (same as `--recipes-json`).
-- **`codemap://recipes/{id}`** — single recipe `{id, description, sql, actions?}`. Replaces `--print-sql <id>`.
+- **`codemap://recipes`** — full catalog JSON (same as `--recipes-json`). Each entry carries `source: "bundled" | "project"` and `shadows: true` on project entries that override a bundled recipe id. Read this at session start so you know when a `--recipe foo` call will run a project override instead of the documented bundled version.
+- **`codemap://recipes/{id}`** — single recipe `{id, description, body?, sql, actions?, source, shadows?}`. Replaces `--print-sql <id>`.
 - **`codemap://schema`** — DDL of every table in `.codemap.db` (queried live from `sqlite_schema`).
 - **`codemap://skill`** — full text of this skill file. Agents that don't preload the skill at session start can fetch it here.
 
