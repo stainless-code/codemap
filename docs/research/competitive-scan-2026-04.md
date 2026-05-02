@@ -71,8 +71,9 @@ Items the scan called out as "watch / defer / future" — most still live in [do
 - ✅ **MCP server wrapping `query`** — shipped as `codemap mcp` (agent-transports v1) in PR [#35](https://github.com/stainless-code/codemap/pull/35). Tool taxonomy, output shape, and resource catalog reserved for HTTP API to inherit.
 - ✅ **Recipes-as-content registry + project-local recipes (`.codemap/recipes/`)** — shipped in PR [#37](https://github.com/stainless-code/codemap/pull/37). Catalog gains `source` / `body` / `shadows` fields so agents see project overrides at session start.
 - ✅ **Targeted-read CLI (`codemap show <symbol>`)** — shipped as `show` + `snippet` siblings in PR [#39](https://github.com/stainless-code/codemap/pull/39).
-- See [`research/fallow.md` § Status snapshot](./fallow.md#status-snapshot-as-of-2026-05-01) for the full ship summary.
-- HTTP API (`codemap serve`) — still backlog
+- ✅ **`--format sarif` + `--format annotations`** — shipped in PR [#43](https://github.com/stainless-code/codemap/pull/43). GitHub Code Scanning + PR-inline annotations for any recipe row-set.
+- ✅ **HTTP API (`codemap serve`)** — shipped in PR [#44](https://github.com/stainless-code/codemap/pull/44). Same tool taxonomy as MCP, `POST /tool/{name}`, loopback default, optional `--token`.
+- See [`research/fallow.md` § Status snapshot](./fallow.md#status-snapshot-as-of-2026-05-02) for the full ship summary.
 - Watch mode (`codemap watch`) — still backlog
 - Cross-agent handoff artifact (speculative) — still backlog
 
