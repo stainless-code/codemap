@@ -4,7 +4,12 @@ import {
   queryRows,
 } from "../application/index-engine";
 import {
+  formatSarif,
+  hasLocatableRows,
+} from "../application/output-formatters";
+import {
   getQueryRecipeActions,
+  getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
@@ -381,11 +386,19 @@ export function parseQueryRest(rest: string[]):
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
+    const resolved = resolveFormat(format, json);
+    const incompat = formatIncompatibility(resolved, {
+      summary,
+      groupBy,
+      saveBaseline,
+      baseline,
+    });
+    if (incompat !== undefined) return { kind: "error", message: incompat };
     return {
       kind: "run",
       sql,
       json,
-      format: resolveFormat(format, json),
+      format: resolved,
       summary,
       changedSince,
       recipeId,
@@ -418,11 +431,19 @@ export function parseQueryRest(rest: string[]):
         'codemap: "--baseline" needs an explicit name when used without --recipe. Use --baseline=<name>.',
     };
   }
+  const resolved = resolveFormat(format, json);
+  const incompat = formatIncompatibility(resolved, {
+    summary,
+    groupBy,
+    saveBaseline,
+    baseline,
+  });
+  if (incompat !== undefined) return { kind: "error", message: incompat };
   return {
     kind: "run",
     sql,
     json,
-    format: resolveFormat(format, json),
+    format: resolved,
     summary,
     changedSince,
     recipeId: undefined,
@@ -442,6 +463,33 @@ function resolveFormat(
 ): OutputFormat {
   if (explicit !== undefined) return explicit;
   return json ? "json" : "text";
+}
+
+/**
+ * Reject combinations of `--format sarif|annotations` with flags that change
+ * the output shape away from "flat row list" (group-by buckets, summary
+ * counts, baseline diffs). Returns an error message or `undefined`.
+ *
+ * Trade-off: keeps SARIF / annotations on the cleanest row → finding mapping
+ * for v1; aggregate/diff shapes can be re-introduced if a real consumer asks.
+ */
+function formatIncompatibility(
+  fmt: OutputFormat,
+  opts: {
+    summary: boolean;
+    groupBy: GroupByMode | undefined;
+    saveBaseline: string | true | undefined;
+    baseline: string | true | undefined;
+  },
+): string | undefined {
+  if (fmt !== "sarif" && fmt !== "annotations") return undefined;
+  const offenders: string[] = [];
+  if (opts.summary) offenders.push("--summary");
+  if (opts.groupBy !== undefined) offenders.push("--group-by");
+  if (opts.saveBaseline !== undefined) offenders.push("--save-baseline");
+  if (opts.baseline !== undefined) offenders.push("--baseline");
+  if (offenders.length === 0) return undefined;
+  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations only support flat row lists).`;
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -573,6 +621,13 @@ export async function runQueryCmd(opts: {
   configFile: string | undefined;
   sql: string;
   json?: boolean;
+  /**
+   * Output format. Defaults to `"text"` for back-compat (callers that
+   * pre-date the `--format` flag still work). When `"sarif"` or
+   * `"annotations"`, group-by / summary / baseline are not allowed —
+   * caller must reject those combos at parse time.
+   */
+  format?: OutputFormat;
   summary?: boolean;
   changedSince?: string | undefined;
   recipeId?: string | undefined;
@@ -639,6 +694,16 @@ export async function runQueryCmd(opts: {
         recipeActions,
         root: getProjectRoot(),
       });
+      return;
+    }
+
+    if (opts.format === "sarif" || opts.format === "annotations") {
+      const code = printFormattedQuery(opts.sql, {
+        format: opts.format,
+        recipeId: opts.recipeId,
+        changedFiles,
+      });
+      if (code !== 0) process.exitCode = code;
       return;
     }
 
@@ -716,6 +781,71 @@ export async function runDropBaselineCmd(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
+  }
+}
+
+/**
+ * Run `sql` and emit results in `--format sarif` or `--format annotations`.
+ * Open / read / close pattern matches `printQueryResult`. Errors emit a
+ * single-line `{"error": "..."}` JSON envelope on stdout (stable across
+ * formatters so callers can branch on format). Returns 0 on success, 1 on
+ * any error.
+ *
+ * Per [docs/plans/sarif-formatter.md § D6 + § D8](../../docs/plans/sarif-formatter.md):
+ * empty / no-location row sets emit a valid SARIF doc with `results: []`
+ * + a stderr warning so the operator knows the recipe doesn't have a
+ * findings shape; annotations emit nothing + the same warning.
+ */
+function printFormattedQuery(
+  sql: string,
+  opts: {
+    format: "sarif" | "annotations";
+    recipeId: string | undefined;
+    changedFiles: Set<string> | undefined;
+  },
+): number {
+  let db: Awaited<ReturnType<typeof openDb>> | undefined;
+  try {
+    db = openDb();
+    let rows = db.query(sql).all() as Record<string, unknown>[];
+    if (opts.changedFiles !== undefined) {
+      rows = filterRowsByChangedFiles(rows, opts.changedFiles) as Record<
+        string,
+        unknown
+      >[];
+    }
+
+    if (rows.length > 0 && !hasLocatableRows(rows)) {
+      console.error(
+        `codemap: --format ${opts.format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${opts.format} v1.)`,
+      );
+    }
+
+    const catalog =
+      opts.recipeId !== undefined
+        ? getQueryRecipeCatalogEntry(opts.recipeId)
+        : undefined;
+
+    if (opts.format === "sarif") {
+      const out = formatSarif({
+        rows,
+        recipeId: opts.recipeId,
+        recipeDescription: catalog?.description,
+        recipeBody: catalog?.body,
+      });
+      console.log(out);
+      return 0;
+    }
+
+    // annotations — Tracer 3
+    console.error("codemap: --format annotations not yet implemented");
+    return 1;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ error: msg }));
+    return 1;
+  } finally {
+    if (db !== undefined) closeDb(db, { readonly: true });
   }
 }
 
