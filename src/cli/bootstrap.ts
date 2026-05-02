@@ -61,6 +61,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "context") return;
   if (rest[0] === "audit") return;
   if (rest[0] === "mcp") return;
+  if (rest[0] === "serve") return;
   if (rest[0] === "show") return;
   if (rest[0] === "snippet") return;
 

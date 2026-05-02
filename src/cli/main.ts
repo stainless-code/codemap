@@ -170,6 +170,28 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "serve") {
+    const { parseServeRest, printServeCmdHelp, runServeCmd } =
+      await import("./cmd-serve.js");
+    const parsed = parseServeRest(rest);
+    if (parsed.kind === "help") {
+      printServeCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runServeCmd({
+      root,
+      configFile,
+      host: parsed.host,
+      port: parsed.port,
+      token: parsed.token,
+    });
+    return;
+  }
+
   if (rest[0] === "audit") {
     const { parseAuditRest, printAuditCmdHelp, runAuditCmd } =
       await import("./cmd-audit.js");
