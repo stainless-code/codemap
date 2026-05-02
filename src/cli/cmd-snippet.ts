@@ -240,7 +240,10 @@ export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
       });
       if (matches.length === 0) {
         const filterDesc = describeFilter(opts.kind, inPath);
-        const message = `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap query --json "SELECT name, file_path FROM symbols WHERE name LIKE '%${opts.name}%'"\` for fuzzy lookup.`;
+        // SQLite single-quote escape (`''`) — keeps the suggested SQL valid
+        // when name contains apostrophes (e.g. `O'Brien`).
+        const safeName = opts.name.replace(/'/g, "''");
+        const message = `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap query --json "SELECT name, file_path FROM symbols WHERE name LIKE '%${safeName}%'"\` for fuzzy lookup.`;
         emitErrorMaybeJson(message, opts.json);
         return;
       }

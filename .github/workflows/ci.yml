@@ -141,6 +141,24 @@ jobs:
           bun run dev --full
           bun run benchmark
 
+  audit:
+    # Non-blocking — visibility into transitive-dep CVEs without gating PRs.
+    # Promote to a hard gate once the team agrees on a vulnerability budget.
+    name: 🛡 Audit (non-blocking)
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: bun audit
+        run: bun audit
+
   ci-complete:
     name: CI complete
     needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
