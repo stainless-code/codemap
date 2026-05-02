@@ -108,6 +108,29 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "show") {
+    const { parseShowRest, printShowCmdHelp, runShowCmd } =
+      await import("./cmd-show.js");
+    const parsed = parseShowRest(rest);
+    if (parsed.kind === "help") {
+      printShowCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runShowCmd({
+      root,
+      configFile,
+      name: parsed.name,
+      kind: parsed.kindFilter,
+      inPath: parsed.inPath,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "mcp") {
     const { parseMcpRest, printMcpCmdHelp, runMcpCmd } =
       await import("./cmd-mcp.js");
