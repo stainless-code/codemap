@@ -110,6 +110,14 @@ codemap query --recipes-json
 codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
 
+# Project-local recipes — drop SQL files into .codemap/recipes/ to make them discoverable across the team
+# Bundled recipes live in templates/recipes/ in the npm package; project recipes win on id collision
+# (shadowing is signalled via a `shadows: true` field in --recipes-json so agents notice the override)
+mkdir -p .codemap/recipes
+echo "SELECT path FROM files WHERE language = 'typescript' AND line_count > 500" \
+  > .codemap/recipes/big-ts-files.sql
+codemap query --recipe big-ts-files                              # auto-discovered alongside bundled
+
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
