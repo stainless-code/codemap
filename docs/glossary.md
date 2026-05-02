@@ -189,6 +189,14 @@ A `bun scripts/query-golden.ts` regression that compares a query/recipe's output
 
 ---
 
+## G
+
+### GH annotations
+
+`::notice file=<path>,line=<n>::<message>` — [GitHub Actions workflow command](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message) that surfaces a finding inline on the PR diff without writing a custom Action wrapper. Codemap emits annotations via `codemap query --format annotations` (or `format: "annotations"` on the MCP query tools). One line per locatable row; rows without a location are skipped. Property values + message payload are percent-encoded per [actions/toolkit](https://github.com/actions/toolkit/blob/master/packages/core/src/command.ts) so paths with `:` / `,` and messages with `%` round-trip safely. Default level `notice`; `warning` and `error` overrides supported via the `level` parameter (CLI exposes only the default for v1; per-recipe override comes with the same v1.x frontmatter that grants per-recipe SARIF severity).
+
+---
+
 ## H
 
 ### hash
@@ -375,6 +383,10 @@ Integer constant in `src/db.ts`. Bumped whenever the DDL changes. `createSchema(
 ### snippet
 
 `codemap snippet <name>` — same lookup as **show**, but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since last index — line range may have shifted), and `missing` (true when file is gone). Per-execution shape mirrors `show`'s envelope; source/stale/missing are additive fields. Stale-file behavior: `source` is ALWAYS returned when the file exists; `stale: true` is metadata the agent reads (no refusal, no auto-reindex side-effects from a read tool — agent decides whether to act on possibly-shifted lines or run `codemap` first). See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+
+### SARIF
+
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) — Static Analysis Results Interchange Format. JSON envelope GitHub Code Scanning consumes natively. Codemap emits SARIF via `codemap query --format sarif` (or `format: "sarif"` on the MCP `query` / `query_recipe` tools). Rule id is `codemap.<recipe-id>` for `--recipe`; `codemap.adhoc` for ad-hoc SQL. Location columns auto-detected (`file_path` / `path` / `to_path` / `from_path` priority; `line_start` + optional `line_end` for region). Aggregate recipes (`index-summary`, `markers-by-kind`) emit `results: []` + a stderr warning. Incompatible with `--summary` / `--group-by` / baseline (different output shapes). Default `result.level` is `"note"`; per-recipe override deferred to v1.x. See [`architecture.md` § Output formatters](./architecture.md#cli-usage).
 
 ### skill
 

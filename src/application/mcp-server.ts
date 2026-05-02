@@ -25,6 +25,7 @@ import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 import { resolveAuditBaselines, runAudit } from "./audit-engine";
 import { buildContextEnvelope } from "./context-engine";
 import { getCurrentCommit } from "./index-engine";
+import { formatAnnotations, formatSarif } from "./output-formatters";
 import { executeQuery } from "./query-engine";
 import {
   getQueryRecipeActions,
@@ -57,6 +58,14 @@ interface ServerOpts {
 const groupByEnum = z.enum(
   GROUP_BY_MODES as unknown as readonly [GroupByMode, ...GroupByMode[]],
 );
+
+/**
+ * MCP-side mirror of CLI's `--format`. `text` is omitted (terminal table is
+ * useless to an agent — the default JSON envelope is the agent-facing shape).
+ * `json` is the implicit default; agents pass `sarif` or `annotations` to get
+ * the formatter output as a single text payload.
+ */
+const formatEnum = z.enum(["json", "sarif", "annotations"]);
 
 // Per-statement schema for query_batch — matches the `oneOf` polymorphism
 // in plan § 5: items are either a bare SQL string or an object that
@@ -164,12 +173,13 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
     "query",
     {
       description:
-        "Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Use `query_batch` for N statements in one round-trip.",
+        'Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` or `"annotations"` to receive a formatted text payload (incompatible with `summary` / `group_by`). Use `query_batch` for N statements in one round-trip.',
       inputSchema: {
         sql: z.string().min(1, "sql must be a non-empty string"),
         summary: z.boolean().optional(),
         changed_since: z.string().optional(),
         group_by: groupByEnum.optional(),
+        format: formatEnum.optional(),
       },
     },
     (args) => {
@@ -178,6 +188,18 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
         const changed = resolveChanged(args.changed_since);
         if (changed && typeof changed === "object" && "error" in changed) {
           return jsonError(changed.error);
+        }
+        if (args.format === "sarif" || args.format === "annotations") {
+          const incompat = formatToolIncompatibility(args.format, args);
+          if (incompat !== undefined) return jsonError(incompat);
+          return formattedQueryResult({
+            sql: args.sql,
+            recipeId: undefined,
+            recipeActions: undefined,
+            changedFiles: changed as Set<string> | undefined,
+            format: args.format,
+            root: opts.root,
+          });
         }
         const payload = executeQuery({
           sql: args.sql,
@@ -200,12 +222,13 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
     "query_recipe",
     {
       description:
-        "Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Compose with `summary` / `changed_since` / `group_by` exactly like `query`. List available recipes via the `codemap://recipes` resource.",
+        'Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` or `"annotations"` to receive a formatted text payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: {
         recipe: z.string().min(1, "recipe must be a non-empty string"),
         summary: z.boolean().optional(),
         changed_since: z.string().optional(),
         group_by: groupByEnum.optional(),
+        format: formatEnum.optional(),
       },
     },
     (args) => {
@@ -222,6 +245,18 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
         if (changed && typeof changed === "object" && "error" in changed) {
           return jsonError(changed.error);
         }
+        if (args.format === "sarif" || args.format === "annotations") {
+          const incompat = formatToolIncompatibility(args.format, args);
+          if (incompat !== undefined) return jsonError(incompat);
+          return formattedQueryResult({
+            sql,
+            recipeId: args.recipe,
+            recipeActions,
+            changedFiles: changed as Set<string> | undefined,
+            format: args.format,
+            root: opts.root,
+          });
+        }
         const payload = executeQuery({
           sql,
           summary: args.summary,
@@ -237,6 +272,71 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
       }
     },
   );
+}
+
+/**
+ * Reject `format: "sarif" | "annotations"` combinations that change the
+ * output shape away from a flat row list. Mirrors the CLI parser's
+ * `formatIncompatibility` (parser-side) for the MCP tool wrapper.
+ */
+function formatToolIncompatibility(
+  fmt: "sarif" | "annotations",
+  args: { summary?: boolean; group_by?: GroupByMode },
+): string | undefined {
+  const offenders: string[] = [];
+  if (args.summary === true) offenders.push("summary");
+  if (args.group_by !== undefined) offenders.push("group_by");
+  if (offenders.length === 0) return undefined;
+  return `codemap: format=${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations only support flat row lists).`;
+}
+
+/**
+ * Run `sql` and return the formatted output as the tool's text payload.
+ * Same shape both `query` and `query_recipe` use — the recipe-aware caller
+ * passes `recipeId` / `recipeActions`; the ad-hoc caller leaves them
+ * undefined (rule id falls back to `codemap.adhoc`).
+ */
+function formattedQueryResult(args: {
+  sql: string;
+  recipeId: string | undefined;
+  recipeActions: ReadonlyArray<unknown> | undefined;
+  changedFiles: Set<string> | undefined;
+  format: "sarif" | "annotations";
+  root: string;
+}) {
+  const payload = executeQuery({
+    sql: args.sql,
+    changedFiles: args.changedFiles,
+    recipeActions: args.recipeActions,
+    root: args.root,
+  });
+  if (isEnginePayloadError(payload)) return jsonError(payload.error);
+  if (!Array.isArray(payload)) {
+    // executeQuery returns rows[] when neither summary nor group_by is set —
+    // the format-tool guard above ensures we never reach here with a non-array.
+    return jsonError(
+      "codemap: internal — formatted output requires flat row list.",
+    );
+  }
+  const rows = payload as Record<string, unknown>[];
+  if (args.format === "sarif") {
+    const catalog =
+      args.recipeId !== undefined
+        ? getQueryRecipeCatalogEntry(args.recipeId)
+        : undefined;
+    const text = formatSarif({
+      rows,
+      recipeId: args.recipeId,
+      recipeDescription: catalog?.description,
+      recipeBody: catalog?.body,
+    });
+    return { content: [{ type: "text" as const, text }] };
+  }
+  const text = formatAnnotations({
+    rows,
+    recipeId: args.recipeId,
+  });
+  return { content: [{ type: "text" as const, text }] };
 }
 
 function registerQueryBatchTool(server: McpServer, opts: ServerOpts): void {

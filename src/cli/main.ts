@@ -241,6 +241,7 @@ Copies bundled agent templates into .agents/ under the project root.
       configFile,
       sql: parsed.sql,
       json: parsed.json,
+      format: parsed.format,
       summary: parsed.summary,
       changedSince: parsed.changedSince,
       recipeId: parsed.recipeId,

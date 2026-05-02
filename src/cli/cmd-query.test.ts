@@ -25,6 +25,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT 1",
       json: false,
+      format: "text",
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -40,6 +41,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT 1",
       json: true,
+      format: "json",
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -55,6 +57,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT 1",
       json: false,
+      format: "text",
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
@@ -70,6 +73,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT 1",
       json: true,
+      format: "json",
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
@@ -87,6 +91,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      format: "text",
       summary: true,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -107,6 +112,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT 1",
       json: false,
+      format: "text",
       summary: false,
       changedSince: "origin/main",
       recipeId: undefined,
@@ -131,6 +137,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: true,
+      format: "json",
       summary: false,
       changedSince: "HEAD~3",
       recipeId: "fan-out",
@@ -152,6 +159,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: "SELECT * FROM symbols",
       json: true,
+      format: "json",
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -169,6 +177,7 @@ describe("parseQueryRest", () => {
       kind: "run",
       sql: sql!,
       json: false,
+      format: "text",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-in",
@@ -372,6 +381,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       kind: "run",
       sql: sql!,
       json: false,
+      format: "text",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample-json",
@@ -389,6 +399,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       kind: "run",
       sql: sql!,
       json: false,
+      format: "text",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -406,6 +417,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       kind: "run",
       sql: sql!,
       json: true,
+      format: "json",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample",
@@ -423,6 +435,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       kind: "run",
       sql: sql!,
       json: true,
+      format: "json",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -440,6 +453,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       kind: "run",
       sql: sql!,
       json: true,
+      format: "json",
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -522,6 +536,192 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const r = parseQueryRest(["query", "--print-sql"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("--print-sql");
+  });
+});
+
+describe("parseQueryRest — --format flag", () => {
+  it("defaults to text when neither --json nor --format is passed", () => {
+    const r = parseQueryRest(["query", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("text");
+    expect(r.json).toBe(false);
+  });
+
+  it("--json implies format=json", () => {
+    const r = parseQueryRest(["query", "--json", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("json");
+  });
+
+  it("accepts --format text|json|sarif|annotations", () => {
+    for (const fmt of ["text", "json", "sarif", "annotations"] as const) {
+      const r = parseQueryRest(["query", "--format", fmt, "SELECT 1"]);
+      if (r.kind !== "run") throw new Error(`expected run for ${fmt}`);
+      expect(r.format).toBe(fmt);
+    }
+  });
+
+  it("accepts --format=<value> equals form", () => {
+    const r = parseQueryRest(["query", "--format=sarif", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+  });
+
+  it("--format overrides --json (precedence per plan § D9)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--format",
+      "sarif",
+      "SELECT 1",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+    expect(r.json).toBe(true); // unchanged — flag still set, just overridden
+  });
+
+  it("--format text wins over --json (resolved format honored at render time)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--format",
+      "text",
+      "SELECT 1",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("text");
+    // Renderer reads `format`, not `json` (post-PR #43 fix per CodeRabbit).
+  });
+
+  it("--format json wins over no flag (renderer uses JSON path)", () => {
+    const r = parseQueryRest(["query", "--format", "json", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("json");
+    expect(r.json).toBe(false);
+  });
+
+  it("rejects --format with no value", () => {
+    const r = parseQueryRest(["query", "--format"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--format");
+  });
+
+  it("rejects unknown --format value", () => {
+    const r = parseQueryRest(["query", "--format", "xml", "SELECT 1"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.message).toContain("xml");
+      expect(r.message).toContain("sarif");
+    }
+  });
+
+  it("rejects --format=", () => {
+    const r = parseQueryRest(["query", "--format=", "SELECT 1"]);
+    expect(r.kind).toBe("error");
+  });
+
+  // Combo-guard regression suite — locks the parse-time rejection of
+  // `--format sarif|annotations` with flags that change the output shape
+  // (different shapes — sarif/annotations only support flat row lists).
+  // Mirrors the formatToolIncompatibility check on the MCP side.
+  describe("combo guards (--format sarif|annotations + summary/group-by/baseline)", () => {
+    it("rejects --format sarif + --summary on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--summary",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("sarif");
+        expect(r.message).toContain("--summary");
+      }
+    });
+
+    it("rejects --format annotations + --group-by on a recipe", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "annotations",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("annotations");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
+    it("rejects --format sarif + --baseline=<name> on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("sarif");
+        expect(r.message).toContain("--baseline");
+      }
+    });
+
+    it("rejects --format annotations + --save-baseline=<name> on ad-hoc SQL", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "annotations",
+        "--save-baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("annotations");
+        expect(r.message).toContain("--save-baseline");
+      }
+    });
+
+    it("rejects --format sarif + --baseline on a recipe (default-name form)", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "sarif",
+        "--baseline",
+        "-r",
+        "deprecated-symbols",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") expect(r.message).toContain("sarif");
+    });
+
+    it("--format text composes freely with --summary (text/json don't trigger the guard)", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "text",
+        "--summary",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("run");
+    });
+
+    it("--format json composes freely with --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "json",
+        "--group-by",
+        "directory",
+        "SELECT file_path FROM symbols",
+      ]);
+      expect(r.kind).toBe("run");
+    });
   });
 });
 

@@ -4,7 +4,13 @@ import {
   queryRows,
 } from "../application/index-engine";
 import {
+  formatAnnotations,
+  formatSarif,
+  hasLocatableRows,
+} from "../application/output-formatters";
+import {
   getQueryRecipeActions,
+  getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
@@ -38,6 +44,21 @@ import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
  * Supports `--json`, `--recipe <id>`, `--recipes-json`, `--print-sql <id>`, and raw SQL (see {@link printQueryCmdHelp}).
  */
+/**
+ * Output formats `codemap query` can emit. `text` (default) → console.table;
+ * `json` → existing JSON envelope; `sarif` → SARIF 2.1.0 doc; `annotations`
+ * → GitHub Actions `::notice file=…,line=…::msg` lines (one per row).
+ *
+ * `--format` overrides `--json` when both are passed; `--json` stays as the
+ * alias for `--format json`. See [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
+ */
+export const OUTPUT_FORMATS = ["text", "json", "sarif", "annotations"] as const;
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
+export function isOutputFormat(s: string): s is OutputFormat {
+  return (OUTPUT_FORMATS as readonly string[]).includes(s);
+}
+
 export function parseQueryRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
@@ -45,6 +66,7 @@ export function parseQueryRest(rest: string[]):
       kind: "run";
       sql: string;
       json: boolean;
+      format: OutputFormat;
       summary: boolean;
       changedSince: string | undefined;
       recipeId: string | undefined;
@@ -63,12 +85,13 @@ export function parseQueryRest(rest: string[]):
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json | --format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
     };
   }
 
   let i = 1;
   let json = false;
+  let format: OutputFormat | undefined;
   let summary = false;
   let changedSince: string | undefined;
   let recipeId: string | undefined;
@@ -88,6 +111,25 @@ export function parseQueryRest(rest: string[]):
     if (a === "--json") {
       json = true;
       i++;
+      continue;
+    }
+    if (a === "--format" || a.startsWith("--format=")) {
+      const eq = a.indexOf("=");
+      const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
+      if (v === undefined || v === "" || v.startsWith("-")) {
+        return {
+          kind: "error",
+          message: `codemap: "--format" requires a value (${OUTPUT_FORMATS.join(" | ")}).`,
+        };
+      }
+      if (!isOutputFormat(v)) {
+        return {
+          kind: "error",
+          message: `codemap: unknown --format "${v}". Known formats: ${OUTPUT_FORMATS.join(", ")}.`,
+        };
+      }
+      format = v;
+      i += eq !== -1 ? 1 : 2;
       continue;
     }
     if (a === "--summary") {
@@ -345,10 +387,19 @@ export function parseQueryRest(rest: string[]):
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
+    const resolved = resolveFormat(format, json);
+    const incompat = formatIncompatibility(resolved, {
+      summary,
+      groupBy,
+      saveBaseline,
+      baseline,
+    });
+    if (incompat !== undefined) return { kind: "error", message: incompat };
     return {
       kind: "run",
       sql,
       json,
+      format: resolved,
       summary,
       changedSince,
       recipeId,
@@ -363,7 +414,7 @@ export function parseQueryRest(rest: string[]):
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json | --format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
     };
   }
   // Ad-hoc SQL needs an explicit baseline name (no recipe id default).
@@ -381,10 +432,19 @@ export function parseQueryRest(rest: string[]):
         'codemap: "--baseline" needs an explicit name when used without --recipe. Use --baseline=<name>.',
     };
   }
+  const resolved = resolveFormat(format, json);
+  const incompat = formatIncompatibility(resolved, {
+    summary,
+    groupBy,
+    saveBaseline,
+    baseline,
+  });
+  if (incompat !== undefined) return { kind: "error", message: incompat };
   return {
     kind: "run",
     sql,
     json,
+    format: resolved,
     summary,
     changedSince,
     recipeId: undefined,
@@ -392,6 +452,45 @@ export function parseQueryRest(rest: string[]):
     saveBaseline,
     baseline,
   };
+}
+
+/**
+ * Resolve the effective format. Per plan § D9, `--format` overrides `--json`;
+ * `--json` alone implies `--format json`; absence of both → `text`.
+ */
+function resolveFormat(
+  explicit: OutputFormat | undefined,
+  json: boolean,
+): OutputFormat {
+  if (explicit !== undefined) return explicit;
+  return json ? "json" : "text";
+}
+
+/**
+ * Reject combinations of `--format sarif|annotations` with flags that change
+ * the output shape away from "flat row list" (group-by buckets, summary
+ * counts, baseline diffs). Returns an error message or `undefined`.
+ *
+ * Trade-off: keeps SARIF / annotations on the cleanest row → finding mapping
+ * for v1; aggregate/diff shapes can be re-introduced if a real consumer asks.
+ */
+function formatIncompatibility(
+  fmt: OutputFormat,
+  opts: {
+    summary: boolean;
+    groupBy: GroupByMode | undefined;
+    saveBaseline: string | true | undefined;
+    baseline: string | true | undefined;
+  },
+): string | undefined {
+  if (fmt !== "sarif" && fmt !== "annotations") return undefined;
+  const offenders: string[] = [];
+  if (opts.summary) offenders.push("--summary");
+  if (opts.groupBy !== undefined) offenders.push("--group-by");
+  if (opts.saveBaseline !== undefined) offenders.push("--save-baseline");
+  if (opts.baseline !== undefined) offenders.push("--baseline");
+  if (offenders.length === 0) return undefined;
+  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations only support flat row lists).`;
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -425,7 +524,7 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>"
+  console.log(`Usage: codemap query [--json] [--format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>"
        codemap query [...] --recipe <id>   (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
@@ -436,8 +535,18 @@ Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json                  Print a JSON array of row objects to stdout (for agents and scripts).
-                          On error, prints a single object: {"error":"<message>"} to stdout.
+  --json                  Alias for --format json. Print a JSON array of row objects to stdout
+                          (for agents and scripts). On error, prints {"error":"<message>"} to stdout.
+  --format <fmt>          One of: ${OUTPUT_FORMATS.join(" | ")}. Overrides --json when both are passed
+                          (so --format text + --json prints text). Default = text.
+                            text         Terminal table via console.table (default).
+                            json         Same as --json — JSON array of row objects.
+                            sarif        SARIF 2.1.0 doc (GitHub Code Scanning); rule.id = codemap.<recipe>
+                                         (or codemap.adhoc for ad-hoc SQL); auto-detects file_path / path /
+                                         to_path / from_path; aggregate recipes (no location) emit results: [].
+                            annotations  GitHub Actions ::notice file=…,line=…::msg per row (PR-inline findings).
+                          sarif/annotations require a flat row list — incompatible with --summary,
+                          --group-by, --save-baseline, --baseline (parser rejects at parse time).
   --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
                           With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
                           With --baseline, collapses to {baseline, current_row_count, added: N, removed: N}.
@@ -523,6 +632,13 @@ export async function runQueryCmd(opts: {
   configFile: string | undefined;
   sql: string;
   json?: boolean;
+  /**
+   * Output format. Defaults to `"text"` for back-compat (callers that
+   * pre-date the `--format` flag still work). When `"sarif"` or
+   * `"annotations"`, group-by / summary / baseline are not allowed —
+   * caller must reject those combos at parse time.
+   */
+  format?: OutputFormat;
   summary?: boolean;
   changedSince?: string | undefined;
   recipeId?: string | undefined;
@@ -530,6 +646,14 @@ export async function runQueryCmd(opts: {
   saveBaseline?: string | true | undefined;
   baseline?: string | true | undefined;
 }): Promise<void> {
+  // Resolve --format / --json once so every render path keys off the same
+  // value. Pre-PR #43 callers pass only `json`; post-PR #43 the parser
+  // pre-resolves into `format` (so `--format text --json` correctly emits
+  // text per design § D9). Keep `isJson` as the boolean every downstream
+  // helper expects until they're refactored to take an OutputFormat.
+  const effectiveFormat: OutputFormat =
+    opts.format ?? (opts.json === true ? "json" : "text");
+  const isJson = effectiveFormat === "json";
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
     initCodemap(resolveCodemapConfig(opts.root, user));
@@ -539,7 +663,7 @@ export async function runQueryCmd(opts: {
     if (opts.changedSince !== undefined) {
       const result = getFilesChangedSince(opts.changedSince, getProjectRoot());
       if (!result.ok) {
-        emitErrorMaybeJson(result.error, opts.json);
+        emitErrorMaybeJson(result.error, isJson);
         return;
       }
       changedFiles = result.files;
@@ -556,7 +680,7 @@ export async function runQueryCmd(opts: {
     if (opts.saveBaseline !== undefined) {
       runSaveBaseline({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         recipeId: opts.recipeId,
         baselineName:
           opts.saveBaseline === true
@@ -569,7 +693,7 @@ export async function runQueryCmd(opts: {
     if (opts.baseline !== undefined) {
       runBaselineDiff({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         summary: opts.summary === true,
         baselineName:
           opts.baseline === true ? (opts.recipeId as string) : opts.baseline,
@@ -582,7 +706,7 @@ export async function runQueryCmd(opts: {
     if (opts.groupBy !== undefined) {
       runGroupedQuery({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         summary: opts.summary === true,
         groupBy: opts.groupBy,
         changedFiles,
@@ -592,8 +716,18 @@ export async function runQueryCmd(opts: {
       return;
     }
 
+    if (effectiveFormat === "sarif" || effectiveFormat === "annotations") {
+      const code = printFormattedQuery(opts.sql, {
+        format: effectiveFormat,
+        recipeId: opts.recipeId,
+        changedFiles,
+      });
+      if (code !== 0) process.exitCode = code;
+      return;
+    }
+
     const code = printQueryResult(opts.sql, {
-      json: opts.json,
+      json: isJson,
       summary: opts.summary,
       changedFiles,
       recipeActions,
@@ -601,7 +735,7 @@ export async function runQueryCmd(opts: {
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitErrorMaybeJson(msg, opts.json);
+    emitErrorMaybeJson(msg, isJson);
   }
 }
 
@@ -666,6 +800,74 @@ export async function runDropBaselineCmd(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
+  }
+}
+
+/**
+ * Run `sql` and emit results in `--format sarif` or `--format annotations`.
+ * Open / read / close pattern matches `printQueryResult`. Errors emit a
+ * single-line `{"error": "..."}` JSON envelope on stdout (stable across
+ * formatters so callers can branch on format). Returns 0 on success, 1 on
+ * any error.
+ *
+ * Empty / no-location row sets emit a valid SARIF doc with `results: []`
+ * + a stderr warning so the operator knows the recipe doesn't have a
+ * findings shape; annotations emit nothing + the same warning. See
+ * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
+ */
+function printFormattedQuery(
+  sql: string,
+  opts: {
+    format: "sarif" | "annotations";
+    recipeId: string | undefined;
+    changedFiles: Set<string> | undefined;
+  },
+): number {
+  let db: Awaited<ReturnType<typeof openDb>> | undefined;
+  try {
+    db = openDb();
+    let rows = db.query(sql).all() as Record<string, unknown>[];
+    if (opts.changedFiles !== undefined) {
+      rows = filterRowsByChangedFiles(rows, opts.changedFiles) as Record<
+        string,
+        unknown
+      >[];
+    }
+
+    if (rows.length > 0 && !hasLocatableRows(rows)) {
+      console.error(
+        `codemap: --format ${opts.format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${opts.format} v1.)`,
+      );
+    }
+
+    const catalog =
+      opts.recipeId !== undefined
+        ? getQueryRecipeCatalogEntry(opts.recipeId)
+        : undefined;
+
+    if (opts.format === "sarif") {
+      const out = formatSarif({
+        rows,
+        recipeId: opts.recipeId,
+        recipeDescription: catalog?.description,
+        recipeBody: catalog?.body,
+      });
+      console.log(out);
+      return 0;
+    }
+
+    const annotations = formatAnnotations({
+      rows,
+      recipeId: opts.recipeId,
+    });
+    if (annotations.length > 0) console.log(annotations);
+    return 0;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ error: msg }));
+    return 1;
+  } finally {
+    if (db !== undefined) closeDb(db, { readonly: true });
   }
 }
 

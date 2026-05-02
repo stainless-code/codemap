@@ -35,6 +35,7 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | MCP server (for agent hosts)      | `codemap mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
 | Targeted read (metadata)          | `codemap show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                             |
 | Targeted read (source text)       | `codemap snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag    |
+| SARIF / GH annotations            | `codemap query --recipe deprecated-symbols --format sarif` · `… --format annotations`                         |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 

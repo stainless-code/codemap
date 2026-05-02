@@ -105,6 +105,12 @@ codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
+# --format <text|json|sarif|annotations> — pipe results into GitHub Code Scanning (SARIF
+# 2.1.0) or surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg). Both
+# require a flat row list (no --summary / --group-by / baseline). Auto-detects file_path /
+# path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc for ad-hoc).
+codemap query --recipe deprecated-symbols --format sarif > findings.sarif
+codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out

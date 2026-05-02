@@ -110,6 +110,24 @@ describe("MCP server — query tool", () => {
       await server.close();
     }
   });
+
+  it("query format=sarif on ad-hoc SQL uses codemap.adhoc rule id", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query",
+        arguments: {
+          sql: "SELECT path AS file_path FROM files",
+          format: "sarif",
+        },
+      });
+      const doc = readJson(r);
+      expect(doc.runs[0].tool.driver.rules[0].id).toBe("codemap.adhoc");
+      expect(doc.runs[0].results.length).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
 });
 
 describe("MCP server — query_batch tool", () => {
@@ -287,6 +305,77 @@ describe("MCP server — query_recipe tool", () => {
         arguments: { recipe: "deprecated-symbols", summary: true },
       });
       expect(readJson(r)).toEqual({ count: 0 });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns a SARIF doc with format=sarif", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", format: "sarif" },
+      });
+      const doc = readJson(r);
+      expect(doc.version).toBe("2.1.0");
+      expect(doc.runs[0].tool.driver.rules[0].id).toBe(
+        "codemap.deprecated-symbols",
+      );
+      expect(doc.runs[0].results).toHaveLength(1);
+      expect(doc.runs[0].results[0].ruleId).toBe("codemap.deprecated-symbols");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns annotation lines with format=annotations", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 7, 10, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", format: "annotations" },
+      });
+      const text = (r as { content: { text: string }[] }).content[0]!.text;
+      expect(text).toMatch(/^::notice file=src\/a\.ts,line=7::oldFn/);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects format=sarif combined with summary", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: {
+          recipe: "deprecated-symbols",
+          format: "sarif",
+          summary: true,
+        },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("summary"),
+      });
     } finally {
       await server.close();
     }
