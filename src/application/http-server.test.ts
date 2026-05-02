@@ -273,3 +273,49 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.error).toContain("unknown tool");
   });
 });
+
+describe("http-server — --token auth", () => {
+  it("rejects POST without Authorization when token set (401)", async () => {
+    serverHandle = await startServer({ token: "secret" });
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT 1",
+    });
+    expect(r.status).toBe(401);
+    expect(r.json.error).toContain("Bearer");
+  });
+
+  it("rejects POST with wrong Authorization (401)", async () => {
+    serverHandle = await startServer({ token: "secret" });
+    const r = await postTool(
+      serverHandle.port,
+      "query",
+      { sql: "SELECT 1" },
+      { token: "wrong" },
+    );
+    expect(r.status).toBe(401);
+  });
+
+  it("accepts POST with correct Bearer token", async () => {
+    serverHandle = await startServer({ token: "secret" });
+    const r = await postTool(
+      serverHandle.port,
+      "query",
+      { sql: "SELECT 1 AS n" },
+      { token: "secret" },
+    );
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual([{ n: 1 }]);
+  });
+
+  it("GET /health is auth-exempt even when token is set", async () => {
+    serverHandle = await startServer({ token: "secret" });
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/health`);
+    expect(r.status).toBe(200);
+  });
+
+  it("GET /tools requires the token (catalog leak protection)", async () => {
+    serverHandle = await startServer({ token: "secret" });
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tools`);
+    expect(r.status).toBe(401);
+  });
+});
