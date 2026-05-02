@@ -146,7 +146,7 @@ export function computeValidateRows(
  * slashes (tinyglobby / Bun.Glob / git diff all emit POSIX), so we normalize
  * here to make `indexByPath.get(rel)` succeed cross-platform.
  */
-function toProjectRelative(projectRoot: string, p: string): string {
+export function toProjectRelative(projectRoot: string, p: string): string {
   const rel = isAbsolute(p) ? relative(projectRoot, p) : p;
   return sep === "/" ? rel : rel.split(sep).join("/");
 }

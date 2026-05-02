@@ -16,6 +16,7 @@ import {
   CODMAP_POINTER_END,
   ensureGitignoreCodemapPattern,
   listRegularFilesRecursive,
+  relPathToAbsSegments,
   resolveAgentsTemplateDir,
   runAgentsInit,
   targetsNeedLinkMode,
@@ -410,5 +411,39 @@ describe("upsertCodemapPointerFile", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("relPathToAbsSegments — defence-in-depth path safety", () => {
+  it("returns segments for a normal relative path", () => {
+    expect(relPathToAbsSegments("rules/codemap.md")).toEqual([
+      "rules",
+      "codemap.md",
+    ]);
+  });
+
+  it("filters empty segments (leading / trailing / double slashes)", () => {
+    expect(relPathToAbsSegments("/rules//codemap.md/")).toEqual([
+      "rules",
+      "codemap.md",
+    ]);
+  });
+
+  it("rejects `..` segment", () => {
+    expect(() => relPathToAbsSegments("../etc/passwd")).toThrow(
+      /refusing path with ".." segment/,
+    );
+  });
+
+  it("rejects `..` segment in the middle of the path", () => {
+    expect(() => relPathToAbsSegments("rules/../../etc/passwd")).toThrow(
+      /refusing path with ".." segment/,
+    );
+  });
+
+  it("rejects `.` segment", () => {
+    expect(() => relPathToAbsSegments("rules/./codemap.md")).toThrow(
+      /refusing path with "." segment/,
+    );
   });
 });

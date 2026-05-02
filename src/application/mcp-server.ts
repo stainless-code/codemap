@@ -17,7 +17,9 @@ import { resolveAgentsTemplateDir } from "../agents-init";
 // once a second consumer (HTTP API) needs them.
 import { resolveAuditBaselines } from "../cli/cmd-audit";
 import { buildContextEnvelope } from "../cli/cmd-context";
-import { computeValidateRows } from "../cli/cmd-validate";
+import { buildShowResult } from "../cli/cmd-show";
+import { buildSnippetResult } from "../cli/cmd-snippet";
+import { computeValidateRows, toProjectRelative } from "../cli/cmd-validate";
 import {
   getQueryRecipeActions,
   getQueryRecipeCatalogEntry,
@@ -41,6 +43,7 @@ import { runAudit } from "./audit-engine";
 import { getCurrentCommit } from "./index-engine";
 import { executeQuery } from "./query-engine";
 import { runCodemapIndex } from "./run-index";
+import { findSymbolsByName } from "./show-engine";
 
 /**
  * MCP server engine — owns the tool / resource registry. CLI shell
@@ -154,6 +157,8 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerSaveBaselineTool(server, opts);
   registerListBaselinesTool(server, opts);
   registerDropBaselineTool(server, opts);
+  registerShowTool(server, opts);
+  registerSnippetTool(server, opts);
   registerResources(server);
 
   return server;
@@ -562,6 +567,80 @@ function registerDropBaselineTool(server: McpServer, _opts: ServerOpts): void {
           return jsonResult({ dropped: args.name });
         } finally {
           closeDb(db);
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerShowTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "show",
+    {
+      description:
+        "Look up symbol(s) by exact name; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}]} with structured `disambiguation` block when multiple matches. One-step lookup that beats composing `SELECT … FROM symbols WHERE name = ?` by hand. Use `snippet` for the actual source text; use `query` with `LIKE` for fuzzy lookup.",
+      inputSchema: {
+        name: z.string().min(1, "name must be a non-empty string"),
+        kind: z.string().optional(),
+        in: z.string().optional(),
+      },
+    },
+    (args) => {
+      try {
+        const db = openDb();
+        try {
+          const inPath =
+            args.in !== undefined && args.in.length > 0
+              ? toProjectRelative(opts.root, args.in)
+              : undefined;
+          const matches = findSymbolsByName(db, {
+            name: args.name,
+            kind: args.kind,
+            inPath,
+          });
+          return jsonResult(buildShowResult(matches));
+        } finally {
+          closeDb(db, { readonly: true });
+        }
+      } catch (err) {
+        return jsonError(err instanceof Error ? err.message : String(err));
+      }
+    },
+  );
+}
+
+function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "snippet",
+    {
+      description:
+        "Same lookup as `show` but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Per-execution shape mirrors `show`'s envelope; source/stale/missing are additive fields on each match.",
+      inputSchema: {
+        name: z.string().min(1, "name must be a non-empty string"),
+        kind: z.string().optional(),
+        in: z.string().optional(),
+      },
+    },
+    (args) => {
+      try {
+        const db = openDb();
+        try {
+          const inPath =
+            args.in !== undefined && args.in.length > 0
+              ? toProjectRelative(opts.root, args.in)
+              : undefined;
+          const matches = findSymbolsByName(db, {
+            name: args.name,
+            kind: args.kind,
+            inPath,
+          });
+          return jsonResult(
+            buildSnippetResult({ db, matches, projectRoot: opts.root }),
+          );
+        } finally {
+          closeDb(db, { readonly: true });
         }
       } catch (err) {
         return jsonError(err instanceof Error ? err.message : String(err));

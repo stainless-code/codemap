@@ -67,6 +67,8 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`drop_baseline`** — `{name}`. Returns `{dropped: <name>}` on success or `isError` if the name doesn't exist.
 - **`context`** — `{compact?, intent?}`. Returns the project-bootstrap envelope (codemap version, schema version, file count, language breakdown, hubs, sample markers). Designed for agent session-start — one call replaces 4-5 `query` calls.
 - **`validate`** — `{paths?: string[]}`. Compares on-disk SHA-256 to indexed `files.content_hash`; empty `paths` validates everything. Returns rows with status (`ok`/`stale`/`missing`/`unindexed`).
+- **`show`** — `{name, kind?, in?}`. Exact, case-sensitive symbol name lookup. Returns `{matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?: {n, by_kind, files, hint}}`. Single match → `{matches: [{...}]}`; multi-match adds the disambiguation envelope so you narrow without re-scanning. Fuzzy lookup belongs in `query` with `LIKE`.
+- **`snippet`** — `{name, kind?, in?}`. Same lookup as `show` but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since indexing — line range may have shifted), `missing` (true when file is gone). Per Q-6 (settled): `source` is always returned when the file exists; agent decides whether to act on stale content or run `codemap` / `codemap --files <path>` to re-index first. No auto-reindex side-effects from this read tool.
 
 **Resources (lazy-cached on first `read_resource`; constant for server-process lifetime):**
 

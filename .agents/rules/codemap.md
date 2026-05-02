@@ -26,6 +26,8 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                                 |
 | Per-delta audit                | —                  | `bun src/index.ts audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
 | MCP server (for agent hosts)   | —                  | `bun src/index.ts mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
+| Targeted read (metadata)       | —                  | `bun src/index.ts show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                             |
+| Targeted read (source text)    | —                  | `bun src/index.ts snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag    |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
@@ -48,9 +50,11 @@ Validation: SQL is rejected at load time if it starts with DML/DDL (DELETE/DROP/
 
 **Audit (`bun src/index.ts audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Reuses B.6 baselines as the snapshot source. Two CLI shapes — `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated`; `--<delta>-baseline <name>` is the explicit per-delta override. v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).
 
+**Targeted reads (`show` / `snippet`)**: precise lookup by exact symbol name without composing SQL. `show` returns metadata (`file_path:line_start-line_end` + `signature`); `snippet` returns the source text from disk plus `stale` / `missing` flags. Both share the same flag set (`--kind <k>` to filter by `symbols.kind`, `--in <path>` for file-scope filter — directory prefix or exact file). Output envelope is `{matches, disambiguation?}` — single match → `{matches: [{...}]}`; multi-match adds `disambiguation: {n, by_kind, files, hint}` so agents narrow without re-scanning. Name match is exact / case-sensitive — for fuzzy use `query` with `LIKE '%name%'`. Snippet stale-file behavior: `source` is always returned when the file exists; `stale: true` means the line range may have shifted (re-index with `bun src/index.ts` or `--files <path>` before acting on the source).
+
 **MCP server (`bun src/index.ts mcp`)**: stdio MCP (Model Context Protocol) server — agents call codemap as JSON-RPC tools instead of shelling out to the CLI on every read. v1 ships one tool per CLI verb plus four lazy-cached resources:
 
-- **Tools:** `query` / `query_batch` / `query_recipe` / `audit` / `save_baseline` / `list_baselines` / `drop_baseline` / `context` / `validate`. Snake_case keys (Codemap convention matching MCP spec examples + reference servers — spec is convention-agnostic; CLI stays kebab).
+- **Tools:** `query` / `query_batch` / `query_recipe` / `audit` / `save_baseline` / `list_baselines` / `drop_baseline` / `context` / `validate` / `show` / `snippet`. Snake_case keys (Codemap convention matching MCP spec examples + reference servers — spec is convention-agnostic; CLI stays kebab).
 - **`query_batch` (MCP-only):** N statements in one round-trip. Items are `string | {sql, summary?, changed_since?, group_by?}` — string form inherits batch-wide flag defaults, object form overrides on a per-key basis. Per-statement errors are isolated.
 - **`save_baseline` (polymorphic):** one tool, `{name, sql? | recipe?}` with runtime exclusivity check (mirrors the CLI's single `--save-baseline=<name>` verb).
 - **Resources:** `codemap://recipes` (catalog), `codemap://recipes/{id}` (one recipe), `codemap://schema` (live DDL from `sqlite_schema`), `codemap://skill` (bundled SKILL.md text). Lazy-cached on first `read_resource`.

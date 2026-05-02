@@ -50,8 +50,23 @@ export function listRegularFilesRecursive(
   return out;
 }
 
-function relPathToAbsSegments(rel: string): string[] {
-  return rel.split("/").filter(Boolean);
+/**
+ * Split a `/`-relative path into segments, rejecting `..` / `.` so callers
+ * can't `join(destRoot, ...)` into a path that escapes `destRoot`. Defence
+ * in depth — today's callers source `rel` from `listRegularFilesRecursive`
+ * (package-controlled, never produces `..`); throwing surfaces future
+ * regressions loudly instead of silently writing outside the dest.
+ */
+export function relPathToAbsSegments(rel: string): string[] {
+  const segments = rel.split("/").filter((s) => s.length > 0);
+  for (const seg of segments) {
+    if (seg === ".." || seg === ".") {
+      throw new Error(
+        `relPathToAbsSegments: refusing path with "${seg}" segment: ${JSON.stringify(rel)}`,
+      );
+    }
+  }
+  return segments;
 }
 
 /** Copy only listed relative paths from `srcRoot` into `destRoot` (mkdir parents per file). */
