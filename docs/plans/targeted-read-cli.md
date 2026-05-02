@@ -1,6 +1,11 @@
 ## Plan — `targeted-read-cli`
 
-> One-step CLI verb for "tell me where this symbol is" — `codemap show <symbol>` returns `file_path:line_start-line_end` + `signature` for the symbol(s) matching the name. Pure ergonomic affordance over `SELECT … FROM symbols WHERE name = ?`; agents stop having to compose SQL for trivial precise-read questions.
+> Two sibling CLI verbs for precise reads:
+>
+> - **`codemap show <symbol>`** — returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for the symbol(s) matching the name. Pure ergonomic affordance over `SELECT … FROM symbols WHERE name = ?`.
+> - **`codemap snippet <symbol>`** — same lookup, returns the source code text sliced from disk at `line_start..line_end`. Stale-file detection via the existing `files.content_hash` mechanism (verified — same primitive `cmd-validate.ts` already uses).
+>
+> Together they close the "agent wants to read this thing" loop without making the agent compose SQL.
 >
 > Adopted from [`docs/roadmap.md` § Backlog](../roadmap.md#backlog) ("Targeted-read CLI"). Builds on the symbols table that's been there since v0; no schema changes.
 
@@ -91,44 +96,50 @@ The roadmap entry hedged `codemap show <symbol> / codemap snippet <name>`. Two v
 Mirrors the `cmd-context.ts` / `cmd-validate.ts` shape (small CLI verb that calls a pure engine helper):
 
 - **`src/cli/cmd-show.ts`** — argv parser, help text, terminal-mode renderer, `runShowCmd` orchestrator
-- **`src/application/show-engine.ts`** — pure `findSymbolsByName({db, name, kind?})` returning `SymbolMatch[]`
-- **`src/cli/main.ts`** dispatch entry for `rest[0] === "show"`
-- **`src/cli/bootstrap.ts`** — add `"show"` to the `validateIndexModeArgs` known-verbs list + help text
+- **`src/cli/cmd-snippet.ts`** — same parser shape; renders source-text instead of metadata; `runSnippetCmd` orchestrator
+- **`src/application/show-engine.ts`** — pure `findSymbolsByName({db, name, kind?, inPath?})` returning `SymbolMatch[]` (used by both `show` and `snippet`); plus `readSymbolSource({match, projectRoot})` returning `{source, stale}` (used by `snippet` only)
+- **`src/cli/main.ts`** dispatch entries for `rest[0] === "show"` and `rest[0] === "snippet"`
+- **`src/cli/bootstrap.ts`** — add `"show"` and `"snippet"` to the `validateIndexModeArgs` known-verbs list + help text
 
-Reuses the `symbols` table directly — no new column, no new index (the existing `idx_symbols_name` already covers the lookup).
+Reuses the `symbols` table directly — no new column, no new index (the existing `idx_symbols_name` already covers the lookup). For snippet, reuses `hashContent` from `src/hash.ts` + `toProjectRelative` from `src/cli/cmd-validate.ts` + `files.content_hash` for stale detection (verified — same pattern `cmd-validate.ts` already uses).
 
 ## 5. MCP integration
 
-The MCP server (PR #35) auto-inherits via the same pattern as `audit` / `context` / `validate` — register a `show` tool that calls `findSymbolsByName` and returns the JSON envelope. Per Q-1 below.
+The MCP server (PR #35) auto-inherits via the same pattern as `audit` / `context` / `validate` — register `show` and `snippet` tools that call the engine helpers and return the JSON envelope. Per Q-1 below.
 
 ## 6. Tracer-bullet sequence
 
-1. **Engine** — `src/application/show-engine.ts` with `findSymbolsByName` + tests (returns rows for a name, optional kind filter, empty array for unknown). Pure; no CLI dependency.
-2. **CLI verb** — `src/cli/cmd-show.ts` (parser, help, terminal renderer, JSON renderer, error UX) wired into `main.ts` + `bootstrap.ts`. Tests cover `--help` / unknown-name / multiple-match-error / `--all` / `--kind` / `--json`.
-3. **MCP tool** — `show({name, kind?, all?})` registered in `mcp-server.ts`; in-process SDK test.
-4. **Docs + agents** — `architecture.md § Show wiring`, glossary entry, README CLI block, rule + skill across `.agents/` and `templates/agents/` (Rule 10), patch changeset, plan deletion (Rule 2).
+1. **Engine — show side** — `src/application/show-engine.ts` with `findSymbolsByName` + tests (returns rows for a name, optional kind filter, optional `inPath` prefix/exact filter, empty array for unknown). Pure; no CLI dependency.
+2. **CLI — `codemap show`** — `src/cli/cmd-show.ts` (parser, help, terminal renderer, JSON renderer, disambiguation envelope, error UX) wired into `main.ts` + `bootstrap.ts`. Tests cover `--help` / unknown-name / single-match / multi-match envelope / `--kind` / `--in <path>` / `--json`.
+3. **Engine — snippet side** — extend `show-engine.ts` with `readSymbolSource({match, projectRoot})` returning `{source: string, stale: boolean}`. Tests cover happy path, line-range slicing, missing file, stale-content (per Q-6 settled).
+4. **CLI — `codemap snippet`** — `src/cli/cmd-snippet.ts` (same parser shape as show) + tests covering single/multi/stale.
+5. **MCP tools** — `show({name, kind?, in?})` and `snippet({name, kind?, in?})` registered in `mcp-server.ts`; in-process SDK tests.
+6. **Docs + agents** — `architecture.md § Show wiring`, glossary entries (`show`, `snippet`, `disambiguation envelope`), README CLI block, rule + skill across `.agents/` and `templates/agents/` (Rule 10), patch changeset, plan deletion (Rule 2).
 
-Estimated total: ~half day across 4 commits.
+Estimated total: ~1 day across 6 commits.
 
 ## 7. Open questions
 
 ### Settled
 
 - **Q-1. MCP `show` tool?** ✅ **(a) Dedicated MCP tool.** Every CLI verb maps to an MCP tool today (set in PR [#35](https://github.com/stainless-code/codemap/pull/35)) — `show` joins the pattern. Discoverability is the killer feature: agents reading `tools/list` see `show` exists without needing the SQL schema. Token savings compound at scale (~50 tokens/call vs the equivalent `query({sql: …})` for agents doing precise reads hundreds of times per session). Cost is trivial (~25 LOC; reuses engine helper). Output shape stays uniform with the CLI's `show --json` per plan § 4.
-- **Q-2. Multiple matches — error or list?** ✅ **(d.i) Always wrap in `{matches, disambiguation?}` envelope.** Single match → `{matches: [{...}]}`; multi-match → `{matches: [...], disambiguation: {n, by_kind, files, hint}}`. Agent reads `result.matches[0]` uniformly across both cases — one shape to learn, document, and test. Disambiguation envelope is forward-extensible (future `nearest_to_cursor`, `most_recently_modified`, `caller_count` fields land as additive keys with zero contract change). Original "error by default" framing was 2023-era — assumed agents would silently pick wrong from a list; today's frontier models reason fine over 2-5 candidates given context. Forcing the round-trip costs more than it saves. Rejected (a) error-by-default, (b) plain list (no future-extensibility), (c) first-match (silent wrong-row), (d.ii) polymorphic (`Array.isArray()` guard pollutes agent code).
+- **Q-2. Multiple matches — error or list?** ✅ **(d.i) Always wrap in `{matches, disambiguation?}` envelope.** Single match → `{matches: [{...}]}`; multi-match → `{matches: [...], disambiguation: {n, by_kind, files, hint}}`. Agent reads `result.matches[0]` uniformly across both cases — one shape to learn, document, and test. Disambiguation envelope is forward-extensible (future `nearest_to_cursor`, `most_recently_modified`, `caller_count` fields land as additive keys with zero contract change). Original "error by default" framing was 2023-era — assumed agents would silently pick wrong from a list; today's frontier models reason fine over 2-5 candidates given context. Forcing the round-trip costs more than it saves. **Uniformity-contract requirement (verified against PR #35's pattern):** `codemap show <name> --json` MUST also wrap in the same envelope, NOT print a bare array. Otherwise CLI would print array and MCP would return envelope, violating the plan § 4 "every tool returns the JSON envelope its CLI counterpart's `--json` prints" contract. Rejected (a) error-by-default, (b) plain list (no future-extensibility), (c) first-match (silent wrong-row), (d.ii) polymorphic (`Array.isArray()` guard pollutes agent code).
 - **Q-3. Exact match or substring/regex?** ✅ **Exact (`name = ?`) only.** Agents have the exact name in 95% of cases (read from stack traces, import statements, prior `query` results, code citations); "half-remembering" is a human pattern. Fuzzy under `show` would silently over-match on typos and inflate the disambiguation envelope. Exact-only fails fast with a recipe-aware error pointing at the escape hatch: `{"error": "no symbol named 'foo'. Try query with LIKE '%foo%' for fuzzy lookup."}` — agent immediately knows whether to fix the name or switch tools. Rejected (b) substring default — useful-when-correct vs noisy-when-typo is the wrong trade. Rejected (c) two-flag (`--like` opt-in) — every flag is cognitive load on the agent's tool-call planning; `query` already covers fuzzy with one MCP call; we don't need two ways to do the same thing. Keeps the `show` mental model sharp: "I know the name → I want to know where it lives."
-- **Q-4. File-scope filter (`--in <path>`)?** ✅ **Ship `--in`.** Closes the loop with the disambiguation envelope (Q-2): the envelope already lists candidate files, so the agent's natural next move is "narrow by path" — that next move should be a flag add, not a tool switch to `query`. `--kind` solves "function vs const" but doesn't solve "this folder vs that folder" (the common ambiguity case). Cost is ~5 LOC. Match rule: if `<path>` ends with `/` or names a directory, treat as prefix (`AND file_path LIKE 'src/cli/%'`); else exact file match (`AND file_path = 'src/cli/cmd-query.ts'`). No glob characters — power users use `query`. Forward-compatible: future `--in-package` / `--in-owner` would be sibling flags. Rejected (b) skip — wastes the disambiguation envelope's groundwork; forces tool-switch to `query` for what should be a parameter add.
+- **Q-4. File-scope filter (`--in <path>`)?** ✅ **Ship `--in`.** Closes the loop with the disambiguation envelope (Q-2): the envelope already lists candidate files, so the agent's natural next move is "narrow by path" — that next move should be a flag add, not a tool switch to `query`. `--kind` solves "function vs const" but doesn't solve "this folder vs that folder" (the common ambiguity case). Cost is ~5 LOC. Match rule: if `<path>` ends with `/` or names a directory, treat as prefix (`AND file_path LIKE 'src/cli/%'`); else exact file match (`AND file_path = 'src/cli/cmd-query.ts'`). No glob characters — power users use `query`. **Path normalization via existing `toProjectRelative(projectRoot, p)` from `src/cli/cmd-validate.ts`** (verified — already handles leading `./`, trailing `/`, Windows backslash → POSIX) so `--in ./src/cli/` and `--in src/cli` both resolve identically. Forward-compatible: future `--in-package` / `--in-owner` would be sibling flags. Rejected (b) skip — wastes the disambiguation envelope's groundwork; forces tool-switch to `query` for what should be a parameter add.
+- **Q-5. Snippet sibling — now or later?** ✅ **Ship `codemap snippet <name>` together with `show` in v1.** Architectural fact-check (verified against codebase): the lookup helper (`findSymbolsByName`) is shared with `show`; `readFileSync(abs, "utf8")` + `toProjectRelative` + `hashContent` (from `src/hash.ts`) + `files.content_hash` comparison is the literal pattern `cmd-validate.ts` already uses for stale detection — pure copy-paste reuse, no new architecture. Marginal cost: ~2-3 hours on top of `show` (~15 LOC slice helper, ~40 LOC `cmd-snippet.ts`, ~25 LOC MCP tool, tests). Splitting into a follow-up PR would duplicate the docs / changeset / Rule-10 mirror overhead — not a real saving. Snippet output: `{matches: [{...metadata, source: "...", stale?: true}]}` — additive field on Q-2's envelope, no shape divergence. Rejected (c) `--with-source` flag — Q-2's lesson against polymorphic envelopes applies; sibling verb is cleaner. Rejected (a) defer — duplicate-PR overhead exceeds the marginal-feature cost.
 
 ### Still open
 
-- **Q-5. Snippet sibling now or later?** `codemap snippet <name>` would slice the actual file content at `line_start..line_end` and return code text. Bias toward later — different feature (touches FS read, encoding, syntax-highlight question), ship `show` first.
+- **Q-6. Stale-file behavior for `snippet`.** When the index says `foo` is at `src/utils/foo.ts:5-15` but the file's `hashContent(readFileSync(abs))` differs from `files.content_hash`, three options: (1) Read anyway, flag staleness — `{matches: [{..., source: "...", stale: true}]}`; agent decides whether to act. (2) Refuse on staleness — error pointing at `codemap` (re-index). (3) Auto re-index that file under the hood (`runCodemapIndex` with `--files <path>` mode) before reading. Agent-first bias toward (1) — gives data + warning, lets the agent choose; (2) is hostile (forces an index round-trip the agent didn't ask for), (3) is hidden side-effect plus latency.
 
 ## 8. Non-goals (v1)
 
-- **Snippet output** (actual code text) — sibling feature; defer until a consumer asks.
 - **Cross-symbol resolution** (e.g. `codemap show MyClass.method`) — not what the symbols table indexes today; would need a new lookup path. Use `query` with `parent_name = 'MyClass'` for now.
 - **Fuzzy matching** — `query` already covers this with `LIKE` patterns.
-- **Output sorting controls** — current default ORDER BY `file_path ASC, line_start ASC`. If a consumer wants different, use `query`.
+- **Output sorting controls** — current default `ORDER BY file_path ASC, line_start ASC`. If a consumer wants different, use `query`.
+- **`--with-source` flag on `show`** — rejected per Q-5; sibling `snippet` verb is cleaner than a polymorphic envelope.
+- **Auto-reindex on snippet stale** — per Q-6 (pending); agent gets `stale: true` and decides; codemap doesn't trigger side-effects from a read tool.
+- **Glob characters in `--in <path>`** — `--in src/**/*.ts` not supported; use `query` with `LIKE` for that pattern. Keeps `show`'s parser simple and unambiguous.
 
 ## 9. References
 
