@@ -38,6 +38,21 @@ import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
  * Supports `--json`, `--recipe <id>`, `--recipes-json`, `--print-sql <id>`, and raw SQL (see {@link printQueryCmdHelp}).
  */
+/**
+ * Output formats `codemap query` can emit. `text` (default) → console.table;
+ * `json` → existing JSON envelope; `sarif` → SARIF 2.1.0 doc; `annotations`
+ * → GitHub Actions `::notice file=…,line=…::msg` lines (one per row).
+ *
+ * Per [docs/plans/sarif-formatter.md § D9 Flag precedence](../../docs/plans/sarif-formatter.md):
+ * `--format` overrides `--json`; `--json` stays as the alias for `--format json`.
+ */
+export const OUTPUT_FORMATS = ["text", "json", "sarif", "annotations"] as const;
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
+export function isOutputFormat(s: string): s is OutputFormat {
+  return (OUTPUT_FORMATS as readonly string[]).includes(s);
+}
+
 export function parseQueryRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
@@ -45,6 +60,7 @@ export function parseQueryRest(rest: string[]):
       kind: "run";
       sql: string;
       json: boolean;
+      format: OutputFormat;
       summary: boolean;
       changedSince: string | undefined;
       recipeId: string | undefined;
@@ -69,6 +85,7 @@ export function parseQueryRest(rest: string[]):
 
   let i = 1;
   let json = false;
+  let format: OutputFormat | undefined;
   let summary = false;
   let changedSince: string | undefined;
   let recipeId: string | undefined;
@@ -88,6 +105,25 @@ export function parseQueryRest(rest: string[]):
     if (a === "--json") {
       json = true;
       i++;
+      continue;
+    }
+    if (a === "--format" || a.startsWith("--format=")) {
+      const eq = a.indexOf("=");
+      const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
+      if (v === undefined || v === "" || v.startsWith("-")) {
+        return {
+          kind: "error",
+          message: `codemap: "--format" requires a value (${OUTPUT_FORMATS.join(" | ")}).`,
+        };
+      }
+      if (!isOutputFormat(v)) {
+        return {
+          kind: "error",
+          message: `codemap: unknown --format "${v}". Known formats: ${OUTPUT_FORMATS.join(", ")}.`,
+        };
+      }
+      format = v;
+      i += eq !== -1 ? 1 : 2;
       continue;
     }
     if (a === "--summary") {
@@ -349,6 +385,7 @@ export function parseQueryRest(rest: string[]):
       kind: "run",
       sql,
       json,
+      format: resolveFormat(format, json),
       summary,
       changedSince,
       recipeId,
@@ -385,6 +422,7 @@ export function parseQueryRest(rest: string[]):
     kind: "run",
     sql,
     json,
+    format: resolveFormat(format, json),
     summary,
     changedSince,
     recipeId: undefined,
@@ -392,6 +430,18 @@ export function parseQueryRest(rest: string[]):
     saveBaseline,
     baseline,
   };
+}
+
+/**
+ * Resolve the effective format. Per plan § D9, `--format` overrides `--json`;
+ * `--json` alone implies `--format json`; absence of both → `text`.
+ */
+function resolveFormat(
+  explicit: OutputFormat | undefined,
+  json: boolean,
+): OutputFormat {
+  if (explicit !== undefined) return explicit;
+  return json ? "json" : "text";
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
