@@ -29,6 +29,7 @@ Adoption-candidate ship status. The tier tables in § 1 are preserved as the ori
 **Adjacent — also shipped post-refresh:**
 
 - **MCP server (agent-transports v1)** — `codemap mcp` ships every CLI verb (plus MCP-only `query_batch`) as JSON-RPC tools over stdio with four lazy-cached resources. PR [#35](https://github.com/stainless-code/codemap/pull/35). Output shape verbatim from each tool's CLI `--json` envelope (no re-mapping). HTTP API (`codemap serve`) stays in roadmap backlog — design points (tool taxonomy, output shape) reserved in [`architecture.md` § MCP wiring](../architecture.md#cli-usage).
+- **Recipes-as-content registry** — bundled recipes are now `<id>.{sql,md}` file pairs in `templates/recipes/`; project teams ship internal SQL via git-tracked `<projectRoot>/.codemap/recipes/<id>.{sql,md}`. PR [#37](https://github.com/stainless-code/codemap/pull/37). Catalog gains `source` / `body` / `shadows` fields so agents see project overrides at session start; YAML frontmatter actions on `.md` mean project recipes feel first-class. Load-time DML/DDL deny-list + runtime `PRAGMA query_only=1` backstop.
 - **Doc-governance Rule 10** added during PR [#29](https://github.com/stainless-code/codemap/pull/29) — every core-surface change must update both `templates/agents/` (ships to npm) and `.agents/` (this clone) in lockstep.
 
 **Open-questions resolution** (from § 6 below):
