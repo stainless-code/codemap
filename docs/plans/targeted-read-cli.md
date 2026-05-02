@@ -114,11 +114,10 @@ Estimated total: ~half day across 4 commits.
 
 ### Settled
 
-_None yet — see § 8 for the grill round before code._
+- **Q-1. MCP `show` tool?** ✅ **(a) Dedicated MCP tool.** Every CLI verb maps to an MCP tool today (set in PR [#35](https://github.com/stainless-code/codemap/pull/35)) — `show` joins the pattern. Discoverability is the killer feature: agents reading `tools/list` see `show` exists without needing the SQL schema. Token savings compound at scale (~50 tokens/call vs the equivalent `query({sql: …})` for agents doing precise reads hundreds of times per session). Cost is trivial (~25 LOC; reuses engine helper). Output shape stays uniform with the CLI's `show --json` per plan § 4.
 
 ### Still open
 
-- **Q-1. MCP `show` tool — separate from `query`?** Three options: (a) Ship `show` as a dedicated MCP tool (parallels CLI 1:1); (b) Skip MCP — agents call `query` with the SQL directly (one fewer tool to discover); (c) Add `show` only as a tool description hint, no separate registration. Bias toward (a) — uniform with how every other CLI verb maps to an MCP tool, plus the discoverability win is real (the tool listing teaches the agent `show` exists).
 - **Q-2. Multiple matches — error or list-with-confirm?** Current proposal: error unless `--all` is set. Alternative: always list, prefix the first row with a "(N matches; use --kind to narrow)" hint. Bias toward "error by default" — agents that get a list back on a `name=foo` query may pick the wrong row; an explicit error forces them to add `--kind` or `--all`.
 - **Q-3. Exact-match only or substring/regex?** Current proposal: `name = ?` exact match. Alternative: `name LIKE '%<name>%'` for fuzzy ("agent searches for `runQuery` and gets `runQueryCmd`"). Bias toward exact — fuzzy is what `query` is for; `show` is the precise read.
 - **Q-4. Should `show` accept a file scope (`--in <path>`)?** Use case: same name in multiple files, agent knows which file. Could be `codemap show foo --in src/cli/cmd-query.ts`. Bias toward yes — cheap to add (just `AND file_path LIKE ?`) and the alternative is making the agent write SQL.
