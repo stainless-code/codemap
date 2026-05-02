@@ -4,7 +4,19 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-import { handleQuery } from "./tool-handlers";
+import {
+  handleAudit,
+  handleContext,
+  handleDropBaseline,
+  handleListBaselines,
+  handleQuery,
+  handleQueryBatch,
+  handleQueryRecipe,
+  handleSaveBaseline,
+  handleShow,
+  handleSnippet,
+  handleValidate,
+} from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
 
 /**
@@ -98,7 +110,12 @@ async function bootstrapForServe(opts: HttpServerOpts): Promise<void> {
  * - `GET  /resources/{uri}`      → MCP resource mirror (Tracer 6)
  * - any other                    → 404 `{error}`
  */
-async function handleRequest(
+/**
+ * Top-level request dispatcher. Exported so tests can attach it to their
+ * own `createServer(...)` without going through the SIGINT-awaiting
+ * `runHttpServer`. Production code calls `runHttpServer` instead.
+ */
+export async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
   opts: HttpServerOpts,
@@ -245,26 +262,71 @@ async function dispatchTool(
   if (!body.ok) return writeJson(res, 400, { error: body.error }, opts.version);
   const args = body.value as Record<string, unknown>;
 
+  // Per-tool dispatch. Each branch casts `args` to the handler's typed
+  // shape — the handler's Zod-validated boundary still applies inside
+  // tool-handlers.ts; HTTP just forwards the parsed JSON.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- runtime shape validated by zod inside each handler
+  const a = args as any;
+  let result: ToolResult;
   switch (name) {
     case "query": {
-      return writeToolResult(
-        res,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shape validated by zod inside handler
-        handleQuery(args as any, opts.root),
-        opts.version,
-      );
+      result = handleQuery(a, opts.root);
+      break;
+    }
+    case "query_recipe": {
+      result = handleQueryRecipe(a, opts.root);
+      break;
+    }
+    case "query_batch": {
+      result = handleQueryBatch(a, opts.root);
+      break;
+    }
+    case "audit": {
+      result = await handleAudit(a);
+      break;
+    }
+    case "context": {
+      result = handleContext(a);
+      break;
+    }
+    case "validate": {
+      result = handleValidate(a);
+      break;
+    }
+    case "show": {
+      result = handleShow(a, opts.root);
+      break;
+    }
+    case "snippet": {
+      result = handleSnippet(a, opts.root);
+      break;
+    }
+    case "save_baseline": {
+      result = handleSaveBaseline(a, opts.root);
+      break;
+    }
+    case "list_baselines": {
+      result = handleListBaselines();
+      break;
+    }
+    case "drop_baseline": {
+      result = handleDropBaseline(a);
+      break;
     }
     default: {
+      // Reachable only if TOOL_NAMES gains an entry without a switch arm —
+      // the route guard above catches user-typed unknown names.
       return writeJson(
         res,
-        501,
+        500,
         {
-          error: `codemap serve: tool "${name}" not yet wired (Tracer 4 pending).`,
+          error: `codemap serve: internal — tool "${name}" not dispatched.`,
         },
         opts.version,
       );
     }
   }
+  return writeToolResult(res, result, opts.version);
 }
 
 /**
