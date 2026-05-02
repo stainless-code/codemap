@@ -334,6 +334,132 @@ describe("http-server — GET /resources", () => {
   });
 });
 
+describe("http-server — CSRF + DNS-rebinding guard", () => {
+  // Threat model documented on csrfCheck() in http-server.ts. The test
+  // matrix covers every headers-set combination a malicious local webpage
+  // could produce vs every legitimate non-browser client (curl, fetch
+  // from Node, MCP hosts, CI scripts).
+
+  it("rejects POST with Sec-Fetch-Site: cross-site (modern-browser CSRF)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Sec-Fetch-Site": "cross-site",
+      },
+      body: JSON.stringify({ sql: "SELECT 1" }),
+    });
+    expect(r.status).toBe(403);
+    const body = (await r.json()) as { error: string };
+    expect(body.error).toContain("Sec-Fetch-Site");
+  });
+
+  it("rejects POST with Sec-Fetch-Site: same-site (subdomain CSRF)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/tool/save_baseline`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Sec-Fetch-Site": "same-site",
+        },
+        body: JSON.stringify({ name: "x", sql: "SELECT 1" }),
+      },
+    );
+    expect(r.status).toBe(403);
+  });
+
+  it("allows Sec-Fetch-Site: none (direct user navigation)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/health`, {
+      headers: { "Sec-Fetch-Site": "none" },
+    });
+    expect(r.status).toBe(200);
+  });
+
+  it("allows Sec-Fetch-Site: same-origin (self-served page on same port)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/health`, {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    });
+    expect(r.status).toBe(200);
+  });
+
+  it("rejects Origin header (browser cross-origin POST)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://evil.com",
+      },
+      body: JSON.stringify({ sql: "SELECT 1" }),
+    });
+    expect(r.status).toBe(403);
+    const body = (await r.json()) as { error: string };
+    expect(body.error).toContain("Origin");
+  });
+
+  it("allows Origin: null (file:// pages, sandboxed iframes — non-attack vector)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "null" },
+      body: JSON.stringify({ sql: "SELECT 1" }),
+    });
+    expect(r.status).toBe(200);
+  });
+
+  it("rejects POST with mismatched Host header (DNS rebinding)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Host: "evil.com:9999",
+      },
+      body: JSON.stringify({ sql: "SELECT 1" }),
+    });
+    expect(r.status).toBe(403);
+    const body = (await r.json()) as { error: string };
+    expect(body.error).toContain("DNS rebinding");
+  });
+
+  it("CSRF guard runs before /health (auth-exempt liveness still gated)", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/health`, {
+      headers: { "Sec-Fetch-Site": "cross-site" },
+    });
+    expect(r.status).toBe(403);
+  });
+
+  it("legitimate curl-style POST (no Origin / no Sec-Fetch-Site) passes", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql: "SELECT 1 AS n" }),
+    });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual([{ n: 1 }]);
+  });
+
+  it("allows localhost Host header on loopback bind", async () => {
+    serverHandle = await startServer();
+    // Host is set automatically by fetch when targeting 127.0.0.1; this test
+    // confirms that 127.0.0.1:<port> in the Host header passes (the default
+    // for any client that targets the loopback IP literally).
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql: "SELECT 1" }),
+    });
+    expect(r.status).toBe(200);
+  });
+});
+
 describe("http-server — --token auth", () => {
   it("rejects POST without Authorization when token set (401)", async () => {
     serverHandle = await startServer({ token: "secret" });

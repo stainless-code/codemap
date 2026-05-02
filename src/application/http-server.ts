@@ -124,6 +124,23 @@ export async function handleRequest(
   const method = req.method ?? "GET";
   const path = url.pathname;
 
+  // CSRF + DNS-rebinding guard — runs BEFORE every other check (including
+  // the auth-exempt /health) so a malicious local webpage can't even probe
+  // for liveness. See `csrfCheck` for the threat model.
+  // Use the socket's actual local port (not opts.port) — when bound to
+  // port 0 the OS picks one, and the configured opts.port stays 0. The
+  // request socket always knows the real port it accepted on.
+  const actualPort = req.socket.localPort ?? opts.port;
+  const csrfReason = csrfCheck(req, opts.host, actualPort);
+  if (csrfReason !== undefined) {
+    return writeJson(
+      res,
+      403,
+      { error: `codemap serve: ${csrfReason}` },
+      opts.version,
+    );
+  }
+
   // Liveness probe — auth-exempt so monitoring works without the token.
   if (method === "GET" && path === "/health") {
     return writeJson(
@@ -365,6 +382,74 @@ async function dispatchTool(
     }
   }
   return writeToolResult(res, result, opts.version);
+}
+
+/**
+ * Reject requests likely to be browser-driven CSRF or DNS-rebinding
+ * attempts. Defense-in-depth — runs before every route, including the
+ * auth-exempt `/health`, so a malicious local webpage can't even probe.
+ *
+ * **Threat model.** A developer runs `codemap serve` on `127.0.0.1:7878`.
+ * While the developer's browser is on `evil.com`, JS on that page can
+ * issue `fetch('http://127.0.0.1:7878/tool/save_baseline', {method: 'POST', body: '{...}'})`.
+ * The browser sends the request (CORS only blocks the *response* from
+ * being read by JS — the request itself reaches us and any side effect
+ * executes). For state-changing tools (`save_baseline`, `drop_baseline`)
+ * this lets a malicious page mutate the developer's `.codemap.db`.
+ *
+ * DNS rebinding extends the same attack: `evil.com` resolves to
+ * `127.0.0.1` after page load; the browser sends `Host: evil.com:7878`
+ * to our loopback listener.
+ *
+ * **Defenses (in order):**
+ *
+ * 1. **`Sec-Fetch-Site`** — modern browsers always send this on every
+ *    request. Reject `cross-site` / `same-site` (would-be CSRF).
+ *    Non-browser clients (curl, fetch from Node, MCP hosts, CI scripts)
+ *    don't send it, so they pass.
+ * 2. **`Host` header** — when bound to loopback, only accept the literal
+ *    loopback names (`127.0.0.1` / `localhost` / `[::1]` + the configured
+ *    port). Defends DNS rebinding. Skipped when the user explicitly opted
+ *    in to a non-loopback bind via `--host 0.0.0.0` / a real IP — the
+ *    Host header could legitimately be any hostname that resolves to
+ *    that interface.
+ * 3. **`Origin`** — fallback for older browsers that don't send
+ *    `Sec-Fetch-Site`. Browsers send `Origin` on every non-GET request
+ *    (and most GETs); non-browser clients don't. Reject if present.
+ *
+ * Returns a reason string (becomes the 403 body) or `undefined` to allow.
+ */
+function csrfCheck(
+  req: IncomingMessage,
+  host: string,
+  port: number,
+): string | undefined {
+  const fetchSite = req.headers["sec-fetch-site"];
+  if (fetchSite === "cross-site" || fetchSite === "same-site") {
+    return `cross-origin request rejected (Sec-Fetch-Site: ${String(fetchSite)}). codemap serve does not accept browser-driven cross-origin requests.`;
+  }
+
+  if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
+    const hostHeader = req.headers.host;
+    if (hostHeader !== undefined) {
+      const allowed = new Set([
+        `127.0.0.1:${port}`,
+        `localhost:${port}`,
+        `[::1]:${port}`,
+        `${host}:${port}`,
+      ]);
+      if (!allowed.has(hostHeader)) {
+        return `unexpected Host header "${hostHeader}" (possible DNS rebinding) — loopback bind only accepts 127.0.0.1:${port} / localhost:${port} / [::1]:${port}.`;
+      }
+    }
+  }
+
+  const origin = req.headers.origin;
+  if (origin !== undefined && origin !== "" && origin !== "null") {
+    return `cross-origin request rejected (Origin: ${origin}). codemap serve does not accept browser-driven cross-origin requests.`;
+  }
+
+  return undefined;
 }
 
 /**
