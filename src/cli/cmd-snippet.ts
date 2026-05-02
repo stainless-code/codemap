@@ -4,12 +4,12 @@ import {
   readSymbolSource,
 } from "../application/show-engine";
 import type { SymbolMatch } from "../application/show-engine";
+import { toProjectRelative } from "../application/validate-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-import { toProjectRelative } from "./cmd-validate";
 
 /**
  * Per-match payload returned by `snippet` — extends the `show` row shape

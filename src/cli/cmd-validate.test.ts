@@ -3,12 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { computeValidateRows } from "../application/validate-engine";
+import type { ValidateRow } from "../application/validate-engine";
 import { resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import { hashContent } from "../hash";
 import { initCodemap } from "../runtime";
-import { computeValidateRows, parseValidateRest } from "./cmd-validate";
-import type { ValidateRow } from "./cmd-validate";
+import { parseValidateRest } from "./cmd-validate";
 
 let tmpRoot = "";
 

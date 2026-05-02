@@ -11,7 +11,6 @@ import { z } from "zod";
 import { resolveAgentsTemplateDir } from "../agents-init";
 import { buildShowResult } from "../cli/cmd-show";
 import { buildSnippetResult } from "../cli/cmd-snippet";
-import { computeValidateRows, toProjectRelative } from "../cli/cmd-validate";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
@@ -43,6 +42,7 @@ import {
 } from "./query-recipes";
 import { runCodemapIndex } from "./run-index";
 import { findSymbolsByName } from "./show-engine";
+import { computeValidateRows, toProjectRelative } from "./validate-engine";
 
 /**
  * MCP server engine — owns the tool / resource registry. CLI shell
