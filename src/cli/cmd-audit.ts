@@ -1,12 +1,12 @@
-import { runAudit, V1_DELTAS } from "../application/audit-engine";
-import type {
-  AuditBaselineMap,
-  AuditEnvelope,
+import {
+  resolveAuditBaselines,
+  runAudit,
+  V1_DELTAS,
 } from "../application/audit-engine";
+import type { AuditEnvelope } from "../application/audit-engine";
 import { runCodemapIndex } from "../application/run-index";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
-import { closeDb, getQueryBaseline, openDb } from "../db";
-import type { CodemapDatabase } from "../db";
+import { closeDb, openDb } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 
@@ -144,33 +144,6 @@ function consumeFlagValue(
     };
   }
   return { kind: "value", value: next, next: i + 2 };
-}
-
-/**
- * Compose the `AuditBaselineMap` from a CLI parse result. Per-delta explicit
- * flags override auto-resolved slots. Auto-resolved slots that don't exist in
- * `query_baselines` are silently absent (the slot just has no baseline → the
- * delta doesn't run).
- */
-export function resolveAuditBaselines(opts: {
-  db: CodemapDatabase;
-  baselinePrefix: string | undefined;
-  perDelta: Record<string, string>;
-}): AuditBaselineMap {
-  const map: AuditBaselineMap = {};
-  for (const spec of V1_DELTAS) {
-    if (opts.baselinePrefix !== undefined) {
-      const candidate = `${opts.baselinePrefix}-${spec.key}`;
-      if (getQueryBaseline(opts.db, candidate) !== undefined) {
-        map[spec.key] = candidate;
-      }
-    }
-  }
-  // Per-delta flags override the auto-resolved slot for that key.
-  for (const [key, name] of Object.entries(opts.perDelta)) {
-    map[key] = name;
-  }
-  return map;
 }
 
 /**

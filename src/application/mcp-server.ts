@@ -15,7 +15,6 @@ import { resolveAgentsTemplateDir } from "../agents-init";
 // them here as pure data / pure functions (no execution flow crosses
 // cli → application). A future refactor may lift them to `src/application/`
 // once a second consumer (HTTP API) needs them.
-import { resolveAuditBaselines } from "../cli/cmd-audit";
 import { buildContextEnvelope } from "../cli/cmd-context";
 import { buildShowResult } from "../cli/cmd-show";
 import { buildSnippetResult } from "../cli/cmd-snippet";
@@ -39,7 +38,7 @@ import { GROUP_BY_MODES } from "../group-by";
 import type { GroupByMode } from "../group-by";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-import { runAudit } from "./audit-engine";
+import { resolveAuditBaselines, runAudit } from "./audit-engine";
 import { getCurrentCommit } from "./index-engine";
 import { executeQuery } from "./query-engine";
 import { runCodemapIndex } from "./run-index";
