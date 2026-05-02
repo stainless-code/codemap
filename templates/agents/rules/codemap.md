@@ -18,24 +18,25 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 
 **Examples below use `codemap`** — prefix with **`npx @stainless-code/codemap`** (or **`pnpm dlx`**, **`yarn dlx`**, **`bunx`**) when the CLI is not on your **`PATH`**.
 
-| Action                            | Command                                                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Incremental index                 | `codemap`                                                                                                     |
-| Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                                                                |
-| Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                                                       |
-| Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**)                                      |
-| Recipe catalog (JSON)             | `codemap query --recipes-json`                                                                                |
-| Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                                                           |
-| Counts only                       | `codemap query --json --summary -r deprecated-symbols`                                                        |
-| PR-scoped rows                    | `codemap query --json --changed-since origin/main -r fan-out`                                                 |
-| Bucket by owner / dir / pkg       | `codemap query --json --group-by directory -r fan-in`                                                         |
-| Save / diff a baseline            | `codemap query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`              |
-| List / drop baselines             | `codemap query --baselines` · `codemap query --drop-baseline <name>`                                          |
-| Per-delta audit                   | `codemap audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
-| MCP server (for agent hosts)      | `codemap mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
-| Targeted read (metadata)          | `codemap show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                             |
-| Targeted read (source text)       | `codemap snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag    |
-| SARIF / GH annotations            | `codemap query --recipe deprecated-symbols --format sarif` · `… --format annotations`                         |
+| Action                            | Command                                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Incremental index                 | `codemap`                                                                                                        |
+| Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                                                                   |
+| Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                                                          |
+| Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**)                                         |
+| Recipe catalog (JSON)             | `codemap query --recipes-json`                                                                                   |
+| Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                                                              |
+| Counts only                       | `codemap query --json --summary -r deprecated-symbols`                                                           |
+| PR-scoped rows                    | `codemap query --json --changed-since origin/main -r fan-out`                                                    |
+| Bucket by owner / dir / pkg       | `codemap query --json --group-by directory -r fan-in`                                                            |
+| Save / diff a baseline            | `codemap query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`                 |
+| List / drop baselines             | `codemap query --baselines` · `codemap query --drop-baseline <name>`                                             |
+| Per-delta audit                   | `codemap audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`)    |
+| MCP server (for agent hosts)      | `codemap mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                             |
+| Targeted read (metadata)          | `codemap show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                                |
+| Targeted read (source text)       | `codemap snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag       |
+| SARIF / GH annotations            | `codemap query --recipe deprecated-symbols --format sarif` · `… --format annotations`                            |
+| HTTP server (for non-MCP)         | `codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]` — same tool taxonomy over POST /tool/{name}. |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 

@@ -12,23 +12,24 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 
 ## CLI (this repository)
 
-| Context                        | Incremental index  | Query                                                                                                                  |
-| ------------------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| **Default** — from this clone  | `bun src/index.ts` | `bun src/index.ts query --json "<SQL>"`                                                                                |
-| Same entry                     | `bun run dev`      | (same as first row)                                                                                                    |
-| Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                                                       |
-| Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**)                             |
-| Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`                                 |
-| Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                                                        |
-| PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                                                 |
-| Bucket by owner / dir / pkg    | —                  | `bun src/index.ts query --json --group-by directory -r fan-in`                                                         |
-| Save / diff a baseline         | —                  | `bun src/index.ts query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`              |
-| List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                                 |
-| Per-delta audit                | —                  | `bun src/index.ts audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
-| MCP server (for agent hosts)   | —                  | `bun src/index.ts mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
-| Targeted read (metadata)       | —                  | `bun src/index.ts show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                             |
-| Targeted read (source text)    | —                  | `bun src/index.ts snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag    |
-| SARIF / GH annotations         | —                  | `bun src/index.ts query --recipe deprecated-symbols --format sarif` · `… --format annotations`                         |
+| Context                        | Incremental index  | Query                                                                                                                     |
+| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Default** — from this clone  | `bun src/index.ts` | `bun src/index.ts query --json "<SQL>"`                                                                                   |
+| Same entry                     | `bun run dev`      | (same as first row)                                                                                                       |
+| Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                                                          |
+| Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**)                                |
+| Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`                                    |
+| Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                                                           |
+| PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                                                    |
+| Bucket by owner / dir / pkg    | —                  | `bun src/index.ts query --json --group-by directory -r fan-in`                                                            |
+| Save / diff a baseline         | —                  | `bun src/index.ts query --save-baseline -r visibility-tags` then `… --json --baseline -r visibility-tags`                 |
+| List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                                    |
+| Per-delta audit                | —                  | `bun src/index.ts audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`)    |
+| MCP server (for agent hosts)   | —                  | `bun src/index.ts mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                             |
+| HTTP server (for non-MCP)      | —                  | `bun src/index.ts serve [--host 127.0.0.1] [--port 7878] [--token <secret>]` — same tool taxonomy over POST /tool/{name}. |
+| Targeted read (metadata)       | —                  | `bun src/index.ts show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                                |
+| Targeted read (source text)    | —                  | `bun src/index.ts snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag       |
+| SARIF / GH annotations         | —                  | `bun src/index.ts query --recipe deprecated-symbols --format sarif` · `… --format annotations`                            |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
