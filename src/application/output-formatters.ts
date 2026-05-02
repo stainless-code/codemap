@@ -3,12 +3,12 @@
  * for GitHub Code Scanning (and any SARIF-aware viewer); GitHub Actions
  * `::notice file=…,line=…::msg` annotations for inline PR-comment surfacing.
  *
- * Per [docs/plans/sarif-formatter.md](../../docs/plans/sarif-formatter.md):
- * location columns auto-detected (`file_path` / `path` / `to_path` /
+ * Location columns auto-detected (`file_path` / `path` / `to_path` /
  * `from_path`, in that priority); `line_start` (+ optional `line_end`) for
  * the SARIF region. Recipes without a location column emit `results: []`
  * (SARIF) or no output (annotations) plus a stderr warning — they're
- * aggregates (`index-summary`, `markers-by-kind`), not findings.
+ * aggregates (`index-summary`, `markers-by-kind`), not findings. See
+ * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  *
  * Both formatters are pure: take rows + recipe metadata, return a string.
  * No I/O, no DB access. Same engine wired into both the CLI (`cmd-query.ts`)

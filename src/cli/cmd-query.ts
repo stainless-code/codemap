@@ -49,8 +49,8 @@ import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
  * `json` → existing JSON envelope; `sarif` → SARIF 2.1.0 doc; `annotations`
  * → GitHub Actions `::notice file=…,line=…::msg` lines (one per row).
  *
- * Per [docs/plans/sarif-formatter.md § D9 Flag precedence](../../docs/plans/sarif-formatter.md):
- * `--format` overrides `--json`; `--json` stays as the alias for `--format json`.
+ * `--format` overrides `--json` when both are passed; `--json` stays as the
+ * alias for `--format json`. See [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  */
 export const OUTPUT_FORMATS = ["text", "json", "sarif", "annotations"] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
@@ -792,10 +792,10 @@ export async function runDropBaselineCmd(opts: {
  * formatters so callers can branch on format). Returns 0 on success, 1 on
  * any error.
  *
- * Per [docs/plans/sarif-formatter.md § D6 + § D8](../../docs/plans/sarif-formatter.md):
- * empty / no-location row sets emit a valid SARIF doc with `results: []`
+ * Empty / no-location row sets emit a valid SARIF doc with `results: []`
  * + a stderr warning so the operator knows the recipe doesn't have a
- * findings shape; annotations emit nothing + the same warning.
+ * findings shape; annotations emit nothing + the same warning. See
+ * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  */
 function printFormattedQuery(
   sql: string,
