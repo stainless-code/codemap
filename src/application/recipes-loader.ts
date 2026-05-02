@@ -197,7 +197,15 @@ function firstSqlKeyword(sql: string): string | undefined {
 }
 
 function stripLineComments(sql: string): string {
-  return sql
+  // Strip block comments first so that a leading `/* DELETE FROM x */` doesn't
+  // smuggle a deny-listed keyword past the lexer, and so that pure-comment
+  // recipes (block-comment only, no actual SQL) trip the empty-recipe check.
+  // Greedy-but-non-overlapping match; doesn't try to track nested comments
+  // (SQLite doesn't support them) or escape sequences inside strings (recipes
+  // mixing block comments with string literals are vanishingly rare and the
+  // runtime PRAGMA query_only=1 backstop catches anything that slips by).
+  const noBlock = sql.replace(/\/\*[\s\S]*?\*\//g, "");
+  return noBlock
     .split("\n")
     .map((line) => {
       const idx = line.indexOf("--");

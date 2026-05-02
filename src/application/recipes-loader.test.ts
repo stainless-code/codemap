@@ -286,6 +286,41 @@ describe("validateRecipeSql — load-time DML/DDL deny-list", () => {
       validateRecipeSql("bad", "/tmp/bad.sql", "drop table x\n"),
     ).toThrow(/read-only/);
   });
+
+  it("strips block /* */ comments before deciding the first keyword", () => {
+    // Without block-comment stripping, this would mis-detect 'INSERT' from the
+    // comment text and reject a legitimate SELECT recipe.
+    expect(() =>
+      validateRecipeSql(
+        "ok",
+        "/tmp/ok.sql",
+        "/* notes about INSERT semantics — see issue #42 */\nSELECT 1\n",
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects DELETE smuggled after a leading block comment (defence in depth)", () => {
+    // A bare `/* SELECT */ DELETE FROM x` would have slipped past a
+    // comment-blind first-keyword scan; block-comment stripping makes the
+    // deny-list see the real first keyword.
+    expect(() =>
+      validateRecipeSql(
+        "bad",
+        "/tmp/bad.sql",
+        "/* SELECT */ DELETE FROM files\n",
+      ),
+    ).toThrow(/read-only/);
+  });
+
+  it("rejects pure-block-comment files as empty (no SQL after stripping)", () => {
+    expect(() =>
+      validateRecipeSql(
+        "blank",
+        "/tmp/blank.sql",
+        "/* placeholder, no SQL yet */\n",
+      ),
+    ).toThrow(/empty/);
+  });
 });
 
 describe("extractFrontmatterAndBody — YAML actions parser", () => {

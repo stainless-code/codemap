@@ -114,7 +114,7 @@ codemap query --print-sql fan-out
 # Bundled recipes live in templates/recipes/ in the npm package; project recipes win on id collision
 # (shadowing is signalled via a `shadows: true` field in --recipes-json so agents notice the override)
 mkdir -p .codemap/recipes
-echo "SELECT path FROM files WHERE language = 'typescript' AND line_count > 500" \
+echo "SELECT path FROM files WHERE language IN ('ts', 'tsx') AND line_count > 500" \
   > .codemap/recipes/big-ts-files.sql
 codemap query --recipe big-ts-files                              # auto-discovered alongside bundled
 

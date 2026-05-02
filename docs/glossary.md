@@ -12,7 +12,7 @@ Alphabetical, lowercase. Disambiguation pairs link to each other.
 
 - **TS shape** = a TypeScript interface or type alias.
 - **SQLite table** = an actual on-disk table in `.codemap.db`.
-- **Recipe** = a bundled SQL string in `src/cli/query-recipes.ts`, exposed via `codemap query --recipe <id>`.
+- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (project-local). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
 - **Query** = any SQL run against the index (recipe or ad-hoc).
 
 ---
