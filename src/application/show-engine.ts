@@ -1,4 +1,8 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { CodemapDatabase } from "../db";
+import { hashContent } from "../hash";
 
 /**
  * One row from the `symbols` table — the canonical match shape returned by
@@ -86,4 +90,74 @@ function looksLikeDirectory(p: string): boolean {
   // No `.` in the trailing segment → directory-shaped (e.g. `src/cli`).
   // A `.` → file-shaped (e.g. `src/cli/cmd-show.ts`, `cmd-show.ts`).
   return !tail.includes(".");
+}
+
+/**
+ * Result of reading a symbol's source content from disk. `source` is the
+ * file lines from `match.line_start..match.line_end` joined by newlines.
+ * `stale` is true when the file's current content_hash differs from
+ * `match`'s recorded hash (per Q-6 settled — read + flag, no auto-reindex).
+ * `missing` is true when the file no longer exists on disk.
+ */
+export interface ReadSourceResult {
+  source: string | undefined;
+  stale: boolean;
+  missing: boolean;
+}
+
+export interface ReadSymbolSourceOpts {
+  match: SymbolMatch;
+  projectRoot: string;
+  /**
+   * The indexed `content_hash` for `match.file_path` — same value
+   * `cmd-validate.ts` reads. Pass `undefined` if the caller doesn't want
+   * stale detection (always returns `stale: false`); pass the value from
+   * `SELECT content_hash FROM files WHERE path = ?` to enable it.
+   */
+  indexedContentHash?: string | undefined;
+}
+
+/**
+ * Read a symbol's source text from disk and compare against the indexed
+ * hash for staleness. Per plan §9 Q-6 (settled): read + flag — agent
+ * decides whether to act on possibly-shifted line ranges. No auto-reindex
+ * (read tool, no side-effects); no refusal (data is already on disk).
+ *
+ * Same FS-read pattern `cmd-validate.ts` uses — `readFileSync(abs, "utf8")`
+ * + `hashContent(source) !== indexedHash`. Reuses `hashContent` from
+ * `src/hash.ts`. Line slicing is 1-indexed inclusive, matching the
+ * `symbols.line_start` / `line_end` column convention.
+ */
+export function readSymbolSource(opts: ReadSymbolSourceOpts): ReadSourceResult {
+  const abs = join(opts.projectRoot, opts.match.file_path);
+  if (!existsSync(abs)) {
+    return { source: undefined, stale: true, missing: true };
+  }
+  const content = readFileSync(abs, "utf8");
+  const stale =
+    opts.indexedContentHash !== undefined &&
+    hashContent(content) !== opts.indexedContentHash;
+  const lines = content.split("\n");
+  // line_start / line_end are 1-indexed inclusive in the symbols table;
+  // slice() is 0-indexed half-open, so subtract 1 from the start and use
+  // line_end as the exclusive upper bound.
+  const start = Math.max(0, opts.match.line_start - 1);
+  const end = Math.min(lines.length, opts.match.line_end);
+  const source = lines.slice(start, end).join("\n");
+  return { source, stale, missing: false };
+}
+
+/**
+ * Convenience: look up a file's indexed content_hash (same query
+ * `cmd-validate.ts` uses). Returns `undefined` for unindexed paths so the
+ * caller can decide what staleness means in that case.
+ */
+export function getIndexedContentHash(
+  db: CodemapDatabase,
+  filePath: string,
+): string | undefined {
+  const row = db
+    .query("SELECT content_hash FROM files WHERE path = ?")
+    .get(filePath) as { content_hash: string } | null;
+  return row?.content_hash;
 }

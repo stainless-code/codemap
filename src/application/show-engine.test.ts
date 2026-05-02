@@ -1,9 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createTables } from "../db";
 import type { CodemapDatabase } from "../db";
+import { hashContent } from "../hash";
 import { openCodemapDatabase } from "../sqlite-db";
-import { findSymbolsByName } from "./show-engine";
+import {
+  findSymbolsByName,
+  getIndexedContentHash,
+  readSymbolSource,
+} from "./show-engine";
+import type { SymbolMatch } from "./show-engine";
 
 let db: CodemapDatabase;
 
@@ -147,5 +156,116 @@ describe("findSymbolsByName", () => {
   it("name match is case-sensitive", () => {
     expect(findSymbolsByName(db, { name: "FOO" })).toEqual([]);
     expect(findSymbolsByName(db, { name: "Foo" })).toEqual([]);
+  });
+});
+
+describe("readSymbolSource — line slicing + stale detection (Q-6)", () => {
+  let projectRoot: string;
+
+  function makeMatch(
+    file: string,
+    lineStart: number,
+    lineEnd: number,
+  ): SymbolMatch {
+    return {
+      name: "x",
+      kind: "function",
+      file_path: file,
+      line_start: lineStart,
+      line_end: lineEnd,
+      signature: "function x(): void",
+      is_exported: 0,
+      parent_name: null,
+      visibility: null,
+    };
+  }
+
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), "show-engine-source-"));
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it("slices lines 1-indexed inclusive", () => {
+    const text = "line 1\nline 2\nline 3\nline 4\nline 5\n";
+    writeFileSync(join(projectRoot, "src/x.ts"), text);
+    const r = readSymbolSource({
+      match: makeMatch("src/x.ts", 2, 4),
+      projectRoot,
+    });
+    expect(r.source).toBe("line 2\nline 3\nline 4");
+    expect(r.stale).toBe(false);
+    expect(r.missing).toBe(false);
+  });
+
+  it("flags missing file with stale: true + missing: true", () => {
+    const r = readSymbolSource({
+      match: makeMatch("src/nope.ts", 1, 5),
+      projectRoot,
+    });
+    expect(r.source).toBeUndefined();
+    expect(r.missing).toBe(true);
+    expect(r.stale).toBe(true);
+  });
+
+  it("returns stale: false when content_hash matches indexed value", () => {
+    const text = "fresh content\n";
+    writeFileSync(join(projectRoot, "src/x.ts"), text);
+    const r = readSymbolSource({
+      match: makeMatch("src/x.ts", 1, 1),
+      projectRoot,
+      indexedContentHash: hashContent(text),
+    });
+    expect(r.stale).toBe(false);
+    expect(r.source).toBe("fresh content");
+  });
+
+  it("returns stale: true when content has changed since index", () => {
+    writeFileSync(join(projectRoot, "src/x.ts"), "old\n");
+    const oldHash = hashContent("old\n");
+    writeFileSync(join(projectRoot, "src/x.ts"), "modified\n");
+    const r = readSymbolSource({
+      match: makeMatch("src/x.ts", 1, 1),
+      projectRoot,
+      indexedContentHash: oldHash,
+    });
+    expect(r.stale).toBe(true);
+    // Source still returned (Q-6 settled — read + flag).
+    expect(r.source).toBe("modified");
+  });
+
+  it("clamps line_end past EOF instead of throwing", () => {
+    writeFileSync(join(projectRoot, "src/x.ts"), "only line\n");
+    const r = readSymbolSource({
+      match: makeMatch("src/x.ts", 1, 999),
+      projectRoot,
+    });
+    expect(r.source).toBe("only line\n"); // includes the trailing newline split
+  });
+
+  it("indexedContentHash undefined → never marks stale", () => {
+    writeFileSync(join(projectRoot, "src/x.ts"), "anything\n");
+    const r = readSymbolSource({
+      match: makeMatch("src/x.ts", 1, 1),
+      projectRoot,
+    });
+    expect(r.stale).toBe(false);
+  });
+});
+
+describe("getIndexedContentHash", () => {
+  it("returns the stored hash for an indexed path", () => {
+    const fresh = openCodemapDatabase(":memory:");
+    createTables(fresh);
+    fresh.run(
+      "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ["src/a.ts", "abc123", 10, 1, "ts", 1, 1],
+    );
+    expect(getIndexedContentHash(fresh, "src/a.ts")).toBe("abc123");
+    expect(getIndexedContentHash(fresh, "src/missing.ts")).toBeUndefined();
+    fresh.close();
   });
 });
