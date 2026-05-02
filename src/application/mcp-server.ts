@@ -9,8 +9,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
-import { buildShowResult } from "../cli/cmd-show";
-import { buildSnippetResult } from "../cli/cmd-snippet";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
@@ -41,7 +39,11 @@ import {
   listQueryRecipeCatalog,
 } from "./query-recipes";
 import { runCodemapIndex } from "./run-index";
-import { findSymbolsByName } from "./show-engine";
+import {
+  buildShowResult,
+  buildSnippetResult,
+  findSymbolsByName,
+} from "./show-engine";
 import { computeValidateRows, toProjectRelative } from "./validate-engine";
 
 /**

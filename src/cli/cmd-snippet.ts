@@ -1,46 +1,13 @@
 import {
+  buildSnippetResult,
   findSymbolsByName,
-  getIndexedContentHash,
-  readSymbolSource,
 } from "../application/show-engine";
-import type { SymbolMatch } from "../application/show-engine";
+import type { SnippetResult, SymbolMatch } from "../application/show-engine";
 import { toProjectRelative } from "../application/validate-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import type { CodemapDatabase } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-
-/**
- * Per-match payload returned by `snippet` — extends the `show` row shape
- * with the source text and stale-flag fields. Same row shape as
- * `findSymbolsByName` returns plus three additive fields:
- * `source` (the file lines from line_start..line_end),
- * `stale` (true when the file's content_hash drifted since indexing),
- * `missing` (true when the file no longer exists on disk).
- */
-export interface SnippetMatch extends SymbolMatch {
-  source: string | undefined;
-  stale: boolean;
-  missing: boolean;
-}
-
-/**
- * The catalog envelope returned by `snippet` — same shape as `show`'s
- * `ShowResult` (per Q-2 + Q-5: snippet adds source/stale/missing on each
- * row but keeps the {matches, disambiguation?} envelope). Single match
- * → `{matches: [{...}]}`; multi-match adds the structured disambiguation
- * block.
- */
-export interface SnippetResult {
-  matches: SnippetMatch[];
-  disambiguation?: {
-    n: number;
-    by_kind: Record<string, number>;
-    files: string[];
-    hint: string;
-  };
-}
 
 interface SnippetOpts {
   root: string;
@@ -168,47 +135,6 @@ export function parseSnippetRest(rest: string[]):
   }
 
   return { kind: "run", name, kindFilter, inPath, json };
-}
-
-/**
- * Build the `SnippetResult` envelope from matches + per-match source reads.
- * Mirrors `buildShowResult` from `cmd-show.ts` but enriches each match with
- * `source` / `stale` / `missing` fields read fresh from disk per Q-6
- * (read + flag, no auto-reindex).
- */
-export function buildSnippetResult(opts: {
-  db: CodemapDatabase;
-  matches: SymbolMatch[];
-  projectRoot: string;
-}): SnippetResult {
-  const enriched: SnippetMatch[] = opts.matches.map((m) => {
-    const indexedHash = getIndexedContentHash(opts.db, m.file_path);
-    const read = readSymbolSource({
-      match: m,
-      projectRoot: opts.projectRoot,
-      indexedContentHash: indexedHash,
-    });
-    return {
-      ...m,
-      source: read.source,
-      stale: read.stale,
-      missing: read.missing,
-    };
-  });
-
-  if (enriched.length <= 1) return { matches: enriched };
-  const byKind: Record<string, number> = {};
-  for (const m of enriched) byKind[m.kind] = (byKind[m.kind] ?? 0) + 1;
-  const files = Array.from(new Set(enriched.map((m) => m.file_path))).sort();
-  return {
-    matches: enriched,
-    disambiguation: {
-      n: enriched.length,
-      by_kind: byKind,
-      files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
-    },
-  };
 }
 
 /**

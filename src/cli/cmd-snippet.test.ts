@@ -3,11 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { buildSnippetResult } from "../application/show-engine";
 import { createTables } from "../db";
 import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
 import { openCodemapDatabase } from "../sqlite-db";
-import { buildSnippetResult, parseSnippetRest } from "./cmd-snippet";
+import { parseSnippetRest } from "./cmd-snippet";
 
 describe("parseSnippetRest", () => {
   it("returns help on --help / -h", () => {

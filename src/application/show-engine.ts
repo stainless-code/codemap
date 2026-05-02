@@ -172,3 +172,113 @@ export function getIndexedContentHash(
     .get(filePath) as { content_hash: string } | null;
   return row?.content_hash;
 }
+
+/**
+ * The catalog envelope returned by `show` — same shape both the CLI's
+ * `--json` mode and the MCP `show` tool surface (per plan §4 uniformity
+ * + Q-2 settled). Single match → `{matches: [{...}]}`; multi-match adds
+ * a structured `disambiguation` block so agents narrow without scanning
+ * every row.
+ */
+export interface ShowResult {
+  matches: SymbolMatch[];
+  disambiguation?: {
+    n: number;
+    by_kind: Record<string, number>;
+    files: string[];
+    hint: string;
+  };
+}
+
+/**
+ * Build the `ShowResult` envelope from a list of matches. Single-match
+ * → `{matches}` only. Multi-match → adds a `disambiguation` block with
+ * structured aids so agents narrow without scanning every row.
+ */
+export function buildShowResult(matches: SymbolMatch[]): ShowResult {
+  if (matches.length <= 1) return { matches };
+  const byKind: Record<string, number> = {};
+  for (const m of matches) byKind[m.kind] = (byKind[m.kind] ?? 0) + 1;
+  const files = Array.from(new Set(matches.map((m) => m.file_path))).sort();
+  return {
+    matches,
+    disambiguation: {
+      n: matches.length,
+      by_kind: byKind,
+      files,
+      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+    },
+  };
+}
+
+/**
+ * Per-match payload returned by `snippet` — extends the `show` row shape
+ * with the source text and stale-flag fields. Same row shape as
+ * `findSymbolsByName` returns plus three additive fields:
+ * `source` (the file lines from line_start..line_end),
+ * `stale` (true when the file's content_hash drifted since indexing),
+ * `missing` (true when the file no longer exists on disk).
+ */
+export interface SnippetMatch extends SymbolMatch {
+  source: string | undefined;
+  stale: boolean;
+  missing: boolean;
+}
+
+/**
+ * The catalog envelope returned by `snippet` — same shape as `show`'s
+ * `ShowResult` (per Q-2 + Q-5: snippet adds source/stale/missing on each
+ * row but keeps the {matches, disambiguation?} envelope). Single match
+ * → `{matches: [{...}]}`; multi-match adds the structured disambiguation
+ * block.
+ */
+export interface SnippetResult {
+  matches: SnippetMatch[];
+  disambiguation?: {
+    n: number;
+    by_kind: Record<string, number>;
+    files: string[];
+    hint: string;
+  };
+}
+
+/**
+ * Build the `SnippetResult` envelope from matches + per-match source reads.
+ * Mirrors `buildShowResult` but enriches each match with `source` / `stale`
+ * / `missing` fields read fresh from disk per plan §9 Q-6 (read + flag,
+ * no auto-reindex).
+ */
+export function buildSnippetResult(opts: {
+  db: CodemapDatabase;
+  matches: SymbolMatch[];
+  projectRoot: string;
+}): SnippetResult {
+  const enriched: SnippetMatch[] = opts.matches.map((m) => {
+    const indexedHash = getIndexedContentHash(opts.db, m.file_path);
+    const read = readSymbolSource({
+      match: m,
+      projectRoot: opts.projectRoot,
+      indexedContentHash: indexedHash,
+    });
+    return {
+      ...m,
+      source: read.source,
+      stale: read.stale,
+      missing: read.missing,
+    };
+  });
+
+  if (enriched.length <= 1) return { matches: enriched };
+  const byKind: Record<string, number> = {};
+  for (const m of enriched) byKind[m.kind] = (byKind[m.kind] ?? 0) + 1;
+  const files = Array.from(new Set(enriched.map((m) => m.file_path))).sort();
+  return {
+    matches: enriched,
+    disambiguation: {
+      n: enriched.length,
+      by_kind: byKind,
+      files,
+      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+    },
+  };
+}
