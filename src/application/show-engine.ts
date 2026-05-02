@@ -62,8 +62,10 @@ export function findSymbolsByName(
       const prefix = opts.inPath.endsWith("/")
         ? opts.inPath
         : `${opts.inPath}/`;
-      clauses.push("file_path LIKE ?");
-      params.push(`${prefix}%`);
+      // Escape user input so `src/__tests__` doesn't over-match via SQL
+      // LIKE's `_`-matches-any-char rule. Trailing `%` stays a wildcard.
+      clauses.push("file_path LIKE ? ESCAPE '\\'");
+      params.push(`${escapeLikeLiteral(prefix)}%`);
     } else {
       clauses.push("file_path = ?");
       params.push(opts.inPath);
@@ -76,6 +78,15 @@ export function findSymbolsByName(
                WHERE ${clauses.join(" AND ")}
                ORDER BY file_path ASC, line_start ASC`;
   return db.query(sql).all(...params) as SymbolMatch[];
+}
+
+/**
+ * Escape SQLite LIKE meta-characters (`_`, `%`) and the escape character
+ * itself so a user-supplied path matches literally. Used with
+ * `file_path LIKE ? ESCAPE '\'`.
+ */
+export function escapeLikeLiteral(s: string): string {
+  return s.replace(/[\\_%]/g, (c) => `\\${c}`);
 }
 
 // Heuristic: `--in src/cli/` (trailing slash) and `--in src/cli` (no slash, no

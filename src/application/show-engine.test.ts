@@ -8,6 +8,7 @@ import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
+  escapeLikeLiteral,
   findSymbolsByName,
   getIndexedContentHash,
   readSymbolSource,
@@ -156,6 +157,59 @@ describe("findSymbolsByName", () => {
   it("name match is case-sensitive", () => {
     expect(findSymbolsByName(db, { name: "FOO" })).toEqual([]);
     expect(findSymbolsByName(db, { name: "Foo" })).toEqual([]);
+  });
+
+  it("inPath with `_` matches the literal directory, not via LIKE wildcard", () => {
+    // Seed two files: real `__tests__` directory + a same-shape `aatestsZZ`
+    // that would over-match if `_` were treated as a SQL LIKE wildcard.
+    db.run(
+      "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?)",
+      [
+        "src/__tests__/setup.ts",
+        "h-test",
+        10,
+        3,
+        "ts",
+        1,
+        1,
+        "src/aatestsZZ/decoy.ts",
+        "h-decoy",
+        10,
+        3,
+        "ts",
+        1,
+        1,
+      ],
+    );
+    db.run(
+      `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+       VALUES
+         ('src/__tests__/setup.ts', 'shared', 'function', 1, 1, 'function shared(): void', 1, 0),
+         ('src/aatestsZZ/decoy.ts', 'shared', 'function', 1, 1, 'function shared(): void', 1, 0)`,
+    );
+    const r = findSymbolsByName(db, {
+      name: "shared",
+      inPath: "src/__tests__",
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]!.file_path).toBe("src/__tests__/setup.ts");
+  });
+});
+
+describe("escapeLikeLiteral", () => {
+  it("escapes underscores", () => {
+    expect(escapeLikeLiteral("foo_bar")).toBe("foo\\_bar");
+  });
+  it("escapes percents", () => {
+    expect(escapeLikeLiteral("100%")).toBe("100\\%");
+  });
+  it("escapes the backslash escape char itself", () => {
+    expect(escapeLikeLiteral("a\\b")).toBe("a\\\\b");
+  });
+  it("leaves ordinary characters alone", () => {
+    expect(escapeLikeLiteral("src/cli/cmd-show.ts")).toBe(
+      "src/cli/cmd-show.ts",
+    );
   });
 });
 
