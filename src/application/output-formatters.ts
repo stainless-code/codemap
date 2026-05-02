@@ -163,3 +163,46 @@ export function formatSarif(opts: FormatOpts): string {
   };
   return JSON.stringify(sarif, null, 2);
 }
+
+export interface AnnotationsOpts {
+  rows: Record<string, unknown>[];
+  /** Same `recipeId` shape as {@link FormatOpts}; not currently rendered (annotation lines don't carry rule id). */
+  recipeId: string | undefined;
+  /**
+   * Annotation level — `"notice" | "warning" | "error"` per GitHub Actions.
+   * Default `"notice"` per plan § D7. Future per-recipe override via
+   * frontmatter `sarifLevel:` (deferred to v1.x).
+   */
+  level?: "notice" | "warning" | "error";
+}
+
+/**
+ * Format the row-set as GitHub Actions annotation commands. One line per
+ * locatable row: `::<level> file=<path>,line=<n>::<message>`.
+ *
+ * Per plan § D7: rows without a location column are skipped; empty input
+ * → empty string. Caller decides whether to print a stderr warning.
+ *
+ * Reference: <https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message>
+ */
+export function formatAnnotations(opts: AnnotationsOpts): string {
+  const level = opts.level ?? "notice";
+  const lines: string[] = [];
+  for (const row of opts.rows) {
+    const locCol = detectLocationColumn(row);
+    if (locCol === null) continue;
+    const file = row[locCol] as string;
+    const lineStartRaw = row["line_start"];
+    const lineN =
+      typeof lineStartRaw === "number" && lineStartRaw > 0
+        ? lineStartRaw
+        : undefined;
+    const params: string[] = [`file=${file}`];
+    if (lineN !== undefined) params.push(`line=${lineN}`);
+    // Annotation messages can't contain raw newlines (the GH parser stops at
+    // the first one); collapse whitespace into a single space.
+    const message = buildMessageText(row).replace(/\s+/g, " ").trim();
+    lines.push(`::${level} ${params.join(",")}::${message}`);
+  }
+  return lines.join("\n");
+}

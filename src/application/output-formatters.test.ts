@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   buildMessageText,
   detectLocationColumn,
+  formatAnnotations,
   formatSarif,
   hasLocatableRows,
 } from "./output-formatters";
@@ -209,5 +210,70 @@ describe("formatSarif", () => {
     expect(doc.runs[0].tool.driver.rules[0].fullDescription).toEqual({
       text: "## Long form body",
     });
+  });
+});
+
+describe("formatAnnotations", () => {
+  it("emits ::notice file=…,line=…::msg per row", () => {
+    const out = formatAnnotations({
+      rows: [
+        { file_path: "a.ts", line_start: 5, name: "foo" },
+        { file_path: "b.ts", line_start: 10, name: "bar" },
+      ],
+      recipeId: "deprecated-symbols",
+    });
+    expect(out.split("\n")).toEqual([
+      "::notice file=a.ts,line=5::foo",
+      "::notice file=b.ts,line=10::bar",
+    ]);
+  });
+
+  it("omits line= when no line_start", () => {
+    const out = formatAnnotations({
+      rows: [{ file_path: "a.ts", fan_in: 17 }],
+      recipeId: "fan-in",
+    });
+    expect(out).toBe("::notice file=a.ts::fan_in=17");
+  });
+
+  it("returns empty string for empty rows", () => {
+    expect(formatAnnotations({ rows: [], recipeId: "x" })).toBe("");
+  });
+
+  it("skips rows with no location", () => {
+    const out = formatAnnotations({
+      rows: [
+        { file_path: "a.ts", name: "foo" },
+        { kind: "TODO", count: 5 },
+        { file_path: "b.ts", name: "bar" },
+      ],
+      recipeId: "mixed",
+    });
+    expect(out.split("\n")).toHaveLength(2);
+  });
+
+  it("collapses newlines in messages (GH parser stops at first one)", () => {
+    const out = formatAnnotations({
+      rows: [
+        {
+          file_path: "a.ts",
+          line_start: 5,
+          name: "foo",
+          doc_comment: "line1\nline2\nline3",
+        },
+      ],
+      recipeId: "x",
+    });
+    expect(out.includes("\n")).toBe(false);
+    expect(out).toContain("line1 line2 line3");
+  });
+
+  it("respects level override", () => {
+    const out = formatAnnotations({
+      rows: [{ file_path: "a.ts", line_start: 1, name: "x" }],
+      recipeId: "x",
+      level: "error",
+    });
+    expect(out).toBe("::error file=a.ts,line=1::x");
   });
 });

@@ -4,6 +4,7 @@ import {
   queryRows,
 } from "../application/index-engine";
 import {
+  formatAnnotations,
   formatSarif,
   hasLocatableRows,
 } from "../application/output-formatters";
@@ -837,9 +838,12 @@ function printFormattedQuery(
       return 0;
     }
 
-    // annotations — Tracer 3
-    console.error("codemap: --format annotations not yet implemented");
-    return 1;
+    const annotations = formatAnnotations({
+      rows,
+      recipeId: opts.recipeId,
+    });
+    if (annotations.length > 0) console.log(annotations);
+    return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.log(JSON.stringify({ error: msg }));
