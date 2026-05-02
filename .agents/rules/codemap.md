@@ -26,6 +26,7 @@ A local database (default **`.codemap.db`**) indexes structure: symbols, imports
 | List / drop baselines          | —                  | `bun src/index.ts query --baselines` · `bun src/index.ts query --drop-baseline <name>`                                 |
 | Per-delta audit                | —                  | `bun src/index.ts audit --json --baseline base` (auto-resolves `base-files` / `base-dependencies` / `base-deprecated`) |
 | MCP server (for agent hosts)   | —                  | `bun src/index.ts mcp` — JSON-RPC on stdio; one tool per CLI verb. See **MCP** section below.                          |
+| HTTP server (for non-MCP)      | —                  | `bun src/index.ts serve [--port 7878] [--token <secret>]` — same tool taxonomy over POST /tool/{name}.                 |
 | Targeted read (metadata)       | —                  | `bun src/index.ts show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                             |
 | Targeted read (source text)    | —                  | `bun src/index.ts snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag    |
 | SARIF / GH annotations         | —                  | `bun src/index.ts query --recipe deprecated-symbols --format sarif` · `… --format annotations`                         |

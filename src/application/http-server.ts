@@ -29,8 +29,7 @@ import type { ToolResult } from "./tool-handlers";
  * Loopback default (`127.0.0.1:7878`). Bare `node:http` (no Express /
  * Fastify) keeps the dep surface minimal and runs on Bun + Node alike.
  *
- * See [`docs/architecture.md` § HTTP wiring] and the design plan
- * [`docs/plans/codemap-serve.md`](../../docs/plans/codemap-serve.md).
+ * See [`docs/architecture.md` § HTTP wiring](../../docs/architecture.md#cli-usage).
  */
 
 export interface HttpServerOpts {

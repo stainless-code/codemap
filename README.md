@@ -111,6 +111,13 @@ codemap audit --baseline base --no-index                        # skip the auto-
 # path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc for ad-hoc).
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
+# HTTP API — same tool taxonomy as `codemap mcp`, exposed over POST /tool/{name} for
+# non-MCP consumers (CI scripts, curl, IDE plugins). Loopback default; optional --token.
+codemap serve --port 7878 --token $(openssl rand -hex 32) &
+curl -s -X POST http://127.0.0.1:7878/tool/query \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"sql":"SELECT name, file_path FROM symbols LIMIT 5"}'
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out

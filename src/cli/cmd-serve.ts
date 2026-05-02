@@ -2,8 +2,8 @@ import { runHttpServer } from "../application/http-server";
 import { CODEMAP_VERSION } from "../version";
 
 /**
- * Default loopback bind. Per [docs/plans/codemap-serve.md § D3](../../docs/plans/codemap-serve.md):
- * 127.0.0.1 default; user must explicitly pass `--host 0.0.0.0` to expose.
+ * Default loopback bind: `127.0.0.1` (refuse `0.0.0.0` unless the user
+ * explicitly passes `--host 0.0.0.0`). See [`docs/architecture.md` § HTTP wiring](../../docs/architecture.md#cli-usage).
  */
 export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 7878;
