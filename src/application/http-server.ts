@@ -4,6 +4,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { handleQuery } from "./tool-handlers";
+import type { ToolResult } from "./tool-handlers";
 
 /**
  * HTTP server engine — same tool taxonomy as `application/mcp-server.ts`,
@@ -141,7 +143,6 @@ async function handleRequest(
   }
 
   if (method === "POST" && path.startsWith("/tool/")) {
-    // Tracers 3 + 4 wire individual tools.
     const name = path.slice("/tool/".length);
     if (!(TOOL_NAMES as readonly string[]).includes(name)) {
       return writeJson(
@@ -153,14 +154,7 @@ async function handleRequest(
         opts.version,
       );
     }
-    return writeJson(
-      res,
-      501,
-      {
-        error: `codemap serve: tool "${name}" not yet wired (Tracer 3+ pending).`,
-      },
-      opts.version,
-    );
+    return dispatchTool(req, res, name, opts);
   }
 
   return writeJson(
@@ -169,6 +163,108 @@ async function handleRequest(
     { error: `codemap serve: no route for ${method} ${path}.` },
     opts.version,
   );
+}
+
+/**
+ * Read the full request body (JSON-encoded) and parse it. Returns the
+ * parsed object on success, or an error envelope on parse failure /
+ * empty body. Caller decides whether empty body is OK (some tools take
+ * `{}` legitimately — `list_baselines`).
+ */
+async function readJsonBody(
+  req: IncomingMessage,
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  // Cap at 1 MiB to avoid trivial DoS via gigantic POST bodies. Real tool
+  // payloads (recipes, baselines) are well under 100 KiB.
+  const MAX_BYTES = 1024 * 1024;
+  for await (const chunk of req) {
+    const buf = chunk as Buffer;
+    total += buf.length;
+    if (total > MAX_BYTES) {
+      return {
+        ok: false,
+        error: `codemap serve: request body exceeds ${MAX_BYTES} bytes.`,
+      };
+    }
+    chunks.push(buf);
+  }
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (text.trim() === "") return { ok: true, value: {} };
+  try {
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `codemap serve: invalid JSON body: ${msg}` };
+  }
+}
+
+/**
+ * Translate a tool's {@link ToolResult} into an HTTP response. JSON
+ * payloads serialize as `application/json`; sarif payloads use
+ * `application/sarif+json`; annotations use `text/plain`. Errors map to
+ * 4xx / 5xx with `{"error": "..."}` (same shape `codemap query --json`
+ * prints on failure — agents and CLI consumers unwrap identically).
+ */
+function writeToolResult(
+  res: ServerResponse,
+  result: ToolResult,
+  version: string,
+): void {
+  if (!result.ok) {
+    return writeJson(res, 400, { error: result.error }, version);
+  }
+  if (result.format === "json") {
+    return writeJson(res, 200, result.payload, version);
+  }
+  res.statusCode = 200;
+  res.setHeader(
+    "Content-Type",
+    result.format === "sarif"
+      ? "application/sarif+json"
+      : "text/plain; charset=utf-8",
+  );
+  res.setHeader("X-Codemap-Version", version);
+  res.end(result.payload);
+}
+
+/**
+ * Dispatch a `POST /tool/{name}` request to the matching pure handler.
+ * Validates the body is JSON; tool-specific schema validation lives in
+ * the handler (mirrors MCP — Zod-validated at the SDK layer there, by
+ * the wrapper here).
+ */
+async function dispatchTool(
+  req: IncomingMessage,
+  res: ServerResponse,
+  name: string,
+  opts: HttpServerOpts,
+): Promise<void> {
+  const body = await readJsonBody(req);
+  if (!body.ok) return writeJson(res, 400, { error: body.error }, opts.version);
+  const args = body.value as Record<string, unknown>;
+
+  switch (name) {
+    case "query": {
+      return writeToolResult(
+        res,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- shape validated by zod inside handler
+        handleQuery(args as any, opts.root),
+        opts.version,
+      );
+    }
+    default: {
+      return writeJson(
+        res,
+        501,
+        {
+          error: `codemap serve: tool "${name}" not yet wired (Tracer 4 pending).`,
+        },
+        opts.version,
+      );
+    }
+  }
 }
 
 /**
