@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
+import { resolveAuditBaselines } from "../application/audit-engine";
 import { createTables, upsertQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
-import { parseAuditRest, resolveAuditBaselines } from "./cmd-audit";
+import { parseAuditRest } from "./cmd-audit";
 
 function freshDb(): CodemapDatabase {
   const db = openCodemapDatabase(":memory:");

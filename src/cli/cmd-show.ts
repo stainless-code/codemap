@@ -1,27 +1,10 @@
-import { findSymbolsByName } from "../application/show-engine";
-import type { SymbolMatch } from "../application/show-engine";
+import { buildShowResult, findSymbolsByName } from "../application/show-engine";
+import type { ShowResult, SymbolMatch } from "../application/show-engine";
+import { toProjectRelative } from "../application/validate-engine";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import { configureResolver } from "../resolver";
 import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
-import { toProjectRelative } from "./cmd-validate";
-
-/**
- * The catalog envelope returned by `show` — same shape both the CLI's
- * `--json` mode and the MCP `show` tool surface (per plan §4 uniformity
- * + Q-2 settled). Single match → `{matches: [{...}]}`; multi-match adds
- * a structured `disambiguation` block so agents narrow without scanning
- * every row.
- */
-export interface ShowResult {
-  matches: SymbolMatch[];
-  disambiguation?: {
-    n: number;
-    by_kind: Record<string, number>;
-    files: string[];
-    hint: string;
-  };
-}
 
 interface ShowOpts {
   root: string;
@@ -141,27 +124,6 @@ export function parseShowRest(rest: string[]):
   }
 
   return { kind: "run", name, kindFilter, inPath, json };
-}
-
-/**
- * Build the `ShowResult` envelope from a list of matches. Single-match
- * → `{matches}` only. Multi-match → adds a `disambiguation` block with
- * structured aids so agents narrow without scanning every row.
- */
-export function buildShowResult(matches: SymbolMatch[]): ShowResult {
-  if (matches.length <= 1) return { matches };
-  const byKind: Record<string, number> = {};
-  for (const m of matches) byKind[m.kind] = (byKind[m.kind] ?? 0) + 1;
-  const files = Array.from(new Set(matches.map((m) => m.file_path))).sort();
-  return {
-    matches,
-    disambiguation: {
-      n: matches.length,
-      by_kind: byKind,
-      files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
-    },
-  };
 }
 
 /**

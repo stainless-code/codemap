@@ -120,6 +120,34 @@ export const V1_DELTAS: readonly AuditDeltaSpec[] = [
 export type AuditBaselineMap = Partial<Record<string, string>>;
 
 /**
+ * Compose the `AuditBaselineMap` from CLI / MCP arg shapes. Per-delta
+ * explicit names override auto-resolved slots. Auto-resolved slots that
+ * don't exist in `query_baselines` are silently absent — the delta just
+ * doesn't run. Same shape both `cmd-audit.ts` and the MCP `audit` tool
+ * call before handing off to {@link runAudit}.
+ */
+export function resolveAuditBaselines(opts: {
+  db: CodemapDatabase;
+  baselinePrefix: string | undefined;
+  perDelta: Record<string, string>;
+}): AuditBaselineMap {
+  const map: AuditBaselineMap = {};
+  for (const spec of V1_DELTAS) {
+    if (opts.baselinePrefix !== undefined) {
+      const candidate = `${opts.baselinePrefix}-${spec.key}`;
+      if (getQueryBaseline(opts.db, candidate) !== undefined) {
+        map[spec.key] = candidate;
+      }
+    }
+  }
+  // Per-delta flags override the auto-resolved slot for that key.
+  for (const [key, name] of Object.entries(opts.perDelta)) {
+    map[key] = name;
+  }
+  return map;
+}
+
+/**
  * Run an audit against the per-delta baseline mapping. Each requested delta
  * (key present in `baselines`) loads its baseline, validates column-set
  * membership, runs the canonical SQL, and emits a per-delta diff. Deltas

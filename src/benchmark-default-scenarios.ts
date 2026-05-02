@@ -1,9 +1,9 @@
+import { getQueryRecipeSql } from "./application/query-recipes";
 import {
   globFilesFiltered,
   readAll,
   traditionalFanoutImportLines,
 } from "./benchmark-common";
-import { getQueryRecipeSql } from "./cli/query-recipes";
 import type { CodemapDatabase } from "./db";
 import { getProjectRoot } from "./runtime";
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import type { SymbolMatch } from "../application/show-engine";
-import { buildShowResult, parseShowRest } from "./cmd-show";
+import { buildShowResult } from "../application/show-engine";
+import { parseShowRest } from "./cmd-show";
 
 describe("parseShowRest", () => {
   it("returns help on --help / -h", () => {

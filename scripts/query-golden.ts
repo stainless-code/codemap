@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../src/api";
-import { getQueryRecipeSql } from "../src/cli/query-recipes";
+import { getQueryRecipeSql } from "../src/application/query-recipes";
 import { parseScenariosJson } from "./query-golden/schema";
 import type { GoldenMatch, GoldenScenario } from "./query-golden/schema";
 
