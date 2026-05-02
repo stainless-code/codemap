@@ -167,7 +167,7 @@ On a small repo, totals move with noise and thermal variance. On a large indexed
 
 The script’s **reindex** section averages **3 internal runs** per mode; full-rebuild wall time varies with disk and CPU load.
 
-The indexed CSS scenario uses `ORDER BY name LIMIT 50`. The **fan-out** row’s indexed path uses **`getQueryRecipeSql("fan-out")`** from **`src/cli/query-recipes.ts`** (same text as **`codemap query --recipe fan-out`**). Other default scenarios’ SQL lives in **`src/benchmark-default-scenarios.ts`**; custom JSON is loaded in **`src/benchmark-config.ts`** (keep **`fixtures/benchmark/scenarios.example.json`** in sync when recipe SQL changes).
+The indexed CSS scenario uses `ORDER BY name LIMIT 50`. The **fan-out** row’s indexed path uses **`getQueryRecipeSql("fan-out")`** from **`src/application/query-recipes.ts`** (same text as **`codemap query --recipe fan-out`**). Other default scenarios’ SQL lives in **`src/benchmark-default-scenarios.ts`**; custom JSON is loaded in **`src/benchmark-config.ts`** (keep **`fixtures/benchmark/scenarios.example.json`** in sync when recipe SQL changes).
 
 ### Key takeaways
 
