@@ -580,6 +580,26 @@ describe("parseQueryRest — --format flag", () => {
     expect(r.json).toBe(true); // unchanged — flag still set, just overridden
   });
 
+  it("--format text wins over --json (resolved format honored at render time)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--json",
+      "--format",
+      "text",
+      "SELECT 1",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("text");
+    // Renderer reads `format`, not `json` (post-PR #43 fix per CodeRabbit).
+  });
+
+  it("--format json wins over no flag (renderer uses JSON path)", () => {
+    const r = parseQueryRest(["query", "--format", "json", "SELECT 1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("json");
+    expect(r.json).toBe(false);
+  });
+
   it("rejects --format with no value", () => {
     const r = parseQueryRest(["query", "--format"]);
     expect(r.kind).toBe("error");

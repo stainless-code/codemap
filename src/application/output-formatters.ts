@@ -177,11 +177,38 @@ export interface AnnotationsOpts {
 }
 
 /**
+ * Escape a workflow-command **data payload** (everything after the `::`
+ * delimiter) per [actions/toolkit `command.ts`](https://github.com/actions/toolkit/blob/master/packages/core/src/command.ts):
+ * `%` → `%25`, `\r` → `%0D`, `\n` → `%0A`. Without this, a `%` in the message
+ * (e.g. `coverage at 50%`) gets parsed as a malformed escape sequence by the
+ * runner.
+ */
+export function escapeAnnotationData(value: string): string {
+  return value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+}
+
+/**
+ * Escape a workflow-command **property value** (the `value` in `key=value`):
+ * data-payload escapes plus `:` → `%3A` and `,` → `%2C`. Without this, a
+ * file path containing `:` (Windows drive letter, `C:\foo`) or `,` would
+ * either prematurely terminate the property or split into two malformed
+ * `key=value` pairs. Same actions/toolkit reference as
+ * {@link escapeAnnotationData}.
+ */
+export function escapeAnnotationProperty(value: string): string {
+  return escapeAnnotationData(value).replace(/:/g, "%3A").replace(/,/g, "%2C");
+}
+
+/**
  * Format the row-set as GitHub Actions annotation commands. One line per
  * locatable row: `::<level> file=<path>,line=<n>::<message>`.
  *
  * Per plan § D7: rows without a location column are skipped; empty input
  * → empty string. Caller decides whether to print a stderr warning.
+ *
+ * **Escaping:** property values (`file`) and the message payload are
+ * percent-encoded per actions/toolkit so paths with `:` / `,` and messages
+ * with `%` / `\r` / `\n` round-trip correctly through the GH runner.
  *
  * Reference: <https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#setting-an-error-message>
  */
@@ -197,11 +224,14 @@ export function formatAnnotations(opts: AnnotationsOpts): string {
       typeof lineStartRaw === "number" && lineStartRaw > 0
         ? lineStartRaw
         : undefined;
-    const params: string[] = [`file=${file}`];
+    const params: string[] = [`file=${escapeAnnotationProperty(file)}`];
     if (lineN !== undefined) params.push(`line=${lineN}`);
-    // Annotation messages can't contain raw newlines (the GH parser stops at
-    // the first one); collapse whitespace into a single space.
-    const message = buildMessageText(row).replace(/\s+/g, " ").trim();
+    // Collapse internal whitespace runs into a single space so the message
+    // is one logical line; THEN escape so the GH runner reads it back as
+    // a single annotation (escaped %0A still terminates the command).
+    const message = escapeAnnotationData(
+      buildMessageText(row).replace(/\s+/g, " ").trim(),
+    );
     lines.push(`::${level} ${params.join(",")}::${message}`);
   }
   return lines.join("\n");

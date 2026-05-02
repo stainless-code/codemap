@@ -85,7 +85,7 @@ export function parseQueryRest(rest: string[]):
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json | --format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id>\nRun codemap query --help for more.',
     };
   }
 
@@ -414,7 +414,7 @@ export function parseQueryRest(rest: string[]):
     return {
       kind: "error",
       message:
-        'codemap: missing SQL or recipe. Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
+        'codemap: missing SQL or recipe. Usage: codemap query [--json | --format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
     };
   }
   // Ad-hoc SQL needs an explicit baseline name (no recipe id default).
@@ -524,7 +524,7 @@ function formatRecipeHelpLines(): string {
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
-  console.log(`Usage: codemap query [--json] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>"
+  console.log(`Usage: codemap query [--json] [--format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>"
        codemap query [...] --recipe <id>   (alias: -r)
        codemap query --recipes-json
        codemap query --print-sql <id>
@@ -535,8 +535,18 @@ Read-only SQL against .codemap.db (after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json                  Print a JSON array of row objects to stdout (for agents and scripts).
-                          On error, prints a single object: {"error":"<message>"} to stdout.
+  --json                  Alias for --format json. Print a JSON array of row objects to stdout
+                          (for agents and scripts). On error, prints {"error":"<message>"} to stdout.
+  --format <fmt>          One of: ${OUTPUT_FORMATS.join(" | ")}. Overrides --json when both are passed
+                          (so --format text + --json prints text). Default = text.
+                            text         Terminal table via console.table (default).
+                            json         Same as --json — JSON array of row objects.
+                            sarif        SARIF 2.1.0 doc (GitHub Code Scanning); rule.id = codemap.<recipe>
+                                         (or codemap.adhoc for ad-hoc SQL); auto-detects file_path / path /
+                                         to_path / from_path; aggregate recipes (no location) emit results: [].
+                            annotations  GitHub Actions ::notice file=…,line=…::msg per row (PR-inline findings).
+                          sarif/annotations require a flat row list — incompatible with --summary,
+                          --group-by, --save-baseline, --baseline (parser rejects at parse time).
   --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
                           With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
                           With --baseline, collapses to {baseline, current_row_count, added: N, removed: N}.
@@ -636,6 +646,14 @@ export async function runQueryCmd(opts: {
   saveBaseline?: string | true | undefined;
   baseline?: string | true | undefined;
 }): Promise<void> {
+  // Resolve --format / --json once so every render path keys off the same
+  // value. Pre-PR #43 callers pass only `json`; post-PR #43 the parser
+  // pre-resolves into `format` (so `--format text --json` correctly emits
+  // text per design § D9). Keep `isJson` as the boolean every downstream
+  // helper expects until they're refactored to take an OutputFormat.
+  const effectiveFormat: OutputFormat =
+    opts.format ?? (opts.json === true ? "json" : "text");
+  const isJson = effectiveFormat === "json";
   try {
     const user = await loadUserConfig(opts.root, opts.configFile);
     initCodemap(resolveCodemapConfig(opts.root, user));
@@ -645,7 +663,7 @@ export async function runQueryCmd(opts: {
     if (opts.changedSince !== undefined) {
       const result = getFilesChangedSince(opts.changedSince, getProjectRoot());
       if (!result.ok) {
-        emitErrorMaybeJson(result.error, opts.json);
+        emitErrorMaybeJson(result.error, isJson);
         return;
       }
       changedFiles = result.files;
@@ -662,7 +680,7 @@ export async function runQueryCmd(opts: {
     if (opts.saveBaseline !== undefined) {
       runSaveBaseline({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         recipeId: opts.recipeId,
         baselineName:
           opts.saveBaseline === true
@@ -675,7 +693,7 @@ export async function runQueryCmd(opts: {
     if (opts.baseline !== undefined) {
       runBaselineDiff({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         summary: opts.summary === true,
         baselineName:
           opts.baseline === true ? (opts.recipeId as string) : opts.baseline,
@@ -688,7 +706,7 @@ export async function runQueryCmd(opts: {
     if (opts.groupBy !== undefined) {
       runGroupedQuery({
         sql: opts.sql,
-        json: opts.json === true,
+        json: isJson,
         summary: opts.summary === true,
         groupBy: opts.groupBy,
         changedFiles,
@@ -698,9 +716,9 @@ export async function runQueryCmd(opts: {
       return;
     }
 
-    if (opts.format === "sarif" || opts.format === "annotations") {
+    if (effectiveFormat === "sarif" || effectiveFormat === "annotations") {
       const code = printFormattedQuery(opts.sql, {
-        format: opts.format,
+        format: effectiveFormat,
         recipeId: opts.recipeId,
         changedFiles,
       });
@@ -709,7 +727,7 @@ export async function runQueryCmd(opts: {
     }
 
     const code = printQueryResult(opts.sql, {
-      json: opts.json,
+      json: isJson,
       summary: opts.summary,
       changedFiles,
       recipeActions,
@@ -717,7 +735,7 @@ export async function runQueryCmd(opts: {
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitErrorMaybeJson(msg, opts.json);
+    emitErrorMaybeJson(msg, isJson);
   }
 }
 

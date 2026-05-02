@@ -3,6 +3,8 @@ import { describe, expect, it } from "bun:test";
 import {
   buildMessageText,
   detectLocationColumn,
+  escapeAnnotationData,
+  escapeAnnotationProperty,
   formatAnnotations,
   formatSarif,
   hasLocatableRows,
@@ -275,5 +277,79 @@ describe("formatAnnotations", () => {
       level: "error",
     });
     expect(out).toBe("::error file=a.ts,line=1::x");
+  });
+
+  it("escapes file path with comma + colon (Windows drive / SQL JSON)", () => {
+    const out = formatAnnotations({
+      rows: [{ file_path: "C:\\a,b.ts", line_start: 1, name: "x" }],
+      recipeId: "x",
+    });
+    // Without escaping, the comma would split this into two malformed
+    // key=value pairs and the colon would terminate the property prematurely.
+    expect(out).toBe("::notice file=C%3A\\a%2Cb.ts,line=1::x");
+  });
+
+  it("escapes percent in the message payload", () => {
+    // Real-world trigger: doc_comment / signature / value columns containing
+    // %. Without escaping, the GH runner reads `%` as a malformed escape
+    // sequence and the annotation either errors or drops fields.
+    const out = formatAnnotations({
+      rows: [
+        {
+          file_path: "a.ts",
+          line_start: 1,
+          name: "loadAt50%",
+        },
+      ],
+      recipeId: "x",
+    });
+    expect(out).toBe("::notice file=a.ts,line=1::loadAt50%25");
+  });
+
+  it("collapses CR/LF in the message before escaping (no %0A leaks)", () => {
+    // The whitespace collapse runs first by design — annotations are
+    // single-line by GH spec, so we normalize THEN escape. Confirms %0A /
+    // %0D never appear in message output (escapeAnnotationData's CR/LF
+    // path is exercised only by property values like file paths).
+    const out = formatAnnotations({
+      rows: [
+        {
+          file_path: "a.ts",
+          line_start: 1,
+          name: "x",
+          extra: "line1\rline2\nline3",
+        },
+      ],
+      recipeId: "x",
+    });
+    expect(out).not.toContain("%0A");
+    expect(out).not.toContain("%0D");
+    expect(out).toContain("line1 line2 line3");
+  });
+});
+
+describe("escapeAnnotationData / escapeAnnotationProperty", () => {
+  it("data: percent-encodes %, CR, LF only", () => {
+    expect(escapeAnnotationData("a%b\rc\nd")).toBe("a%25b%0Dc%0Ad");
+  });
+
+  it("data: leaves : and , alone (only properties need those)", () => {
+    expect(escapeAnnotationData("a:b,c")).toBe("a:b,c");
+  });
+
+  it("property: extends data escaping with : and ,", () => {
+    expect(escapeAnnotationProperty("C:\\a,b")).toBe("C%3A\\a%2Cb");
+  });
+
+  it("property: percent escaping happens first (no double-encoding of %3A)", () => {
+    // If : were escaped before %, the % in %3A would itself become %25,
+    // producing %253A — wrong. Order matters.
+    expect(escapeAnnotationProperty(":")).toBe("%3A");
+    expect(escapeAnnotationProperty("%")).toBe("%25");
+  });
+
+  it("both: empty string round-trips", () => {
+    expect(escapeAnnotationData("")).toBe("");
+    expect(escapeAnnotationProperty("")).toBe("");
   });
 });
