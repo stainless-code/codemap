@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  extractFrontmatterAndBody,
   loadAllRecipes,
   mergeRecipes,
   readRecipesFromDir,
+  validateRecipeSql,
 } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
 
@@ -219,5 +221,191 @@ describe("loadAllRecipes — bundled + project composition", () => {
     });
     expect(r).toHaveLength(1);
     expect(r[0]!.source).toBe("bundled");
+  });
+});
+
+describe("validateRecipeSql — load-time DML/DDL deny-list", () => {
+  it("accepts SELECT (the common case)", () => {
+    expect(() =>
+      validateRecipeSql("ok", "/tmp/ok.sql", "SELECT 1\n"),
+    ).not.toThrow();
+  });
+
+  it("accepts WITH-prefixed CTEs", () => {
+    expect(() =>
+      validateRecipeSql(
+        "cte",
+        "/tmp/cte.sql",
+        "WITH x AS (SELECT 1) SELECT * FROM x\n",
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects DELETE with recipe-aware error", () => {
+    expect(() =>
+      validateRecipeSql("bad", "/tmp/bad.sql", "DELETE FROM files\n"),
+    ).toThrow(/recipes must be read-only/);
+  });
+
+  for (const verb of [
+    "INSERT",
+    "UPDATE",
+    "DROP",
+    "CREATE",
+    "ALTER",
+    "ATTACH",
+    "DETACH",
+    "REPLACE",
+    "TRUNCATE",
+    "VACUUM",
+    "PRAGMA",
+  ]) {
+    it(`rejects ${verb} at load time`, () => {
+      expect(() =>
+        validateRecipeSql(
+          "bad",
+          "/tmp/bad.sql",
+          `${verb} something arbitrary\n`,
+        ),
+      ).toThrow(/read-only/);
+    });
+  }
+
+  it("ignores leading -- comments before the keyword", () => {
+    expect(() =>
+      validateRecipeSql(
+        "ok",
+        "/tmp/ok.sql",
+        "-- doc line\n-- another doc\nSELECT 1\n",
+      ),
+    ).not.toThrow();
+  });
+
+  it("rejects lowercase deny-list keywords (case-insensitive)", () => {
+    expect(() =>
+      validateRecipeSql("bad", "/tmp/bad.sql", "drop table x\n"),
+    ).toThrow(/read-only/);
+  });
+});
+
+describe("extractFrontmatterAndBody — YAML actions parser", () => {
+  it("returns body as full text when no frontmatter delimiter present", () => {
+    const md = "Just some plain markdown.\n";
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toBeUndefined();
+    expect(r.body).toBe(md);
+  });
+
+  it("parses a single action with type only", () => {
+    const md = `---
+actions:
+  - type: review-coupling
+---
+Body line one
+Body line two
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toEqual([{ type: "review-coupling" }]);
+    expect(r.body.startsWith("Body line one")).toBe(true);
+  });
+
+  it("parses action with type + description (double-quoted)", () => {
+    const md = `---
+actions:
+  - type: split-barrel
+    description: "Confirm intent before splitting."
+---
+body
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toEqual([
+      { type: "split-barrel", description: "Confirm intent before splitting." },
+    ]);
+  });
+
+  it("parses action with auto_fixable: true (boolean scalar)", () => {
+    const md = `---
+actions:
+  - type: delete-file
+    auto_fixable: true
+    description: bare unquoted text is fine
+---
+body
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toEqual([
+      {
+        type: "delete-file",
+        auto_fixable: true,
+        description: "bare unquoted text is fine",
+      },
+    ]);
+  });
+
+  it("parses multiple action items", () => {
+    const md = `---
+actions:
+  - type: a
+  - type: b
+    description: second
+---
+body
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toEqual([
+      { type: "a" },
+      { type: "b", description: "second" },
+    ]);
+  });
+
+  it("returns undefined actions when no actions key in frontmatter", () => {
+    const md = `---
+some_other_key: value
+---
+body
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toBeUndefined();
+    expect(r.body.startsWith("body")).toBe(true);
+  });
+
+  it("treats malformed frontmatter (no closing ---) as no frontmatter", () => {
+    const md = `---
+actions:
+  - type: foo
+this never closes
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toBeUndefined();
+    expect(r.body).toBe(md);
+  });
+});
+
+describe("readRecipesFromDir — frontmatter integration", () => {
+  it("populates actions from sibling .md frontmatter", () => {
+    const dir = makeRecipeDir("with-frontmatter");
+    writeFileSync(join(dir, "fan-out.sql"), "SELECT 1\n");
+    writeFileSync(
+      join(dir, "fan-out.md"),
+      `---
+actions:
+  - type: review-coupling
+    description: "High fan-out usually means orchestrator role."
+---
+
+Top 10 files by dependency fan-out (edge count)
+`,
+    );
+    const r = readRecipesFromDir(dir, "bundled");
+    expect(r).toHaveLength(1);
+    expect(r[0]!.actions).toEqual([
+      {
+        type: "review-coupling",
+        description: "High fan-out usually means orchestrator role.",
+      },
+    ]);
+    expect(r[0]!.description).toBe(
+      "Top 10 files by dependency fan-out (edge count)",
+    );
   });
 });

@@ -64,66 +64,14 @@ export function resolveProjectRecipesDir(
 }
 
 /**
- * Bundled recipe `actions` templates. Per-row hint that surfaces in `--json`
- * output so agents see the recommended follow-up alongside each row. Lives
- * here in code through Tracer 2 → Tracer 5 will lift these into YAML
- * frontmatter on the sibling `<id>.md` and remove this map.
- *
- * Add an entry here only when the recipe has a concrete next step the agent
- * should consider for *every* row — counts-by-kind and similar aggregates
- * intentionally have no actions.
- */
-const BUNDLED_RECIPE_ACTIONS: Record<string, RecipeAction[]> = {
-  "fan-out": [
-    {
-      type: "review-coupling",
-      description:
-        "High fan-out usually means orchestrator role; consider extracting helpers or splitting responsibilities.",
-    },
-  ],
-  "fan-in": [
-    {
-      type: "review-stability",
-      description:
-        "High fan-in: changes here ripple through many consumers. Protect with tests before refactoring.",
-    },
-  ],
-  "files-largest": [
-    {
-      type: "split-file",
-      description:
-        "Files this large are typical refactor candidates. Look for cohesive sub-modules to extract.",
-    },
-  ],
-  "deprecated-symbols": [
-    {
-      type: "flag-caller",
-      description:
-        "Warn before suggesting changes that depend on this symbol; check callers via the calls table.",
-    },
-  ],
-  "visibility-tags": [
-    {
-      type: "flag-non-public",
-      description:
-        "Treat as not part of the public API unless visibility = 'public': don't import from package consumers; check the visibility tag before extending re-exports.",
-    },
-  ],
-  "barrel-files": [
-    {
-      type: "split-barrel",
-      description:
-        "Confirm this is an intentional public-API surface; if it's accidental fan-out, consider splitting into smaller barrels.",
-    },
-  ],
-};
-
-/**
  * Module-cached registry — populated lazily on first access (loader is pure;
  * the cache means we pay the filesystem read once per process lifetime per
  * plan §9 Q-B). Cache key includes `projectDir` so that a process running
  * against multiple roots (test fixtures, multi-root MCP sessions later)
  * re-resolves when the root changes.
+ *
+ * Per Tracer 5: `actions` come from YAML frontmatter on each `<id>.md` for
+ * BOTH bundled and project recipes — uniform shape, no special-casing.
  */
 let cachedRegistry: LoadedRecipe[] | undefined;
 let cachedRegistryProjectDir: string | undefined;
@@ -146,13 +94,7 @@ function getRegistry(): LoadedRecipe[] {
   cachedRegistry = loadAllRecipes({
     bundledDir: resolveBundledRecipesDir(),
     projectDir,
-  }).map((r) => ({
-    ...r,
-    // Stitch in the bundled actions map until Tracer 5 lifts them into
-    // frontmatter on each `.md` file. Project recipes get `actions: undefined`
-    // until Tracer 5 plugs the YAML frontmatter parser.
-    actions: r.source === "bundled" ? BUNDLED_RECIPE_ACTIONS[r.id] : r.actions,
-  }));
+  });
   cachedRegistryProjectDir = projectDir;
   return cachedRegistry;
 }
