@@ -35,6 +35,7 @@ Codemap stays a structural-index primitive that other tools can consume. Out of 
 
 ## Backlog
 
+- [ ] **`.codemap/` directory consolidation** — single root + self-managed `.codemap/.gitignore` (blacklist of generated artifacts, mirrors flowbite-react pattern). Move `.codemap.db` → `.codemap/index.db`; move `<root>/codemap.config.{ts,json}` → `<state-dir>/config.{ts,js,json}`; collapse the per-feature `agents-init.ts` `.gitignore` patching to a one-time `.codemap/` defensive entry. Self-healing files (`ensure*` reconcilers run every codemap boot — setup logic IS the migration). Plan: [`plans/codemap-dir-consolidation.md`](./plans/codemap-dir-consolidation.md).
 - [ ] **`codemap audit` verdict + thresholds** (v1.x) — `verdict: "pass" | "warn" | "fail"` driven by `codemap.config.audit.deltas[<key>].{added_max, action}`. Triggers: two consumers ship `jq`-based threshold scripts with similar shapes, OR one consumer asks with a concrete config sketch. Until then, raw deltas + consumer-side `jq` is the CI exit-code idiom.
 - [ ] **Monorepo / workspace awareness** — discover workspaces from `pnpm-workspace.yaml` / `package.json` and index per-workspace dependency graphs
 - [ ] **Cross-agent handoff artifact** — _speculative_; layered prefix/delta JSON written on session-stop, read on session-start. Complementary to indexing rather than core to it; revisit if user demand emerges
