@@ -401,6 +401,29 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
     expect(r.json.error).toContain("name");
   });
 
+  it("audit rejects base + baseline_prefix combo (mutually exclusive)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "audit", {
+      base: "origin/main",
+      baseline_prefix: "v1",
+      no_index: true,
+    });
+    // ToolResult error → 400 by default; mutual-exclusion error has no
+    // dedicated status, so it falls through to 400.
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("mutually exclusive");
+  });
+
+  it("audit --base in non-git project errors cleanly", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "audit", {
+      base: "HEAD~1",
+      no_index: true,
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("requires a git repository");
+  });
+
   it("impact without target → 400 with structured error", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "impact", {});
