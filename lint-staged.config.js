@@ -25,9 +25,23 @@ function typecheckStagedFiles(filenames) {
   return `bun run typecheck -p ${TEMP_TSCONFIG}`;
 }
 
+/**
+ * `oxlint` exits 1 when every staged file matches an `ignorePatterns` entry
+ * (e.g. all-fixture commits) — filter out ignored paths before lint-staged
+ * passes them to oxlint. Same for format:check via oxfmt.
+ */
+function lintStaged(filenames) {
+  const lintable = filenames.filter((f) => {
+    const rel = path.relative(process.cwd(), f).replace(/\\/g, "/");
+    return !rel.startsWith("fixtures/");
+  });
+  if (lintable.length === 0) return "true";
+  return `bun run lint ${lintable.map((f) => JSON.stringify(f)).join(" ")}`;
+}
+
 /** @type {import('lint-staged').Configuration} */
 export default {
-  "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}": ["bun run format:check", "bun run lint"],
+  "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}": ["bun run format:check", lintStaged],
   "*.{css,json,md,mdc,html,yaml,yml}": "bun run format:check",
   "*.{ts,tsx}": typecheckStagedFiles,
   "*.test.ts": "bun test",

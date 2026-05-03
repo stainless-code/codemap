@@ -12,3 +12,17 @@ export function now(): number {
 export function _epochSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
+
+/**
+ * @alpha Experimental — fixture for `visibility-tags` four-tag coverage.
+ */
+export function nanoseconds(): bigint {
+  return BigInt(Date.now()) * 1_000_000n;
+}
+
+/**
+ * @private Internal-only utility — fixture for `visibility-tags` four-tag coverage.
+ */
+export function _hiResEpoch(): number {
+  return performance.now();
+}
