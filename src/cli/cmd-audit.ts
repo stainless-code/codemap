@@ -326,7 +326,10 @@ function renderAuditTerminal(envelope: AuditEnvelope, summary: boolean): void {
   const keyWidth = entries.reduce((n, [k]) => Math.max(n, k.length), 0);
   for (const [key, delta] of entries) {
     const sha = delta.base.sha ? ` @ ${delta.base.sha.slice(0, 8)}` : "";
-    const provenance = `← ${delta.base.name}${sha}`;
+    // base.source narrows the union: "baseline" carries `name`; "ref" carries `ref`.
+    const provenanceLabel =
+      delta.base.source === "baseline" ? delta.base.name : delta.base.ref;
+    const provenance = `← ${provenanceLabel}${sha}`;
     const counts =
       delta.added.length === 0 && delta.removed.length === 0
         ? "(no drift)"
