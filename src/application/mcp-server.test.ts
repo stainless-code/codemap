@@ -403,9 +403,14 @@ describe("MCP server — audit / context / validate tools", () => {
     // freshly-created DB without git history. Confirms the skip.
     const { _markWatchActiveForTests, _resetWatchStateForTests } =
       await import("./watcher");
-    _markWatchActiveForTests();
-    const { client, server } = await makeClient();
+    let server: Awaited<ReturnType<typeof makeClient>>["server"] | undefined;
     try {
+      // Mark + makeClient + everything else INSIDE the guard so a
+      // throw doesn't leak the singleton flag into sibling tests
+      // (caught by CodeRabbit on PR #47).
+      _markWatchActiveForTests();
+      const made = await makeClient();
+      server = made.server;
       // Seed a baseline so audit has something to diff against.
       const db = openDb();
       try {
@@ -421,7 +426,7 @@ describe("MCP server — audit / context / validate tools", () => {
       } finally {
         closeDb(db);
       }
-      const r = await client.callTool({
+      const r = await made.client.callTool({
         name: "audit",
         arguments: { baseline_prefix: "watch-skip" },
       });
@@ -430,7 +435,7 @@ describe("MCP server — audit / context / validate tools", () => {
       const json = readJson(r);
       expect(json.deltas).toBeDefined();
     } finally {
-      await server.close();
+      if (server !== undefined) await server.close();
       _resetWatchStateForTests();
     }
   });

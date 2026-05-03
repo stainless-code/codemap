@@ -40,6 +40,7 @@ import {
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
 import {
+  createPrimeIndex,
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
   runWatchLoop,
@@ -367,21 +368,38 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
   if (opts.watch === true) {
     // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
     console.error("codemap mcp: --watch enabled, booting file watcher...");
-    const handle = runWatchLoop({
-      root: getProjectRoot(),
-      excludeDirNames: getExcludeDirNames(),
-      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-      onChange: createReindexOnChange({
-        quiet: false,
-        label: "codemap mcp",
-      }),
-    });
-    stopWatch = handle.stop;
+    try {
+      const handle = runWatchLoop({
+        root: getProjectRoot(),
+        excludeDirNames: getExcludeDirNames(),
+        debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+        onPrime: createPrimeIndex({ quiet: false, label: "codemap mcp" }),
+        onChange: createReindexOnChange({
+          quiet: false,
+          label: "codemap mcp",
+        }),
+      });
+      stopWatch = handle.stop;
+    } catch (err) {
+      // Watcher boot threw — close the MCP transport so the agent host
+      // sees the disconnect cleanly instead of a half-alive server.
+      // Caught by CodeRabbit on PR #47.
+      await server.close();
+      throw err;
+    }
   }
 
   await new Promise<void>((resolve) => {
     transport.onclose = () => resolve();
   });
 
-  if (stopWatch !== undefined) await stopWatch();
+  if (stopWatch !== undefined) {
+    try {
+      await stopWatch();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console -- intentional shutdown-error log
+      console.error(`codemap mcp: watcher stop failed — ${msg}`);
+    }
+  }
 }

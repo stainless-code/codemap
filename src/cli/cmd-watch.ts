@@ -1,4 +1,5 @@
 import {
+  createPrimeIndex,
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
   runWatchLoop,
@@ -77,6 +78,12 @@ export function parseWatchRest(rest: string[]):
   return { kind: "run", debounceMs, quiet };
 }
 
+/**
+ * Print **`codemap watch`** usage to stdout. Mirrors the `--help` /
+ * `-h` path returned by {@link parseWatchRest}; called from `main.ts`
+ * when the parser returns `{kind: "help"}`. No side effects beyond
+ * stdout. Safe to call before bootstrap.
+ */
 export function printWatchCmdHelp(): void {
   console.log(`Usage: codemap watch [--debounce <ms>] [--quiet]
 
@@ -132,6 +139,7 @@ export async function runWatchCmd(opts: WatchOpts): Promise<void> {
       root,
       excludeDirNames: getExcludeDirNames(),
       debounceMs: opts.debounceMs,
+      onPrime: createPrimeIndex({ quiet: opts.quiet }),
       onChange: createReindexOnChange({ quiet: opts.quiet }),
     });
 
@@ -143,7 +151,17 @@ export async function runWatchCmd(opts: WatchOpts): Promise<void> {
             `codemap watch: ${signal} received, draining + shutting down...`,
           );
         }
-        void handle.stop().then(() => resolve());
+        // .finally(resolve) so a stop() rejection still unblocks the
+        // outer Promise — caught by CodeRabbit on PR #47 (without the
+        // .catch + .finally a watcher tear-down failure would deadlock
+        // the process on SIGINT/SIGTERM).
+        handle
+          .stop()
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`codemap watch: stop failed — ${msg}`);
+          })
+          .finally(() => resolve());
       };
       process.once("SIGINT", () => shutdown("SIGINT"));
       process.once("SIGTERM", () => shutdown("SIGTERM"));

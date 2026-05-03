@@ -65,11 +65,13 @@ export function shouldIndexPath(
   // Project-local recipes: <root>/.codemap/recipes/<id>.{sql,md}.
   // The path-segment scan above doesn't exclude `.codemap` since it's
   // not in excludeDirNames (the whole .codemap.db dir lives under it).
+  // `relPath` is always POSIX (toRelativePosix normalizes Windows
+  // backslashes); compare with a literal `/` prefix so Windows recipe
+  // changes match too. (Earlier sep-built prefix mismatched on Windows
+  // — caught by CodeRabbit on PR #47.)
   if (
     (ext === ".sql" || ext === ".md") &&
-    relPath.startsWith(
-      `.codemap${sep === "/" ? "/" : sep}recipes${sep === "/" ? "/" : sep}`,
-    )
+    relPath.startsWith(".codemap/recipes/")
   ) {
     return true;
   }
@@ -138,16 +140,25 @@ export function createDebouncer(
 export const DEFAULT_DEBOUNCE_MS = 250;
 
 /**
- * Module-level "watcher is active" flag. Read by `handleAudit` to skip
- * its incremental-index prelude when the watcher already keeps the
- * index fresh — turning the audit's expensive boot-time prelude into
- * a no-op in `mcp --watch` / `serve --watch` deployments — see
- * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
+ * Module-level "watcher is keeping the index live" flag. Read by
+ * `handleAudit` to skip its incremental-index prelude — turning the
+ * audit's expensive boot-time prelude into a no-op in `mcp --watch`
+ * / `serve --watch` deployments. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
  *
- * Single-flag design (vs threading "indexIsLive" through every handler
- * signature): the watcher is process-scoped — there's at most one live
+ * **Set true ONLY after** the optional `onPrime` callback resolves
+ * (typically a `runCodemapIndex({mode: 'incremental'})` catch-up). A
+ * watcher that just booted hasn't seen the historical drift between
+ * `last_indexed_commit` and HEAD — handleAudit must NOT trust the
+ * index until that catch-up runs. Caught by CodeRabbit on PR #47.
+ *
+ * **Set false when:** stop() is called (graceful shutdown), or the
+ * backend emits an error (chokidar dying mid-flight). The "active"
+ * status reflects "the watcher is healthy AND has caught up", not raw
+ * "we tried to start a watcher".
+ *
+ * Single-flag design: the watcher is process-scoped — at most one live
  * watcher per server process, so a singleton matches the actual
- * topology. Test reset exposed via {@link _resetWatchStateForTests}.
+ * topology.
  */
 let watchActive = false;
 
@@ -155,7 +166,7 @@ export function isWatchActive(): boolean {
   return watchActive;
 }
 
-/** Test-only escape hatch — drops the watcher-active flag so a test that booted a fake watcher can leave a clean slate for siblings. */
+/** Test-only escape hatch — drops the flag so a test that booted a fake watcher leaves a clean slate for siblings. */
 export function _resetWatchStateForTests(): void {
   watchActive = false;
 }
@@ -163,6 +174,35 @@ export function _resetWatchStateForTests(): void {
 /** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
 export function _markWatchActiveForTests(): void {
   watchActive = true;
+}
+
+/**
+ * Standard `onPrime` callback for embedders that want `handleAudit` to
+ * skip its incremental-index prelude. Runs an incremental reindex
+ * against the current HEAD before the watcher is marked active, so
+ * the "watcher is keeping the index live" claim is true on first
+ * tool call (not just for events that arrive after boot). See the
+ * `watchActive` JSDoc above + CodeRabbit on PR #47.
+ */
+export function createPrimeIndex(opts: {
+  quiet: boolean;
+  label?: string;
+}): () => Promise<void> {
+  const prefix = opts.label ?? "codemap watch";
+  return async () => {
+    const t0 = performance.now();
+    const db = openDb();
+    try {
+      await runCodemapIndex(db, { mode: "incremental", quiet: true });
+    } finally {
+      closeDb(db);
+    }
+    if (!opts.quiet) {
+      const ms = Math.round(performance.now() - t0);
+      // eslint-disable-next-line no-console -- intentional prime-status log
+      console.error(`${prefix}: prime catch-up indexed in ${ms}ms`);
+    }
+  };
 }
 
 /**
@@ -211,6 +251,16 @@ export interface WatchLoopOpts {
   excludeDirNames: ReadonlySet<string>;
   /** Coalesced reindex callback. Path set is project-relative POSIX. */
   onChange: (paths: ReadonlySet<string>) => void | Promise<void>;
+  /**
+   * Optional priming callback — runs after `backend.start()` but BEFORE
+   * `isWatchActive()` flips to `true`. Embedders that want
+   * `handleAudit` to skip its incremental-index prelude MUST supply
+   * this (typically `() => runCodemapIndex({mode: 'incremental'})`),
+   * otherwise the watcher is "running but not yet caught up" — see the
+   * `watchActive` JSDoc above. If undefined, the flag flips immediately
+   * (suitable for tests that don't care about audit prelude behavior).
+   */
+  onPrime?: () => Promise<void>;
   /** Override the default debounce; use 0 for testing. */
   debounceMs?: number;
   /**
@@ -248,8 +298,21 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   stop: () => Promise<void>;
 } {
   const debounceMs = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+
+  // Track in-flight onChange so stop() can drain. Serialise rather than
+  // overlap — concurrent reindexes against the same DB are pointless and
+  // can clash on writes. CodeRabbit caught the original fire-and-forget
+  // on PR #47 (a stop() that returned while an onChange was still
+  // re-indexing left the DB in a half-state).
+  let inFlight: Promise<void> = Promise.resolve();
   const debouncer = createDebouncer((paths) => {
-    void opts.onChange(paths);
+    inFlight = inFlight
+      .then(() => Promise.resolve(opts.onChange(paths)))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-console -- intentional onChange-error log
+        console.error(`codemap watch: onChange failed — ${msg}`);
+      });
   }, debounceMs);
 
   const backend: WatchBackend = opts.backend ?? createChokidarBackend();
@@ -262,17 +325,58 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       debouncer.trigger(rel);
     },
     onError: (err) => {
+      // Backend dying mid-flight = we're no longer keeping the index
+      // live. Clear the flag so handleAudit re-enables its prelude
+      // until the embedder restarts the watcher (or process exits).
+      // CodeRabbit caught this on PR #47.
+      watchActive = false;
       // eslint-disable-next-line no-console -- intentional: watcher errors must surface
       console.error(`codemap watch: backend error — ${err.message}`);
     },
   });
-  watchActive = true;
+
+  // Priming: only flip the active flag AFTER the optional catch-up
+  // resolves. Without this, a `mcp --watch audit` immediately after
+  // boot would skip the incremental-index prelude and read whatever
+  // was in `.codemap.db` from the prior run (potentially stale by N
+  // commits). CodeRabbit raised the freshness race on PR #47.
+  let primingDone: Promise<void>;
+  if (opts.onPrime === undefined) {
+    watchActive = true;
+    primingDone = Promise.resolve();
+  } else {
+    primingDone = (async () => {
+      try {
+        await opts.onPrime!();
+        watchActive = true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-console -- intentional: prime errors must surface
+        console.error(
+          `codemap watch: prime failed — ${msg} (handleAudit will continue running its prelude)`,
+        );
+        // Leave watchActive = false; embedder may decide to stop or
+        // tolerate. We don't tear down here — the watcher is still
+        // catching new edits, just can't promise historical freshness.
+      }
+    })();
+  }
 
   return {
     async stop() {
-      debouncer.flushNow();
-      await backend.stop();
+      // Stop early so handleAudit doesn't keep skipping prelude while
+      // we're shutting down (any in-flight audit reads a "stale"
+      // signal which is the correct conservative behavior).
       watchActive = false;
+      // Wait for the priming pass to finish (if still running) so we
+      // don't tear down its DB connection out from under it.
+      await primingDone;
+      // Force any pending debounced batch to fire one last time.
+      debouncer.flushNow();
+      // Drain in-flight onChange (the just-fired batch + any prior
+      // ones still re-indexing).
+      await inFlight;
+      await backend.stop();
     },
   };
 }

@@ -131,24 +131,30 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
   // chokidar / fs-watch flakiness in CI containers.
   function fakeBackend(): WatchBackend & {
     fire: (kind: "add" | "change" | "unlink", abs: string) => void;
+    fireError: (err: Error) => void;
     started: boolean;
     stopped: boolean;
   } {
     let onEvent:
       | ((k: "add" | "change" | "unlink", p: string) => void)
       | undefined;
+    let onError: ((err: Error) => void) | undefined;
     return {
       started: false,
       stopped: false,
       start(opts) {
         this.started = true;
         onEvent = opts.onEvent;
+        onError = opts.onError;
       },
       async stop() {
         this.stopped = true;
       },
       fire(kind, abs) {
         if (onEvent !== undefined) onEvent(kind, abs);
+      },
+      fireError(err) {
+        if (onError !== undefined) onError(err);
       },
     };
   }
@@ -282,10 +288,98 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
       onChange: () => undefined,
       debounceMs: 20,
       backend,
+      // No onPrime → flag flips immediately (test-friendly default).
     });
     expect(isWatchActive()).toBe(true);
     await handle.stop();
     expect(isWatchActive()).toBe(false);
+  });
+
+  it("isWatchActive stays false until onPrime resolves (CodeRabbit on #47)", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let releasePrime: (() => void) | undefined;
+    const primeStarted = new Promise<void>((resolve) => {
+      releasePrime = resolve;
+    });
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: () => undefined,
+      debounceMs: 20,
+      backend,
+      onPrime: async () => {
+        await primeStarted;
+      },
+    });
+    // Backend started, but flag still false because prime hasn't run.
+    expect(backend.started).toBe(true);
+    expect(isWatchActive()).toBe(false);
+    // Release the prime → flag flips.
+    releasePrime!();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(isWatchActive()).toBe(true);
+    await handle.stop();
+    expect(isWatchActive()).toBe(false);
+  });
+
+  it("onError clears isWatchActive (backend dies → handleAudit re-enables prelude)", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: () => undefined,
+      debounceMs: 20,
+      backend,
+    });
+    expect(isWatchActive()).toBe(true);
+    backend.fireError(new Error("inotify watch limit reached"));
+    expect(isWatchActive()).toBe(false);
+    await handle.stop();
+  });
+
+  it("stop() awaits in-flight onChange (CodeRabbit on #47 — no fire-and-forget)", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let onChangeFinished = false;
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: async () => {
+        await new Promise((r) => setTimeout(r, 50));
+        onChangeFinished = true;
+      },
+      debounceMs: 10,
+      backend,
+    });
+    backend.fire("change", "/tmp/proj/src/a.ts");
+    // Wait for debounce to fire onChange but NOT for onChange to finish.
+    await new Promise((r) => setTimeout(r, 25));
+    expect(onChangeFinished).toBe(false);
+    // stop() must wait for onChange to complete.
+    await handle.stop();
+    expect(onChangeFinished).toBe(true);
+  });
+
+  it("stop() also drains the just-flushed batch from flushNow (no fire-and-forget)", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let onChangeFinished = false;
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: async () => {
+        await new Promise((r) => setTimeout(r, 30));
+        onChangeFinished = true;
+      },
+      debounceMs: 999_999, // never auto-fire
+      backend,
+    });
+    backend.fire("change", "/tmp/proj/src/a.ts");
+    // stop() flushes the pending batch + awaits its async onChange.
+    await handle.stop();
+    expect(onChangeFinished).toBe(true);
   });
 
   it("treats unlink as a path requiring reindex (caller handles deletes)", async () => {

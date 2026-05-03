@@ -39,6 +39,7 @@ import {
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
 import {
+  createPrimeIndex,
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
   runWatchLoop,
@@ -119,16 +120,25 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
 
   let stopWatch: (() => Promise<void>) | undefined;
   if (opts.watch === true) {
-    const handle = runWatchLoop({
-      root: getProjectRoot(),
-      excludeDirNames: getExcludeDirNames(),
-      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-      onChange: createReindexOnChange({
-        quiet: false,
-        label: "codemap serve",
-      }),
-    });
-    stopWatch = handle.stop;
+    try {
+      const handle = runWatchLoop({
+        root: getProjectRoot(),
+        excludeDirNames: getExcludeDirNames(),
+        debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+        onPrime: createPrimeIndex({ quiet: false, label: "codemap serve" }),
+        onChange: createReindexOnChange({
+          quiet: false,
+          label: "codemap serve",
+        }),
+      });
+      stopWatch = handle.stop;
+    } catch (err) {
+      // Watcher boot threw AFTER `server.listen()` resolved — close
+      // the listener so we don't leak an orphaned HTTP socket on a
+      // failed boot. Caught by CodeRabbit on PR #47.
+      await new Promise<void>((res) => server.close(() => res()));
+      throw err;
+    }
   }
 
   await new Promise<void>((resolve) => {
@@ -139,7 +149,17 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
         server.close(() => resolve());
       };
       if (stopWatch !== undefined) {
-        void stopWatch().then(closeServer);
+        // .finally(closeServer) so a watcher stop() rejection still
+        // closes the HTTP listener — without it, a rejected stop()
+        // means closeServer never runs and runHttpServer never resolves
+        // on SIGTERM/SIGINT (caught by CodeRabbit on PR #47).
+        stopWatch()
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console -- intentional shutdown-error log
+            console.error(`codemap serve: watcher stop failed — ${msg}`);
+          })
+          .finally(closeServer);
       } else {
         closeServer();
       }
