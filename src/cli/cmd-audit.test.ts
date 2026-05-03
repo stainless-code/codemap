@@ -42,6 +42,7 @@ describe("parseAuditRest", () => {
     expect(r).toEqual({
       kind: "run",
       baselinePrefix: "base",
+      base: undefined,
       perDelta: {},
       json: false,
       summary: false,
@@ -54,6 +55,7 @@ describe("parseAuditRest", () => {
     expect(r).toEqual({
       kind: "run",
       baselinePrefix: "base",
+      base: undefined,
       perDelta: {},
       json: false,
       summary: false,
@@ -74,6 +76,7 @@ describe("parseAuditRest", () => {
     expect(r).toEqual({
       kind: "run",
       baselinePrefix: undefined,
+      base: undefined,
       perDelta: { files: "X", dependencies: "Y", deprecated: "Z" },
       json: false,
       summary: false,
@@ -92,6 +95,7 @@ describe("parseAuditRest", () => {
     expect(r).toEqual({
       kind: "run",
       baselinePrefix: "base",
+      base: undefined,
       perDelta: { dependencies: "experimental-deps" },
       json: false,
       summary: false,
@@ -149,6 +153,58 @@ describe("parseAuditRest", () => {
     const r = parseAuditRest(["audit", "--unknown", "x", "--baseline", "n"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("--unknown");
+  });
+
+  it("parses --base <ref> alone", () => {
+    const r = parseAuditRest(["audit", "--base", "origin/main"]);
+    expect(r).toEqual({
+      kind: "run",
+      baselinePrefix: undefined,
+      base: "origin/main",
+      perDelta: {},
+      json: false,
+      summary: false,
+      noIndex: false,
+    });
+  });
+
+  it("parses --base=<ref>", () => {
+    const r = parseAuditRest(["audit", "--base=HEAD~3"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.base).toBe("HEAD~3");
+  });
+
+  it("rejects --base + --baseline (mutually exclusive)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--base",
+      "origin/main",
+      "--baseline",
+      "pr",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.message).toContain("mutually exclusive");
+    }
+  });
+
+  it("allows --base + per-delta override (composes)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--base",
+      "origin/main",
+      "--files-baseline",
+      "pre-refactor",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.base).toBe("origin/main");
+    expect(r.perDelta).toEqual({ files: "pre-refactor" });
+  });
+
+  it("errors when --base has no value", () => {
+    const r = parseAuditRest(["audit", "--base"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--base");
   });
 });
 
