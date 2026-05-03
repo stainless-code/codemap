@@ -4,5 +4,23 @@
     "line_number": 3,
     "kind": "TODO",
     "content": "this file exists so marker scans have a predictable hit."
+  },
+  {
+    "file_path": "src/notes.md",
+    "line_number": 5,
+    "kind": "HACK",
+    "content": "this whole fixture is intentionally tiny — exercise codemap, not real UX."
+  },
+  {
+    "file_path": "src/notes.md",
+    "line_number": 7,
+    "kind": "NOTE",
+    "content": "when adding a new generated artifact under `.codemap/`, also bump the"
+  },
+  {
+    "file_path": "src/notes.md",
+    "line_number": 10,
+    "kind": "NOTE",
+    "content": "codemap's marker scanner recognises `TODO`/`FIXME`/`HACK`/`NOTE` only — `XXX` is not yet a kind."
   }
 ]

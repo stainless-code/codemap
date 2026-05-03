@@ -1,0 +1,10 @@
+# Fixture CODEOWNERS — exercises `codemap query --group-by owner`.
+# Real ownership lookup uses last-matching-rule semantics; we keep two rules
+# so the recipe groups fan-in / fan-out by team.
+
+src/api/        @backend
+src/components/ @frontend
+src/lib/        @backend
+src/utils/      @platform
+src/styles/     @frontend
+*.md            @docs

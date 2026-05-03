@@ -1,9 +1,15 @@
 [
   {
-    "path": "README.md",
-    "content_hash": "428564b4ac5e4864ca2292a4195b726be3d4c7c5cac3d19dd01f17714d026c66",
+    "path": ".codemap/recipes/shop-symbols.md",
+    "content_hash": "0ef26e4291fd1dbfb60887d79251bfd9eb1af71675811ba40a1932368e6b112c",
     "language": "md",
-    "line_count": 11
+    "line_count": 9
+  },
+  {
+    "path": "README.md",
+    "content_hash": "75032b11e435e7f265151787faf72c59a986b491ba4e866856ba77eda6b4deb4",
+    "language": "md",
+    "line_count": 41
   },
   {
     "path": "package.json",
@@ -13,27 +19,57 @@
   },
   {
     "path": "src/api/client.ts",
-    "content_hash": "4d0ec5edad3f758e7f84898dd602dbacaf3ea65ad87614ae9f179bd2383bbf56",
+    "content_hash": "625df0a0f197f2233506c028f5a4b2022567587de2ecc5e81863c2cb2654e507",
     "language": "ts",
-    "line_count": 9
+    "line_count": 44
+  },
+  {
+    "path": "src/components/shop/ProductCard.tsx",
+    "content_hash": "4cdd3d8376da664789c075bfdb3eab49adc3460fcd0810eedc1ad456e7c5be9a",
+    "language": "tsx",
+    "line_count": 20
+  },
+  {
+    "path": "src/components/shop/ShopButton.default.ts",
+    "content_hash": "105488e5bfb6446c071d2cf2311411aa9e7301d1b75ca72e317fde79c1d35740",
+    "language": "ts",
+    "line_count": 5
   },
   {
     "path": "src/components/shop/ShopButton.tsx",
-    "content_hash": "481b9ff2e493fd69b36b67d2738e298999ce55040bce64c4c38a2e736c0573fd",
+    "content_hash": "cbc7939a134240c0076f76f6499fa893309f131dda53eaef4d946470f42c54af",
     "language": "tsx",
+    "line_count": 15
+  },
+  {
+    "path": "src/components/shop/index.ts",
+    "content_hash": "824c09d50df619c90500baad1489075e9fe501090aeeb7afa39e335d41ce52c2",
+    "language": "ts",
     "line_count": 8
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "420ad98f7fedaf07ec07d1a64ef6ade100be4a7973883718a3942c68b1350903",
+    "content_hash": "ab868f04a0f22a8b132bc7a4ae42b403dad9c20185497f8513c06dd26c848091",
     "language": "ts",
-    "line_count": 11
+    "line_count": 19
+  },
+  {
+    "path": "src/lib/cache.ts",
+    "content_hash": "a185908afc6dca9552783847c0726686378dcf60e9d5714bfdb0aa24c479a4c1",
+    "language": "ts",
+    "line_count": 21
+  },
+  {
+    "path": "src/lib/store.ts",
+    "content_hash": "a23e13e22cecf8051d83659b39f792b6fc592f90d501da83d75ab5fd61dac1a8",
+    "language": "ts",
+    "line_count": 15
   },
   {
     "path": "src/notes.md",
-    "content_hash": "1a2bff433137690132077b15032ba3f07f5ed1b576b894816890342155ab640a",
+    "content_hash": "03ab92544e475626defcaafec97e1169d7940532ca3eeb4a25d28b4816c1ca9a",
     "language": "md",
-    "line_count": 4
+    "line_count": 11
   },
   {
     "path": "src/styles/button.module.css",
@@ -55,9 +91,15 @@
   },
   {
     "path": "src/utils/date.ts",
-    "content_hash": "89e6301076caeb9f4c13cee8ea06f7f25a5e1aa239daf921f7ff984236ffa177",
+    "content_hash": "d42719b407b74b0ebab2d0ed25e004413e6a2231d4ad05aa51e431bea5075396",
     "language": "ts",
-    "line_count": 15
+    "line_count": 29
+  },
+  {
+    "path": "src/utils/format.ts",
+    "content_hash": "8f4e1b729d1a69f1457a57c0a6ce61740ff27f2119976d2183ca053bf50b2ad6",
+    "language": "ts",
+    "line_count": 16
   },
   {
     "path": "tsconfig.json",

@@ -53,7 +53,7 @@
     "fix": "bun run lint:fix && bun run format",
     "format": "oxfmt",
     "format:check": "oxfmt --check --no-error-on-unmatched-pattern",
-    "lint": "oxlint",
+    "lint": "oxlint --no-error-on-unmatched-pattern",
     "lint-staged": "lint-staged",
     "lint:ci": "oxlint --quiet",
     "lint:fix": "oxlint --fix",

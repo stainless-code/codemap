@@ -7,5 +7,32 @@
     "line_start": 12,
     "signature": "_epochSeconds(): number",
     "doc_comment": "@internal Implementation helper — fixture for the `visibility-tags` recipe."
+  },
+  {
+    "name": "nanoseconds",
+    "kind": "function",
+    "visibility": "alpha",
+    "file_path": "src/utils/date.ts",
+    "line_start": 19,
+    "signature": "nanoseconds(): bigint",
+    "doc_comment": "@alpha Experimental — fixture for `visibility-tags` four-tag coverage."
+  },
+  {
+    "name": "_hiResEpoch",
+    "kind": "function",
+    "visibility": "private",
+    "file_path": "src/utils/date.ts",
+    "line_start": 26,
+    "signature": "_hiResEpoch(): number",
+    "doc_comment": "@private Internal-only utility — fixture for `visibility-tags` four-tag coverage."
+  },
+  {
+    "name": "nowIso",
+    "kind": "function",
+    "visibility": "beta",
+    "file_path": "src/utils/format.ts",
+    "line_start": 13,
+    "signature": "nowIso(): string",
+    "doc_comment": "@beta Fixture for the `visibility-tags` recipe — lock-in for the four-tag\ncoverage (alongside `@internal`, `@alpha`, `@private`)."
   }
 ]

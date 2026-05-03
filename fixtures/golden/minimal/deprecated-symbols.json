@@ -1,10 +1,26 @@
 [
   {
+    "name": "legacyClient",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 41,
+    "signature": "legacyClient()",
+    "doc_comment": "@deprecated Use `createClient({ baseUrl })` directly. Kept as a fixture for\n`deprecated-symbols` + `--format sarif` / `--format annotations` recipes."
+  },
+  {
     "name": "now",
     "kind": "function",
     "file_path": "src/utils/date.ts",
     "line_start": 5,
     "signature": "now(): number",
     "doc_comment": "@deprecated Use `Date.now()` directly. Kept as a fixture for the\n`deprecated-symbols` recipe golden test."
+  },
+  {
+    "name": "epochMs",
+    "kind": "function",
+    "file_path": "src/utils/format.ts",
+    "line_start": 5,
+    "signature": "epochMs(): number",
+    "doc_comment": "@deprecated Drift detector for the SARIF / GH-annotations golden output.\nPair with `now()` in `./date.ts` to give recipes >1 row to render."
   }
 ]
