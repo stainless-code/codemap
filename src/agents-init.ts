@@ -123,6 +123,9 @@ function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
 
 /** Default DB basename `.codemap` plus SQLite sidecars (`.db`, `-wal`, `-shm`, …). */
 const GITIGNORE_CODEMAP_PATTERN = ".codemap.*";
+// `.codemap/audit-cache/` ignored separately because `.codemap.*` doesn't
+// match the directory shape AND `.codemap/recipes/` is git-tracked.
+const GITIGNORE_AUDIT_CACHE_PATTERN = ".codemap/audit-cache/";
 
 /**
  * Optional integrations after canonical `.agents/` is written.
@@ -288,9 +291,14 @@ export interface AgentsInitOptions {
 }
 
 /**
- * Ensure `.codemap.*` is listed in `.gitignore` when the project uses Git:
- * - If `<projectRoot>/.git` exists and there is no `.gitignore`, create one with `.codemap.*`.
- * - If `.gitignore` exists, append `.codemap.*` once when missing.
+ * Ensure codemap-managed paths are listed in `.gitignore` when the project
+ * uses Git. Adds `.codemap.*` (matches `.codemap.db` etc.) AND
+ * `.codemap/audit-cache/` (the audit-base worktree cache; `.codemap/recipes/`
+ * stays tracked, so we can't ignore the whole `.codemap/` dir).
+ *
+ * - If `<projectRoot>/.git` exists and there is no `.gitignore`, create one
+ *   with both patterns.
+ * - If `.gitignore` exists, append each pattern once when missing.
  * - If there is no `.git`, do nothing (not a Git working tree).
  */
 export function ensureGitignoreCodemapPattern(projectRoot: string): void {
@@ -299,25 +307,27 @@ export function ensureGitignoreCodemapPattern(projectRoot: string): void {
   if (!existsSync(gitDir)) {
     return;
   }
+  const patterns = [GITIGNORE_CODEMAP_PATTERN, GITIGNORE_AUDIT_CACHE_PATTERN];
   if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath, `${GITIGNORE_CODEMAP_PATTERN}\n`, "utf-8");
+    writeFileSync(gitignorePath, `${patterns.join("\n")}\n`, "utf-8");
     console.log(
-      `  Created .gitignore with ${GITIGNORE_CODEMAP_PATTERN} (Git repo, no .gitignore yet)`,
+      `  Created .gitignore with ${patterns.join(" + ")} (Git repo, no .gitignore yet)`,
     );
     return;
   }
   const content = readFileSync(gitignorePath, "utf-8");
   const lines = content.split(/\r?\n/);
-  if (lines.some((line) => line.trim() === GITIGNORE_CODEMAP_PATTERN)) {
-    return;
-  }
+  const missing = patterns.filter(
+    (p) => !lines.some((line) => line.trim() === p),
+  );
+  if (missing.length === 0) return;
   const needsLeadingNewline = content.length > 0 && !content.endsWith("\n");
   appendFileSync(
     gitignorePath,
-    `${needsLeadingNewline ? "\n" : ""}${GITIGNORE_CODEMAP_PATTERN}\n`,
+    `${needsLeadingNewline ? "\n" : ""}${missing.join("\n")}\n`,
     "utf-8",
   );
-  console.log(`  Appended ${GITIGNORE_CODEMAP_PATTERN} to .gitignore`);
+  console.log(`  Appended ${missing.join(" + ")} to .gitignore`);
 }
 
 function removePathForRewrite(

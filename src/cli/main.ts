@@ -262,6 +262,7 @@ Copies bundled agent templates into .agents/ under the project root.
       root,
       configFile,
       baselinePrefix: parsed.baselinePrefix,
+      base: parsed.base,
       perDelta: parsed.perDelta,
       json: parsed.json,
       summary: parsed.summary,

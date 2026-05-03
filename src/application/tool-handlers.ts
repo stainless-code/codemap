@@ -29,7 +29,12 @@ import { getFilesChangedSince } from "../git-changed";
 import type { GroupByMode } from "../group-by";
 import { GROUP_BY_MODES } from "../group-by";
 import { getProjectRoot } from "../runtime";
-import { resolveAuditBaselines, runAudit } from "./audit-engine";
+import {
+  makeWorktreeReindex,
+  resolveAuditBaselines,
+  runAudit,
+  runAuditFromRef,
+} from "./audit-engine";
 import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
@@ -340,6 +345,7 @@ function mergeBatchItem(
 
 export const auditArgsSchema = {
   baseline_prefix: z.string().optional(),
+  base: z.string().optional(),
   baselines: z
     .object({
       files: z.string().optional(),
@@ -353,12 +359,19 @@ export const auditArgsSchema = {
 
 export interface AuditArgs {
   baseline_prefix?: string;
+  /** Git committish (origin/main, HEAD~5, sha, tag…). Mutually exclusive with baseline_prefix. */
+  base?: string;
   baselines?: { files?: string; dependencies?: string; deprecated?: string };
   summary?: boolean;
   no_index?: boolean;
 }
 
 export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
+  if (args.base !== undefined && args.baseline_prefix !== undefined) {
+    return err(
+      "codemap audit: `base` and `baseline_prefix` are mutually exclusive. Use `base` for ad-hoc git-ref comparison; `baseline_prefix` for saved snapshots. Per-delta `baselines.<key>` overrides compose with either.",
+    );
+  }
   // Skip the incremental-index prelude when the watcher already keeps
   // the index fresh (mcp --watch / serve --watch). Explicit
   // `no_index: false` is honored even when watch is on (escape hatch
@@ -378,12 +391,23 @@ export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
           if (typeof v === "string") perDelta[k] = v;
         }
       }
-      const baselines = resolveAuditBaselines({
-        db,
-        baselinePrefix: args.baseline_prefix,
-        perDelta,
-      });
-      const result = runAudit({ db, baselines });
+      const result =
+        args.base !== undefined
+          ? await runAuditFromRef({
+              db,
+              ref: args.base,
+              perDeltaOverrides: perDelta,
+              projectRoot: getProjectRoot(),
+              reindex: makeWorktreeReindex(),
+            })
+          : runAudit({
+              db,
+              baselines: resolveAuditBaselines({
+                db,
+                baselinePrefix: args.baseline_prefix,
+                perDelta,
+              }),
+            });
       if ("error" in result) {
         return err(result.error);
       }

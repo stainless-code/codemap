@@ -133,10 +133,15 @@ describe("runAudit (engine)", () => {
       });
 
       if ("error" in r1 || "error" in r2) throw new Error("unexpected error");
-      expect(r1.deltas.files!.base.name).toBe("files-snap-yesterday");
-      expect(r1.deltas.files!.base.sha).toBe("yesterday-sha");
-      expect(r2.deltas.files!.base.name).toBe("files-snap-today");
-      expect(r2.deltas.files!.base.sha).toBe("today-sha");
+      const r1Base = r1.deltas.files!.base;
+      const r2Base = r2.deltas.files!.base;
+      if (r1Base.source !== "baseline" || r2Base.source !== "baseline") {
+        throw new Error("expected baseline-source bases");
+      }
+      expect(r1Base.name).toBe("files-snap-yesterday");
+      expect(r1Base.sha).toBe("yesterday-sha");
+      expect(r2Base.name).toBe("files-snap-today");
+      expect(r2Base.sha).toBe("today-sha");
     } finally {
       db.close();
     }

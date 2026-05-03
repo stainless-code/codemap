@@ -496,6 +496,41 @@ describe("MCP server — audit / context / validate tools", () => {
     }
   });
 
+  it("audit rejects base + baseline_prefix as mutually exclusive", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "audit",
+        arguments: {
+          base: "origin/main",
+          baseline_prefix: "v1",
+          no_index: true,
+        },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      const json = readJson(r);
+      expect(json.error).toContain("mutually exclusive");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("audit returns the {error: ...} envelope when --base used in non-git project", async () => {
+    // benchDir is mkdtemp'd without `git init`, so isGitRepo() returns false.
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "audit",
+        arguments: { base: "HEAD~1", no_index: true },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      const json = readJson(r);
+      expect(json.error).toContain("requires a git repository");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("context returns the envelope shape (file count etc.)", async () => {
     const { client, server } = await makeClient();
     try {
