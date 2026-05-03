@@ -7,7 +7,7 @@
 
 ---
 
-## Status snapshot (as of 2026-05-02)
+## Status snapshot (as of 2026-05-03)
 
 Adoption-candidate ship status. The tier tables in § 1 are preserved as the original assessment record; this snapshot is the single source of truth for "what's open." Update on every PR that closes a row.
 
@@ -34,6 +34,7 @@ Adoption-candidate ship status. The tier tables in § 1 are preserved as the ori
 - **Doc-governance Rule 10** added during PR [#29](https://github.com/stainless-code/codemap/pull/29) — every core-surface change must update both `templates/agents/` (ships to npm) and `.agents/` (this clone) in lockstep.
 - **`cli/*` → `application/*` engine lift (internal)** — PR [#41](https://github.com/stainless-code/codemap/pull/41) closed the last layer-reversal imports `application/mcp-server.ts` had on `cli/*` (called out in the PR #35 self-audit). New engines `context-engine` / `validate-engine`; `query-recipes` moved to `application/`; envelope builders + helpers consolidated in `audit-engine` / `show-engine`. Pure refactor — no behavior or public API change — but unblocks the HTTP transport (B-tier `serve`) since that engine reuse is now clean.
 - **`codemap serve` HTTP API** — PR [#44](https://github.com/stainless-code/codemap/pull/44). Same tool taxonomy as `codemap mcp` over `POST /tool/{name}` for non-MCP consumers (CI scripts, simple `curl`, IDE plugins). Loopback default (`127.0.0.1:7878`); optional `--token` for Bearer auth. Bare `node:http` (no Express/Fastify dep). Tool bodies + resource fetchers live in shared `application/{tool,resource}-handlers.ts` — both transports dispatch the same pure handlers. CSRF + DNS-rebinding guard rejects `Sec-Fetch-Site: cross-site|same-site`, mismatched `Host` (loopback bind), and any `Origin` header — defends against malicious local webpages `fetch`-ing the API while the dev browses. Per-tool Zod validation at the HTTP boundary; ToolResult error arm carries `status?: 400|404|500` so unknown recipe / baseline → 404 and engine throws → 500.
+- **`codemap watch` (live reindex)** — PR [#47](https://github.com/stainless-code/codemap/pull/47), planned in PR [#46](https://github.com/stainless-code/codemap/pull/46). The biggest agent-UX win in the roadmap: eliminates the "is the index stale?" friction every CLI / MCP / HTTP query rides on today. Three shapes: standalone `codemap watch`, plus killer combos `codemap mcp --watch` and `codemap serve --watch` (also `CODEMAP_WATCH=1`). Chokidar v5 backend (selected via 6-watcher audit on PR #46 — pure JS, no Bun N-API quirks, identical on Bun + Node). Sliding-window debouncer (default 250 ms) + path-segment exclude scan + project-local recipe glob. Optional `onPrime` opt runs an incremental catch-up BEFORE flipping `isWatchActive()` true so `handleAudit` only skips its prelude when the index is genuinely fresh. Stop drains in-flight reindex (serialized via inFlight chain) before close so SIGINT/SIGTERM never leaves a half-written DB. Backend errors clear the active flag so a dying chokidar re-enables the audit prelude immediately.
 
 **Open-questions resolution** (from § 6 below):
 
