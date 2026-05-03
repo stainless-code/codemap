@@ -392,7 +392,7 @@ Long-running process that subscribes to filesystem changes via [chokidar v5](htt
 - **Combined with MCP**: `codemap mcp --watch` — boots stdio MCP server + watcher in one process; agents never hit a stale index.
 - **Combined with HTTP**: `codemap serve --watch` — boots HTTP server + watcher; CI scripts / IDE plugins read live data.
 
-`CODEMAP_WATCH=1` env var is shorthand for adding `--watch` to `mcp` / `serve` (useful for IDE / CI launches that can't easily edit the spawn command). When watch is active, `codemap mcp audit`'s incremental-index prelude becomes a no-op (the watcher already keeps the index fresh — saves the per-request reindex cost). Implementation: `src/cli/cmd-watch.ts` (CLI shell) + `src/application/watcher.ts` (engine — pure debouncer + chokidar backend; injectable backend for tests). See [`architecture.md` § Watch wiring](./architecture.md#cli-usage).
+`CODEMAP_WATCH=1` env var is shorthand for adding `--watch` to either `codemap mcp` or `codemap serve` (useful for IDE / CI launches that can't easily edit the spawn command). When watch is active, the audit tool's incremental-index prelude becomes a no-op on both transports (the watcher already keeps the index fresh — saves the per-request reindex cost on every `mcp audit` and every `POST /tool/audit`). Implementation: `src/cli/cmd-watch.ts` (CLI shell) + `src/application/watcher.ts` (engine — pure debouncer + chokidar backend; injectable backend for tests). See [`architecture.md` § Watch wiring](./architecture.md#cli-usage).
 
 ### `codemap serve` / HTTP server
 

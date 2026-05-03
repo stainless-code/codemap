@@ -162,7 +162,7 @@ function registerAuditTool(server: McpServer): void {
     "audit",
     {
       description:
-        "Structural-drift audit. Composes per-delta baselines (files / dependencies / deprecated) into a {head, deltas} envelope. Pass `baseline_prefix` to auto-resolve <prefix>-{files,dependencies,deprecated} from query_baselines, OR `baselines: {<deltaKey>: <name>}` for explicit per-delta overrides (composes with prefix). `summary: true` collapses each delta to {added: N, removed: N}. `no_index: true` skips the auto-incremental-index prelude (default re-indexes first so head reflects current source).",
+        "Structural-drift audit. Composes per-delta baselines (files / dependencies / deprecated) into a {head, deltas} envelope. Pass `baseline_prefix` to auto-resolve <prefix>-{files,dependencies,deprecated} from query_baselines, OR `baselines: {<deltaKey>: <name>}` for explicit per-delta overrides (composes with prefix — both shapes work the same in watch mode). `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the auto-incremental-index prelude that runs before the diff: default `true`-equivalent without watch (re-indexes first so head reflects current source), default `false`-equivalent with `--watch` active (the watcher already kept the index fresh — prelude becomes a no-op). Pass `no_index: false` explicitly to force a re-index even when watch is active (escape hatch for 'force a re-index right now').",
       inputSchema: auditArgsSchema,
     },
     async (args) => wrapToolResult(await handleAudit(args)),

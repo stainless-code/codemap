@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { DEFAULT_HOST, DEFAULT_PORT, parseServeRest } from "./cmd-serve";
 
 describe("parseServeRest", () => {
@@ -11,7 +12,7 @@ describe("parseServeRest", () => {
       port: DEFAULT_PORT,
       token: undefined,
       watch: false,
-      debounceMs: 250,
+      debounceMs: DEFAULT_DEBOUNCE_MS,
     });
   });
 
@@ -95,7 +96,7 @@ describe("parseServeRest", () => {
       port: 9000,
       token: "secret",
       watch: false,
-      debounceMs: 250,
+      debounceMs: DEFAULT_DEBOUNCE_MS,
     });
   });
 

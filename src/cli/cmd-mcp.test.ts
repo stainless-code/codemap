@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { parseMcpRest } from "./cmd-mcp";
 
 describe("parseMcpRest", () => {
@@ -8,7 +9,7 @@ describe("parseMcpRest", () => {
     expect(r.kind).toBe("run");
     if (r.kind === "run") {
       // CODEMAP_WATCH env may be set in dev shells; ignore in this assertion.
-      expect(r.debounceMs).toBe(250);
+      expect(r.debounceMs).toBe(DEFAULT_DEBOUNCE_MS);
     }
   });
 
