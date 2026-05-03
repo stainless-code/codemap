@@ -243,9 +243,8 @@ export async function runImpactCmd(opts: ImpactOpts): Promise<void> {
       closeDb(db, { readonly: true });
     }
 
-    // --summary trims the per-node `matches` array but always keeps the
-    // `summary` block — the JSON-CI consumption pattern is
-    // `codemap impact X --json --summary | jq '.summary.nodes'`.
+    // --summary trims `matches` but keeps `summary.nodes` so
+    // `jq '.summary.nodes'` still works in CI gates.
     const payload = opts.summary
       ? { ...result, matches: [] as typeof result.matches }
       : result;

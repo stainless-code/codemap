@@ -6,7 +6,6 @@ export type ImpactDirection = "up" | "down" | "both";
 /** Graph backend. `all` = every backend compatible with the resolved target. */
 export type ImpactBackend = "dependencies" | "calls" | "imports" | "all";
 
-/** What the user-supplied target resolved to. */
 export type ImpactTargetKind = "symbol" | "file";
 
 /**
@@ -30,10 +29,8 @@ export interface ImpactNode {
 }
 
 /**
- * Resolved target. `matched_in` is the list of files where the symbol/file
- * was found (for files: `[file_path]`; for symbols: every file declaring a
- * matching symbol). Multi-match symbols still produce a single envelope —
- * agents narrow with `--in <path>` (added in v1.x if needed).
+ * `matched_in`: file targets → `[file_path]`; symbol targets → every file
+ * declaring a matching symbol (multi-match still single envelope).
  */
 export interface ImpactTarget {
   kind: ImpactTargetKind;
@@ -90,15 +87,9 @@ const DEFAULT_LIMIT = 500;
 const UNBOUNDED_DEPTH_SENTINEL = 1_000_000;
 
 /**
- * Pure transport-agnostic walker. Executes one `WITH RECURSIVE` per
- * (direction, backend) combo, merges + dedups results in JS, and reports
- * the termination reason. CLI / MCP / HTTP all wrap this same function.
- *
- * Symbol vs file targets walk different backends (per plan §D2):
- * - **file**  → `dependencies`, `imports`
- * - **symbol** → `calls`
- * `--via all` walks every backend compatible with the target kind;
- * incompatible explicit choices land in `skipped_backends`.
+ * One `WITH RECURSIVE` per (direction, backend); JS-side dedup + summary.
+ * Backends per target kind: file → `dependencies` + `imports`;
+ * symbol → `calls`. Incompatible explicit `--via` lands in `skipped_backends`.
  */
 export function findImpact(
   db: CodemapDatabase,
@@ -155,12 +146,8 @@ export function findImpact(
       (a.name ?? "").localeCompare(b.name ?? ""),
   );
 
-  // "limit" wins over "depth" — if we have to truncate, that's the more
-  // user-actionable signal. "depth" means at least one node sat at the
-  // depth cap and could (heuristically) have had further descendants;
-  // we don't probe depth+1 to verify (per plan §D6 — bounded depth +
-  // limit keeps even cyclic graphs cheap, exact cycle accounting is best
-  // effort).
+  // "limit" wins over "depth" (truncation is the more actionable signal);
+  // "depth" is heuristic — we don't probe depth+1 to confirm more existed.
   const terminationBy: ImpactTermination =
     deduped.length > limit ? "limit" : depthCapped ? "depth" : "exhausted";
   const matches = deduped.slice(0, limit);
@@ -243,8 +230,6 @@ function resolveBackends(
       : { backends: [...symbolBackends], skipped: [] };
   }
 
-  // Explicit single-backend choice — keep if compatible, surface a
-  // structured skip note otherwise.
   if (via === "calls") {
     return targetKind === "symbol"
       ? { backends: ["calls"], skipped: [] }
@@ -302,10 +287,7 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   const edge: ImpactNode["edge"] =
     opts.direction === "up" ? "called_by" : "calls";
 
-  // Seed depth = 0; user-facing depth equals internal depth (1..depthLimit).
-  // `WHERE walk.depth < depthLimit` is the gate: a row at depth=2 expanding
-  // produces depth=3 children (kept iff depthLimit >= 3). Seed itself is
-  // filtered out by `WHERE depth > 0` so callers never see themselves.
+  // Seed depth = 0; `WHERE depth > 0` filters seed; `< depthLimit` is the cap.
   const sql = `
     WITH RECURSIVE walk(node, depth, path, file_path) AS (
       SELECT ?, 0, ',' || ? || ',', NULL
@@ -351,8 +333,7 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
 function walkFileGraph(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   const seedFile = opts.target.matched_in[0] ?? opts.target.name;
   const table = opts.backend === "imports" ? "imports" : "dependencies";
-  // imports table uses (file_path, resolved_path) instead of
-  // (from_path, to_path); normalise the column names per backend.
+  // imports uses (file_path, resolved_path); dependencies uses (from_path, to_path).
   const fromCol = opts.backend === "imports" ? "file_path" : "from_path";
   const toCol = opts.backend === "imports" ? "resolved_path" : "to_path";
   const joinFromCol = opts.direction === "up" ? toCol : fromCol;
@@ -369,7 +350,6 @@ function walkFileGraph(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   const filterNonNull =
     opts.backend === "imports" ? `AND c.${joinToCol} IS NOT NULL` : "";
 
-  // Seed depth = 0; same shape as walkCalls (depth 1 = direct neighbour).
   const sql = `
     WITH RECURSIVE walk(node, depth, path) AS (
       SELECT ?, 0, ',' || ? || ','

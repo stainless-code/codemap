@@ -689,9 +689,7 @@ export function handleImpact(args: ImpactArgs): ToolResult {
         depth: args.depth,
         limit: args.limit,
       });
-      // `--summary` trims `matches` to keep the envelope cheap when an
-      // agent only wants the top-level node count / termination signal
-      // for a CI gate or fan-in score (mirrors cmd-impact.ts behaviour).
+      // mirrors cmd-impact.ts: trim `matches`, keep `summary.nodes`.
       const payload =
         args.summary === true
           ? { ...result, matches: [] as typeof result.matches }
