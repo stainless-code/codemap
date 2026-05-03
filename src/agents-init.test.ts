@@ -134,11 +134,11 @@ describe("runAgentsInit", () => {
       mkdirSync(join(dir, ".git"), { recursive: true });
       ensureGitignoreCodemapPattern(dir);
       expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
-        ".codemap.*\n",
+        ".codemap.*\n.codemap/audit-cache/\n",
       );
       ensureGitignoreCodemapPattern(dir);
       expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
-        ".codemap.*\n",
+        ".codemap.*\n.codemap/audit-cache/\n",
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -165,7 +165,7 @@ describe("runAgentsInit", () => {
       mkdirSync(join(dir, ".git"), { recursive: true });
       expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
       expect(readFileSync(join(dir, ".gitignore"), "utf-8")).toBe(
-        ".codemap.*\n",
+        ".codemap.*\n.codemap/audit-cache/\n",
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });

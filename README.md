@@ -103,6 +103,11 @@ codemap audit --json --summary --baseline base                  # counts-only �
 codemap audit --files-baseline base-files                       # explicit per-delta — runs only the slots provided
 codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto-resolve deps + deprecated; override files
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
+codemap audit --base origin/main --json                         # ad-hoc — worktree+reindex against any committish; no --save-baseline needed
+codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override
+# --base materialises <ref> via `git worktree add` to .codemap/audit-cache/<sha>/, reindexes into
+# a temp DB, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
+# non-git projects get a clean `--base requires a git repository` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
 # --format <text|json|sarif|annotations> — pipe results into GitHub Code Scanning (SARIF
