@@ -206,7 +206,7 @@ describe("findImpact — limit termination", () => {
       limit: 3,
     });
     expect(r.matches).toHaveLength(3);
-    expect(r.summary.terminated_by).not.toBe("limit");
+    expect(r.summary.terminated_by).toBe("exhausted");
   });
 });
 

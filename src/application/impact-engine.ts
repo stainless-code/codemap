@@ -324,6 +324,7 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
       edge,
       kind: "symbol",
       name: r.node,
+      // "" when the symbol isn't in the index (external / dynamic call).
       file_path: symFile ?? "",
     };
     return node;
