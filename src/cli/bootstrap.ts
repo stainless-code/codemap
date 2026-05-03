@@ -39,6 +39,9 @@ Targeted reads (precise lookup by symbol name):
   codemap show <name> [--kind <k>] [--in <path>] [--json]      # metadata: file:line + signature
   codemap snippet <name> [--kind <k>] [--in <path>] [--json]   # source text from disk + stale flag
 
+Impact analysis (graph walk for refactor blast-radius):
+  codemap impact <target> [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]
+
 Other:
   codemap version
   codemap --version, -V
@@ -72,6 +75,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "watch") return;
   if (rest[0] === "show") return;
   if (rest[0] === "snippet") return;
+  if (rest[0] === "impact") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
