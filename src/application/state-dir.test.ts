@@ -1,12 +1,21 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
+  ensureStateGitignore,
   resolveStateDir,
   STATE_CONFIG_BASENAMES,
   STATE_DB_NAME,
   STATE_DIR_DEFAULT,
+  STATE_GITIGNORE_BODY,
   STATE_GITIGNORE_NAME,
 } from "./state-dir";
 
@@ -60,5 +69,64 @@ describe("constants", () => {
       "config.js",
       "config.json",
     ]);
+  });
+});
+
+describe("ensureStateGitignore — self-healing reconciler (D11)", () => {
+  let stateDir: string;
+
+  beforeEach(() => {
+    stateDir = mkdtempSync(join(tmpdir(), "codemap-state-")) + "/.codemap";
+  });
+
+  afterEach(() => {
+    rmSync(stateDir + "/..", { recursive: true, force: true });
+  });
+
+  it("creates the file when absent (and mkdirs the state-dir)", () => {
+    expect(existsSync(stateDir)).toBe(false);
+    const r = ensureStateGitignore(stateDir);
+    expect(r).toEqual({
+      before: undefined,
+      after: STATE_GITIGNORE_BODY,
+      written: true,
+    });
+    expect(readFileSync(join(stateDir, ".gitignore"), "utf-8")).toBe(
+      STATE_GITIGNORE_BODY,
+    );
+  });
+
+  it("steady-state run is a no-op (drift-detect)", () => {
+    ensureStateGitignore(stateDir);
+    const r = ensureStateGitignore(stateDir);
+    expect(r.written).toBe(false);
+    expect(r.before).toBe(STATE_GITIGNORE_BODY);
+    expect(r.after).toBe(STATE_GITIGNORE_BODY);
+  });
+
+  it("rewrites a user-modified file back to canonical (overwrite by design)", () => {
+    ensureStateGitignore(stateDir);
+    writeFileSync(join(stateDir, ".gitignore"), "rogue content\n", "utf-8");
+    const r = ensureStateGitignore(stateDir);
+    expect(r.written).toBe(true);
+    expect(r.before).toBe("rogue content\n");
+    expect(r.after).toBe(STATE_GITIGNORE_BODY);
+  });
+
+  it("self-heals when an older codemap version's content is missing today's entries", () => {
+    // Older shape — pre-audit-cache: only the DB lines.
+    const olderBody =
+      "# old codemap-managed file\nindex.db\nindex.db-shm\nindex.db-wal\n";
+    const { mkdirSync } = require("node:fs") as typeof import("node:fs");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, ".gitignore"), olderBody, "utf-8");
+    const r = ensureStateGitignore(stateDir);
+    expect(r.written).toBe(true);
+    expect(r.after).toContain("audit-cache/");
+  });
+
+  it("returned `after` matches the file on disk", () => {
+    const r = ensureStateGitignore(stateDir);
+    expect(r.after).toBe(readFileSync(join(stateDir, ".gitignore"), "utf-8"));
   });
 });
