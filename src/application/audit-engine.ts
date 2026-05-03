@@ -327,28 +327,47 @@ function tryGetGitRef(): string | null {
 export type ReindexFn = (worktreePath: string) => Promise<void>;
 
 /**
- * Standard production reindex callback for `runAuditFromRef`. Saves the
- * runtime singletons, re-initialises codemap against the worktree so
- * `runCodemapIndex` walks the worktree's tree, then restores. Both
- * `cmd-audit.ts` and `application/tool-handlers.ts` (MCP / HTTP) call
- * this — single source of truth for the "open temp DB inside worktree
- * dir, reindex, restore" sequence.
+ * Process-level serialiser for the runtime-singleton swap inside
+ * `makeWorktreeReindex`. `initCodemap` / `configureResolver` mutate global
+ * state (`getProjectRoot`, the resolver instance). Two HTTP / MCP audits
+ * starting in parallel would otherwise interleave save/swap/restore and
+ * route one request's index work at the other's project root. The mutex
+ * guarantees one reindex critical section at a time per process.
+ *
+ * Long-term cleanup tracked in `docs/roadmap.md` § Backlog (`runCodemapIndex`
+ * accepts an explicit context — would let us drop the mutex). Cost today
+ * is small: only `--base` audits pay the lock; cache hits skip it.
+ */
+let _reindexChain: Promise<void> = Promise.resolve();
+
+/**
+ * Standard production reindex callback for `runAuditFromRef`. Save → swap
+ * runtime singletons against the worktree → run `runCodemapIndex` → restore.
+ * Both `cmd-audit.ts` and `application/tool-handlers.ts` (MCP / HTTP) call
+ * this — single source of truth. Critical section is serialised
+ * process-wide via `_reindexChain` so concurrent audits don't interleave.
  */
 export function makeWorktreeReindex(): ReindexFn {
-  return async (worktreePath: string) => {
-    const wtDbPath = `${worktreePath}/.codemap.db`;
-    const wtDb = openCodemapDatabase(wtDbPath);
-    const savedConfig = getCodemapConfig();
-    try {
-      const wtUser = await loadUserConfig(worktreePath, undefined);
-      initCodemap(resolveCodemapConfig(worktreePath, wtUser));
-      configureResolver(getProjectRoot(), getTsconfigPath());
-      await runCodemapIndex(wtDb, { mode: "full", quiet: true });
-    } finally {
-      wtDb.close();
-      initCodemap(savedConfig);
-      configureResolver(getProjectRoot(), getTsconfigPath());
-    }
+  return (worktreePath: string) => {
+    const next = _reindexChain.then(async () => {
+      const wtDbPath = `${worktreePath}/.codemap.db`;
+      const wtDb = openCodemapDatabase(wtDbPath);
+      const savedConfig = getCodemapConfig();
+      try {
+        const wtUser = await loadUserConfig(worktreePath, undefined);
+        initCodemap(resolveCodemapConfig(worktreePath, wtUser));
+        configureResolver(getProjectRoot(), getTsconfigPath());
+        await runCodemapIndex(wtDb, { mode: "full", quiet: true });
+      } finally {
+        wtDb.close();
+        initCodemap(savedConfig);
+        configureResolver(getProjectRoot(), getTsconfigPath());
+      }
+    });
+    // Catch on the chain itself so one failed reindex doesn't poison the
+    // serializer; surface the error to THIS caller via `next`.
+    _reindexChain = next.catch(() => {});
+    return next;
   };
 }
 

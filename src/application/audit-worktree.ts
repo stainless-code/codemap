@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -146,7 +147,11 @@ export async function populateWorktree(
   const cacheRoot = join(opts.projectRoot, CACHE_DIR_NAME);
   mkdirSync(cacheRoot, { recursive: true });
 
-  const tmpName = `.tmp.${opts.sha}.${process.pid}.${Date.now()}`;
+  // randomUUID() suffix on top of (sha, pid, ms) — defensive against
+  // cross-process races where two `codemap audit --base` invocations share
+  // the same sha and start within the same millisecond. Mutex (audit-engine)
+  // already serialises in-process; this catches the multi-process case.
+  const tmpName = `.tmp.${opts.sha}.${process.pid}.${Date.now()}.${randomUUID()}`;
   const tmpPath = join(cacheRoot, tmpName);
   const finalPath = join(cacheRoot, opts.sha);
 
@@ -200,7 +205,10 @@ export async function populateWorktree(
     }
   }
 
-  evictIfOverLimits(opts.projectRoot);
+  // Pass `protectPath` so the freshly-populated entry can't be its own victim
+  // (single huge entry > MAX_CACHE_BYTES would otherwise oscillate between
+  // re-populate and return-dead-path).
+  evictIfOverLimits(opts.projectRoot, finalPath);
 
   return {
     worktreePath: finalPath,
@@ -239,9 +247,12 @@ interface CacheEntryInfo {
 /**
  * LRU sweep — runs after every successful populate. Removes oldest entries
  * until under both ENTRY and BYTE budgets. `.tmp.*` dirs older than a few
- * minutes are also swept (orphans from crashed populates).
+ * minutes are also swept (orphans from crashed populates). `protectPath`
+ * is excluded from both counts and eviction — callers pass the freshly-
+ * populated entry so it can't evict itself when a single entry exceeds
+ * `MAX_CACHE_BYTES`.
  */
-function evictIfOverLimits(projectRoot: string): void {
+function evictIfOverLimits(projectRoot: string, protectPath?: string): void {
   const cacheRoot = join(projectRoot, CACHE_DIR_NAME);
   if (!existsSync(cacheRoot)) return;
 
@@ -249,6 +260,7 @@ function evictIfOverLimits(projectRoot: string): void {
   const entries: CacheEntryInfo[] = [];
   for (const name of readdirSync(cacheRoot)) {
     const path = join(cacheRoot, name);
+    if (path === protectPath) continue;
     let stat;
     try {
       stat = statSync(path);

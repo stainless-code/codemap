@@ -206,6 +206,18 @@ describe("parseAuditRest", () => {
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toContain("--base");
   });
+
+  it("errors when --base= has empty value", () => {
+    const r = parseAuditRest(["audit", "--base="]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("non-empty");
+  });
+
+  it("errors when --base gets an empty-string value (two-token form)", () => {
+    const r = parseAuditRest(["audit", "--base", ""]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--base");
+  });
 });
 
 describe("resolveAuditBaselines", () => {

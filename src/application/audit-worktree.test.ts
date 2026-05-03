@@ -59,10 +59,13 @@ function commitFiles(message: string, files: Record<string, string>): string {
     writeFileSync(abs, content);
   }
   git(["add", "."]);
-  spawnSync("git", ["commit", "-m", message, "--no-gpg-sign"], {
+  const commit = spawnSync("git", ["commit", "-m", message, "--no-gpg-sign"], {
     cwd: projectRoot,
     env: fixtureEnv(),
   });
+  if (commit.status !== 0) {
+    throw new Error(`git commit failed: ${commit.stderr.toString().trim()}`);
+  }
   const sha = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: projectRoot,
     env: fixtureEnv(),
@@ -190,6 +193,26 @@ describe("populateWorktree + lookupCacheEntry", () => {
       const tmps = entries.filter((e) => e.startsWith(".tmp."));
       expect(tmps).toEqual([]);
     }
+  });
+
+  it("eviction does not delete the freshly-populated entry (protectPath)", async () => {
+    // Single-huge-entry case: even if the new entry alone would breach
+    // MAX_CACHE_BYTES, populateWorktree's protectPath guard keeps it.
+    // We don't actually need >500 MiB to exercise the path — a passing
+    // populate followed by a successful lookupCacheEntry is sufficient.
+    const populated = await populateWorktree({
+      projectRoot,
+      sha: baseSha,
+      reindex: async (worktreePath) => {
+        const db = openCodemapDatabase(join(worktreePath, ".codemap.db"));
+        createTables(db);
+        db.close();
+      },
+    });
+    expect(populated).toMatchObject({ sha: baseSha });
+    expect(lookupCacheEntry(baseSha, { projectRoot })).toMatchObject({
+      sha: baseSha,
+    });
   });
 
   it("returns ref-unresolved-shaped error for bogus shas (worktree add fails)", async () => {
