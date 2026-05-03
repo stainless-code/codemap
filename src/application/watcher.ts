@@ -9,8 +9,7 @@ import { runCodemapIndex } from "./run-index";
 /**
  * `codemap watch` engine — keeps `.codemap.db` fresh on file edits so
  * every CLI / MCP / HTTP query reads live data without a per-request
- * reindex prelude. See [`docs/plans/watch-mode.md`](../../docs/plans/watch-mode.md)
- * for the library audit + agent-experience rationale.
+ * reindex prelude. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
  *
  * **Layering:** chokidar is the only file-watcher backend (pure JS;
  * works identically on Bun + Node, no per-runtime branching). All other
@@ -142,8 +141,8 @@ export const DEFAULT_DEBOUNCE_MS = 250;
  * Module-level "watcher is active" flag. Read by `handleAudit` to skip
  * its incremental-index prelude when the watcher already keeps the
  * index fresh — turning the audit's expensive boot-time prelude into
- * a no-op in `mcp --watch` / `serve --watch` deployments (per
- * [`docs/plans/watch-mode.md` § Tracer 4](../../docs/plans/watch-mode.md)).
+ * a no-op in `mcp --watch` / `serve --watch` deployments — see
+ * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
  *
  * Single-flag design (vs threading "indexIsLive" through every handler
  * signature): the watcher is process-scoped — there's at most one live

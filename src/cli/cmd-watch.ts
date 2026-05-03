@@ -21,9 +21,9 @@ interface WatchOpts {
 
 /**
  * Parse `argv` after the bootstrap split: `rest[0]` must be `"watch"`.
- * Per [docs/plans/watch-mode.md § Sketched API](../../docs/plans/watch-mode.md):
  * `--debounce <ms>` overrides the default; `--quiet` silences per-batch
- * stderr logs. `--root` / `--config` are absorbed by bootstrap.
+ * stderr logs. `--root` / `--config` are absorbed by bootstrap. See
+ * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
  */
 export function parseWatchRest(rest: string[]):
   | { kind: "help" }

@@ -67,7 +67,7 @@ export interface HttpServerOpts {
   /**
    * If true, boot a co-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data. Drains
-   * pending events on shutdown. See [`docs/plans/watch-mode.md`](../../../docs/plans/watch-mode.md).
+   * pending events on shutdown. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
    */
   watch?: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */

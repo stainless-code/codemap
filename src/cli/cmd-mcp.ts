@@ -6,7 +6,7 @@ import { CODEMAP_VERSION } from "../version";
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"mcp"`.
  * `--root` / `--config` are absorbed by bootstrap. `--watch` /
  * `--debounce <ms>` boot a co-process watcher (per
- * [`docs/plans/watch-mode.md`](../../docs/plans/watch-mode.md)) so the
+ * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage)) so the
  * MCP server's tools always read live data without per-request reindex.
  */
 export function parseMcpRest(rest: string[]):
