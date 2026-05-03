@@ -6,7 +6,12 @@ import type { ZodRawShape } from "zod";
 
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import {
+  getExcludeDirNames,
+  getProjectRoot,
+  getTsconfigPath,
+  initCodemap,
+} from "../runtime";
 import { listResources, readResource } from "./resource-handlers";
 import {
   auditArgsSchema,
@@ -33,6 +38,12 @@ import {
   validateArgsSchema,
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
+import {
+  createPrimeIndex,
+  createReindexOnChange,
+  DEFAULT_DEBOUNCE_MS,
+  runWatchLoop,
+} from "./watcher";
 
 /**
  * HTTP server engine — same tool taxonomy as `application/mcp-server.ts`,
@@ -54,6 +65,14 @@ export interface HttpServerOpts {
   port: number;
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
+  /**
+   * If true, boot a co-process file watcher (chokidar via
+   * `runWatchLoop`) so the server's tools always read live data. Drains
+   * pending events on shutdown. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
+   */
+  watch?: boolean;
+  /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
+  debounceMs?: number;
 }
 
 const TOOL_NAMES = [
@@ -92,17 +111,58 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
       console.error(
         `codemap serve: listening on http://${opts.host}:${opts.port}` +
-          (opts.token !== undefined ? " (auth: Bearer)" : ""),
+          (opts.token !== undefined ? " (auth: Bearer)" : "") +
+          (opts.watch === true ? " (watch: on)" : ""),
       );
       resolve();
     });
   });
 
+  let stopWatch: (() => Promise<void>) | undefined;
+  if (opts.watch === true) {
+    try {
+      const handle = runWatchLoop({
+        root: getProjectRoot(),
+        excludeDirNames: getExcludeDirNames(),
+        debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+        onPrime: createPrimeIndex({ quiet: false, label: "codemap serve" }),
+        onChange: createReindexOnChange({
+          quiet: false,
+          label: "codemap serve",
+        }),
+      });
+      stopWatch = handle.stop;
+    } catch (err) {
+      // Watcher boot threw AFTER `server.listen()` resolved — close
+      // the listener so we don't leak an orphaned HTTP socket on a
+      // failed boot. Caught by CodeRabbit on PR #47.
+      await new Promise<void>((res) => server.close(() => res()));
+      throw err;
+    }
+  }
+
   await new Promise<void>((resolve) => {
     const shutdown = (signal: string) => {
       // eslint-disable-next-line no-console -- intentional shutdown log on stderr
       console.error(`codemap serve: ${signal} received, shutting down...`);
-      server.close(() => resolve());
+      const closeServer = (): void => {
+        server.close(() => resolve());
+      };
+      if (stopWatch !== undefined) {
+        // .finally(closeServer) so a watcher stop() rejection still
+        // closes the HTTP listener — without it, a rejected stop()
+        // means closeServer never runs and runHttpServer never resolves
+        // on SIGTERM/SIGINT (caught by CodeRabbit on PR #47).
+        stopWatch()
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console -- intentional shutdown-error log
+            console.error(`codemap serve: watcher stop failed — ${msg}`);
+          })
+          .finally(closeServer);
+      } else {
+        closeServer();
+      }
     };
     process.once("SIGINT", () => shutdown("SIGINT"));
     process.once("SIGTERM", () => shutdown("SIGTERM"));

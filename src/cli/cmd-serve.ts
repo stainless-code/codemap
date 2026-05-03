@@ -1,4 +1,5 @@
 import { runHttpServer } from "../application/http-server";
+import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { CODEMAP_VERSION } from "../version";
 
 /**
@@ -13,6 +14,10 @@ export interface ServeRunOpts {
   port: number;
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
+  /** Boot a co-process file watcher so tools always read live data. */
+  watch: boolean;
+  /** Coalesce burst events into one reindex after `debounceMs` of quiet (only meaningful with `watch: true`). */
+  debounceMs: number;
 }
 
 /**
@@ -28,6 +33,8 @@ export function parseServeRest(rest: string[]):
       host: string;
       port: number;
       token: string | undefined;
+      watch: boolean;
+      debounceMs: number;
     } {
   if (rest[0] !== "serve") {
     throw new Error("parseServeRest: expected serve");
@@ -36,6 +43,13 @@ export function parseServeRest(rest: string[]):
   let host: string = DEFAULT_HOST;
   let port: number = DEFAULT_PORT;
   let token: string | undefined;
+  // CODEMAP_WATCH=1 / "true" is the env shortcut for IDE / CI launches
+  // that can't easily edit the launch command.
+  const envWatch =
+    process.env["CODEMAP_WATCH"] === "1" ||
+    process.env["CODEMAP_WATCH"] === "true";
+  let watch = envWatch;
+  let debounceMs = DEFAULT_DEBOUNCE_MS;
 
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
@@ -92,13 +106,40 @@ export function parseServeRest(rest: string[]):
       continue;
     }
 
+    if (a === "--watch") {
+      watch = true;
+      continue;
+    }
+
+    if (a === "--debounce" || a.startsWith("--debounce=")) {
+      const eq = a.indexOf("=");
+      const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
+      if (v === undefined || v === "" || v.startsWith("-")) {
+        return {
+          kind: "error",
+          message:
+            'codemap serve: "--debounce" requires a non-negative integer (milliseconds).',
+        };
+      }
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0) {
+        return {
+          kind: "error",
+          message: `codemap serve: "--debounce ${v}" is not a non-negative integer.`,
+        };
+      }
+      debounceMs = n;
+      if (eq === -1) i++;
+      continue;
+    }
+
     return {
       kind: "error",
       message: `codemap serve: unknown option "${a}". Run \`codemap serve --help\` for usage.`,
     };
   }
 
-  return { kind: "run", host, port, token };
+  return { kind: "run", host, port, token, watch, debounceMs };
 }
 
 export function printServeCmdHelp(): void {
@@ -119,6 +160,12 @@ Flags:
                   Require Authorization: Bearer <secret> on every request.
                   GET /health is exempt so liveness probes work without
                   leaking the token. Use a long random string.
+  --watch         Boot a co-process file watcher so every tool reads a
+                  live index — eliminates the per-request reindex prelude.
+                  Killer combo for IDE plugins / CI scripts that hit the
+                  HTTP API repeatedly. Also enabled when CODEMAP_WATCH=1.
+  --debounce <ms> Coalesce burst events into one reindex after <ms> of
+                  quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with --watch.
   --help, -h      Show this help.
 
 Routes (every MCP tool maps to POST /tool/<name>; output shape matches
@@ -167,6 +214,8 @@ export async function runServeCmd(opts: {
   host: string;
   port: number;
   token: string | undefined;
+  watch: boolean;
+  debounceMs: number;
 }): Promise<void> {
   await runHttpServer({
     version: CODEMAP_VERSION,
@@ -175,5 +224,7 @@ export async function runServeCmd(opts: {
     host: opts.host,
     port: opts.port,
     token: opts.token,
+    watch: opts.watch,
+    debounceMs: opts.debounceMs,
   });
 }

@@ -119,6 +119,12 @@ curl -s -X POST http://127.0.0.1:7878/tool/query \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"sql":"SELECT name, file_path FROM symbols LIMIT 5"}'
+# Watch mode — long-running process; debounced reindex on file changes (default 250ms).
+# Combine with mcp / serve so every tool reads a live index without per-request prelude:
+codemap mcp --watch                   # killer combo for agent hosts
+codemap serve --watch --port 7878     # killer combo for CI / IDE plugins
+codemap watch --quiet                 # standalone (decoupled from a transport)
+CODEMAP_WATCH=1 codemap mcp           # env-var shortcut for IDE / CI launches
 # List bundled recipes as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out

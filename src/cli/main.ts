@@ -166,7 +166,33 @@ Copies bundled agent templates into .agents/ under the project root.
       console.error(parsed.message);
       process.exit(1);
     }
-    await runMcpCmd({ root, configFile });
+    await runMcpCmd({
+      root,
+      configFile,
+      watch: parsed.watch,
+      debounceMs: parsed.debounceMs,
+    });
+    return;
+  }
+
+  if (rest[0] === "watch") {
+    const { parseWatchRest, printWatchCmdHelp, runWatchCmd } =
+      await import("./cmd-watch.js");
+    const parsed = parseWatchRest(rest);
+    if (parsed.kind === "help") {
+      printWatchCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runWatchCmd({
+      root,
+      configFile,
+      debounceMs: parsed.debounceMs,
+      quiet: parsed.quiet,
+    });
     return;
   }
 
@@ -188,6 +214,8 @@ Copies bundled agent templates into .agents/ under the project root.
       host: parsed.host,
       port: parsed.port,
       token: parsed.token,
+      watch: parsed.watch,
+      debounceMs: parsed.debounceMs,
     });
     return;
   }
