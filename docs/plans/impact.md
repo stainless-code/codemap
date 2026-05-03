@@ -21,7 +21,7 @@ Codemap's current agent-friction surface (post-PR #47):
 | "What's the public API surface?"              | Partially covered by `barrel-files` recipe | Out of scope                  |
 | "When did X arrive in the codebase?"          | Requires `git log -L` shell-out            | Out of scope (consider later) |
 
-Agents in refactor sessions today follow a 5-7 query pattern; `impact` collapses 3 of those queries into one round-trip. Higher-leverage than the alternatives considered (see [§ Alternatives](#alternatives)).
+Agents in refactor sessions today follow a 5-7 query pattern; `impact` collapses 3 of those queries into one round-trip. Higher-leverage than the alternatives considered (see [§ Alternatives](#alternatives-considered-and-rejected-for-now)).
 
 ## Sketched API
 
