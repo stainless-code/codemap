@@ -1,10 +1,5 @@
-// Pair with `./store.ts` to form a 2-node static call cycle in the `calls` graph:
-//   cache.invalidate → store.write → cache.invalidate
-// `cache.get → store.read` is a separate non-cyclic edge. Exercises
-// `codemap impact`'s cycle-detection (path-string `instr` check).
-// The `write(key, "")` below is a parse-only sentinel: guarded so it never
-// executes (would otherwise stack-overflow), but the AST still records the
-// `cache.invalidate → store.write` call edge needed for the cycle fixture.
+// 2-node static call cycle with `./store.ts` (`invalidate ↔ write`) for
+// `codemap impact` cycle-detection. `get → read` is a separate non-cyclic edge.
 
 import { read, write } from "./store";
 
@@ -20,5 +15,6 @@ export function get(key: string): string | undefined {
 
 export function invalidate(key: string): void {
   _data.delete(key);
+  // Parse-only: AST records `invalidate → write` edge; guard prevents runtime recursion.
   if (key === "__codemap_unreachable__") write(key, "");
 }
