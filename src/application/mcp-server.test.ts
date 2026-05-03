@@ -948,3 +948,109 @@ describe("MCP server — show + snippet tools", () => {
     }
   });
 });
+
+describe("MCP server — impact tool", () => {
+  function seedCallChain() {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES
+           ('src/a.ts', 'a', 'function', 1, 1, 'function a()', 0, 0),
+           ('src/b.ts', 'b', 'function', 1, 1, 'function b()', 0, 0)`,
+      );
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name)
+         VALUES ('src/a.ts', 'a', 'function', 'b')`,
+      );
+      db.run(
+        `INSERT INTO dependencies (from_path, to_path)
+         VALUES ('src/a.ts', 'src/b.ts')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists impact in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("impact");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("impact returns the {target, matches, summary} envelope for a symbol", async () => {
+    seedCallChain();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "a", direction: "down", depth: 1 },
+      });
+      const json = readJson(r);
+      expect(json.target).toMatchObject({ kind: "symbol", name: "a" });
+      expect(json.matches.map((m: { name: string }) => m.name)).toEqual(["b"]);
+      expect(json.summary).toMatchObject({
+        nodes: 1,
+        terminated_by: expect.any(String),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("impact walks file dependencies for a file target", async () => {
+    seedCallChain();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "src/a.ts", direction: "down" },
+      });
+      const json = readJson(r);
+      expect(json.target.kind).toBe("file");
+      expect(
+        json.matches.map((m: { file_path: string }) => m.file_path),
+      ).toContain("src/b.ts");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("impact summary mode trims matches but keeps summary", async () => {
+    seedCallChain();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "a", direction: "down", summary: true },
+      });
+      const json = readJson(r);
+      // Summary mode trims `matches` (transport bandwidth saver) but the
+      // `summary.nodes` count still reports what was actually found —
+      // otherwise CI gates lose the data they care about. Matches that
+      // would have been returned: 1 (b).
+      expect(json.matches).toEqual([]);
+      expect(json.summary.nodes).toBe(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("impact returns isError on non-integer depth (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "a", depth: 1.5 },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+});
