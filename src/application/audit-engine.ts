@@ -1,7 +1,24 @@
+import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { getQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
 import { diffRows } from "../diff-rows";
+import { configureResolver } from "../resolver";
+import {
+  getCodemapConfig,
+  getProjectRoot,
+  getTsconfigPath,
+  initCodemap,
+} from "../runtime";
+import { openCodemapDatabase } from "../sqlite-db";
+import {
+  isGitRepo,
+  lookupCacheEntry,
+  populateWorktree,
+  resolveSha,
+} from "./audit-worktree";
+import type { PopulatedCacheEntry } from "./audit-worktree";
 import { getCurrentCommit } from "./index-engine";
+import { runCodemapIndex } from "./run-index";
 
 /**
  * Per-delta diff payload — the rows that drifted between baseline and current,
@@ -18,15 +35,27 @@ export interface AuditDelta {
 }
 
 /**
- * Per-delta snapshot metadata. v1 always has `source: "baseline"` (B.6 reuse);
- * v1.x adds `source: "ref"` for the worktree+reindex path. Each delta carries
- * its own `base` because audits can mix baselines (e.g. `--files-baseline X
- * --dependencies-baseline Y`).
+ * Per-delta snapshot metadata — discriminated by `source`. `"baseline"` (B.6
+ * reuse) loads rows from the `query_baselines` table; `"ref"` materialises the
+ * snapshot via worktree + reindex (`--base <ref>`). Per-delta because audits
+ * can mix sources (e.g. `--base origin/main --files-baseline pr-files`).
  */
-export interface AuditBase {
+export type AuditBase = AuditBaseFromBaseline | AuditBaseFromRef;
+
+export interface AuditBaseFromBaseline {
   source: "baseline";
   name: string;
   sha: string | null;
+  indexed_at: number;
+}
+
+export interface AuditBaseFromRef {
+  source: "ref";
+  /** User-supplied ref string (e.g. `origin/main`, `HEAD~5`, `v1.0.0`). */
+  ref: string;
+  /** Resolved sha — what `git rev-parse --verify` returned. */
+  sha: string;
+  /** When the worktree-side `.codemap.db` was last indexed (cache-mtime). */
   indexed_at: number;
 }
 
@@ -287,4 +316,198 @@ function tryGetGitRef(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Reindex callback contract — `runAuditFromRef` injects this. The default
+ * production implementation (`makeWorktreeReindex`) re-inits the runtime
+ * singletons against the worktree path then calls `runCodemapIndex`; tests
+ * inject a stub via this same hook.
+ */
+export type ReindexFn = (worktreePath: string) => Promise<void>;
+
+/**
+ * Process-level serialiser for the runtime-singleton swap inside
+ * `makeWorktreeReindex`. `initCodemap` / `configureResolver` mutate global
+ * state (`getProjectRoot`, the resolver instance). Two HTTP / MCP audits
+ * starting in parallel would otherwise interleave save/swap/restore and
+ * route one request's index work at the other's project root. The mutex
+ * guarantees one reindex critical section at a time per process.
+ *
+ * Long-term cleanup tracked in `docs/roadmap.md` § Backlog (`runCodemapIndex`
+ * accepts an explicit context — would let us drop the mutex). Cost today
+ * is small: only `--base` audits pay the lock; cache hits skip it.
+ */
+let _reindexChain: Promise<void> = Promise.resolve();
+
+/**
+ * Standard production reindex callback for `runAuditFromRef`. Save → swap
+ * runtime singletons against the worktree → run `runCodemapIndex` → restore.
+ * Both `cmd-audit.ts` and `application/tool-handlers.ts` (MCP / HTTP) call
+ * this — single source of truth. Critical section is serialised
+ * process-wide via `_reindexChain` so concurrent audits don't interleave.
+ */
+export function makeWorktreeReindex(): ReindexFn {
+  return (worktreePath: string) => {
+    const next = _reindexChain.then(async () => {
+      const wtDbPath = `${worktreePath}/.codemap.db`;
+      const wtDb = openCodemapDatabase(wtDbPath);
+      const savedConfig = getCodemapConfig();
+      try {
+        const wtUser = await loadUserConfig(worktreePath, undefined);
+        initCodemap(resolveCodemapConfig(worktreePath, wtUser));
+        configureResolver(getProjectRoot(), getTsconfigPath());
+        await runCodemapIndex(wtDb, { mode: "full", quiet: true });
+      } finally {
+        wtDb.close();
+        initCodemap(savedConfig);
+        configureResolver(getProjectRoot(), getTsconfigPath());
+      }
+    });
+    // Catch on the chain itself so one failed reindex doesn't poison the
+    // serializer; surface the error to THIS caller via `next`.
+    _reindexChain = next.catch(() => {});
+    return next;
+  };
+}
+
+export interface RunAuditFromRefOpts {
+  db: CodemapDatabase;
+  ref: string;
+  /**
+   * Per-delta override map. When a delta key is present here, the delta
+   * uses the saved baseline (`source: "baseline"`) instead of the worktree
+   * (`source: "ref"`). Composes orthogonally with `--base` per plan §D7.
+   */
+  perDeltaOverrides?: AuditBaselineMap;
+  projectRoot: string;
+  reindex: ReindexFn;
+}
+
+/**
+ * Run an audit with the base snapshot materialised from a git ref.
+ * Resolves `<ref>` to a sha, reuses (or populates) the worktree cache,
+ * runs each delta's canonical SQL on the cached `.codemap.db`, and diffs
+ * against the live DB. Per-delta overrides escape to the existing
+ * `query_baselines`-backed path.
+ *
+ * Mirrors {@link runAudit} but the "base rows" come from a sibling SQLite
+ * file instead of `query_baselines`. Errors map to `AuditError` for the
+ * same `{error}` shape the CLI / MCP / HTTP transports already render.
+ */
+export async function runAuditFromRef(
+  opts: RunAuditFromRefOpts,
+): Promise<AuditEnvelope | AuditError> {
+  if (!isGitRepo(opts.projectRoot)) {
+    return { error: "codemap audit: --base requires a git repository." };
+  }
+
+  const resolved = resolveSha(opts.ref, opts.projectRoot);
+  if ("error" in resolved) return { error: resolved.error };
+  const sha = resolved.sha;
+
+  let entry: PopulatedCacheEntry | undefined = lookupCacheEntry(sha, {
+    projectRoot: opts.projectRoot,
+  });
+  if (entry === undefined) {
+    const populated = await populateWorktree({
+      projectRoot: opts.projectRoot,
+      sha,
+      reindex: opts.reindex,
+    });
+    if ("error" in populated) return { error: populated.error };
+    entry = populated;
+  }
+
+  const baseDb = openCodemapDatabase(entry.dbPath);
+  try {
+    const deltas: Record<string, AuditDelta> = {};
+    const overrides = opts.perDeltaOverrides ?? {};
+    for (const spec of V1_DELTAS) {
+      const overrideName = overrides[spec.key];
+      if (overrideName !== undefined) {
+        const baselineDelta = computeDeltaFromBaseline(
+          opts.db,
+          overrideName,
+          spec,
+        );
+        if ("error" in baselineDelta) return baselineDelta;
+        deltas[spec.key] = baselineDelta;
+        continue;
+      }
+
+      const baseRows = baseDb.query(spec.sql).all() as unknown[];
+      const projectedBase = baseRows.map((row) =>
+        projectRow(row, spec.requiredColumns),
+      );
+      const headRows = opts.db.query(spec.sql).all() as unknown[];
+      const projectedHead = headRows.map((row) =>
+        projectRow(row, spec.requiredColumns),
+      );
+      const diff = diffRows(projectedBase, projectedHead);
+
+      deltas[spec.key] = {
+        base: {
+          source: "ref",
+          ref: opts.ref,
+          sha,
+          indexed_at: entry.indexedAt,
+        },
+        ...diff,
+      };
+    }
+
+    return {
+      head: {
+        sha: tryGetGitRef(),
+        indexed_at: Date.now(),
+      },
+      deltas,
+    };
+  } finally {
+    baseDb.close();
+  }
+}
+
+/**
+ * Replays the existing baseline-side flow for one delta — used by
+ * `runAuditFromRef` when the user passes `--base <ref> --<delta>-baseline X`
+ * to override one delta with a saved baseline (per plan §D7).
+ */
+function computeDeltaFromBaseline(
+  db: CodemapDatabase,
+  baselineName: string,
+  spec: AuditDeltaSpec,
+): AuditDelta | AuditError {
+  const baseline = getQueryBaseline(db, baselineName);
+  if (baseline === undefined) {
+    return {
+      error: `codemap audit: no baseline named "${baselineName}" (requested for delta "${spec.key}"). Use \`codemap query --baselines\` to list saved baselines.`,
+    };
+  }
+  let baselineRows: unknown[];
+  try {
+    const parsed = JSON.parse(baseline.rows_json) as unknown;
+    if (!Array.isArray(parsed)) {
+      return {
+        error: `codemap audit: baseline "${baseline.name}" (delta "${spec.key}") has invalid rows_json — drop and re-save.`,
+      };
+    }
+    baselineRows = parsed;
+  } catch {
+    return {
+      error: `codemap audit: baseline "${baseline.name}" (delta "${spec.key}") has corrupt rows_json — drop and re-save.`,
+    };
+  }
+  const diff = computeDelta(db, baseline.name, baselineRows, spec);
+  if ("error" in diff) return diff;
+  return {
+    base: {
+      source: "baseline",
+      name: baseline.name,
+      sha: baseline.git_ref,
+      indexed_at: baseline.created_at,
+    },
+    ...diff,
+  };
 }

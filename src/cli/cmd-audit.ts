@@ -1,6 +1,8 @@
 import {
+  makeWorktreeReindex,
   resolveAuditBaselines,
   runAudit,
+  runAuditFromRef,
   V1_DELTAS,
 } from "../application/audit-engine";
 import type { AuditEnvelope } from "../application/audit-engine";
@@ -28,6 +30,7 @@ export function parseAuditRest(rest: string[]):
   | {
       kind: "run";
       baselinePrefix: string | undefined;
+      base: string | undefined;
       perDelta: Record<string, string>;
       json: boolean;
       summary: boolean;
@@ -42,6 +45,7 @@ export function parseAuditRest(rest: string[]):
   let summary = false;
   let noIndex = false;
   let baselinePrefix: string | undefined;
+  let base: string | undefined;
   const perDelta: Record<string, string> = {};
 
   while (i < rest.length) {
@@ -74,6 +78,14 @@ export function parseAuditRest(rest: string[]):
       continue;
     }
 
+    if (a === "--base" || a.startsWith("--base=")) {
+      const value = consumeFlagValue(rest, i, "--base");
+      if (value.kind === "error") return value;
+      base = value.value;
+      i = value.next;
+      continue;
+    }
+
     // Per-delta `--<key>-baseline <name>` (explicit).
     let matchedPerDelta = false;
     for (const [flag, key] of Object.entries(PER_DELTA_FLAGS)) {
@@ -94,15 +106,35 @@ export function parseAuditRest(rest: string[]):
     };
   }
 
-  if (baselinePrefix === undefined && Object.keys(perDelta).length === 0) {
+  if (base !== undefined && baselinePrefix !== undefined) {
     return {
       kind: "error",
       message:
-        "codemap audit: missing snapshot source. Pass --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta. v1.x adds --base <ref>.",
+        "codemap audit: --base and --baseline are mutually exclusive. Use --base <ref> for ad-hoc git-ref comparison; --baseline <prefix> for saved snapshots. Per-delta --<delta>-baseline overrides compose with either.",
     };
   }
 
-  return { kind: "run", baselinePrefix, perDelta, json, summary, noIndex };
+  if (
+    base === undefined &&
+    baselinePrefix === undefined &&
+    Object.keys(perDelta).length === 0
+  ) {
+    return {
+      kind: "error",
+      message:
+        "codemap audit: missing snapshot source. Pass --base <ref> (worktree+reindex against any committish), --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
+    };
+  }
+
+  return {
+    kind: "run",
+    baselinePrefix,
+    base,
+    perDelta,
+    json,
+    summary,
+    noIndex,
+  };
 }
 
 // Eat either `--flag value` (two tokens) or `--flag=value` (one). Returns the
@@ -155,14 +187,21 @@ export function printAuditCmdHelp(): void {
       `  --${d.key}-baseline <name>  Explicit baseline for the ${d.key} delta.`,
   ).join("\n");
 
-  console.log(`Usage: codemap audit [--baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
+  console.log(`Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
 
 Diff the current .codemap.db against per-delta baselines (saved by \`codemap query --save-baseline\`)
-and emit the structural deltas as a {head, deltas} envelope. Each delta carries its own \`base\`
-metadata. v1 ships three deltas: files, dependencies, deprecated. No verdict / threshold / non-zero
-exit codes in v1 — compose --json + jq for CI exit codes.
+or against a git ref (\`--base <ref>\` materialises a worktree + reindex), and emit structural deltas
+as a {head, deltas} envelope. Each delta carries its own \`base\` metadata. v1 ships three deltas:
+files, dependencies, deprecated. No verdict / threshold / non-zero exit codes — compose --json + jq
+for CI exit codes.
 
-Snapshot sources (at least one delta-baseline must resolve):
+Snapshot sources (one of these must resolve; --base and --baseline are mutually exclusive):
+
+  --base <ref>                 Materialise <ref> via git worktree to a sha-keyed cache
+                               under .codemap/audit-cache/, reindex into a temp DB, then
+                               diff. <ref> = any committish (origin/main, HEAD~5, sha,
+                               tag, …). Cache hit on second run against same sha is
+                               sub-100ms. Requires a git repository.
 
   --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
                                <prefix>-dependencies, <prefix>-deprecated in
@@ -170,9 +209,8 @@ Snapshot sources (at least one delta-baseline must resolve):
                                silently absent (no error per missing slot).
 
 ${perDeltaLines}
-                               Each per-delta flag overrides the auto-resolved
-                               slot for that delta. Names must exist in
-                               query_baselines or audit exits 1.
+                               Each per-delta flag overrides one delta's source —
+                               composes with both --base and --baseline.
 
 Other flags:
   --json              Emit the {head, deltas} envelope as JSON to stdout
@@ -184,6 +222,12 @@ Other flags:
   --help, -h          Show this help.
 
 Examples:
+
+  # Compare current branch to origin/main (no setup — worktree + reindex on first run)
+  codemap audit --base origin/main --json
+
+  # Compare to a tag, with explicit per-delta override for one slot
+  codemap audit --base v1.0.0 --files-baseline pre-release-files
 
   # Convention: save with the <prefix>-<delta> naming, then audit by prefix
   codemap query --save-baseline=base-files "SELECT path FROM files"
@@ -216,6 +260,7 @@ export async function runAuditCmd(opts: {
   root: string;
   configFile: string | undefined;
   baselinePrefix: string | undefined;
+  base: string | undefined;
   perDelta: Record<string, string>;
   json: boolean;
   summary: boolean;
@@ -236,13 +281,24 @@ export async function runAuditCmd(opts: {
         await runCodemapIndex(db, { mode: "incremental", quiet: true });
       }
 
-      const baselines = resolveAuditBaselines({
-        db,
-        baselinePrefix: opts.baselinePrefix,
-        perDelta: opts.perDelta,
-      });
+      const result =
+        opts.base !== undefined
+          ? await runAuditFromRef({
+              db,
+              ref: opts.base,
+              perDeltaOverrides: opts.perDelta,
+              projectRoot: getProjectRoot(),
+              reindex: makeWorktreeReindex(),
+            })
+          : runAudit({
+              db,
+              baselines: resolveAuditBaselines({
+                db,
+                baselinePrefix: opts.baselinePrefix,
+                perDelta: opts.perDelta,
+              }),
+            });
 
-      const result = runAudit({ db, baselines });
       if ("error" in result) {
         emitAuditError(result.error, opts.json);
         return;
@@ -326,7 +382,10 @@ function renderAuditTerminal(envelope: AuditEnvelope, summary: boolean): void {
   const keyWidth = entries.reduce((n, [k]) => Math.max(n, k.length), 0);
   for (const [key, delta] of entries) {
     const sha = delta.base.sha ? ` @ ${delta.base.sha.slice(0, 8)}` : "";
-    const provenance = `← ${delta.base.name}${sha}`;
+    // base.source narrows the union: "baseline" carries `name`; "ref" carries `ref`.
+    const provenanceLabel =
+      delta.base.source === "baseline" ? delta.base.name : delta.base.ref;
+    const provenance = `← ${provenanceLabel}${sha}`;
     const counts =
       delta.added.length === 0 && delta.removed.length === 0
         ? "(no drift)"
