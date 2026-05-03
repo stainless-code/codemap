@@ -23,6 +23,10 @@ export function getProjectRoot(): string {
   return getCodemapConfig().root;
 }
 
+export function getStateDir(): string {
+  return getCodemapConfig().stateDir;
+}
+
 export function getDatabasePath(): string {
   return getCodemapConfig().databasePath;
 }

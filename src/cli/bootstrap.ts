@@ -112,6 +112,7 @@ export function parseBootstrapArgs(argv: string[]) {
   const envRoot = process.env.CODEMAP_ROOT ?? process.env.CODEMAP_TEST_BENCH;
   let root = envRoot ? resolve(envRoot) : undefined;
   let configFile: string | undefined;
+  let stateDir: string | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -123,8 +124,14 @@ export function parseBootstrapArgs(argv: string[]) {
       configFile = resolve(argv[++i]);
       continue;
     }
+    if (a === "--state-dir" && argv[i + 1]) {
+      stateDir = argv[++i];
+      continue;
+    }
     rest.push(a);
   }
   if (!root) root = process.cwd();
-  return { root, configFile, rest };
+  // --state-dir wins over CODEMAP_STATE_DIR (precedence per plan §D7).
+  if (!stateDir) stateDir = process.env.CODEMAP_STATE_DIR;
+  return { root, configFile, stateDir, rest };
 }

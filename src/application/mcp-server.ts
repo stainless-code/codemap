@@ -62,6 +62,7 @@ interface ServerOpts {
   version: string;
   root: string;
   configFile?: string | undefined;
+  stateDir?: string | undefined;
   /**
    * If true, boot a co-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data without
@@ -362,8 +363,12 @@ function registerStaticResource(
  * pre-initialized stack on every request without re-bootstrapping.
  */
 async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
-  const user = await loadUserConfig(opts.root, opts.configFile);
-  initCodemap(resolveCodemapConfig(opts.root, user));
+  const user = await loadUserConfig(opts.root, opts.configFile, {
+    stateDir: opts.stateDir,
+  });
+  initCodemap(
+    resolveCodemapConfig(opts.root, user, { stateDir: opts.stateDir }),
+  );
   configureResolver(getProjectRoot(), getTsconfigPath());
 }
 

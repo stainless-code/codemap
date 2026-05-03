@@ -1,6 +1,4 @@
 node_modules/
-.codemap.*
-.codemap/audit-cache/
 .DS_Store
 dist/
 *.tgz

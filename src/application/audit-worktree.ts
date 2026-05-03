@@ -28,22 +28,15 @@ function gitSpawnEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Sha-keyed worktree cache for `audit --base <ref>`.
+ * Sha-keyed worktree cache for `audit --base <ref>`. Each entry is a
+ * `git worktree` at `<projectRoot>/.codemap/audit-cache/<sha>/` with its
+ * own `.codemap/index.db`. Cache-hit detection: that DB exists.
  *
- * Each cache entry is a populated `git worktree` at `<projectRoot>/.codemap/audit-cache/<sha>/`
- * containing the materialised tree at that commit AND a temp `.codemap.db`
- * indexed against it. Cache-hit detection is "does `<sha>/.codemap.db` exist?"
- * — atomic populate (D11) guarantees the DB only appears after a successful
- * reindex, so a cache hit never observes a half-written entry.
+ * **Concurrency.** Per-pid temp dir + POSIX `rename` to the final `<sha>/`
+ * slot — losers fall through to cache-hit; no lock files.
  *
- * **Concurrency.** Two parallel `audit --base <ref>` invocations resolving to
- * the same sha race-safely: each writes to a per-pid temp dir, then POSIX
- * `rename` claims the final `<sha>/` slot. Whichever rename loses gets EEXIST
- * on most platforms — we treat that as "the winner already populated, fall
- * through to cache-hit." No lock files needed.
- *
- * **Eviction.** LRU after 5 entries OR 500 MiB (D2). Computed by directory
- * mtime; `git worktree remove --force` then `rm -rf` to clean up.
+ * **Eviction.** LRU after 5 entries OR 500 MiB (D2); `git worktree remove
+ * --force` + `rm -rf`.
  */
 
 const CACHE_DIR_NAME = ".codemap/audit-cache";
@@ -105,16 +98,20 @@ export function isGitRepo(projectRoot: string): boolean {
   return existsSync(join(projectRoot, ".git"));
 }
 
+/** Path of the cached DB inside a single cache entry. Mirrors the
+ * post-consolidation layout (`<root>/.codemap/index.db`) recursively. */
+const CACHE_ENTRY_DB_REL = ".codemap/index.db";
+
 /**
- * Cache-hit fast path. Returns the entry when `<sha>/.codemap.db` exists.
- * Caller falls back to {@link populateWorktree} on a miss.
+ * Cache-hit fast path. Returns the entry when `<sha>/.codemap/index.db`
+ * exists. Caller falls back to {@link populateWorktree} on a miss.
  */
 export function lookupCacheEntry(
   sha: string,
   opts: WorktreeCacheOpts,
 ): PopulatedCacheEntry | undefined {
   const worktreePath = join(opts.projectRoot, CACHE_DIR_NAME, sha);
-  const dbPath = join(worktreePath, ".codemap.db");
+  const dbPath = join(worktreePath, CACHE_ENTRY_DB_REL);
   if (!existsSync(dbPath)) return undefined;
   return {
     worktreePath,
@@ -212,7 +209,7 @@ export async function populateWorktree(
 
   return {
     worktreePath: finalPath,
-    dbPath: join(finalPath, ".codemap.db"),
+    dbPath: join(finalPath, CACHE_ENTRY_DB_REL),
     sha: opts.sha,
     indexedAt: Date.now(),
   };

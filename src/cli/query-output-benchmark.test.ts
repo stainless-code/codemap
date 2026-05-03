@@ -18,7 +18,7 @@ async function runCli(
 }
 
 const root = join(import.meta.dir, "..", "..");
-const hasDb = existsSync(join(root, ".codemap.db"));
+const hasDb = existsSync(join(root, ".codemap", "index.db"));
 const describeIntegration = hasDb ? describe : describe.skip;
 
 describeIntegration("query default vs --json (integration)", () => {

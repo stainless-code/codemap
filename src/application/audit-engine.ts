@@ -350,16 +350,18 @@ let _reindexChain: Promise<void> = Promise.resolve();
 export function makeWorktreeReindex(): ReindexFn {
   return (worktreePath: string) => {
     const next = _reindexChain.then(async () => {
-      const wtDbPath = `${worktreePath}/.codemap.db`;
-      const wtDb = openCodemapDatabase(wtDbPath);
+      // Cached worktree is a self-contained codemap project; DB resolves
+      // to <worktree>/.codemap/index.db via the default state-dir.
       const savedConfig = getCodemapConfig();
+      let wtDb;
       try {
         const wtUser = await loadUserConfig(worktreePath, undefined);
         initCodemap(resolveCodemapConfig(worktreePath, wtUser));
         configureResolver(getProjectRoot(), getTsconfigPath());
+        wtDb = openCodemapDatabase();
         await runCodemapIndex(wtDb, { mode: "full", quiet: true });
       } finally {
-        wtDb.close();
+        wtDb?.close();
         initCodemap(savedConfig);
         configureResolver(getProjectRoot(), getTsconfigPath());
       }

@@ -2,19 +2,16 @@ import { extname } from "node:path";
 
 import { VALID_EXTENSIONS } from "../application/index-engine";
 import { runCodemapIndex } from "../application/run-index";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 export async function runIndexCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   rest: string[];
 }): Promise<void> {
-  const user = await loadUserConfig(opts.root, opts.configFile);
-  initCodemap(resolveCodemapConfig(opts.root, user));
-  configureResolver(getProjectRoot(), getTsconfigPath());
+  await bootstrapCodemap(opts);
 
   const args = opts.rest;
   const db = openDb();

@@ -1,13 +1,13 @@
 import { computeValidateRows } from "../application/validate-engine";
 import type { ValidateRow } from "../application/validate-engine";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ValidateOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   paths: string[];
   json?: boolean;
 }
@@ -82,9 +82,7 @@ export function parseValidateRest(
 export async function runValidateCmd(opts: ValidateOpts): Promise<void> {
   const json = opts.json === true;
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
     const db = openDb();
     let rows: ValidateRow[];
     try {

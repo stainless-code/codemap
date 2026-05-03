@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -57,7 +57,8 @@ describe("resolveCodemapConfig", () => {
   it("defaults database path and include patterns", () => {
     const r = resolveCodemapConfig(dir, undefined);
     expect(r.root).toBe(dir);
-    expect(r.databasePath).toBe(join(dir, ".codemap.db"));
+    expect(r.stateDir).toBe(join(dir, ".codemap"));
+    expect(r.databasePath).toBe(join(dir, ".codemap", "index.db"));
     expect(r.include.length).toBe(DEFAULT_INCLUDE_PATTERNS.length);
     expect(r.excludeDirNames.has("node_modules")).toBe(true);
   });
@@ -114,9 +115,11 @@ describe("loadUserConfig", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("loads codemap.config.json from project root", async () => {
+  it("loads <state-dir>/config.json", async () => {
+    const stateDir = join(dir, ".codemap");
+    mkdirSync(stateDir, { recursive: true });
     writeFileSync(
-      join(dir, "codemap.config.json"),
+      join(stateDir, "config.json"),
       JSON.stringify({ include: ["**/*.ts"] }),
     );
     const cfg = await loadUserConfig(dir);
@@ -136,8 +139,10 @@ describe("loadUserConfig", () => {
   });
 
   it("invalid JSON config throws when resolved", async () => {
+    const stateDir = join(dir, ".codemap");
+    mkdirSync(stateDir, { recursive: true });
     writeFileSync(
-      join(dir, "codemap.config.json"),
+      join(stateDir, "config.json"),
       JSON.stringify({ include: [1, 2] }),
     );
     const cfg = await loadUserConfig(dir);

@@ -4,18 +4,13 @@ import {
   DEFAULT_DEBOUNCE_MS,
   runWatchLoop,
 } from "../application/watcher";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
-import { configureResolver } from "../resolver";
-import {
-  getExcludeDirNames,
-  getProjectRoot,
-  getTsconfigPath,
-  initCodemap,
-} from "../runtime";
+import { getExcludeDirNames, getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface WatchOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   debounceMs: number;
   quiet: boolean;
 }
@@ -123,9 +118,7 @@ file watcher). Tracer 4 lands an optimization: when watcher is active,
  */
 export async function runWatchCmd(opts: WatchOpts): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     const root = getProjectRoot();
     if (!opts.quiet) {

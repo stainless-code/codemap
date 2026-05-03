@@ -4,14 +4,14 @@ import {
 } from "../application/show-engine";
 import type { SnippetResult, SymbolMatch } from "../application/show-engine";
 import { toProjectRelative } from "../application/validate-engine";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface SnippetOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   name: string;
   kind: string | undefined;
   inPath: string | undefined;
@@ -145,9 +145,7 @@ export function parseSnippetRest(rest: string[]):
  */
 export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     const projectRoot = getProjectRoot();
     const inPath =
