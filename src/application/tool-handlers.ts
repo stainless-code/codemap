@@ -31,6 +31,8 @@ import { GROUP_BY_MODES } from "../group-by";
 import { getProjectRoot } from "../runtime";
 import { resolveAuditBaselines, runAudit } from "./audit-engine";
 import { buildContextEnvelope } from "./context-engine";
+import { findImpact } from "./impact-engine";
+import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
 import { formatAnnotations, formatSarif } from "./output-formatters";
 import { executeQuery } from "./query-engine";
@@ -648,6 +650,51 @@ export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
         inPath,
       });
       return ok(buildSnippetResult({ db, matches, projectRoot: root }));
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === impact =================================================================
+
+export const impactArgsSchema = {
+  target: z.string().min(1, "target must be a non-empty string"),
+  direction: z.enum(["up", "down", "both"]).optional(),
+  via: z.enum(["dependencies", "calls", "imports", "all"]).optional(),
+  depth: z.number().int().nonnegative().optional(),
+  limit: z.number().int().positive().optional(),
+  summary: z.boolean().optional(),
+};
+
+export interface ImpactArgs {
+  target: string;
+  direction?: ImpactDirection;
+  via?: ImpactBackend;
+  depth?: number;
+  limit?: number;
+  summary?: boolean;
+}
+
+export function handleImpact(args: ImpactArgs): ToolResult {
+  try {
+    const db = openDb();
+    try {
+      const result = findImpact(db, {
+        target: args.target,
+        direction: args.direction,
+        via: args.via,
+        depth: args.depth,
+        limit: args.limit,
+      });
+      // mirrors cmd-impact.ts: trim `matches`, keep `summary.nodes`.
+      const payload =
+        args.summary === true
+          ? { ...result, matches: [] as typeof result.matches }
+          : result;
+      return ok(payload);
     } finally {
       closeDb(db, { readonly: true });
     }

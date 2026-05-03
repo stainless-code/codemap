@@ -259,6 +259,18 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.matches[0]).toHaveProperty("missing");
   });
 
+  it("impact returns the {target, matches, summary} envelope", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "impact", {
+      target: "foo",
+      direction: "down",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.target).toMatchObject({ kind: "symbol", name: "foo" });
+    expect(r.json.summary).toBeDefined();
+    expect(Array.isArray(r.json.matches)).toBe(true);
+  });
+
   it("list_baselines returns array (empty when none saved)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "list_baselines", {});
@@ -387,6 +399,31 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
     expect(r.status).toBe(400);
     expect(r.json.error).toContain('"snippet"');
     expect(r.json.error).toContain("name");
+  });
+
+  it("impact without target → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "impact", {});
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"impact"');
+  });
+
+  it("impact with non-integer depth → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "impact", {
+      target: "foo",
+      depth: 1.5,
+    });
+    expect(r.status).toBe(400);
+  });
+
+  it("impact with unknown direction → 400 (Zod enum)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "impact", {
+      target: "foo",
+      direction: "sideways",
+    });
+    expect(r.status).toBe(400);
   });
 });
 

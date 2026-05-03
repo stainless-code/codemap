@@ -21,6 +21,7 @@ import {
   handleAudit,
   handleContext,
   handleDropBaseline,
+  handleImpact,
   handleListBaselines,
   handleQuery,
   handleQueryBatch,
@@ -29,6 +30,7 @@ import {
   handleShow,
   handleSnippet,
   handleValidate,
+  impactArgsSchema,
   listBaselinesArgsSchema,
   queryArgsSchema,
   queryBatchArgsSchema,
@@ -116,6 +118,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerDropBaselineTool(server);
   registerShowTool(server, opts);
   registerSnippetTool(server, opts);
+  registerImpactTool(server);
   registerResources(server);
 
   return server;
@@ -250,6 +253,18 @@ function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
       inputSchema: snippetArgsSchema,
     },
     (args) => wrapToolResult(handleSnippet(args, opts.root)),
+  );
+}
+
+function registerImpactTool(server: McpServer): void {
+  server.registerTool(
+    "impact",
+    {
+      description:
+        "Walk the dependency / calls / imports graph from <target> and return the blast radius. Replaces composing `WITH RECURSIVE` queries by hand. Args: target (symbol name or file path), direction (up|down|both, default both), via (dependencies|calls|imports|all, default all — symbol targets walk calls; file targets walk dependencies+imports; mismatched explicit choices land in skipped_backends), depth (default 3, 0=unbounded but cycle-detected and limit-capped), limit (default 500), summary (returns target+summary only). Result envelope: {target, direction, via, depth_limit, matches: [{depth, direction, edge, kind, name?, file_path}], summary: {nodes, max_depth_reached, by_kind, terminated_by: 'depth'|'limit'|'exhausted'}}.",
+      inputSchema: impactArgsSchema,
+    },
+    (args) => wrapToolResult(handleImpact(args)),
   );
 }
 

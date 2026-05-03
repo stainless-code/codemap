@@ -220,6 +220,32 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "impact") {
+    const { parseImpactRest, printImpactCmdHelp, runImpactCmd } =
+      await import("./cmd-impact.js");
+    const parsed = parseImpactRest(rest);
+    if (parsed.kind === "help") {
+      printImpactCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runImpactCmd({
+      root,
+      configFile,
+      target: parsed.target,
+      direction: parsed.direction,
+      via: parsed.via,
+      depth: parsed.depth,
+      limit: parsed.limit,
+      summary: parsed.summary,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "audit") {
     const { parseAuditRest, printAuditCmdHelp, runAuditCmd } =
       await import("./cmd-audit.js");

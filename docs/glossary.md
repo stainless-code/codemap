@@ -215,6 +215,10 @@ A file with high **fan-in** — many other files import it. Surfaced by the `fan
 
 Index mode that diffs against `last_indexed_commit` (git) and only re-indexes changed files. Default mode (no flag); falls back to full rebuild if commit history is incompatible.
 
+### `codemap impact` / impact tool
+
+Symbol or file blast-radius walker. CLI: `codemap impact <target> [--direction up|down|both] [--depth N] [--via dependencies|calls|imports|all] [--limit N] [--summary] [--json]`. MCP: `impact` tool. HTTP: `POST /tool/impact`. Replaces hand-composed `WITH RECURSIVE` queries that agents struggle to write reliably. Walks compatible graphs based on resolved target kind: **symbol** targets walk `calls` (callers / callees by name); **file** targets walk `dependencies` + `imports` (`resolved_path` only). Mismatched explicit `--via` choices land in `skipped_backends` instead of failing. Cycle-detected via path-string `instr` check inside the recursive CTE; bounded by `--depth` (default 3, 0 = unbounded but still cycle-detected and limit-capped) and `--limit` (default 500). Result envelope: `{target, direction, via, depth_limit, matches: [{depth, direction, edge, kind, name?, file_path}], summary: {nodes, max_depth_reached, by_kind, terminated_by: 'depth'|'limit'|'exhausted'}}`. `--summary` trims `matches` for cheap CI gate consumption (`jq '.summary.nodes'`) but preserves the count. Pure transport-agnostic engine in `application/impact-engine.ts`; CLI / MCP / HTTP all dispatch the same `findImpact` function. `sarif` / `annotations` formats not supported (impact rows are graph traversals, not findings).
+
 ### `imports` (table)
 
 Raw `import` statements. `specifiers` is JSON-encoded; `resolved_path` is non-null only when the resolver could map `source` to an indexed file. See `ImportRow` and the resolved view `dependencies`.
