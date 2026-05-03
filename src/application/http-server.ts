@@ -6,7 +6,12 @@ import type { ZodRawShape } from "zod";
 
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import {
+  getExcludeDirNames,
+  getProjectRoot,
+  getTsconfigPath,
+  initCodemap,
+} from "../runtime";
 import { listResources, readResource } from "./resource-handlers";
 import {
   auditArgsSchema,
@@ -33,6 +38,11 @@ import {
   validateArgsSchema,
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
+import {
+  createReindexOnChange,
+  DEFAULT_DEBOUNCE_MS,
+  runWatchLoop,
+} from "./watcher";
 
 /**
  * HTTP server engine — same tool taxonomy as `application/mcp-server.ts`,
@@ -54,6 +64,14 @@ export interface HttpServerOpts {
   port: number;
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
+  /**
+   * If true, boot a co-process file watcher (chokidar via
+   * `runWatchLoop`) so the server's tools always read live data. Drains
+   * pending events on shutdown. See [`docs/plans/watch-mode.md`](../../../docs/plans/watch-mode.md).
+   */
+  watch?: boolean;
+  /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
+  debounceMs?: number;
 }
 
 const TOOL_NAMES = [
@@ -92,17 +110,39 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
       console.error(
         `codemap serve: listening on http://${opts.host}:${opts.port}` +
-          (opts.token !== undefined ? " (auth: Bearer)" : ""),
+          (opts.token !== undefined ? " (auth: Bearer)" : "") +
+          (opts.watch === true ? " (watch: on)" : ""),
       );
       resolve();
     });
   });
 
+  let stopWatch: (() => Promise<void>) | undefined;
+  if (opts.watch === true) {
+    const handle = runWatchLoop({
+      root: getProjectRoot(),
+      excludeDirNames: getExcludeDirNames(),
+      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      onChange: createReindexOnChange({
+        quiet: false,
+        label: "codemap serve",
+      }),
+    });
+    stopWatch = handle.stop;
+  }
+
   await new Promise<void>((resolve) => {
     const shutdown = (signal: string) => {
       // eslint-disable-next-line no-console -- intentional shutdown log on stderr
       console.error(`codemap serve: ${signal} received, shutting down...`);
-      server.close(() => resolve());
+      const closeServer = (): void => {
+        server.close(() => resolve());
+      };
+      if (stopWatch !== undefined) {
+        void stopWatch().then(closeServer);
+      } else {
+        closeServer();
+      }
     };
     process.once("SIGINT", () => shutdown("SIGINT"));
     process.once("SIGTERM", () => shutdown("SIGTERM"));

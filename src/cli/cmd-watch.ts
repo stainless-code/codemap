@@ -1,7 +1,9 @@
-import { runCodemapIndex } from "../application/run-index";
-import { DEFAULT_DEBOUNCE_MS, runWatchLoop } from "../application/watcher";
+import {
+  createReindexOnChange,
+  DEFAULT_DEBOUNCE_MS,
+  runWatchLoop,
+} from "../application/watcher";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
-import { closeDb, openDb } from "../db";
 import { configureResolver } from "../resolver";
 import {
   getExcludeDirNames,
@@ -130,26 +132,7 @@ export async function runWatchCmd(opts: WatchOpts): Promise<void> {
       root,
       excludeDirNames: getExcludeDirNames(),
       debounceMs: opts.debounceMs,
-      onChange: async (paths) => {
-        const t0 = performance.now();
-        const db = openDb();
-        try {
-          await runCodemapIndex(db, {
-            mode: "files",
-            files: [...paths],
-            quiet: true,
-          });
-        } finally {
-          closeDb(db);
-        }
-        if (!opts.quiet) {
-          const ms = Math.round(performance.now() - t0);
-          // eslint-disable-next-line no-console -- intentional batch-status log on stderr
-          console.error(
-            `codemap watch: reindex ${paths.size} file(s) in ${ms}ms`,
-          );
-        }
-      },
+      onChange: createReindexOnChange({ quiet: opts.quiet }),
     });
 
     await new Promise<void>((resolve) => {

@@ -166,7 +166,12 @@ Copies bundled agent templates into .agents/ under the project root.
       console.error(parsed.message);
       process.exit(1);
     }
-    await runMcpCmd({ root, configFile });
+    await runMcpCmd({
+      root,
+      configFile,
+      watch: parsed.watch,
+      debounceMs: parsed.debounceMs,
+    });
     return;
   }
 
@@ -209,6 +214,8 @@ Copies bundled agent templates into .agents/ under the project root.
       host: parsed.host,
       port: parsed.port,
       token: parsed.token,
+      watch: parsed.watch,
+      debounceMs: parsed.debounceMs,
     });
     return;
   }

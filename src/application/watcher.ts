@@ -3,6 +3,9 @@ import { extname, relative, sep } from "node:path";
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 
+import { closeDb, openDb } from "../db";
+import { runCodemapIndex } from "./run-index";
+
 /**
  * `codemap watch` engine — keeps `.codemap.db` fresh on file edits so
  * every CLI / MCP / HTTP query reads live data without a per-request
@@ -134,6 +137,45 @@ export function createDebouncer(
 
 /** Default debounce — long enough to coalesce a single editor save burst, short enough that agents don't perceive lag. */
 export const DEFAULT_DEBOUNCE_MS = 250;
+
+/**
+ * Standard onChange callback every embedder uses (cmd-watch, serve
+ * --watch, mcp --watch): open DB, run targeted reindex on the changed
+ * paths, log a one-line status to stderr unless `quiet`. Errors are
+ * caught + logged so a transient parse failure doesn't kill the watch
+ * loop.
+ */
+export function createReindexOnChange(opts: {
+  quiet: boolean;
+  /** Optional label so serve/mcp embedders distinguish their stderr lines from a standalone watch session. */
+  label?: string;
+}): (paths: ReadonlySet<string>) => Promise<void> {
+  const prefix = opts.label ?? "codemap watch";
+  return async (paths) => {
+    const t0 = performance.now();
+    try {
+      const db = openDb();
+      try {
+        await runCodemapIndex(db, {
+          mode: "files",
+          files: [...paths],
+          quiet: true,
+        });
+      } finally {
+        closeDb(db);
+      }
+      if (!opts.quiet) {
+        const ms = Math.round(performance.now() - t0);
+        // eslint-disable-next-line no-console -- intentional batch-status log on stderr
+        console.error(`${prefix}: reindex ${paths.size} file(s) in ${ms}ms`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console -- intentional error log on stderr
+      console.error(`${prefix}: reindex failed — ${msg}`);
+    }
+  };
+}
 
 export interface WatchLoopOpts {
   /** Project root the indexer is configured for. */

@@ -10,6 +10,8 @@ describe("parseServeRest", () => {
       host: DEFAULT_HOST,
       port: DEFAULT_PORT,
       token: undefined,
+      watch: false,
+      debounceMs: 250,
     });
   });
 
@@ -92,10 +94,44 @@ describe("parseServeRest", () => {
       host: "0.0.0.0",
       port: 9000,
       token: "secret",
+      watch: false,
+      debounceMs: 250,
     });
   });
 
   it("throws if rest[0] is not 'serve'", () => {
     expect(() => parseServeRest(["query"])).toThrow();
+  });
+
+  it("parses --watch", () => {
+    const r = parseServeRest(["serve", "--watch"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(true);
+  });
+
+  it("parses --debounce <ms>", () => {
+    const r = parseServeRest(["serve", "--debounce", "500"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.debounceMs).toBe(500);
+  });
+
+  it("composes --watch + --debounce + --port", () => {
+    const r = parseServeRest([
+      "serve",
+      "--watch",
+      "--debounce",
+      "100",
+      "--port",
+      "9000",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(true);
+    expect(r.debounceMs).toBe(100);
+    expect(r.port).toBe(9000);
+  });
+
+  it("rejects --debounce with non-numeric value", () => {
+    const r = parseServeRest(["serve", "--debounce", "abc"]);
+    expect(r.kind).toBe("error");
   });
 });

@@ -6,7 +6,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import {
+  getExcludeDirNames,
+  getProjectRoot,
+  getTsconfigPath,
+  initCodemap,
+} from "../runtime";
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import {
@@ -34,6 +39,11 @@ import {
   validateArgsSchema,
 } from "./tool-handlers";
 import type { ToolResult } from "./tool-handlers";
+import {
+  createReindexOnChange,
+  DEFAULT_DEBOUNCE_MS,
+  runWatchLoop,
+} from "./watcher";
 
 /**
  * MCP server engine — owns the tool / resource registry. CLI shell
@@ -49,6 +59,15 @@ interface ServerOpts {
   version: string;
   root: string;
   configFile?: string | undefined;
+  /**
+   * If true, boot a co-process file watcher (chokidar via
+   * `runWatchLoop`) so the server's tools always read live data without
+   * a per-request reindex prelude. Drains pending events on shutdown.
+   * See [`docs/plans/watch-mode.md`](../../../docs/plans/watch-mode.md).
+   */
+  watch?: boolean;
+  /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
+  debounceMs?: number;
 }
 
 /**
@@ -343,7 +362,26 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
   const server = createMcpServer(opts);
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  let stopWatch: (() => Promise<void>) | undefined;
+  if (opts.watch === true) {
+    // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
+    console.error("codemap mcp: --watch enabled, booting file watcher...");
+    const handle = runWatchLoop({
+      root: getProjectRoot(),
+      excludeDirNames: getExcludeDirNames(),
+      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      onChange: createReindexOnChange({
+        quiet: false,
+        label: "codemap mcp",
+      }),
+    });
+    stopWatch = handle.stop;
+  }
+
   await new Promise<void>((resolve) => {
     transport.onclose = () => resolve();
   });
+
+  if (stopWatch !== undefined) await stopWatch();
 }
