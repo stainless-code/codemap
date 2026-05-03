@@ -146,10 +146,19 @@ codemap snippet foo --json                                      # {matches: [{..
 # Output envelope is always {matches, disambiguation?} — single match → {matches: [{...}]};
 # multi-match adds disambiguation: {n, by_kind, files, hint} for agent-friendly narrowing.
 
+# Impact analysis — symbol/file blast-radius walker (callers, callees, dependents, dependencies)
+codemap impact handleQuery                                      # both directions, depth 3, all compatible graphs
+codemap impact src/db.ts --direction up                         # what depends on db.ts (file-level, deps + imports)
+codemap impact handleAudit --depth 1 --via calls                # direct callers via the calls table only
+codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fan-in score
+# Replaces hand-composed `WITH RECURSIVE` queries. Cycle-detected, depth-bounded
+# (default 3, --depth 0 = unbounded), limit-capped (default 500). Result envelope:
+# {target, matches: [{depth, edge, kind, name?, file_path}], summary: {nodes, terminated_by}}.
+
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
-#        save_baseline, list_baselines, drop_baseline, context, validate
+#        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact
 # Resources: codemap://recipes, codemap://recipes/{id}, codemap://schema, codemap://skill (lazy-cached)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
