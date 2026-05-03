@@ -35,6 +35,7 @@ Codemap stays a structural-index primitive that other tools can consume. Out of 
 
 ## Backlog
 
+- [ ] **`codemap impact <target>`** — symbol/file blast-radius walker (callers, callees, depth-bounded, multi-graph). Replaces hand-composed `WITH RECURSIVE` queries that agents struggle to write. Plan: [`plans/impact.md`](./plans/impact.md).
 - [ ] **`codemap audit --base <ref>`** (v1.x) — worktree+reindex snapshot strategy. v1 shipped `--baseline <prefix>` / `--<delta>-baseline <name>` (B.6 reuse) — see [`architecture.md` § Audit wiring](./architecture.md#cli-usage). v1.x adds `--base <ref>` for "audit against an arbitrary ref I haven't pre-baselined" (defers worktree spawn + cache decision until a real consumer asks).
 - [ ] **`codemap audit` verdict + thresholds** (v1.x) — `verdict: "pass" | "warn" | "fail"` driven by `codemap.config.audit.deltas[<key>].{added_max, action}`. Triggers: two consumers ship `jq`-based threshold scripts with similar shapes, OR one consumer asks with a concrete config sketch. Until then, raw deltas + consumer-side `jq` is the CI exit-code idiom.
 - [ ] **Monorepo / workspace awareness** — discover workspaces from `pnpm-workspace.yaml` / `package.json` and index per-workspace dependency graphs
