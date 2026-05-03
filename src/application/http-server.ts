@@ -20,6 +20,7 @@ import {
   handleAudit,
   handleContext,
   handleDropBaseline,
+  handleImpact,
   handleListBaselines,
   handleQuery,
   handleQueryBatch,
@@ -28,6 +29,7 @@ import {
   handleShow,
   handleSnippet,
   handleValidate,
+  impactArgsSchema,
   listBaselinesArgsSchema,
   queryArgsSchema,
   queryBatchArgsSchema,
@@ -84,6 +86,7 @@ const TOOL_NAMES = [
   "validate",
   "show",
   "snippet",
+  "impact",
   "save_baseline",
   "list_baselines",
   "drop_baseline",
@@ -456,6 +459,12 @@ async function dispatchTool(
       const r = validate(snippetArgsSchema, args, "snippet");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleSnippet(r.value, opts.root);
+      break;
+    }
+    case "impact": {
+      const r = validate(impactArgsSchema, args, "impact");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleImpact(r.value);
       break;
     }
     case "save_baseline": {
