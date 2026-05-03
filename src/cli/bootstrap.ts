@@ -31,6 +31,10 @@ MCP server (Model Context Protocol — for agent hosts):
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
   codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]
 
+Watch mode (long-running; keeps .codemap.db fresh on file edits):
+  codemap watch [--debounce 250] [--quiet]
+  codemap mcp --watch · codemap serve --watch    # killer combo
+
 Targeted reads (precise lookup by symbol name):
   codemap show <name> [--kind <k>] [--in <path>] [--json]      # metadata: file:line + signature
   codemap snippet <name> [--kind <k>] [--in <path>] [--json]   # source text from disk + stale flag
@@ -65,6 +69,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "audit") return;
   if (rest[0] === "mcp") return;
   if (rest[0] === "serve") return;
+  if (rest[0] === "watch") return;
   if (rest[0] === "show") return;
   if (rest[0] === "snippet") return;
 

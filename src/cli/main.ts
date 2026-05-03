@@ -170,6 +170,27 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "watch") {
+    const { parseWatchRest, printWatchCmdHelp, runWatchCmd } =
+      await import("./cmd-watch.js");
+    const parsed = parseWatchRest(rest);
+    if (parsed.kind === "help") {
+      printWatchCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runWatchCmd({
+      root,
+      configFile,
+      debounceMs: parsed.debounceMs,
+      quiet: parsed.quiet,
+    });
+    return;
+  }
+
   if (rest[0] === "serve") {
     const { parseServeRest, printServeCmdHelp, runServeCmd } =
       await import("./cmd-serve.js");
