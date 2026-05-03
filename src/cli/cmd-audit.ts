@@ -1,21 +1,16 @@
 import {
+  makeWorktreeReindex,
   resolveAuditBaselines,
   runAudit,
   runAuditFromRef,
   V1_DELTAS,
 } from "../application/audit-engine";
-import type { AuditEnvelope, ReindexFn } from "../application/audit-engine";
+import type { AuditEnvelope } from "../application/audit-engine";
 import { runCodemapIndex } from "../application/run-index";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import { configureResolver } from "../resolver";
-import {
-  getCodemapConfig,
-  getProjectRoot,
-  getTsconfigPath,
-  initCodemap,
-} from "../runtime";
-import { openCodemapDatabase } from "../sqlite-db";
+import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
 
 // Per-delta CLI flag → delta key. Generated from V1_DELTAS so adding a delta
 // in the engine surfaces a `--<key>-baseline` flag automatically.
@@ -315,37 +310,6 @@ export async function runAuditCmd(opts: {
   } catch (err) {
     emitAuditError(err instanceof Error ? err.message : String(err), opts.json);
   }
-}
-
-/**
- * Build the `ReindexFn` injected into `runAuditFromRef`. Opens a fresh DB
- * inside the worktree dir and runs a full index against it via
- * `runCodemapIndex({ mode: "files" / "full" })` — but we have to swap the
- * runtime singletons (`getProjectRoot`) for the worktree path. Cheapest
- * way: re-init codemap with the worktree as root, run, then restore. The
- * cache shape ({sha}/.codemap.db) means subsequent runs short-circuit
- * before this fn is called.
- */
-function makeWorktreeReindex(): ReindexFn {
-  return async (worktreePath: string) => {
-    const wtDbPath = `${worktreePath}/.codemap.db`;
-    const wtDb = openCodemapDatabase(wtDbPath);
-    // Save+restore the runtime singletons. `initCodemap` overwrites global
-    // state (`getProjectRoot`, etc.); without restoring, control returns
-    // to `runAuditCmd` with codemap pointing at the worktree, breaking
-    // any subsequent live-DB operation.
-    const savedConfig = getCodemapConfig();
-    try {
-      const wtUser = await loadUserConfig(worktreePath, undefined);
-      initCodemap(resolveCodemapConfig(worktreePath, wtUser));
-      configureResolver(getProjectRoot(), getTsconfigPath());
-      await runCodemapIndex(wtDb, { mode: "full", quiet: true });
-    } finally {
-      wtDb.close();
-      initCodemap(savedConfig);
-      configureResolver(getProjectRoot(), getTsconfigPath());
-    }
-  };
 }
 
 function emitAuditError(message: string, json: boolean) {

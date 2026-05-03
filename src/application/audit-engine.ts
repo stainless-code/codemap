@@ -1,6 +1,14 @@
+import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { getQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
 import { diffRows } from "../diff-rows";
+import { configureResolver } from "../resolver";
+import {
+  getCodemapConfig,
+  getProjectRoot,
+  getTsconfigPath,
+  initCodemap,
+} from "../runtime";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   isGitRepo,
@@ -10,6 +18,7 @@ import {
 } from "./audit-worktree";
 import type { PopulatedCacheEntry } from "./audit-worktree";
 import { getCurrentCommit } from "./index-engine";
+import { runCodemapIndex } from "./run-index";
 
 /**
  * Per-delta diff payload — the rows that drifted between baseline and current,
@@ -310,12 +319,38 @@ function tryGetGitRef(): string | null {
 }
 
 /**
- * Reindex callback contract — `runAuditFromRef` injects this so the engine
- * stays decoupled from `application/run-index.ts` (which itself depends on
- * config + resolver + runtime singletons). Tracer 2 wires the production
- * implementation in `cmd-audit.ts`.
+ * Reindex callback contract — `runAuditFromRef` injects this. The default
+ * production implementation (`makeWorktreeReindex`) re-inits the runtime
+ * singletons against the worktree path then calls `runCodemapIndex`; tests
+ * inject a stub via this same hook.
  */
 export type ReindexFn = (worktreePath: string) => Promise<void>;
+
+/**
+ * Standard production reindex callback for `runAuditFromRef`. Saves the
+ * runtime singletons, re-initialises codemap against the worktree so
+ * `runCodemapIndex` walks the worktree's tree, then restores. Both
+ * `cmd-audit.ts` and `application/tool-handlers.ts` (MCP / HTTP) call
+ * this — single source of truth for the "open temp DB inside worktree
+ * dir, reindex, restore" sequence.
+ */
+export function makeWorktreeReindex(): ReindexFn {
+  return async (worktreePath: string) => {
+    const wtDbPath = `${worktreePath}/.codemap.db`;
+    const wtDb = openCodemapDatabase(wtDbPath);
+    const savedConfig = getCodemapConfig();
+    try {
+      const wtUser = await loadUserConfig(worktreePath, undefined);
+      initCodemap(resolveCodemapConfig(worktreePath, wtUser));
+      configureResolver(getProjectRoot(), getTsconfigPath());
+      await runCodemapIndex(wtDb, { mode: "full", quiet: true });
+    } finally {
+      wtDb.close();
+      initCodemap(savedConfig);
+      configureResolver(getProjectRoot(), getTsconfigPath());
+    }
+  };
+}
 
 export interface RunAuditFromRefOpts {
   db: CodemapDatabase;
