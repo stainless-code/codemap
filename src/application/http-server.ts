@@ -63,6 +63,7 @@ export interface HttpServerOpts {
   version: string;
   root: string;
   configFile?: string | undefined;
+  stateDir?: string | undefined;
   host: string;
   port: number;
   /** Bearer token; if undefined the server skips auth. */
@@ -173,8 +174,12 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
 }
 
 async function bootstrapForServe(opts: HttpServerOpts): Promise<void> {
-  const user = await loadUserConfig(opts.root, opts.configFile);
-  initCodemap(resolveCodemapConfig(opts.root, user));
+  const user = await loadUserConfig(opts.root, opts.configFile, {
+    stateDir: opts.stateDir,
+  });
+  initCodemap(
+    resolveCodemapConfig(opts.root, user, { stateDir: opts.stateDir }),
+  );
   configureResolver(getProjectRoot(), getTsconfigPath());
 }
 

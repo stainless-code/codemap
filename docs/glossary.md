@@ -11,7 +11,7 @@ Alphabetical, lowercase. Disambiguation pairs link to each other.
 ## Conventions
 
 - **TS shape** = a TypeScript interface or type alias.
-- **SQLite table** = an actual on-disk table in `.codemap.db`.
+- **SQLite table** = an actual on-disk table in `.codemap/index.db`.
 - **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (project-local). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
 - **Query** = any SQL run against the index (recipe or ad-hoc).
 
@@ -33,11 +33,11 @@ A `.agents/rules/<name>.md` file with YAML frontmatter. Distinct from a **skill*
 
 ### audit
 
-Two-snapshot structural-drift command: `codemap audit` diffs the live `.codemap.db` against a base snapshot and emits `{head, deltas}` where each `deltas[<key>]` carries `{base, added, removed}`. v1 ships three deltas: `files`, `dependencies`, `deprecated`. Each delta pins a canonical SQL projection (in `V1_DELTAS`) and a required-columns list — projects baseline rows down to that subset before diffing so schema bumps that add columns don't break pre-bump baselines. Three mutually-exclusive top-level snapshot sources: `--baseline <prefix>` (auto-resolve `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated` from `query_baselines`), `--<delta>-baseline <name>` (explicit per-delta — composes with the others), and `--base <ref>` (worktree + reindex against a git committish — see § A `audit --base`). Distinct from `codemap query --baseline` (that's one query, one diff; audit composes multiple per-delta diffs into one envelope). Distinct from `fallow audit` (that runs code-quality verdicts — dead code, dupes, complexity — which are explicit non-goals per [`roadmap.md` § Non-goals (v1)](./roadmap.md#non-goals-v1); codemap audit stays structural).
+Two-snapshot structural-drift command: `codemap audit` diffs the live `.codemap/index.db` against a base snapshot and emits `{head, deltas}` where each `deltas[<key>]` carries `{base, added, removed}`. v1 ships three deltas: `files`, `dependencies`, `deprecated`. Each delta pins a canonical SQL projection (in `V1_DELTAS`) and a required-columns list — projects baseline rows down to that subset before diffing so schema bumps that add columns don't break pre-bump baselines. Three mutually-exclusive top-level snapshot sources: `--baseline <prefix>` (auto-resolve `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated` from `query_baselines`), `--<delta>-baseline <name>` (explicit per-delta — composes with the others), and `--base <ref>` (worktree + reindex against a git committish — see § A `audit --base`). Distinct from `codemap query --baseline` (that's one query, one diff; audit composes multiple per-delta diffs into one envelope). Distinct from `fallow audit` (that runs code-quality verdicts — dead code, dupes, complexity — which are explicit non-goals per [`roadmap.md` § Non-goals (v1)](./roadmap.md#non-goals-v1); codemap audit stays structural).
 
 ### `audit --base <ref>` / git-ref baseline
 
-Ad-hoc audit snapshot from any git committish (`origin/main`, `HEAD~5`, `<sha>`, tag, …). `git worktree add` materialises `<ref>` to `<projectRoot>/.codemap/audit-cache/<sha>/`, codemap reindexes into the worktree's `.codemap.db`, then per-delta canonical SQL runs on that DB vs the live one. Cache key is the **resolved sha** (`git rev-parse --verify`), so `--base origin/main` and `--base <sha>` (when they point at the same commit) share one cache entry. **Atomic populate** — per-pid temp dir + POSIX `rename`; concurrent processes resolving the same sha race-safely without lock files. Eviction: hardcoded LRU 5 entries / 500 MiB. Per-delta `base.source` is `"ref"` (vs `"baseline"`) and the delta carries `base.ref` (user-supplied string) + `base.sha` (resolved). Mutually exclusive with `--baseline <prefix>`; composes orthogonally with per-delta `--<delta>-baseline <name>` overrides. Hard error on non-git projects (no graceful fallback — there's no meaningful "ref" without git). Both transports (MCP `audit` tool's `base?` arg, HTTP `POST /tool/audit`) call the same `runAuditFromRef` engine in `application/audit-engine.ts`.
+Ad-hoc audit snapshot from any git committish (`origin/main`, `HEAD~5`, `<sha>`, tag, …). `git worktree add` materialises `<ref>` to `<projectRoot>/.codemap/audit-cache/<sha>/`, codemap reindexes into the worktree's `.codemap/index.db`, then per-delta canonical SQL runs on that DB vs the live one. Cache key is the **resolved sha** (`git rev-parse --verify`), so `--base origin/main` and `--base <sha>` (when they point at the same commit) share one cache entry. **Atomic populate** — per-pid temp dir + POSIX `rename`; concurrent processes resolving the same sha race-safely without lock files. Eviction: hardcoded LRU 5 entries / 500 MiB. Per-delta `base.source` is `"ref"` (vs `"baseline"`) and the delta carries `base.ref` (user-supplied string) + `base.sha` (resolved). Mutually exclusive with `--baseline <prefix>`; composes orthogonally with per-delta `--<delta>-baseline <name>` overrides. Hard error on non-git projects (no graceful fallback — there's no meaningful "ref" without git). Both transports (MCP `audit` tool's `base?` arg, HTTP `POST /tool/audit`) call the same `runAuditFromRef` engine in `application/audit-engine.ts`.
 
 ---
 
@@ -75,9 +75,17 @@ TS shape for one row of the `calls` table. Maps 1:1 to the SQLite columns.
 
 The extraction path a file took during parsing. One of `ts`, `css`, or `text`. Stored on `ParsedFile.category`, not on a SQLite table. See `ParsedFile`.
 
-### `.codemap.db`
+### `.codemap/` / `<state-dir>` / `CODEMAP_STATE_DIR`
 
-The on-disk SQLite database file at `<project_root>/.codemap.db`. Always accompanied by `.codemap.db-wal` and `.codemap.db-shm` while open (WAL mode). Gitignored via the `.codemap.*` pattern that `codemap agents init` ensures.
+The codemap state directory under `<project_root>` — holds every codemap-managed file: `index.db` (+ WAL / SHM), `audit-cache/<sha>/`, project-local `recipes/`, `config.{ts,js,json}`, and the self-managed `.gitignore` (per plan §D7 + D11). Default name `.codemap/`; override via `--state-dir <path>` CLI or `CODEMAP_STATE_DIR` env (relative paths resolve against `<project_root>`). Resolved at bootstrap, not via the config file (chicken-and-egg). Engine: `src/application/state-dir.ts` (`resolveStateDir`).
+
+### `.codemap/index.db` (the index)
+
+The on-disk SQLite database file at `<state-dir>/index.db` (default `<project_root>/.codemap/index.db`). Always accompanied by `index.db-wal` and `index.db-shm` while open (WAL mode). Gitignored by the self-managed `<state-dir>/.gitignore` written by `ensureStateGitignore`.
+
+### `.codemap/.gitignore` / self-healing files
+
+Codemap-managed `.gitignore` inside `<state-dir>/` (blacklist of generated artifacts; tracked sources `recipes/` + `config.*` default to tracked). Reconciled on every codemap boot by `ensureStateGitignore` (`src/application/state-dir.ts`) — read → compare to canonical → write only on drift. **Bumping the canonical body in a future PR IS the migration**: every consumer's project repairs itself on next codemap run. Same self-healing pattern (`ensure*` reconciler, idempotent, drift-detect) governs `<state-dir>/config.json` (`ensureStateConfig` in `src/application/state-config.ts` — prunes unknown keys, sorts keys, never touches user-authored TS/JS configs). Inspired by flowbite-react's `setup-*` shape; expressed in codemap's own conventions per plan §D11.
 
 ### `codemap context`
 
@@ -325,11 +333,11 @@ A managed root-level file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copil
 
 ### query
 
-Any SQL run against `.codemap.db` — either a **recipe** (bundled SQL) or ad-hoc. Distinct from **query-recipes.ts** (the file that holds bundled recipe SQL strings).
+Any SQL run against `.codemap/index.db` — either a **recipe** (bundled SQL) or ad-hoc. Distinct from **query-recipes.ts** (the file that holds bundled recipe SQL strings).
 
 ### query baseline
 
-A snapshot of a query result set saved by `codemap query --save-baseline[=<name>]` and replayed by `codemap query --baseline[=<name>]` for added/removed diffs. Stored in the `query_baselines` table inside `.codemap.db` (no parallel JSON files; survives `--full` and `SCHEMA_VERSION` rebuilds because the table is intentionally absent from `dropAll()`). Default name = `--recipe` id; ad-hoc SQL must pass an explicit name. Diff identity is per-row `JSON.stringify` equality — exact match, no fuzzy "changed" category in v1.
+A snapshot of a query result set saved by `codemap query --save-baseline[=<name>]` and replayed by `codemap query --baseline[=<name>]` for added/removed diffs. Stored in the `query_baselines` table inside `.codemap/index.db` (no parallel JSON files; survives `--full` and `SCHEMA_VERSION` rebuilds because the table is intentionally absent from `dropAll()`). Default name = `--recipe` id; ad-hoc SQL must pass an explicit name. Diff identity is per-row `JSON.stringify` equality — exact match, no fuzzy "changed" category in v1.
 
 ### query recipe
 
@@ -404,7 +412,7 @@ Long-running process that subscribes to filesystem changes via [chokidar v5](htt
 
 ### `codemap serve` / HTTP server
 
-Long-running HTTP server exposing the same tool taxonomy as `codemap mcp` over `POST /tool/{name}` for non-MCP consumers (CI scripts, simple `curl`, IDE plugins that don't speak MCP). Default bind **`127.0.0.1:7878`** (loopback only — refuse `0.0.0.0` unless explicitly opted in via `--host 0.0.0.0`); optional `--token <secret>` requires `Authorization: Bearer <secret>` on every request. Output shape matches `codemap query --json` (NOT MCP's `{content: [...]}` wrapper — HTTP doesn't need that transport artifact); `format: "sarif"` payloads ship as `application/sarif+json`, `format: "annotations"` as `text/plain`. Routes: `POST /tool/{name}` (every MCP tool), `GET /resources/{encoded-uri}` (mirror of `codemap://recipes` / `schema` / `skill`), `GET /health` (auth-exempt liveness probe), `GET /tools` / `GET /resources` (catalogs). Pure transport — same `tool-handlers.ts` / `resource-handlers.ts` MCP uses; no engine duplication. Errors → `{"error": "..."}` with HTTP status 400 / 401 / 403 / 404 / 500. SIGINT / SIGTERM → graceful drain. Every response carries `X-Codemap-Version: <semver>`. **CSRF + DNS-rebinding guard:** every request (including auth-exempt `/health`) is evaluated against `Sec-Fetch-Site` / `Origin` / `Host` when present — modern browsers send `Sec-Fetch-Site` and `Origin` on cross-origin fetches (header presence varies by request type, browser, and privacy settings), so the guard rejects browser-driven cross-origin requests like a malicious local webpage `fetch`-ing `http://127.0.0.1:7878/tool/save_baseline` to mutate `.codemap.db`. `Host` mismatch on a loopback bind blocks DNS rebinding (an attacker resolving `evil.com` to `127.0.0.1` post-load). Non-browser clients (curl, fetch from Node, MCP hosts, CI scripts) typically omit these headers and pass through. Implementation: `src/cli/cmd-serve.ts` (CLI shell) + `src/application/http-server.ts` (transport). See [`architecture.md` § HTTP wiring](./architecture.md#cli-usage).
+Long-running HTTP server exposing the same tool taxonomy as `codemap mcp` over `POST /tool/{name}` for non-MCP consumers (CI scripts, simple `curl`, IDE plugins that don't speak MCP). Default bind **`127.0.0.1:7878`** (loopback only — refuse `0.0.0.0` unless explicitly opted in via `--host 0.0.0.0`); optional `--token <secret>` requires `Authorization: Bearer <secret>` on every request. Output shape matches `codemap query --json` (NOT MCP's `{content: [...]}` wrapper — HTTP doesn't need that transport artifact); `format: "sarif"` payloads ship as `application/sarif+json`, `format: "annotations"` as `text/plain`. Routes: `POST /tool/{name}` (every MCP tool), `GET /resources/{encoded-uri}` (mirror of `codemap://recipes` / `schema` / `skill`), `GET /health` (auth-exempt liveness probe), `GET /tools` / `GET /resources` (catalogs). Pure transport — same `tool-handlers.ts` / `resource-handlers.ts` MCP uses; no engine duplication. Errors → `{"error": "..."}` with HTTP status 400 / 401 / 403 / 404 / 500. SIGINT / SIGTERM → graceful drain. Every response carries `X-Codemap-Version: <semver>`. **CSRF + DNS-rebinding guard:** every request (including auth-exempt `/health`) is evaluated against `Sec-Fetch-Site` / `Origin` / `Host` when present — modern browsers send `Sec-Fetch-Site` and `Origin` on cross-origin fetches (header presence varies by request type, browser, and privacy settings), so the guard rejects browser-driven cross-origin requests like a malicious local webpage `fetch`-ing `http://127.0.0.1:7878/tool/save_baseline` to mutate `.codemap/index.db`. `Host` mismatch on a loopback bind blocks DNS rebinding (an attacker resolving `evil.com` to `127.0.0.1` post-load). Non-browser clients (curl, fetch from Node, MCP hosts, CI scripts) typically omit these headers and pass through. Implementation: `src/cli/cmd-serve.ts` (CLI shell) + `src/application/http-server.ts` (transport). See [`architecture.md` § HTTP wiring](./architecture.md#cli-usage).
 
 ### SARIF
 
@@ -468,7 +476,7 @@ A JSDoc tag controlling export visibility — `@public`, `@internal`, `@private`
 
 ### WAL
 
-Write-Ahead Log mode. Set by `PRAGMA journal_mode = WAL` on every `openDb()`. Why `.codemap.db-wal` and `.codemap.db-shm` files exist alongside `.codemap.db`. Allows concurrent readers during writes.
+Write-Ahead Log mode. Set by `PRAGMA journal_mode = WAL` on every `openDb()`. Why `.codemap/index.db-wal` and `.codemap/index.db-shm` files exist alongside `.codemap/index.db`. Allows concurrent readers during writes.
 
 ### `WITHOUT ROWID`
 

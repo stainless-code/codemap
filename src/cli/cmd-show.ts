@@ -1,14 +1,14 @@
 import { buildShowResult, findSymbolsByName } from "../application/show-engine";
 import type { ShowResult, SymbolMatch } from "../application/show-engine";
 import { toProjectRelative } from "../application/validate-engine";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ShowOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   name: string;
   kind: string | undefined;
   inPath: string | undefined;
@@ -134,9 +134,7 @@ export function parseShowRest(rest: string[]):
  */
 export async function runShowCmd(opts: ShowOpts): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     const projectRoot = getProjectRoot();
     const inPath =

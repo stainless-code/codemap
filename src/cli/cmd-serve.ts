@@ -211,6 +211,7 @@ The server runs until SIGINT/SIGTERM (drains in-flight + closes listener).
 export async function runServeCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   host: string;
   port: number;
   token: string | undefined;
@@ -221,6 +222,7 @@ export async function runServeCmd(opts: {
     version: CODEMAP_VERSION,
     root: opts.root,
     configFile: opts.configFile,
+    stateDir: opts.stateDir,
     host: opts.host,
     port: opts.port,
     token: opts.token,

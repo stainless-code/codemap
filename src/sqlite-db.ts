@@ -1,4 +1,6 @@
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname } from "node:path";
 
 import { getDatabasePath } from "./runtime";
 
@@ -136,6 +138,8 @@ function wrap(inner: SqliteInner): CodemapDatabase {
 
 export function openCodemapDatabase(path?: string): CodemapDatabase {
   const p = path ?? getDatabasePath();
+  // Auto-create parent dir — <state-dir> may not exist on first run.
+  if (p !== ":memory:") mkdirSync(dirname(p), { recursive: true });
   const db = wrap(openRaw(p));
 
   db.run("PRAGMA journal_mode = WAL");

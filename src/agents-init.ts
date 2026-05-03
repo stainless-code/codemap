@@ -1,5 +1,4 @@
 import {
-  appendFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -12,6 +11,8 @@ import {
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
 /**
  * Directory containing `rules/` and `skills/` (next to `dist/` in published packages).
@@ -120,12 +121,6 @@ function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
     rmSync(abs, { recursive: true, force: true });
   }
 }
-
-/** Default DB basename `.codemap` plus SQLite sidecars (`.db`, `-wal`, `-shm`, …). */
-const GITIGNORE_CODEMAP_PATTERN = ".codemap.*";
-// `.codemap/audit-cache/` ignored separately because `.codemap.*` doesn't
-// match the directory shape AND `.codemap/recipes/` is git-tracked.
-const GITIGNORE_AUDIT_CACHE_PATTERN = ".codemap/audit-cache/";
 
 /**
  * Optional integrations after canonical `.agents/` is written.
@@ -291,43 +286,18 @@ export interface AgentsInitOptions {
 }
 
 /**
- * Ensure codemap-managed paths are listed in `.gitignore` when the project
- * uses Git. Adds `.codemap.*` (matches `.codemap.db` etc.) AND
- * `.codemap/audit-cache/` (the audit-base worktree cache; `.codemap/recipes/`
- * stays tracked, so we can't ignore the whole `.codemap/` dir).
- *
- * - If `<projectRoot>/.git` exists and there is no `.gitignore`, create one
- *   with both patterns.
- * - If `.gitignore` exists, append each pattern once when missing.
- * - If there is no `.git`, do nothing (not a Git working tree).
+ * Reconcile the self-managed `<state-dir>/.gitignore` (per plan §D11 +
+ * Tracer 2). Idempotent: writes only on drift; logs only on actual change.
+ * Replaces the per-feature root `.gitignore` patching the old version did
+ * — root is no longer touched (nested `.gitignore` covers every artifact).
  */
 export function ensureGitignoreCodemapPattern(projectRoot: string): void {
-  const gitDir = join(projectRoot, ".git");
-  const gitignorePath = join(projectRoot, ".gitignore");
-  if (!existsSync(gitDir)) {
-    return;
+  const stateDir = resolveStateDir({ root: projectRoot });
+  const result = ensureStateGitignore(stateDir);
+  if (result.written) {
+    const verb = result.before === undefined ? "Created" : "Updated";
+    console.log(`  ${verb} ${stateDir}/.gitignore`);
   }
-  const patterns = [GITIGNORE_CODEMAP_PATTERN, GITIGNORE_AUDIT_CACHE_PATTERN];
-  if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath, `${patterns.join("\n")}\n`, "utf-8");
-    console.log(
-      `  Created .gitignore with ${patterns.join(" + ")} (Git repo, no .gitignore yet)`,
-    );
-    return;
-  }
-  const content = readFileSync(gitignorePath, "utf-8");
-  const lines = content.split(/\r?\n/);
-  const missing = patterns.filter(
-    (p) => !lines.some((line) => line.trim() === p),
-  );
-  if (missing.length === 0) return;
-  const needsLeadingNewline = content.length > 0 && !content.endsWith("\n");
-  appendFileSync(
-    gitignorePath,
-    `${needsLeadingNewline ? "\n" : ""}${missing.join("\n")}\n`,
-    "utf-8",
-  );
-  console.log(`  Appended ${missing.join(" + ")} to .gitignore`);
 }
 
 function removePathForRewrite(

@@ -144,8 +144,10 @@ describe("populateWorktree + lookupCacheEntry", () => {
       projectRoot,
       sha: baseSha,
       reindex: async (worktreePath) => {
-        // Stand-in for the real reindex — just create an empty .codemap.db.
-        const db = openCodemapDatabase(join(worktreePath, ".codemap.db"));
+        // Stand-in for the real reindex — just create an empty cached DB.
+        const db = openCodemapDatabase(
+          join(worktreePath, ".codemap", "index.db"),
+        );
         createTables(db);
         db.close();
       },
@@ -162,7 +164,7 @@ describe("populateWorktree + lookupCacheEntry", () => {
     let reindexCalls = 0;
     const reindex = async (wp: string) => {
       reindexCalls += 1;
-      const db = openCodemapDatabase(join(wp, ".codemap.db"));
+      const db = openCodemapDatabase(join(wp, ".codemap", "index.db"));
       createTables(db);
       db.close();
     };
@@ -204,7 +206,9 @@ describe("populateWorktree + lookupCacheEntry", () => {
       projectRoot,
       sha: baseSha,
       reindex: async (worktreePath) => {
-        const db = openCodemapDatabase(join(worktreePath, ".codemap.db"));
+        const db = openCodemapDatabase(
+          join(worktreePath, ".codemap", "index.db"),
+        );
         createTables(db);
         db.close();
       },
@@ -230,11 +234,11 @@ describe("populateWorktree + lookupCacheEntry", () => {
 describe("runAuditFromRef — end-to-end against a fixture repo", () => {
   /**
    * Reindex stub that actually runs the canonical SQL projection by creating
-   * a `.codemap.db` with the worktree's files seeded into the `files` table.
+   * a `<state-dir>/index.db` with the worktree's files seeded into the `files` table.
    * Stand-in for the real `runCodemapIndex` — Tracer 2 wires the real one.
    */
   async function fakeReindex(worktreePath: string): Promise<void> {
-    const dbPath = join(worktreePath, ".codemap.db");
+    const dbPath = join(worktreePath, ".codemap", "index.db");
     const db = openCodemapDatabase(dbPath);
     try {
       createTables(db);

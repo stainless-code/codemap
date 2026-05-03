@@ -7,10 +7,9 @@ import {
 } from "../application/audit-engine";
 import type { AuditEnvelope } from "../application/audit-engine";
 import { runCodemapIndex } from "../application/run-index";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 // Per-delta CLI flag → delta key. Generated from V1_DELTAS so adding a delta
 // in the engine surfaces a `--<key>-baseline` flag automatically.
@@ -259,6 +258,7 @@ Examples:
 export async function runAuditCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   baselinePrefix: string | undefined;
   base: string | undefined;
   perDelta: Record<string, string>;
@@ -267,9 +267,7 @@ export async function runAuditCmd(opts: {
   noIndex: boolean;
 }): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     const db = openDb();
     try {

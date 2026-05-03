@@ -16,7 +16,6 @@ import {
   listQueryRecipeIds,
   QUERY_RECIPES,
 } from "../application/query-recipes";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import {
   closeDb,
   deleteQueryBaseline,
@@ -37,8 +36,8 @@ import {
   loadCodeowners,
   makePackageBucketizer,
 } from "../group-by";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 /**
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"query"`.
@@ -630,6 +629,7 @@ Examples:
 export async function runQueryCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   sql: string;
   json?: boolean;
   /**
@@ -655,9 +655,7 @@ export async function runQueryCmd(opts: {
     opts.format ?? (opts.json === true ? "json" : "text");
   const isJson = effectiveFormat === "json";
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     let changedFiles: Set<string> | undefined;
     if (opts.changedSince !== undefined) {
@@ -743,12 +741,11 @@ export async function runQueryCmd(opts: {
 export async function runListBaselinesCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   json: boolean;
 }): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
     const db = openDb();
     try {
       const rows = listQueryBaselines(db);
@@ -772,13 +769,12 @@ export async function runListBaselinesCmd(opts: {
 export async function runDropBaselineCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   name: string;
   json: boolean;
 }): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
     const db = openDb();
     try {
       const dropped = deleteQueryBaseline(db, opts.name);

@@ -125,6 +125,7 @@ With --watch, the file watcher is drained before the server exits.
 export async function runMcpCmd(opts: {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   watch: boolean;
   debounceMs: number;
 }): Promise<void> {
@@ -132,6 +133,7 @@ export async function runMcpCmd(opts: {
     version: CODEMAP_VERSION,
     root: opts.root,
     configFile: opts.configFile,
+    stateDir: opts.stateDir,
     watch: opts.watch,
     debounceMs: opts.debounceMs,
   });

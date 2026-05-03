@@ -4,11 +4,11 @@
 
 **Two topics — pick the row that matches what you need:**
 
-| You want to…                                                                                                                                       | Read                                                                             |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap.db` goes | [§ Indexing another project](#indexing-another-project)                          |
-| **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                 | [§ The benchmark script](#the-benchmark-script)                                  |
-| **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                            | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
+| You want to…                                                                                                                                             | Read                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap/index.db` goes | [§ Indexing another project](#indexing-another-project)                          |
+| **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
+| **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
 
 ---
 
@@ -33,7 +33,7 @@ CODEMAP_TEST_BENCH=/absolute/path/to/your-app bun src/index.ts --full
 
 Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavior is the same.
 
-**Where `.codemap.db` lives:** defaults to **`<indexed-project-root>/.codemap.db`**, not inside the Codemap repo — add `.codemap.db` to that project’s `.gitignore` if needed.
+**Where `.codemap/index.db` lives:** defaults to **`<indexed-project-root>/.codemap/index.db`**, not inside the Codemap repo. The codemap-managed `<state-dir>/.gitignore` reconciler ignores it automatically on first boot; no manual `.gitignore` edits needed.
 
 **Agents:** Work in the **stainless-code/codemap** window with [`.agents/rules/codemap.md`](../.agents/rules/codemap.md) and the [skill](../.agents/skills/codemap/SKILL.md). Queries resolve against whatever **`CODEMAP_*`** / **`--root`** selected.
 
@@ -45,7 +45,7 @@ Use **`CODEMAP_ROOT`** instead of **`CODEMAP_TEST_BENCH`** if you prefer; behavi
 
 ### Overview
 
-1. **Indexed** — single SQL query against `.codemap.db`
+1. **Indexed** — single SQL query against `.codemap/index.db`
 2. **Traditional** — glob (same implementation as the indexer — [packaging.md § Node vs Bun](./packaging.md#node-vs-bun)) → **`readFileSync`** → regex match (simulates what AI agent tools like Grep/Read/Glob do)
 
 For **repeatable** numbers, use **`fixtures/minimal/`** ([Fixtures](#fixtures)) or index your own app with **`CODEMAP_ROOT`** before running the script.
@@ -74,7 +74,7 @@ bun src/benchmark.ts --verbose
 
 ### Query stdout: table vs JSON (`benchmark:query`)
 
-After **`bun src/index.ts`** (or **`codemap`**) has created **`.codemap.db`** in the project you are measuring:
+After **`bun src/index.ts`** (or **`codemap`**) has created **`.codemap/index.db`** in the project you are measuring:
 
 ```bash
 bun run benchmark:query

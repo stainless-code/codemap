@@ -4,14 +4,13 @@ import type {
   ImpactDirection,
   ImpactResult,
 } from "../application/impact-engine";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ImpactOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   target: string;
   direction: ImpactDirection;
   via: ImpactBackend;
@@ -225,9 +224,7 @@ export function parseImpactRest(rest: string[]):
  */
 export async function runImpactCmd(opts: ImpactOpts): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
 
     const db = openDb();
     let result: ImpactResult;

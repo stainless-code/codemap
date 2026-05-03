@@ -12,7 +12,7 @@ import {
  */
 export async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const { root, configFile, rest } = parseBootstrapArgs(argv);
+  const { root, configFile, stateDir, rest } = parseBootstrapArgs(argv);
 
   if (rest[0] === "--help" || rest[0] === "-h") {
     printCliUsage();
@@ -81,6 +81,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runContextCmd({
       root,
       configFile,
+      stateDir,
       compact: parsed.compact,
       intent: parsed.intent,
     });
@@ -102,6 +103,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runValidateCmd({
       root,
       configFile,
+      stateDir,
       paths: parsed.paths,
       json: parsed.json,
     });
@@ -123,6 +125,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runShowCmd({
       root,
       configFile,
+      stateDir,
       name: parsed.name,
       kind: parsed.kindFilter,
       inPath: parsed.inPath,
@@ -146,6 +149,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runSnippetCmd({
       root,
       configFile,
+      stateDir,
       name: parsed.name,
       kind: parsed.kindFilter,
       inPath: parsed.inPath,
@@ -169,6 +173,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runMcpCmd({
       root,
       configFile,
+      stateDir,
       watch: parsed.watch,
       debounceMs: parsed.debounceMs,
     });
@@ -190,6 +195,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runWatchCmd({
       root,
       configFile,
+      stateDir,
       debounceMs: parsed.debounceMs,
       quiet: parsed.quiet,
     });
@@ -211,6 +217,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runServeCmd({
       root,
       configFile,
+      stateDir,
       host: parsed.host,
       port: parsed.port,
       token: parsed.token,
@@ -235,6 +242,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runImpactCmd({
       root,
       configFile,
+      stateDir,
       target: parsed.target,
       direction: parsed.direction,
       via: parsed.via,
@@ -261,6 +269,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runAuditCmd({
       root,
       configFile,
+      stateDir,
       baselinePrefix: parsed.baselinePrefix,
       base: parsed.base,
       perDelta: parsed.perDelta,
@@ -301,13 +310,19 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "listBaselines") {
-      await runListBaselinesCmd({ root, configFile, json: parsed.json });
+      await runListBaselinesCmd({
+        root,
+        configFile,
+        stateDir,
+        json: parsed.json,
+      });
       return;
     }
     if (parsed.kind === "dropBaseline") {
       await runDropBaselineCmd({
         root,
         configFile,
+        stateDir,
         name: parsed.name,
         json: parsed.json,
       });
@@ -316,6 +331,7 @@ Copies bundled agent templates into .agents/ under the project root.
     await runQueryCmd({
       root,
       configFile,
+      stateDir,
       sql: parsed.sql,
       json: parsed.json,
       format: parsed.format,
@@ -330,5 +346,5 @@ Copies bundled agent templates into .agents/ under the project root.
   }
 
   const { runIndexCmd } = await import("./cmd-index.js");
-  await runIndexCmd({ root, configFile, rest });
+  await runIndexCmd({ root, configFile, stateDir, rest });
 }

@@ -5,6 +5,12 @@ import { pathToFileURL } from "node:url";
 
 import { z } from "zod";
 
+import {
+  resolveStateDir,
+  STATE_CONFIG_BASENAMES,
+  STATE_DB_NAME,
+} from "./application/state-dir";
+
 async function readJsonFile(filePath: string): Promise<unknown> {
   if (typeof Bun !== "undefined") {
     return Bun.file(filePath).json();
@@ -58,7 +64,7 @@ export const codemapUserConfigSchema = z
       .string()
       .optional()
       .describe(
-        "SQLite database path, relative to root or absolute. Default: `<root>/.codemap.db`.",
+        "SQLite database path, relative to root or absolute. Default: `<state-dir>/index.db` (i.e. `.codemap/index.db`).",
       ),
     include: z
       .array(z.string())
@@ -103,7 +109,14 @@ function formatCodemapConfigError(error: z.ZodError): string {
 export interface ResolvedCodemapConfig {
   /** Absolute project root (from CLI `--root`, env, or `process.cwd()`). */
   readonly root: string;
-  /** Absolute path to the SQLite database file (default `<root>/.codemap.db`). */
+  /**
+   * Absolute path to the codemap state directory (`<root>/.codemap` by default).
+   * Overridable via `--state-dir <path>` or `CODEMAP_STATE_DIR`. Holds every
+   * codemap-managed file: `index.db` (+ WAL/SHM), `audit-cache/`, `recipes/`,
+   * `config.{ts,js,json}`, `.gitignore` (self-managed).
+   */
+  readonly stateDir: string;
+  /** Absolute path to the SQLite database file (default `<stateDir>/index.db`). */
   readonly databasePath: string;
   /** Glob patterns relative to `root`; either user-supplied or {@link DEFAULT_INCLUDE_PATTERNS}. */
   readonly include: readonly string[];
@@ -135,18 +148,37 @@ export function defineConfig(config: CodemapUserConfig): CodemapUserConfig {
   return parseCodemapUserConfig(config);
 }
 
+export interface ResolveCodemapConfigOpts {
+  /**
+   * Pre-resolved state-dir (from CLI `--state-dir` or `CODEMAP_STATE_DIR`).
+   * When omitted the default `<root>/.codemap` is used. Resolved at the
+   * bootstrap layer (NOT via the user config — the config file lives
+   * inside `<state-dir>/` so we'd hit a chicken-and-egg).
+   */
+  stateDir?: string | undefined;
+}
+
 /**
  * Merge user config with defaults (absolute paths, default DB location, tsconfig discovery).
+ *
+ * Three-arg form (`opts.stateDir`) lets the bootstrap pass the resolved
+ * state directory through; legacy two-arg call sites keep working with the
+ * default `<root>/.codemap`. User-supplied `databasePath` (escape hatch for
+ * non-standard layouts) wins over the state-dir derivation.
  */
 export function resolveCodemapConfig(
   root: string,
   user: CodemapUserConfig | undefined,
+  opts: ResolveCodemapConfigOpts = {},
 ): ResolvedCodemapConfig {
   const parsed = user !== undefined ? parseCodemapUserConfig(user) : undefined;
   const absRoot = resolve(root);
+  const stateDir = opts.stateDir
+    ? resolve(opts.stateDir)
+    : resolveStateDir({ root: absRoot });
   const databasePath = parsed?.databasePath
     ? resolve(absRoot, parsed.databasePath)
-    : join(absRoot, ".codemap.db");
+    : join(stateDir, STATE_DB_NAME);
   const include = parsed?.include?.length
     ? [...parsed.include]
     : [...DEFAULT_INCLUDE_PATTERNS];
@@ -167,6 +199,7 @@ export function resolveCodemapConfig(
 
   return {
     root: absRoot,
+    stateDir,
     databasePath,
     include,
     excludeDirNames,
@@ -175,12 +208,18 @@ export function resolveCodemapConfig(
 }
 
 /**
- * Load optional `codemap.config.ts` / `codemap.config.json` from the project root,
- * or from `explicitPath` (CLI `--config`).
+ * Load `<state-dir>/config.{ts,js,json}` (D8 order) — or `explicitPath`
+ * when CLI `--config` is set. Pre-v1: legacy `<root>/codemap.config.{ts,json}`
+ * paths are not searched; the changelog notes the one-line move.
+ *
+ * Three-arg form (`opts.stateDir`) lets the bootstrap pass the resolved
+ * state directory through; legacy two-arg form (`loadUserConfig(root)`)
+ * defaults to `<root>/.codemap/`.
  */
 export async function loadUserConfig(
   root: string,
   explicitPath?: string,
+  opts: { stateDir?: string | undefined } = {},
 ): Promise<CodemapUserConfig | undefined> {
   const tryImport = async (
     file: string,
@@ -207,14 +246,18 @@ export async function loadUserConfig(
     return tryImport(explicitPath);
   }
 
-  const tsConfig = join(root, "codemap.config.ts");
-  const fromTs = await tryImport(tsConfig);
-  if (fromTs) return fromTs;
-
-  const jsonPath = join(root, "codemap.config.json");
-  if (existsSync(jsonPath)) {
-    const raw = await readJsonFile(jsonPath);
-    return raw as CodemapUserConfig;
+  const stateDir = opts.stateDir ?? resolveStateDir({ root });
+  for (const basename of STATE_CONFIG_BASENAMES) {
+    const candidate = join(stateDir, basename);
+    if (basename.endsWith(".json")) {
+      if (existsSync(candidate)) {
+        const raw = await readJsonFile(candidate);
+        return raw as CodemapUserConfig;
+      }
+      continue;
+    }
+    const fromImport = await tryImport(candidate);
+    if (fromImport) return fromImport;
   }
 
   return undefined;

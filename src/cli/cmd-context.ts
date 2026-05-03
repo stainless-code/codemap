@@ -1,13 +1,13 @@
 import { buildContextEnvelope } from "../application/context-engine";
 import type { ContextEnvelope } from "../application/context-engine";
-import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
-import { configureResolver } from "../resolver";
-import { getProjectRoot, getTsconfigPath, initCodemap } from "../runtime";
+import { getProjectRoot } from "../runtime";
+import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ContextOpts {
   root: string;
   configFile: string | undefined;
+  stateDir?: string | undefined;
   compact: boolean;
   intent: string | null;
 }
@@ -82,9 +82,7 @@ export function parseContextRest(
  */
 export async function runContextCmd(opts: ContextOpts): Promise<void> {
   try {
-    const user = await loadUserConfig(opts.root, opts.configFile);
-    initCodemap(resolveCodemapConfig(opts.root, user));
-    configureResolver(getProjectRoot(), getTsconfigPath());
+    await bootstrapCodemap(opts);
     const db = openDb();
     let envelope: ContextEnvelope;
     try {
