@@ -10,7 +10,7 @@ Stable tree exercising every codemap surface — used by `src/benchmark.ts`, gol
 | `imports` / `exports` (named + default + re-export)             | `consumer.ts` named imports; `components/shop/index.ts` barrel re-exports; `ShopButton.default.ts` default export                                                                                                                                                 |
 | `dependencies` (resolved file→file edges)                       | TS imports across `api/`, `lib/`, `components/shop/`, `utils/`, `usePermissions`                                                                                                                                                                                  |
 | `components` (React)                                            | `ShopButton`, `ProductCard` (both call `usePermissions` — fan-in)                                                                                                                                                                                                 |
-| `calls` (caller→callee, depth >1, with cycle)                   | `run → createClient → setupTransport → openSocket → handshake`; cycle `cache.get → store.read → cache.invalidate → store.write → cache.get`                                                                                                                       |
+| `calls` (caller→callee, depth >1, with cycle)                   | `run → createClient → setupTransport → openSocket → handshake`; non-cyclic `cache.get → store.read`; 2-node cycle `cache.invalidate ↔ store.write`                                                                                                                |
 | `markers` (TODO / FIXME / HACK / NOTE)                          | `notes.md` + `consumer.ts` (`XXX` is not yet a recognised kind)                                                                                                                                                                                                   |
 | `type_members`                                                  | `ClientConfig`, `Transport`, `ProductCardProps`                                                                                                                                                                                                                   |
 | Visibility tags (`@internal` / `@beta` / `@alpha` / `@private`) | `_epochSeconds`, `nowIso`, `nanoseconds`, `_hiResEpoch`                                                                                                                                                                                                           |
@@ -31,7 +31,9 @@ CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun run dev --full
 # Benchmark
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun run benchmark
 
-# Project-local recipe
+# Project-local recipe (known limitation: currently rejected as "unknown" — see
+# the "Project-local recipes" row above; will work once recipe loading is
+# deferred past bootstrap)
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts query --recipe shop-symbols --json
 ```
 

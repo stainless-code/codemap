@@ -7,9 +7,9 @@
   },
   {
     "path": "README.md",
-    "content_hash": "c5945c11f5119a986a53fcf51c8157f1967d015d1b089a1e3804772c7c5eea07",
+    "content_hash": "185e778a9d1a7247b373dd4c226c9de1d82e18a182e0be6daa76b7f835fcbe86",
     "language": "md",
-    "line_count": 39
+    "line_count": 41
   },
   {
     "path": "package.json",
@@ -55,9 +55,9 @@
   },
   {
     "path": "src/lib/cache.ts",
-    "content_hash": "25934e14b1b0dfa53f3293ee6fd59fc0fd668439d0c09acc93e49debc668c04e",
+    "content_hash": "7503a156d1634e3739cb306c61fc82039178c1d84cbe4ff5c518b1fc439da808",
     "language": "ts",
-    "line_count": 21
+    "line_count": 25
   },
   {
     "path": "src/lib/store.ts",
