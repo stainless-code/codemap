@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -117,7 +118,6 @@ describe("ensureStateGitignore — self-healing reconciler (D11)", () => {
     // Older shape — pre-audit-cache: only the DB lines.
     const olderBody =
       "# old codemap-managed file\nindex.db\nindex.db-shm\nindex.db-wal\n";
-    const { mkdirSync } = require("node:fs") as typeof import("node:fs");
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(join(stateDir, ".gitignore"), olderBody, "utf-8");
     const r = ensureStateGitignore(stateDir);

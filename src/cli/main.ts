@@ -310,7 +310,12 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "listBaselines") {
-      await runListBaselinesCmd({ root, configFile, json: parsed.json });
+      await runListBaselinesCmd({
+        root,
+        configFile,
+        stateDir,
+        json: parsed.json,
+      });
       return;
     }
     if (parsed.kind === "dropBaseline") {

@@ -1,6 +1,8 @@
 import { ensureStateConfig } from "../application/state-config";
-import { resolveStateDir } from "../application/state-dir";
-import { ensureStateGitignore } from "../application/state-dir";
+import {
+  ensureStateGitignore,
+  resolveStateDir,
+} from "../application/state-dir";
 import { loadUserConfig, resolveCodemapConfig } from "../config";
 import { configureResolver } from "../resolver";
 import {

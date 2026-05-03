@@ -64,7 +64,7 @@ export const codemapUserConfigSchema = z
       .string()
       .optional()
       .describe(
-        "SQLite database path, relative to root or absolute. Default: `<root>/.codemap.db`.",
+        "SQLite database path, relative to root or absolute. Default: `<state-dir>/index.db` (i.e. `.codemap/index.db`).",
       ),
     include: z
       .array(z.string())

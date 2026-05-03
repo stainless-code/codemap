@@ -8,7 +8,7 @@ import { CODEMAP_VERSION } from "../version";
 export function printCliUsage(): void {
   console.log(`Usage: codemap [options] [command]
 
-Index (default): update .codemap.db for the project root (\`--root\` or cwd).
+Index (default): update .codemap/index.db for the project root (\`--root\` or cwd).
   codemap [--root DIR] [--config FILE] [--full]
   codemap [--root DIR] [--config FILE] --files <paths...>
 
@@ -31,7 +31,7 @@ MCP server (Model Context Protocol — for agent hosts):
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
   codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]
 
-Watch mode (long-running; keeps .codemap.db fresh on file edits):
+Watch mode (long-running; keeps .codemap/index.db fresh on file edits):
   codemap watch [--debounce 250] [--quiet]
   codemap mcp --watch · codemap serve --watch    # killer combo
 
@@ -46,10 +46,11 @@ Other:
   codemap version
   codemap --version, -V
 
-Environment: CODEMAP_ROOT (same as --root)
+Environment: CODEMAP_ROOT (same as --root), CODEMAP_STATE_DIR (same as --state-dir)
 
 Options:
   --full          Full rebuild
+  --state-dir DIR State directory for codemap-managed files (default .codemap/ under root)
   --performance   Print per-phase timing breakdown + top-10 slowest files
                   (full rebuild only)
   --help, -h      Show this help

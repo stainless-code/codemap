@@ -50,7 +50,7 @@ export interface WorktreeCacheOpts {
 export interface PopulatedCacheEntry {
   /** Absolute path to the cached worktree dir. */
   worktreePath: string;
-  /** Absolute path to the `.codemap.db` inside that worktree. */
+  /** Absolute path to the cached `.codemap/index.db` inside that worktree. */
   dbPath: string;
   /** Resolved sha this entry was created against. */
   sha: string;
@@ -123,7 +123,7 @@ export function lookupCacheEntry(
 
 export interface PopulateOpts extends WorktreeCacheOpts {
   sha: string;
-  /** Reindex callback — receives the worktree path, must build `.codemap.db` inside it. */
+  /** Reindex callback — receives the worktree path, must build `.codemap/index.db` inside it. */
   reindex: (worktreePath: string) => Promise<void>;
 }
 
@@ -131,7 +131,7 @@ export interface PopulateOpts extends WorktreeCacheOpts {
  * Populate a cache entry atomically (D11):
  * 1. mkdir per-pid temp dir under the cache root
  * 2. `git worktree add <tmp> <sha>`
- * 3. caller's `reindex(<tmp>)` builds `.codemap.db`
+ * 3. caller's `reindex(<tmp>)` builds `.codemap/index.db`
  * 4. `rename(<tmp>, <sha>)` — POSIX-atomic; if the final slot already exists
  *    (raced with a concurrent populate), discard the temp and use the winner.
  *
