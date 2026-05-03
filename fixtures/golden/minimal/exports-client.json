@@ -4,7 +4,27 @@
     "kind": "type"
   },
   {
+    "name": "Transport",
+    "kind": "type"
+  },
+  {
     "name": "createClient",
+    "kind": "value"
+  },
+  {
+    "name": "setupTransport",
+    "kind": "value"
+  },
+  {
+    "name": "openSocket",
+    "kind": "value"
+  },
+  {
+    "name": "handshake",
+    "kind": "value"
+  },
+  {
+    "name": "legacyClient",
     "kind": "value"
   }
 ]

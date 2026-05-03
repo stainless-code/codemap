@@ -3,6 +3,12 @@
     "callee_name": "createClient"
   },
   {
+    "callee_name": "epochMs"
+  },
+  {
+    "callee_name": "get"
+  },
+  {
     "callee_name": "now"
   }
 ]

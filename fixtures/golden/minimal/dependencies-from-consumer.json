@@ -5,6 +5,18 @@
   },
   {
     "from_path": "src/consumer.ts",
+    "to_path": "src/components/shop/index.ts"
+  },
+  {
+    "from_path": "src/consumer.ts",
+    "to_path": "src/lib/cache.ts"
+  },
+  {
+    "from_path": "src/consumer.ts",
     "to_path": "src/utils/date.ts"
+  },
+  {
+    "from_path": "src/consumer.ts",
+    "to_path": "src/utils/format.ts"
   }
 ]
