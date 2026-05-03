@@ -73,8 +73,8 @@ Items the scan called out as "watch / defer / future" — most still live in [do
 - ✅ **Targeted-read CLI (`codemap show <symbol>`)** — shipped as `show` + `snippet` siblings in PR [#39](https://github.com/stainless-code/codemap/pull/39).
 - ✅ **`--format sarif` + `--format annotations`** — shipped in PR [#43](https://github.com/stainless-code/codemap/pull/43). GitHub Code Scanning + PR-inline annotations for any recipe row-set.
 - ✅ **HTTP API (`codemap serve`)** — shipped in PR [#44](https://github.com/stainless-code/codemap/pull/44). Same tool taxonomy as MCP, `POST /tool/{name}`, loopback default, optional `--token`.
-- See [`research/fallow.md` § Status snapshot](./fallow.md#status-snapshot-as-of-2026-05-02) for the full ship summary.
-- Watch mode (`codemap watch`) — still backlog
+- ✅ **Watch mode (`codemap watch`)** — shipped in PR [#47](https://github.com/stainless-code/codemap/pull/47), planned in PR [#46](https://github.com/stainless-code/codemap/pull/46). Standalone + `mcp --watch` / `serve --watch` killer combos; chokidar v5 backend.
+- See [`research/fallow.md` § Status snapshot](./fallow.md#status-snapshot-as-of-2026-05-03) for the full ship summary.
 - Cross-agent handoff artifact (speculative) — still backlog
 
 The scan's "PASS" list (dead-code / dupes / complexity / boundaries / fix actions, runtime/V8 coverage merging, framework plugins, PageRank summarization, skyline visualization, daemon process, embedded intent classification) has been folded into [roadmap.md § Non-goals](../roadmap.md#non-goals-v1) — that's the canonical home; do not duplicate here.
