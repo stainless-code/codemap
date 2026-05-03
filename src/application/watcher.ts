@@ -139,6 +139,34 @@ export function createDebouncer(
 export const DEFAULT_DEBOUNCE_MS = 250;
 
 /**
+ * Module-level "watcher is active" flag. Read by `handleAudit` to skip
+ * its incremental-index prelude when the watcher already keeps the
+ * index fresh — turning the audit's expensive boot-time prelude into
+ * a no-op in `mcp --watch` / `serve --watch` deployments (per
+ * [`docs/plans/watch-mode.md` § Tracer 4](../../docs/plans/watch-mode.md)).
+ *
+ * Single-flag design (vs threading "indexIsLive" through every handler
+ * signature): the watcher is process-scoped — there's at most one live
+ * watcher per server process, so a singleton matches the actual
+ * topology. Test reset exposed via {@link _resetWatchStateForTests}.
+ */
+let watchActive = false;
+
+export function isWatchActive(): boolean {
+  return watchActive;
+}
+
+/** Test-only escape hatch — drops the watcher-active flag so a test that booted a fake watcher can leave a clean slate for siblings. */
+export function _resetWatchStateForTests(): void {
+  watchActive = false;
+}
+
+/** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
+export function _markWatchActiveForTests(): void {
+  watchActive = true;
+}
+
+/**
  * Standard onChange callback every embedder uses (cmd-watch, serve
  * --watch, mcp --watch): open DB, run targeted reindex on the changed
  * paths, log a one-line status to stderr unless `quiet`. Errors are
@@ -239,11 +267,13 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       console.error(`codemap watch: backend error — ${err.message}`);
     },
   });
+  watchActive = true;
 
   return {
     async stop() {
       debouncer.flushNow();
       await backend.stop();
+      watchActive = false;
     },
   };
 }

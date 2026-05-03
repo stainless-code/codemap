@@ -396,6 +396,45 @@ describe("MCP server — audit / context / validate tools", () => {
     }
   });
 
+  it("audit skips its incremental-index prelude when watcher is active (Tracer 4)", async () => {
+    // Driver: set the watcher-active flag manually so handleAudit treats
+    // the index as fresh. With prelude skipped, audit must NOT throw the
+    // 'no last_indexed_commit' error a prelude would have surfaced on a
+    // freshly-created DB without git history. Confirms the skip.
+    const { _markWatchActiveForTests, _resetWatchStateForTests } =
+      await import("./watcher");
+    _markWatchActiveForTests();
+    const { client, server } = await makeClient();
+    try {
+      // Seed a baseline so audit has something to diff against.
+      const db = openDb();
+      try {
+        upsertQueryBaseline(db, {
+          name: "watch-skip-files",
+          recipe_id: null,
+          sql: "SELECT path FROM files",
+          rows_json: "[]",
+          row_count: 0,
+          git_ref: null,
+          created_at: 0,
+        });
+      } finally {
+        closeDb(db);
+      }
+      const r = await client.callTool({
+        name: "audit",
+        arguments: { baseline_prefix: "watch-skip" },
+      });
+      // No isError — prelude was skipped, audit ran against the live DB.
+      expect((r as { isError?: boolean }).isError).toBeUndefined();
+      const json = readJson(r);
+      expect(json.deltas).toBeDefined();
+    } finally {
+      await server.close();
+      _resetWatchStateForTests();
+    }
+  });
+
   it("audit returns isError when no baseline slot resolves", async () => {
     const { client, server } = await makeClient();
     try {

@@ -46,6 +46,7 @@ import {
   findSymbolsByName,
 } from "./show-engine";
 import { computeValidateRows, toProjectRelative } from "./validate-engine";
+import { isWatchActive } from "./watcher";
 
 /**
  * Discriminated union every handler returns. `format` distinguishes JSON
@@ -356,10 +357,17 @@ export interface AuditArgs {
 }
 
 export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
+  // Skip the incremental-index prelude when the watcher already keeps
+  // the index fresh (mcp --watch / serve --watch). Explicit
+  // `no_index: false` is honored even when watch is on (escape hatch
+  // for the rare "force a re-index right now" case). Computed up-front
+  // so the inner `finally` can also use it for the readonly close hint.
+  const watchKeepsIndexFresh = isWatchActive() && args.no_index !== false;
+  const shouldRunPrelude = !args.no_index && !watchKeepsIndexFresh;
   try {
     const db = openDb();
     try {
-      if (!args.no_index) {
+      if (shouldRunPrelude) {
         await runCodemapIndex(db, { mode: "incremental", quiet: true });
       }
       const perDelta: Record<string, string> = {};
@@ -397,7 +405,10 @@ export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
       }
       return ok(result);
     } finally {
-      closeDb(db, { readonly: args.no_index === true });
+      // Mark the connection readonly when no write happened — same
+      // condition as `shouldRunPrelude`. Without this, closeDb runs a
+      // checkpoint pass that's wasted on a watcher-fresh DB.
+      closeDb(db, { readonly: !shouldRunPrelude });
     }
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);

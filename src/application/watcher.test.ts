@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { createDebouncer, runWatchLoop, shouldIndexPath } from "./watcher";
+import {
+  _resetWatchStateForTests,
+  createDebouncer,
+  isWatchActive,
+  runWatchLoop,
+  shouldIndexPath,
+} from "./watcher";
 import type { WatchBackend } from "./watcher";
 
 describe("shouldIndexPath", () => {
@@ -264,6 +270,22 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     expect([...calls[0]!]).toEqual(["src/a.ts"]);
 
     await handle.stop();
+  });
+
+  it("toggles isWatchActive on start + stop (used by handleAudit to skip prelude)", async () => {
+    _resetWatchStateForTests();
+    expect(isWatchActive()).toBe(false);
+    const backend = fakeBackend();
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: () => undefined,
+      debounceMs: 20,
+      backend,
+    });
+    expect(isWatchActive()).toBe(true);
+    await handle.stop();
+    expect(isWatchActive()).toBe(false);
   });
 
   it("treats unlink as a path requiring reindex (caller handles deletes)", async () => {
