@@ -32,8 +32,8 @@ export function ensureStateConfig(stateDir: string): EnsureStateConfigResult {
     const path = join(stateDir, basename);
     if (!existsSync(path)) continue;
 
+    // TS/JS validation happens at load time (loadUserConfig); never rewrite.
     if (basename !== "config.json") {
-      // TS/JS — validation happens at load time; nothing to write.
       return { found: basename, written: false, warnings: [] };
     }
 
@@ -50,9 +50,8 @@ export function ensureStateConfig(stateDir: string): EnsureStateConfigResult {
       return { found: basename, written: false, warnings };
     }
 
-    // Passthrough validation lets us spot+prune unknown keys; strict
-    // schema rejection only happens at downstream `parseCodemapUserConfig`
-    // (config.ts) which we leave authoritative for runtime errors.
+    // Passthrough so we can prune unknown keys; strict rejection lives
+    // in `parseCodemapUserConfig` (config.ts), authoritative for runtime.
     const result = codemapUserConfigSchema.passthrough().safeParse(parsed);
     if (!result.success) {
       for (const issue of result.error.issues) {

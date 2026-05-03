@@ -21,12 +21,9 @@ codemap agents init --interactive   # or -i; requires a TTY
 
 ## Git and `.gitignore`
 
-If **`<project>/.git`** exists, Codemap ensures **`.codemap.*`** is listed so SQLite artifacts (e.g. **`.codemap.db`**, WAL/SHM) stay untracked:
+Codemap maintains its own self-managed **`<state-dir>/.gitignore`** (default `.codemap/.gitignore`) — a blacklist of generated artifacts (`index.db` + WAL/SHM, `audit-cache/`) reconciled to canonical on every codemap boot via `ensureStateGitignore` (`src/application/state-dir.ts`). Project-tracked sources (`recipes/`, `config.{ts,js,json}`) default to tracked.
 
-- No **`.gitignore`** → create one containing **`.codemap.*`**.
-- **`.gitignore`** exists → append **`.codemap.*`** once if missing.
-
-If the project is **not** a Git working tree, **`.gitignore`** is not created.
+The user's root **`.gitignore`** is no longer touched by `codemap agents init`. Future codemap versions can add new generated artifacts to the canonical blacklist; every consumer's project repairs itself on the next `codemap` invocation. **The setup logic IS the migration** (per plan §D11).
 
 ## Optional IDE / tool wiring
 

@@ -28,7 +28,7 @@ What Codemap **is**: a deterministic, AST-backed SQLite index of structural fact
 
 ## The Solution
 
-A pre-built SQLite index (`.codemap.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
+A pre-built SQLite index (`.codemap/index.db`) that extracts and structures code metadata at index time. Agents query it with SQL instead of scanning files. Timings, scenarios, and methodology: [benchmark.md](./benchmark.md).
 
 ## Bundled CLI recipes
 
@@ -113,7 +113,7 @@ Other "AI-friendly code intelligence" tools occupy different points in the desig
 | Output shape      | Result rows from a SQL query          | SARIF / JSON findings, fix `actions`                          | Markdown / token-budgeted text      | LSP messages over stdio     |
 | Decides relevance | The agent (via SQL)                   | The tool (via static rules)                                   | The tool (PageRank-style)           | The editor                  |
 | Scope             | Structural facts (definitions, edges) | Static analysis verdicts                                      | Whole-repo summary                  | One file at a time          |
-| Storage           | Local SQLite (`.codemap.db`)          | In-process; emits findings                                    | In-prompt context                   | In-process index            |
+| Storage           | Local SQLite (`.codemap/index.db`)    | In-process; emits findings                                    | In-prompt context                   | In-process index            |
 | Token cost        | Per-query; tiny result rows           | Per-run; finding lists                                        | Upfront; bounded by token budget    | None (editor-side)          |
 | Best for          | Targeted "where / what / who" lookups | "Did this PR introduce dead code / dupes / complexity drift?" | First-touch context priming         | Editor-time refactoring     |
 | Worst for         | Whole-file semantic understanding     | Granular structural lookups (different shape)                 | Targeted line-range reads           | Cross-cutting graph queries |

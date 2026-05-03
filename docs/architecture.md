@@ -111,7 +111,7 @@ A local SQLite database (`.codemap/index.db`) indexes the project tree and store
 | `parsed-types.ts`                                                                                 | Shared `ParsedFile` shape for workers and adapters                                                                                                                                                                                            |
 | `agents-init.ts` / `agents-init-interactive.ts`                                                   | `codemap agents init` — see [agents.md](./agents.md) (granular template + IDE writes, pointer upsert, **`--interactive`**, `.gitignore`)                                                                                                      |
 | `benchmark.ts` (+ `benchmark-default-scenarios.ts`, `benchmark-config.ts`, `benchmark-common.ts`) | SQL vs traditional timing; optional **`CODEMAP_BENCHMARK_CONFIG`** JSON — [benchmark.md § Custom scenarios](./benchmark.md#custom-scenarios-codemap_benchmark_config)                                                                         |
-| `config.ts`                                                                                       | `codemap.config.*` load path, **Zod** user schema (`codemapUserConfigSchema`), `resolveCodemapConfig`                                                                                                                                         |
+| `config.ts`                                                                                       | `<state-dir>/config.{ts,js,json}` load path, **Zod** user schema (`codemapUserConfigSchema`), `resolveCodemapConfig`                                                                                                                          |
 
 ## CLI usage
 
@@ -159,7 +159,7 @@ When specific file paths are passed via `--files`, the indexer skips git diff, g
 
 The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), **`runCodemapIndex`** (advanced), **`codemapUserConfigSchema`**, **`parseCodemapUserConfig`**, **`defineConfig`**, **`CodemapDatabase`** (type), adapter types (`LanguageAdapter`, `getAdapterForExtension`, …), and **`ParsedFile`** — see **`src/api.ts`** / **`src/index.ts`** and **`dist/index.d.mts`**. Typical flow:
 
-1. **`await createCodemap({ root, configFile?, config? })`** — loads `codemap.config.*`, calls **`initCodemap`** and **`configureResolver`**.
+1. **`await createCodemap({ root, configFile?, config? })`** — loads `<state-dir>/config.{ts,js,json}`, calls **`initCodemap`** and **`configureResolver`**.
 2. **`await cm.index({ mode, files?, quiet? })`** — same pipeline as the CLI (incremental / full / targeted).
 3. **`cm.query(sql)`** — read-only SQL against `.codemap/index.db` (opens the DB per call).
 
