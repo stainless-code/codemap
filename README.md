@@ -59,7 +59,7 @@ codemap agents init                                          # scaffold .agents/
 ### Full reference
 
 ```bash
-# Index project root (optional codemap.config.ts / codemap.config.json)
+# Index project root (optional <state-dir>/config.{ts,js,json}; --state-dir overrides .codemap/)
 codemap
 
 # Version (also: codemap --version, codemap -V)
@@ -85,7 +85,7 @@ codemap query --json --summary --changed-since HEAD~5 "SELECT file_path FROM sym
 codemap query --json --summary --group-by directory -r fan-in
 codemap query --json --group-by owner -r deprecated-symbols
 codemap query --json --summary --group-by package "SELECT file_path FROM symbols"
-# Snapshot a result, refactor, then diff (saved inside .codemap.db, no JSON files)
+# Snapshot a result, refactor, then diff (saved inside .codemap/index.db, no JSON files)
 codemap query --save-baseline -r visibility-tags                # save under name "visibility-tags"
 codemap query --json --baseline -r visibility-tags              # full diff: {baseline, current_row_count, added, removed}
 codemap query --json --summary --baseline -r visibility-tags    # counts only: {baseline, current_row_count, added: N, removed: N}
@@ -171,7 +171,9 @@ codemap mcp                                                     # JSON-RPC on st
 codemap --root /path/to/repo --full
 
 # Explicit config
-codemap --config /path/to/codemap.config.json --full
+codemap --config /path/to/config.json --full
+# Override the state directory (default `.codemap/`):
+codemap --state-dir .cm --full        # or: CODEMAP_STATE_DIR=.cm codemap --full
 
 # Re-index only given paths (relative to project root)
 codemap --files src/a.ts src/b.tsx
@@ -184,7 +186,7 @@ codemap agents init --interactive   # -i; IDE wiring + symlink vs copy
 
 **Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**. Indexing a project outside this clone: [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).
 
-**Configuration:** optional **`codemap.config.ts`** (default export object or async factory) or **`codemap.config.json`**. Shape: [codemap.config.example.json](codemap.config.example.json). Runtime validation (**Zod**, strict keys) and API surface: [docs/architecture.md § User config](docs/architecture.md#user-config). When developing inside this repo you can use `defineConfig` from `@stainless-code/codemap` or `./src/config`. If you set **`include`**, it **replaces** the default glob list entirely.
+**Configuration:** optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; default export object or async factory). Shape: [codemap.config.example.json](codemap.config.example.json). Runtime validation (**Zod**, strict keys) and API surface: [docs/architecture.md § User config](docs/architecture.md#user-config). When developing inside this repo you can use `defineConfig` from `@stainless-code/codemap` or `./src/config`. If you set **`include`**, it **replaces** the default glob list entirely. **Self-healing files (D11):** `<state-dir>/.gitignore` is rewritten to canonical on every codemap boot; JSON config gets unknown-key pruning + key-sort drift; TS/JS configs are validate-only.
 
 ---
 
@@ -210,16 +212,16 @@ const rows = cm.query("SELECT name FROM symbols LIMIT 5");
 
 Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 
-| Command                              | Purpose                                                                                                                                                                      |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                                                                                                                         |
-| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing                                                                                                             |
-| `bun run fix`                        | Apply lint fixes, then format                                                                                                                                                |
-| `bun run test` / `bun run typecheck` | Focused checks                                                                                                                                                               |
-| `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)                                                                                                          |
-| `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)                                                                                                       |
-| `bun run benchmark:query`            | Compare `console.table` vs `--json` stdout size (needs local `.codemap.db`; [docs/benchmark.md § Query stdout](docs/benchmark.md#query-stdout-table-vs-json-benchmarkquery)) |
-| `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH`                                                                                                   |
+| Command                              | Purpose                                                                                                                                                                            |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                                                                                                                               |
+| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing                                                                                                                   |
+| `bun run fix`                        | Apply lint fixes, then format                                                                                                                                                      |
+| `bun run test` / `bun run typecheck` | Focused checks                                                                                                                                                                     |
+| `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)                                                                                                                |
+| `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)                                                                                                             |
+| `bun run benchmark:query`            | Compare `console.table` vs `--json` stdout size (needs local `.codemap/index.db`; [docs/benchmark.md § Query stdout](docs/benchmark.md#query-stdout-table-vs-json-benchmarkquery)) |
+| `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH`                                                                                                         |
 
 ```bash
 bun install

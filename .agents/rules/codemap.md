@@ -6,7 +6,7 @@ alwaysApply: true
 
 > **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
 
-A local database (default **`.codemap.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes.
+A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** (`ensureStateGitignore`) — bumping its canonical body in a PR auto-applies on every consumer's next run.
 
 **This file** is for **developing Codemap** in this clone. **End users** of the published package get the agent rule from **`templates/agents/`** (via **`codemap agents init`**). **Generic defaults:** SQL and triggers stay project-agnostic — **edit** this rule for repo-specific paths and queries.
 
@@ -51,7 +51,7 @@ actions:
 
 Validation: SQL is rejected at load time if it starts with DML/DDL (DELETE/DROP/UPDATE/etc.); the runtime `PRAGMA query_only=1` is the parser-proof backstop.
 
-**Baselines** (`query_baselines` table inside `.codemap.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
+**Baselines** (`query_baselines` table inside `.codemap/index.db`, no parallel JSON files): `--save-baseline[=<name>]` snapshots a result set; `--baseline[=<name>]` diffs the current result against it (added / removed rows; identity = `JSON.stringify(row)`). Name defaults to the `--recipe` id; ad-hoc SQL needs an explicit `=<name>`. Survives `--full` and SCHEMA bumps.
 
 **Audit (`bun src/index.ts audit`)**: structural-drift command; emits `{head, deltas: {files, dependencies, deprecated}}` (each delta carries its own `base` metadata). Three mutually-exclusive snapshot sources: `--base <ref>` materialises a git committish via `git worktree add` to a sha-keyed cache under `.codemap/audit-cache/`, reindexes a temp DB, then diffs (sub-100ms second run; requires git; `base.source: "ref"`); `--baseline <prefix>` auto-resolves `<prefix>-files` / `<prefix>-dependencies` / `<prefix>-deprecated` from saved `query_baselines` entries (`base.source: "baseline"`); `--<delta>-baseline <name>` is the explicit per-delta override (composes with both). v1 ships no `verdict` / threshold config — consumers compose `--json` + `jq` for CI exit codes. Auto-runs an incremental index before the diff (use `--no-index` to skip for frozen-DB CI).
 

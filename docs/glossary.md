@@ -75,9 +75,17 @@ TS shape for one row of the `calls` table. Maps 1:1 to the SQLite columns.
 
 The extraction path a file took during parsing. One of `ts`, `css`, or `text`. Stored on `ParsedFile.category`, not on a SQLite table. See `ParsedFile`.
 
-### `.codemap.db`
+### `.codemap/` / `<state-dir>` / `CODEMAP_STATE_DIR`
 
-The on-disk SQLite database file at `<project_root>/.codemap.db`. Always accompanied by `.codemap.db-wal` and `.codemap.db-shm` while open (WAL mode). Gitignored via the `.codemap.*` pattern that `codemap agents init` ensures.
+The codemap state directory under `<project_root>` — holds every codemap-managed file: `index.db` (+ WAL / SHM), `audit-cache/<sha>/`, project-local `recipes/`, `config.{ts,js,json}`, and the self-managed `.gitignore` (per plan §D7 + D11). Default name `.codemap/`; override via `--state-dir <path>` CLI or `CODEMAP_STATE_DIR` env (relative paths resolve against `<project_root>`). Resolved at bootstrap, not via the config file (chicken-and-egg). Engine: `src/application/state-dir.ts` (`resolveStateDir`).
+
+### `.codemap/index.db` (the index)
+
+The on-disk SQLite database file at `<state-dir>/index.db` (default `<project_root>/.codemap/index.db`). Always accompanied by `index.db-wal` and `index.db-shm` while open (WAL mode). Gitignored by the self-managed `<state-dir>/.gitignore` written by `ensureStateGitignore`.
+
+### `.codemap/.gitignore` / self-healing files
+
+Codemap-managed `.gitignore` inside `<state-dir>/` (blacklist of generated artifacts; tracked sources `recipes/` + `config.*` default to tracked). Reconciled on every codemap boot by `ensureStateGitignore` (`src/application/state-dir.ts`) — read → compare to canonical → write only on drift. **Bumping the canonical body in a future PR IS the migration**: every consumer's project repairs itself on next codemap run. Same self-healing pattern (`ensure*` reconciler, idempotent, drift-detect) governs `<state-dir>/config.json` (`ensureStateConfig` in `src/application/state-config.ts` — prunes unknown keys, sorts keys, never touches user-authored TS/JS configs). Inspired by flowbite-react's `setup-*` shape; expressed in codemap's own conventions per plan §D11.
 
 ### `codemap context`
 
