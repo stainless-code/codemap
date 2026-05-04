@@ -21,6 +21,7 @@ Stable tree exercising every codemap surface — used by `src/benchmark.ts`, gol
 | `--group-by owner`                                              | `CODEOWNERS` (4 owners)                                                                                                                                                                                                                                           |
 | Project-local recipes                                           | `.codemap/recipes/shop-symbols.{sql,md}` (with frontmatter actions) — file shape valid; loader currently runs at parse time before bootstrap, so `--recipe shop-symbols` is rejected as "unknown" until that's deferred to the runner (known limitation)          |
 | Self-managed `.gitignore`                                       | `.codemap/.gitignore` (codemap-managed)                                                                                                                                                                                                                           |
+| `coverage` (Istanbul + LCOV ingest)                             | `coverage/coverage-final.json` (Istanbul) + `coverage/lcov.info` (LCOV) — equivalent partial coverage shape; bundled recipes `untested-and-dead`, `files-by-coverage`, `worst-covered-exports` exercise the join axis against `@deprecated` symbols               |
 
 ## Use
 
@@ -35,6 +36,14 @@ CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun run benchmark
 # the "Project-local recipes" row above; will work once recipe loading is
 # deferred past bootstrap)
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts query --recipe shop-symbols --json
+
+# Static coverage ingest — Istanbul (every modern JS test runner that emits
+# coverage-final.json) or LCOV (e.g. `bun test --coverage`). Format auto-detected.
+CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts ingest-coverage coverage/coverage-final.json
+CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts ingest-coverage coverage/lcov.info
+
+# After ingest — the killer recipe (exported + no callers + zero coverage)
+CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts query --recipe untested-and-dead --json
 ```
 
 **Editor / `tsc`:** run `bun install` here so `react` + `@types/react` resolve `react/jsx-runtime` for `.tsx` (`jsx: "react-jsx"` in `tsconfig.json`).

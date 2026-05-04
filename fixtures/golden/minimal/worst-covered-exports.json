@@ -1,0 +1,122 @@
+[
+  {
+    "name": "createClient",
+    "file_path": "src/api/client.ts",
+    "line_start": 15,
+    "coverage_pct": 0
+  },
+  {
+    "name": "setupTransport",
+    "file_path": "src/api/client.ts",
+    "line_start": 22,
+    "coverage_pct": 0
+  },
+  {
+    "name": "openSocket",
+    "file_path": "src/api/client.ts",
+    "line_start": 28,
+    "coverage_pct": 0
+  },
+  {
+    "name": "handshake",
+    "file_path": "src/api/client.ts",
+    "line_start": 32,
+    "coverage_pct": 0
+  },
+  {
+    "name": "legacyClient",
+    "file_path": "src/api/client.ts",
+    "line_start": 41,
+    "coverage_pct": 0
+  },
+  {
+    "name": "FormatPrice",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "run",
+    "file_path": "src/consumer.ts",
+    "line_start": 10,
+    "coverage_pct": 0
+  },
+  {
+    "name": "get",
+    "file_path": "src/lib/cache.ts",
+    "line_start": 8,
+    "coverage_pct": 0
+  },
+  {
+    "name": "invalidate",
+    "file_path": "src/lib/cache.ts",
+    "line_start": 16,
+    "coverage_pct": 0
+  },
+  {
+    "name": "read",
+    "file_path": "src/lib/store.ts",
+    "line_start": 7,
+    "coverage_pct": 0
+  },
+  {
+    "name": "write",
+    "file_path": "src/lib/store.ts",
+    "line_start": 11,
+    "coverage_pct": 0
+  },
+  {
+    "name": "_epochSeconds",
+    "file_path": "src/utils/date.ts",
+    "line_start": 12,
+    "coverage_pct": 0
+  },
+  {
+    "name": "nanoseconds",
+    "file_path": "src/utils/date.ts",
+    "line_start": 19,
+    "coverage_pct": 0
+  },
+  {
+    "name": "_hiResEpoch",
+    "file_path": "src/utils/date.ts",
+    "line_start": 26,
+    "coverage_pct": 0
+  },
+  {
+    "name": "epochMs",
+    "file_path": "src/utils/format.ts",
+    "line_start": 5,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ProductCard",
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 11,
+    "coverage_pct": 100
+  },
+  {
+    "name": "ShopButton",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 7,
+    "coverage_pct": 100
+  },
+  {
+    "name": "usePermissions",
+    "file_path": "src/usePermissions.ts",
+    "line_start": 1,
+    "coverage_pct": 100
+  },
+  {
+    "name": "now",
+    "file_path": "src/utils/date.ts",
+    "line_start": 5,
+    "coverage_pct": 100
+  },
+  {
+    "name": "nowIso",
+    "file_path": "src/utils/format.ts",
+    "line_start": 13,
+    "coverage_pct": 100
+  }
+]

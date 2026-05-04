@@ -7,9 +7,9 @@
   },
   {
     "path": "README.md",
-    "content_hash": "75032b11e435e7f265151787faf72c59a986b491ba4e866856ba77eda6b4deb4",
+    "content_hash": "6333c6bbc9240f2df77da0b60e4c8653a20df7c116531616c1b25d6ceb1521b6",
     "language": "md",
-    "line_count": 41
+    "line_count": 50
   },
   {
     "path": "package.json",

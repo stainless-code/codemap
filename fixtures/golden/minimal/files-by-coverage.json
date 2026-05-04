@@ -1,0 +1,38 @@
+[
+  {
+    "file_path": "src/api/client.ts",
+    "hit_statements": 0,
+    "total_statements": 1,
+    "coverage_pct": 0
+  },
+  {
+    "file_path": "src/utils/date.ts",
+    "hit_statements": 1,
+    "total_statements": 3,
+    "coverage_pct": 33.33
+  },
+  {
+    "file_path": "src/utils/format.ts",
+    "hit_statements": 1,
+    "total_statements": 2,
+    "coverage_pct": 50
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "hit_statements": 2,
+    "total_statements": 3,
+    "coverage_pct": 66.67
+  },
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "hit_statements": 3,
+    "total_statements": 3,
+    "coverage_pct": 100
+  },
+  {
+    "file_path": "src/usePermissions.ts",
+    "hit_statements": 1,
+    "total_statements": 1,
+    "coverage_pct": 100
+  }
+]

@@ -1,0 +1,51 @@
+{
+  "src/usePermissions.ts": {
+    "path": "src/usePermissions.ts",
+    "statementMap": {
+      "0": { "start": { "line": 2, "column": 0 }, "end": { "line": 2, "column": 1 } }
+    },
+    "s": { "0": 4 }
+  },
+  "src/api/client.ts": {
+    "path": "src/api/client.ts",
+    "statementMap": {
+      "0": { "start": { "line": 42, "column": 0 }, "end": { "line": 42, "column": 1 } }
+    },
+    "s": { "0": 0 }
+  },
+  "src/utils/format.ts": {
+    "path": "src/utils/format.ts",
+    "statementMap": {
+      "0": { "start": { "line": 6, "column": 0 }, "end": { "line": 6, "column": 1 } },
+      "1": { "start": { "line": 14, "column": 0 }, "end": { "line": 14, "column": 1 } }
+    },
+    "s": { "0": 0, "1": 1 }
+  },
+  "src/utils/date.ts": {
+    "path": "src/utils/date.ts",
+    "statementMap": {
+      "0": { "start": { "line": 6, "column": 0 }, "end": { "line": 6, "column": 1 } },
+      "1": { "start": { "line": 13, "column": 0 }, "end": { "line": 13, "column": 1 } },
+      "2": { "start": { "line": 20, "column": 0 }, "end": { "line": 20, "column": 1 } }
+    },
+    "s": { "0": 1, "1": 0, "2": 0 }
+  },
+  "src/components/shop/ProductCard.tsx": {
+    "path": "src/components/shop/ProductCard.tsx",
+    "statementMap": {
+      "0": { "start": { "line": 13, "column": 0 }, "end": { "line": 13, "column": 1 } },
+      "1": { "start": { "line": 14, "column": 0 }, "end": { "line": 14, "column": 1 } },
+      "2": { "start": { "line": 16, "column": 0 }, "end": { "line": 16, "column": 1 } }
+    },
+    "s": { "0": 1, "1": 1, "2": 1 }
+  },
+  "src/components/shop/ShopButton.tsx": {
+    "path": "src/components/shop/ShopButton.tsx",
+    "statementMap": {
+      "0": { "start": { "line": 4, "column": 0 }, "end": { "line": 4, "column": 1 } },
+      "1": { "start": { "line": 9, "column": 0 }, "end": { "line": 9, "column": 1 } },
+      "2": { "start": { "line": 10, "column": 0 }, "end": { "line": 10, "column": 1 } }
+    },
+    "s": { "0": 0, "1": 1, "2": 1 }
+  }
+}

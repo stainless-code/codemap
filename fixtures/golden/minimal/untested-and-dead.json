@@ -1,0 +1,38 @@
+[
+  {
+    "name": "legacyClient",
+    "file_path": "src/api/client.ts",
+    "line_start": 41,
+    "coverage_pct": 0
+  },
+  {
+    "name": "FormatPrice",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "run",
+    "file_path": "src/consumer.ts",
+    "line_start": 10,
+    "coverage_pct": 0
+  },
+  {
+    "name": "_epochSeconds",
+    "file_path": "src/utils/date.ts",
+    "line_start": 12,
+    "coverage_pct": 0
+  },
+  {
+    "name": "nanoseconds",
+    "file_path": "src/utils/date.ts",
+    "line_start": 19,
+    "coverage_pct": 0
+  },
+  {
+    "name": "_hiResEpoch",
+    "file_path": "src/utils/date.ts",
+    "line_start": 26,
+    "coverage_pct": 0
+  }
+]
