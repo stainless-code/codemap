@@ -86,7 +86,7 @@ WHERE s.doc_comment LIKE '%@deprecated%'
 
 ripgrep can't compose with `symbols` / `coverage` / `markers` in one shot — it can produce a list of file paths the agent then has to JOIN in JS. Same anti-pattern C.11 fixed for coverage.
 
-**Verdict:** flip non-goal to **opt-in FTS5 capability**. Ship as `--with-fts` index flag (off by default to keep cold-start sub-100ms; on for projects that want it). Bundled recipe `text-in-deprecated-functions` exemplifies the JOIN.
+**Verdict:** flip non-goal to **opt-in FTS5 capability**. Per [§ 6 Q2 (resolved 2026-05)](#resolved-2026-05): toggle via either `codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time. **Default OFF** — preserves `.codemap/index.db` size for non-users (FTS5 grows the DB ~30–50% on text-heavy projects). Cold-start is **unaffected** (FTS5 is index-time cost only; one-shot CLI reads the existing DB and the virtual table doesn't slow startup) — earlier "off to keep cold-start sub-100ms" framing was wrong. Bundled recipe `text-in-deprecated-functions` exemplifies the JOIN.
 
 **Risk:** index size grows with `--with-fts`. Mitigation: opt-in; document the size tax in `architecture.md` § Schema.
 
@@ -219,9 +219,10 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 - ✅ **Q3 — LSP shape** — **thin shim, no engine**; consume existing `application/show-engine.ts` + `application/impact-engine.ts` + watch-mode via stdio. Per § 2.5 reframe — building an LSP _engine_ would re-extract structure inside the protocol layer, duplicating moat B substrate. Standalone LSP server deferred to "if VSCode-extension demand emerges" (no measurement today supports it).
 - ✅ **Q4 — C.9 plugin contract scope** — **entry-point hints only for v1** (option (i) per [`fallow.md § 6`](./fallow.md#6-open-questions)). Plugins contribute `glob → is_entry: true` annotations on `files`; reachability sweep over `dependencies` from entry points closes the closed-dead-subgraph case (8-file widget pack via [`fallow.md § 0`](./fallow.md#0-fresh-evidence--what-a-hands-on-graph-audit-surfaced)). Arbitrary `dependencies` edge injection deferred to v2 if a real recipe demands it. Static config only — respects § 3 ergonomic "no JS exec at index time" floor. Pre-locked into the (b) plan PR per § 5.
 
+- ✅ **Q2 — FTS5 opt-in vs default-on** — **opt-in via either `codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; default OFF.** Both surfaces because config-only forces CI / ephemeral-index workflows to commit `fts5: true`; CLI-only forces every long-term user to remember the flag on `--full`. Default OFF respects backwards-compat: existing users wouldn't see `.codemap/index.db` grow ~30–50% silently on the next `--full`. Cold-start is unaffected either way (FTS5 is index-time cost only) — the earlier "default OFF to keep cold-start sub-100ms" framing was a wrong reason. **Re-evaluate default** in v2 once external-corpus size measurements (`bun run benchmark:query` shape) land. Default-ON is reserved for capabilities without disk-size tax (Mermaid output, parametrised recipes, complexity column).
+
 ### Still open
 
-- ❓ **Q2 — FTS5 opt-in vs default-on** — index size tax is real on big repos. First pass: opt-in via `codemap.config.ts` `fts5: true`. Revisit after measurements on the fallow / external corpus.
 - ❓ **Q5 — `history` table** — would unlock "when did coverage drop?" / "when did symbol X last have a caller?". Schema-shape question: per-commit snapshots (large) vs append-only event log (small but harder to query). Defer until a recipe demands it.
 
 ---
