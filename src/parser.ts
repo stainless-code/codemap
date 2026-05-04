@@ -131,21 +131,31 @@ export function extractFileData(
     _scopeStr = scopeStack.join(".");
   };
 
-  // Cyclomatic-complexity stack: each pushed entry is the index in `symbols`
-  // for the function currently being walked + a counter starting at 1 (the
-  // function-entry path). Branching-node visitors increment the top entry's
-  // count; the function's exit handler pops + writes complexity into the
-  // already-pushed symbol row. Nested function declarations get their own
-  // entries — inner branches don't count toward the outer function.
+  // Cyclomatic-complexity stack: pushed on every function-shaped node
+  // (FunctionDeclaration / ArrowFunctionExpression / FunctionExpression)
+  // enter, popped on exit. `symbolIndex >= 0` writes the count back to
+  // `symbols[symbolIndex].complexity` on pop; `-1` is anonymous (callbacks,
+  // IIFEs, etc.) — counted but not persisted, so nested anonymous arrows
+  // don't bleed branches into the outer function.
+  //
+  // Named arrow / function expressions from a `VariableDeclaration` are
+  // associated with their owning symbol via `arrowFnSymbolIndex` (keyed by
+  // the AST node identity) — the VariableDeclaration handler creates the
+  // symbol then records the mapping; the ArrowFunctionExpression /
+  // FunctionExpression enter handler reads it. This keeps multi-declarator
+  // statements (`const a = () => …, b = () => …`) correct: each function
+  // body gets its own stack entry instead of all branches accumulating
+  // onto the last-pushed declarator's counter.
   const complexityStack: { symbolIndex: number; count: number }[] = [];
+  const arrowFnSymbolIndex = new WeakMap<object, number>();
   const pushComplexityFor = (symbolIndex: number) => {
     complexityStack.push({ symbolIndex, count: 1 });
   };
-  const popComplexityInto = (symbolIndex: number) => {
-    const top = complexityStack[complexityStack.length - 1];
-    if (top && top.symbolIndex === symbolIndex) {
-      symbols[symbolIndex].complexity = top.count;
-      complexityStack.pop();
+  const popComplexityTop = () => {
+    const top = complexityStack.pop();
+    if (!top) return;
+    if (top.symbolIndex >= 0) {
+      symbols[top.symbolIndex].complexity = top.count;
     }
   };
   const incrementComplexity = () => {
@@ -192,8 +202,7 @@ export function extractFileData(
       if (name && scopeStack[scopeStack.length - 1] === name) {
         scopePop();
       }
-      const top = complexityStack[complexityStack.length - 1];
-      if (top) popComplexityInto(top.symbolIndex);
+      popComplexityTop();
       if (name && currentFunctionScope === name) {
         maybeAddComponent(name, node, false);
         currentFunctionScope = null;
@@ -236,7 +245,11 @@ export function extractFileData(
 
         if (isArrowOrFn) {
           scopePush(name);
-          pushComplexityFor(symbolIndex);
+          // Defer complexity push to the ArrowFunctionExpression /
+          // FunctionExpression visitor so multi-declarator shapes like
+          // `const a = () => {…}, b = () => {…}` push per-function
+          // (not per-declarator) — see the complexityStack comment above.
+          if (init) arrowFnSymbolIndex.set(init, symbolIndex);
         }
         if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {
           currentFunctionScope = name;
@@ -256,14 +269,25 @@ export function extractFileData(
           init?.type === "FunctionExpression";
         if (isArrowOrFn && scopeStack[scopeStack.length - 1] === name) {
           scopePop();
-          const top = complexityStack[complexityStack.length - 1];
-          if (top) popComplexityInto(top.symbolIndex);
         }
         if (name && currentFunctionScope === name) {
           maybeAddComponent(name, init, true);
           currentFunctionScope = null;
         }
       }
+    },
+
+    ArrowFunctionExpression(node: any) {
+      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
+    },
+    "ArrowFunctionExpression:exit"() {
+      popComplexityTop();
+    },
+    FunctionExpression(node: any) {
+      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
+    },
+    "FunctionExpression:exit"() {
+      popComplexityTop();
     },
 
     TSTypeAliasDeclaration(node: any) {
