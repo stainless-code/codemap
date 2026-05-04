@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -54,7 +54,8 @@ export function createTables(db: CodemapDatabase) {
       doc_comment TEXT,
       value TEXT,
       parent_name TEXT,
-      visibility TEXT
+      visibility TEXT,
+      complexity REAL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -394,6 +395,14 @@ export interface SymbolRow {
    * in document order wins when multiple tags are present.
    */
   visibility: string | null;
+  /**
+   * Cyclomatic complexity (1 + branching nodes). Function-shaped symbols
+   * only; `null` for non-function kinds (interfaces, types, enums, plain
+   * consts) and for symbols without a walked body. Optional for back-
+   * compat with callers that built `SymbolRow` literals before the
+   * column existed; absence binds as `null`.
+   */
+  complexity?: number | null;
 }
 
 const BATCH_SIZE = 500;
@@ -426,8 +435,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -443,6 +452,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.value,
         s.parent_name,
         s.visibility,
+        s.complexity ?? null,
       ),
   );
 }

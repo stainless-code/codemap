@@ -131,6 +131,29 @@ export function extractFileData(
     _scopeStr = scopeStack.join(".");
   };
 
+  // `symbolIndex = -1` marks anonymous functions (callbacks, IIFEs) — counted
+  // but never persisted, so their branches don't bleed into outer scopes.
+  // `arrowFnSymbolIndex` maps each named-arrow init node back to its symbol
+  // row index — must push from the function-shaped visitors (not the
+  // VariableDeclaration loop) so multi-declarator `const a = () => …,
+  // b = () => …` shapes attribute branches per-function, not per-statement.
+  const complexityStack: { symbolIndex: number; count: number }[] = [];
+  const arrowFnSymbolIndex = new WeakMap<object, number>();
+  const pushComplexityFor = (symbolIndex: number) => {
+    complexityStack.push({ symbolIndex, count: 1 });
+  };
+  const popComplexityTop = () => {
+    const top = complexityStack.pop();
+    if (!top) return;
+    if (top.symbolIndex >= 0) {
+      symbols[top.symbolIndex].complexity = top.count;
+    }
+  };
+  const incrementComplexity = () => {
+    const top = complexityStack[complexityStack.length - 1];
+    if (top) top.count++;
+  };
+
   const visitor = new Visitor({
     FunctionDeclaration(node: any) {
       const name = node.id?.name;
@@ -141,6 +164,7 @@ export function extractFileData(
         exportedNames.has(name) || defaultExportedNames.has(name);
       const isDefault = defaultExportedNames.has(name);
 
+      const symbolIndex = symbols.length;
       symbols.push({
         file_path: relPath,
         name,
@@ -156,6 +180,7 @@ export function extractFileData(
         parent_name: currentParent(),
         visibility: null,
       });
+      pushComplexityFor(symbolIndex);
 
       scopePush(name);
       if (isTsx && RE_COMPONENT.test(name)) {
@@ -168,6 +193,7 @@ export function extractFileData(
       if (name && scopeStack[scopeStack.length - 1] === name) {
         scopePop();
       }
+      popComplexityTop();
       if (name && currentFunctionScope === name) {
         maybeAddComponent(name, node, false);
         currentFunctionScope = null;
@@ -189,6 +215,7 @@ export function extractFileData(
           init?.type === "ArrowFunctionExpression" ||
           init?.type === "FunctionExpression";
 
+        const symbolIndex = symbols.length;
         symbols.push({
           file_path: relPath,
           name,
@@ -209,6 +236,7 @@ export function extractFileData(
 
         if (isArrowOrFn) {
           scopePush(name);
+          if (init) arrowFnSymbolIndex.set(init, symbolIndex);
         }
         if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {
           currentFunctionScope = name;
@@ -234,6 +262,19 @@ export function extractFileData(
           currentFunctionScope = null;
         }
       }
+    },
+
+    ArrowFunctionExpression(node: any) {
+      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
+    },
+    "ArrowFunctionExpression:exit"() {
+      popComplexityTop();
+    },
+    FunctionExpression(node: any) {
+      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
+    },
+    "FunctionExpression:exit"() {
+      popComplexityTop();
     },
 
     TSTypeAliasDeclaration(node: any) {
@@ -457,6 +498,34 @@ export function extractFileData(
     },
     JSXFragment() {
       if (currentFunctionScope) jsxScopes.add(currentFunctionScope);
+    },
+
+    // Cyclomatic-complexity branching nodes — each adds 1 to the
+    // currently-walked function's count. Standard McCabe formula:
+    // CC = 1 + (#decision points). Tracks if/loops/case/catch/&&/||/??/?:.
+    IfStatement: incrementComplexity,
+    WhileStatement: incrementComplexity,
+    DoWhileStatement: incrementComplexity,
+    ForStatement: incrementComplexity,
+    ForInStatement: incrementComplexity,
+    ForOfStatement: incrementComplexity,
+    ConditionalExpression: incrementComplexity, // `a ? b : c`
+    CatchClause: incrementComplexity,
+    SwitchCase(node: any) {
+      // `default:` is the fall-through arm, not a decision point — only
+      // count `case X:` arms.
+      if (node.test !== null && node.test !== undefined) incrementComplexity();
+    },
+    LogicalExpression(node: any) {
+      // `&&`, `||`, `??` introduce branching paths; `&` / `|` are bitwise
+      // (not decision points; AST shapes them as BinaryExpression).
+      if (
+        node.operator === "&&" ||
+        node.operator === "||" ||
+        node.operator === "??"
+      ) {
+        incrementComplexity();
+      }
     },
   });
 
