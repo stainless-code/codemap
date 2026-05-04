@@ -99,6 +99,14 @@ CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses:
 
 React components (PascalCase + JSX return or hook usage). PascalCase functions that neither return JSX nor call hooks stay in `symbols` only — never `components`. `hooks_used` is JSON-encoded. See `ComponentRow`.
 
+### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
+
+Opt-in FTS5 virtual table over file content (`tokenize='porter unicode61'`). Always created (near-zero space when empty); populated only when the resolved config has FTS5 enabled (`codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; CLI wins, logs stderr override). Demonstrates the FTS5 ⨯ `symbols` ⨯ `coverage` JOIN composability that ripgrep can't match — bundled recipe `text-in-deprecated-functions` exemplifies the JOIN. Toggle change auto-detects via `meta.fts5_enabled` and forces a full rebuild so `source_fts` is consistently populated. Stderr telemetry `[fts5] source_fts populated: <N> files / <X> KB` on first populate. Distinct from arbitrary full-text storage — the table is structurally identical to `coverage` (both `WITHOUT ROWID`-class virtual tables in the substrate). Default OFF preserves `.codemap/index.db` size for non-users (~30–50% growth on text-heavy projects).
+
+### `--format mermaid` / `formatMermaid` / `MERMAID_MAX_EDGES`
+
+Output mode rendering `{from, to, label?, kind?}` rows as a Mermaid `flowchart LR` diagram. Sibling of `--format sarif` / `--format annotations` in `application/output-formatters.ts`. **Bounded-input contract** (50-edge ceiling; `MERMAID_MAX_EDGES`) — unbounded inputs reject with a scope-suggestion error naming the recipe + count + scoping knobs (`LIMIT` / `--via` / `WHERE`). Auto-truncation explicitly out of scope (would be a verdict masquerading as output mode, violating the predicate-as-API moat). Recipes / ad-hoc SQL must alias columns to the `{from, to}` shape (e.g. `SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50`).
+
 ### `coverage` (table)
 
 Static statement coverage ingested from Istanbul JSON or LCOV via `codemap ingest-coverage <path>`. Natural-key PK `(file_path, name, line_start)` — intentionally **not** a FK to `symbols.id` because `symbols` re-creates with fresh AUTOINCREMENT ids on every `--full` reindex; the natural-key approach lets coverage rows survive that churn (`coverage` is also intentionally absent from `dropAll()`, joins the `query_baselines` precedent). Columns: `coverage_pct REAL` (`NULL` when `total_statements = 0` — "untested" and "no testable code" are different signals), `hit_statements`, `total_statements`. Orphan rows (file deleted from project) are cleaned by an explicit `DELETE FROM coverage WHERE file_path NOT IN (SELECT path FROM files)` at the end of every ingest. Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record freshness — single ingest at a time, so format is meta-level not per-row.

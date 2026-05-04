@@ -93,7 +93,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   let i = 0;
   while (i < rest.length) {
     const a = rest[i];
-    if (a === "--full" || a === "--performance") {
+    if (a === "--full" || a === "--performance" || a === "--with-fts") {
       i++;
       continue;
     }
@@ -118,6 +118,7 @@ export function parseBootstrapArgs(argv: string[]) {
   let root = envRoot ? resolve(envRoot) : undefined;
   let configFile: string | undefined;
   let stateDir: string | undefined;
+  let fts5Cli: boolean | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -133,10 +134,17 @@ export function parseBootstrapArgs(argv: string[]) {
       stateDir = argv[++i];
       continue;
     }
+    // Bootstrap-level (config-resolve needs it); also pushed to `rest` so
+    // `validateIndexModeArgs` accepts it as a known flag.
+    if (a === "--with-fts") {
+      fts5Cli = true;
+      rest.push(a);
+      continue;
+    }
     rest.push(a);
   }
   if (!root) root = process.cwd();
   // --state-dir wins over CODEMAP_STATE_DIR (precedence per plan §D7).
   if (!stateDir) stateDir = process.env.CODEMAP_STATE_DIR;
-  return { root, configFile, stateDir, rest };
+  return { root, configFile, stateDir, fts5Cli, rest };
 }

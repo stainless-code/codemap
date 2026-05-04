@@ -200,6 +200,92 @@ export function escapeAnnotationProperty(value: string): string {
 }
 
 /**
+ * Maximum edge count `formatMermaid` will render before rejecting with a
+ * scope-suggestion error. Recipes / ad-hoc SQL must `LIMIT` to ≤ this; the
+ * `impact` engine already bounds via `--depth` / `--limit`.
+ * (`docs/plans/fts5-mermaid.md` Q4 — hard-coded for v1; promote to config
+ * later if real-world data shows 50 is wrong.)
+ */
+export const MERMAID_MAX_EDGES = 50;
+
+export interface MermaidOpts {
+  /** Rows must shape as `{from, to, label?, kind?}` — alias other columns via SELECT. */
+  rows: Record<string, unknown>[];
+  /** Recipe id surfaced in the error message when the row-set is unbounded. */
+  recipeId: string | undefined;
+}
+
+/**
+ * Render a `{from, to, label?, kind?}` row-set as a Mermaid `flowchart LR`
+ * diagram (`docs/plans/fts5-mermaid.md` Q5). Rejects with a scope-suggestion
+ * error when row count exceeds {@link MERMAID_MAX_EDGES} — auto-truncation
+ * would be a verdict masquerading as an output mode (Q4 / moat A).
+ *
+ * Throws `Error` with a message naming the recipe + count + scoping knobs
+ * (`LIMIT` / `--via` / `WHERE from_path LIKE`) when the contract is violated.
+ */
+export function formatMermaid(opts: MermaidOpts): string {
+  if (opts.rows.length > MERMAID_MAX_EDGES) {
+    const recipe = opts.recipeId ?? "(ad-hoc SQL)";
+    throw new Error(
+      `[mermaid] ${recipe} produced ${opts.rows.length} edges (> ${MERMAID_MAX_EDGES}). ` +
+        `Auto-truncation is out of scope (would be a verdict, not an output mode). ` +
+        `Scope the input via 'LIMIT ${MERMAID_MAX_EDGES}', '--via <backend>' (impact), or 'WHERE from_path LIKE …' (recipe / ad-hoc).`,
+    );
+  }
+
+  const ids = new Map<string, string>();
+  let nextId = 0;
+  function nodeId(name: string): string {
+    const cached = ids.get(name);
+    if (cached !== undefined) return cached;
+    const id = `n${nextId++}`;
+    ids.set(name, id);
+    return id;
+  }
+
+  const lines: string[] = ["flowchart LR"];
+  const seen = new Set<string>();
+  for (const row of opts.rows) {
+    const from = readMermaidEndpoint(row, "from");
+    const to = readMermaidEndpoint(row, "to");
+    if (from === undefined || to === undefined) continue;
+
+    const fromId = nodeId(from);
+    const toId = nodeId(to);
+    if (!seen.has(from)) {
+      lines.push(`  ${fromId}[${quoteMermaidLabel(from)}]`);
+      seen.add(from);
+    }
+    if (!seen.has(to)) {
+      lines.push(`  ${toId}[${quoteMermaidLabel(to)}]`);
+      seen.add(to);
+    }
+
+    const labelRaw = row["label"];
+    const label =
+      typeof labelRaw === "string" && labelRaw.length > 0
+        ? `|${quoteMermaidLabel(labelRaw)}|`
+        : "";
+    lines.push(`  ${fromId} --> ${label} ${toId}`.replace(/\s+$/, ""));
+  }
+  return lines.join("\n");
+}
+
+function readMermaidEndpoint(
+  row: Record<string, unknown>,
+  key: "from" | "to",
+): string | undefined {
+  const v = row[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+/** Mermaid label quoting: `"` and `\` need escaping; everything else is literal. */
+function quoteMermaidLabel(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
  * Format the row-set as GitHub Actions annotation commands. One line per
  * locatable row: `::<level> file=<path>,line=<n>::<message>`.
  *

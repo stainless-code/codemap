@@ -5,6 +5,7 @@ import {
 } from "../application/index-engine";
 import {
   formatAnnotations,
+  formatMermaid,
   formatSarif,
   hasLocatableRows,
 } from "../application/output-formatters";
@@ -51,7 +52,13 @@ import { bootstrapCodemap } from "./bootstrap-codemap";
  * `--format` overrides `--json` when both are passed; `--json` stays as the
  * alias for `--format json`. See [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  */
-export const OUTPUT_FORMATS = ["text", "json", "sarif", "annotations"] as const;
+export const OUTPUT_FORMATS = [
+  "text",
+  "json",
+  "sarif",
+  "annotations",
+  "mermaid",
+] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
 export function isOutputFormat(s: string): s is OutputFormat {
@@ -482,14 +489,15 @@ function formatIncompatibility(
     baseline: string | true | undefined;
   },
 ): string | undefined {
-  if (fmt !== "sarif" && fmt !== "annotations") return undefined;
+  if (fmt !== "sarif" && fmt !== "annotations" && fmt !== "mermaid")
+    return undefined;
   const offenders: string[] = [];
   if (opts.summary) offenders.push("--summary");
   if (opts.groupBy !== undefined) offenders.push("--group-by");
   if (opts.saveBaseline !== undefined) offenders.push("--save-baseline");
   if (opts.baseline !== undefined) offenders.push("--baseline");
   if (offenders.length === 0) return undefined;
-  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations only support flat row lists).`;
+  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations/mermaid only support flat row lists).`;
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -714,7 +722,11 @@ export async function runQueryCmd(opts: {
       return;
     }
 
-    if (effectiveFormat === "sarif" || effectiveFormat === "annotations") {
+    if (
+      effectiveFormat === "sarif" ||
+      effectiveFormat === "annotations" ||
+      effectiveFormat === "mermaid"
+    ) {
       const code = printFormattedQuery(opts.sql, {
         format: effectiveFormat,
         recipeId: opts.recipeId,
@@ -814,7 +826,7 @@ export async function runDropBaselineCmd(opts: {
 function printFormattedQuery(
   sql: string,
   opts: {
-    format: "sarif" | "annotations";
+    format: "sarif" | "annotations" | "mermaid";
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
   },
@@ -830,7 +842,13 @@ function printFormattedQuery(
       >[];
     }
 
-    if (rows.length > 0 && !hasLocatableRows(rows)) {
+    // SARIF / annotations require a location column; mermaid requires
+    // the from/to graph contract (checked inside formatMermaid).
+    if (
+      opts.format !== "mermaid" &&
+      rows.length > 0 &&
+      !hasLocatableRows(rows)
+    ) {
       console.error(
         `codemap: --format ${opts.format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${opts.format} v1.)`,
       );
@@ -847,6 +865,15 @@ function printFormattedQuery(
         recipeId: opts.recipeId,
         recipeDescription: catalog?.description,
         recipeBody: catalog?.body,
+      });
+      console.log(out);
+      return 0;
+    }
+
+    if (opts.format === "mermaid") {
+      const out = formatMermaid({
+        rows,
+        recipeId: opts.recipeId,
       });
       console.log(out);
       return 0;

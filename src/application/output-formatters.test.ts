@@ -6,8 +6,10 @@ import {
   escapeAnnotationData,
   escapeAnnotationProperty,
   formatAnnotations,
+  formatMermaid,
   formatSarif,
   hasLocatableRows,
+  MERMAID_MAX_EDGES,
 } from "./output-formatters";
 
 describe("detectLocationColumn", () => {
@@ -325,6 +327,98 @@ describe("formatAnnotations", () => {
     expect(out).not.toContain("%0A");
     expect(out).not.toContain("%0D");
     expect(out).toContain("line1 line2 line3");
+  });
+});
+
+describe("formatMermaid", () => {
+  it("renders a flowchart from {from, to} rows", () => {
+    const out = formatMermaid({
+      rows: [
+        { from: "a.ts", to: "b.ts" },
+        { from: "b.ts", to: "c.ts" },
+      ],
+      recipeId: "fan-out",
+    });
+    expect(out.startsWith("flowchart LR")).toBe(true);
+    expect(out).toContain("a.ts");
+    expect(out).toContain("b.ts");
+    expect(out).toContain("c.ts");
+    expect(out).toContain("-->");
+  });
+
+  it("supports optional label as edge text", () => {
+    const out = formatMermaid({
+      rows: [{ from: "a", to: "b", label: "calls" }],
+      recipeId: "x",
+    });
+    expect(out).toContain('--> |"calls"|');
+  });
+
+  it("dedupes node declarations across edges", () => {
+    const out = formatMermaid({
+      rows: [
+        { from: "a", to: "b" },
+        { from: "a", to: "c" },
+      ],
+      recipeId: "x",
+    });
+    const nodeDeclarations = out
+      .split("\n")
+      .filter((l) => l.match(/^\s+n\d+\["/));
+    expect(nodeDeclarations).toHaveLength(3); // a, b, c
+  });
+
+  it("rejects unbounded inputs (> MERMAID_MAX_EDGES)", () => {
+    const rows = Array.from({ length: MERMAID_MAX_EDGES + 1 }, (_, i) => ({
+      from: `a${i}`,
+      to: `b${i}`,
+    }));
+    expect(() => formatMermaid({ rows, recipeId: "fan-out" })).toThrow(
+      /produced \d+ edges/,
+    );
+  });
+
+  it("error message names recipe + scoping knobs", () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({
+      from: `a${i}`,
+      to: `b${i}`,
+    }));
+    expect(() => formatMermaid({ rows, recipeId: "fan-out" })).toThrow(
+      /fan-out.*LIMIT.*--via.*WHERE/s,
+    );
+  });
+
+  it("error message uses '(ad-hoc SQL)' when recipeId is undefined", () => {
+    const rows = Array.from({ length: 100 }, (_, i) => ({
+      from: `a${i}`,
+      to: `b${i}`,
+    }));
+    expect(() => formatMermaid({ rows, recipeId: undefined })).toThrow(
+      /\(ad-hoc SQL\)/,
+    );
+  });
+
+  it("escapes quotes in labels", () => {
+    const out = formatMermaid({
+      rows: [{ from: 'a"b', to: "c" }],
+      recipeId: "x",
+    });
+    expect(out).toContain('\\"');
+  });
+
+  it("skips rows missing from / to", () => {
+    const out = formatMermaid({
+      rows: [
+        { from: "a", to: "b" },
+        { from: "c" }, // missing to
+        { to: "e" }, // missing from
+      ],
+      recipeId: "x",
+    });
+    expect(out).toContain("a.ts" === "a.ts" ? "a" : "");
+    // Only one edge should be rendered.
+    const edgeLines = out.split("\n").filter((l) => l.includes("-->"));
+    expect(edgeLines).toHaveLength(1);
   });
 });
 

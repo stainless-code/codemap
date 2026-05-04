@@ -14,6 +14,8 @@ export type { ParsedFile } from "./parsed-types";
 export interface WorkerInput {
   files: string[];
   projectRoot: string;
+  /** Tees `source` into `parsed.content` for the indexer's `source_fts` write. */
+  fts5Enabled?: boolean;
 }
 
 export interface WorkerOutput {
@@ -31,7 +33,7 @@ function parseAsTextFallback(
 }
 
 export function parseWorkerInput(input: WorkerInput): WorkerOutput {
-  const { files, projectRoot } = input;
+  const { files, projectRoot, fts5Enabled } = input;
   const results: ParsedFile[] = [];
 
   for (const relPath of files) {
@@ -72,6 +74,8 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
       },
       category: "text",
     };
+
+    if (fts5Enabled === true) parsed.content = source;
 
     const ctx: ParseContext = { absPath, relPath, source };
 

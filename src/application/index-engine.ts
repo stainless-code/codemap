@@ -14,6 +14,7 @@ import {
   getMeta,
   setMeta,
   deleteFileData,
+  deleteSourceFts,
   insertFile,
   insertSymbols,
   insertImports,
@@ -27,6 +28,8 @@ import {
   insertTypeMembers,
   insertCalls,
   getAllFileHashes,
+  upsertSourceFts,
+  META_FTS5_ENABLED_KEY,
   SCHEMA_VERSION,
 } from "../db";
 import type { CodemapDatabase, FileRow } from "../db";
@@ -37,7 +40,12 @@ import { extractMarkers } from "../markers";
 import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
-import { getIncludePatterns, getProjectRoot, isPathExcluded } from "../runtime";
+import {
+  getFts5Enabled,
+  getIncludePatterns,
+  getProjectRoot,
+  isPathExcluded,
+} from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
 import type {
   IndexPerformanceReport,
@@ -186,6 +194,10 @@ function insertParsedResults(
 
       insertFile(db, parsed.fileRow);
 
+      if (parsed.content !== undefined) {
+        upsertSourceFts(db, parsed.fileRow.path, parsed.content);
+      }
+
       try {
         if (parsed.category === "text") {
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
@@ -289,9 +301,15 @@ export async function indexFiles(
     createTables(db);
     db.run("PRAGMA synchronous = OFF");
     db.run("PRAGMA foreign_keys = OFF");
+    // dropAll wiped meta; re-seed `fts5_enabled` + `schema_version` so the
+    // next run's toggle-change detection has a reference point.
+    setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
+    setMeta(db, "schema_version", String(SCHEMA_VERSION));
   } else {
     createSchema(db);
   }
+  const fts5WasEmpty =
+    fullRebuild && getFts5Enabled() && !quiet && countFts5Rows(db) === 0;
 
   const indexedPaths = knownIndexedPaths ?? new Set(filePaths);
 
@@ -353,6 +371,10 @@ export async function indexFiles(
           indexed_at: Date.now(),
         };
         insertFile(db, fileRow);
+
+        if (getFts5Enabled()) {
+          upsertSourceFts(db, relPath, source);
+        }
 
         try {
           const category = fileCategory(relPath);
@@ -442,6 +464,15 @@ export async function indexFiles(
     };
   }
 
+  if (fts5WasEmpty && getFts5Enabled()) {
+    const fts5Rows = countFts5Rows(db);
+    if (fts5Rows > 0) {
+      console.error(
+        `[fts5] source_fts populated: ${fts5Rows} files / ${formatFts5SizeDelta(db)}`,
+      );
+    }
+  }
+
   if (!quiet) {
     console.log(
       `\n  Codemap ${fullRebuild ? "(full rebuild)" : "(incremental)"}`,
@@ -498,6 +529,8 @@ export function deleteFilesFromIndex(
     const batch = deleted.slice(i, i + CHUNK);
     const placeholders = batch.map(() => "?").join(",");
     db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
+    // FK CASCADE doesn't reach `source_fts` (virtual table); mirror manually.
+    for (const path of batch) deleteSourceFts(db, path);
   }
   if (!quiet) {
     console.log(`  Removed ${deleted.length} deleted files from index`);
@@ -632,5 +665,35 @@ export function queryRows(sql: string): unknown[] {
     return db.query(sql).all();
   } finally {
     closeDb(db, { readonly: true });
+  }
+}
+
+function countFts5Rows(db: CodemapDatabase): number {
+  const row = db
+    .query<{ c: number }>("SELECT COUNT(*) AS c FROM source_fts")
+    .get();
+  return row?.c ?? 0;
+}
+
+/**
+ * Best-effort FTS5 size telemetry. SQLite's `dbstat` virtual table requires
+ * the SQLITE_ENABLE_DBSTAT_VTAB build flag (not always available); fall
+ * back to file-bytes accounting via `sum(length(content))` so the line is
+ * informational regardless of build flags. (`docs/plans/fts5-mermaid.md` Q7.)
+ */
+function formatFts5SizeDelta(db: CodemapDatabase): string {
+  try {
+    const row = db
+      .query<{ b: number }>(
+        "SELECT IFNULL(SUM(length(content)), 0) AS b FROM source_fts",
+      )
+      .get();
+    const bytes = row?.b ?? 0;
+    if (bytes < 1024) return `${bytes} B (uncompressed content)`;
+    if (bytes < 1024 * 1024)
+      return `${Math.round(bytes / 1024)} KB (uncompressed content)`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB (uncompressed content)`;
+  } catch {
+    return "size unknown";
   }
 }

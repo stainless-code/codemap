@@ -34,6 +34,8 @@ A local database (default **`.codemap/index.db`**) indexes structure: symbols, i
 | Impact (blast-radius walker)   | —                  | `bun src/index.ts impact <target> [--direction up\|down\|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]` — replaces hand-composed `WITH RECURSIVE` queries                                                               |
 | Coverage ingest                | —                  | `bun src/index.ts ingest-coverage <path> [--json]` — Istanbul (`coverage-final.json`) or LCOV (`lcov.info`); format auto-detected. Joinable to `symbols` for "untested AND dead" queries.                                                |
 | SARIF / GH annotations         | —                  | `bun src/index.ts query --recipe deprecated-symbols --format sarif` · `… --format annotations`                                                                                                                                           |
+| Mermaid graph (≤50 edges)      | —                  | `bun src/index.ts query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'` — recipes / SQL must alias columns to `{from, to, label?, kind?}`; rejects unbounded inputs.                          |
+| FTS5 full-text (opt-in)        | `--with-fts`       | `bun src/index.ts --with-fts --full` enables `source_fts` virtual table; `query --recipe text-in-deprecated-functions` demos JOINs.                                                                                                      |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
 
@@ -94,29 +96,30 @@ Violating this order is wrong even if you get the right answer — it wastes tim
 
 If the question looks like any of these → use the index:
 
-| Question shape                                               | Table(s)                                                 |
-| ------------------------------------------------------------ | -------------------------------------------------------- |
-| "What/which files import X?"                                 | `imports` (by `source`) or `dependencies` (by `to_path`) |
-| "Where is X defined?"                                        | `symbols`                                                |
-| "What does file X export?"                                   | `exports`                                                |
-| "What hooks does component X use?" / "List React components" | `components`                                             |
-| "What are the CSS variables/tokens for X?"                   | `css_variables`                                          |
-| "Find all TODOs/FIXMEs"                                      | `markers`                                                |
-| "Who depends on file X?" / "What does file X depend on?"     | `dependencies`                                           |
-| "How many files/symbols/components are there?"               | any table with `COUNT(*)`                                |
-| "What are the CSS classes in X?"                             | `css_classes`                                            |
-| "What keyframe animations exist?"                            | `css_keyframes`                                          |
-| "What fields does interface/type X have?"                    | `type_members`                                           |
-| "Is symbol X deprecated?" / "What does X do?"                | `symbols` (`doc_comment`)                                |
-| "What's `@internal` / `@beta` / `@alpha` / `@private`?"      | `symbols.visibility` (parsed JSDoc tag — not regex)      |
-| "Who calls X?" / "What does X call?"                         | `calls`                                                  |
-| "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `ingest-coverage`)                     |
-| "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                             |
-| "Rank files by test coverage"                                | `--recipe files-by-coverage`                             |
-| "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                         |
-| "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                |
-| "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                         |
-| "Which exports has nobody imported?"                         | `--recipe unimported-exports`                            |
+| Question shape                                                | Table(s)                                                 |
+| ------------------------------------------------------------- | -------------------------------------------------------- |
+| "What/which files import X?"                                  | `imports` (by `source`) or `dependencies` (by `to_path`) |
+| "Where is X defined?"                                         | `symbols`                                                |
+| "What does file X export?"                                    | `exports`                                                |
+| "What hooks does component X use?" / "List React components"  | `components`                                             |
+| "What are the CSS variables/tokens for X?"                    | `css_variables`                                          |
+| "Find all TODOs/FIXMEs"                                       | `markers`                                                |
+| "Who depends on file X?" / "What does file X depend on?"      | `dependencies`                                           |
+| "How many files/symbols/components are there?"                | any table with `COUNT(*)`                                |
+| "What are the CSS classes in X?"                              | `css_classes`                                            |
+| "What keyframe animations exist?"                             | `css_keyframes`                                          |
+| "What fields does interface/type X have?"                     | `type_members`                                           |
+| "Is symbol X deprecated?" / "What does X do?"                 | `symbols` (`doc_comment`)                                |
+| "What's `@internal` / `@beta` / `@alpha` / `@private`?"       | `symbols.visibility` (parsed JSDoc tag — not regex)      |
+| "Who calls X?" / "What does X call?"                          | `calls`                                                  |
+| "Is symbol X tested?" / "What's the coverage of file Y?"      | `coverage` (after `ingest-coverage`)                     |
+| "What's structurally dead AND untested?"                      | `--recipe untested-and-dead`                             |
+| "Rank files by test coverage"                                 | `--recipe files-by-coverage`                             |
+| "Worst-covered exported functions"                            | `--recipe worst-covered-exports`                         |
+| "Which components touch deprecated APIs?"                     | `--recipe components-touching-deprecated`                |
+| "What's risky to refactor right now?"                         | `--recipe refactor-risk-ranking`                         |
+| "Which exports has nobody imported?"                          | `--recipe unimported-exports`                            |
+| "Find @deprecated functions with TODO/FIXME and low coverage" | `--recipe text-in-deprecated-functions` (needs FTS5 on)  |
 
 ## When Grep / Read IS appropriate
 

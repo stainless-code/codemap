@@ -9,6 +9,7 @@ export async function runIndexCmd(opts: {
   root: string;
   configFile: string | undefined;
   stateDir?: string | undefined;
+  fts5Cli?: boolean | undefined;
   rest: string[];
 }): Promise<void> {
   await bootstrapCodemap(opts);

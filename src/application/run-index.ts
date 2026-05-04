@@ -1,5 +1,6 @@
-import { createSchema, setMeta } from "../db";
+import { createSchema, getMeta, META_FTS5_ENABLED_KEY, setMeta } from "../db";
 import type { CodemapDatabase } from "../db";
+import { getFts5Enabled } from "../runtime";
 import {
   collectFiles,
   deleteFilesFromIndex,
@@ -10,6 +11,31 @@ import {
   targetedReindex,
 } from "./index-engine";
 import type { IndexResult, IndexTableStats } from "./types";
+
+/**
+ * Returns `true` when the persisted `meta.fts5_enabled` differs from the
+ * current resolved config and the caller should upgrade an incremental
+ * run to a full rebuild (`docs/plans/fts5-mermaid.md` Q3). First-run
+ * (`undefined` meta) seeds the value silently.
+ */
+function detectFts5ToggleChange(db: CodemapDatabase, mode: IndexMode): boolean {
+  const wantEnabled = getFts5Enabled();
+  const lastValue = getMeta(db, META_FTS5_ENABLED_KEY);
+  if (lastValue === undefined) {
+    setMeta(db, META_FTS5_ENABLED_KEY, wantEnabled ? "1" : "0");
+    return false;
+  }
+  const lastEnabled = lastValue === "1";
+  if (lastEnabled === wantEnabled) return false;
+  if (mode === "full") {
+    setMeta(db, META_FTS5_ENABLED_KEY, wantEnabled ? "1" : "0");
+    return false;
+  }
+  console.error(
+    `[fts5] toggle change detected (${lastEnabled} → ${wantEnabled}); upgrading this run to a full rebuild so source_fts is consistently populated.`,
+  );
+  return true;
+}
 
 function emptyStats(): IndexTableStats {
   return {
@@ -71,9 +97,17 @@ export async function runCodemapIndex(
   options: RunIndexOptions = {},
 ): Promise<IndexResult> {
   const quiet = options.quiet ?? false;
-  const mode: IndexMode = options.mode ?? "incremental";
+  let mode: IndexMode = options.mode ?? "incremental";
 
   const wantPerformance = options.performance === true;
+
+  // createSchema is idempotent; needed up-front so `meta` exists for the
+  // toggle read.
+  createSchema(db);
+  if (detectFts5ToggleChange(db, mode)) {
+    mode = "full";
+    setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
+  }
 
   if (mode === "full") {
     if (!quiet) console.log("  Full rebuild requested...");
