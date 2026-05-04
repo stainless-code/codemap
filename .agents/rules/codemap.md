@@ -6,7 +6,7 @@ alwaysApply: true
 
 > **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
 
-A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** (`ensureStateGitignore`) — bumping its canonical body in a PR auto-applies on every consumer's next run.
+A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes, and (after `bun src/index.ts ingest-coverage <path>`) static coverage from Istanbul JSON or LCOV. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** (`ensureStateGitignore`) — bumping its canonical body in a PR auto-applies on every consumer's next run.
 
 **This file** is for **developing Codemap** in this clone. **End users** of the published package get the agent rule from **`templates/agents/`** (via **`codemap agents init`**). **Generic defaults:** SQL and triggers stay project-agnostic — **edit** this rule for repo-specific paths and queries.
 
@@ -32,6 +32,7 @@ A local database (default **`.codemap/index.db`**) indexes structure: symbols, i
 | Targeted read (metadata)       | —                  | `bun src/index.ts show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                                                                                                                                               |
 | Targeted read (source text)    | —                  | `bun src/index.ts snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag                                                                                                                      |
 | Impact (blast-radius walker)   | —                  | `bun src/index.ts impact <target> [--direction up\|down\|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]` — replaces hand-composed `WITH RECURSIVE` queries                                                               |
+| Coverage ingest                | —                  | `bun src/index.ts ingest-coverage <path> [--json]` — Istanbul (`coverage-final.json`) or LCOV (`lcov.info`); format auto-detected. Joinable to `symbols` for "untested AND dead" queries.                                                |
 | SARIF / GH annotations         | —                  | `bun src/index.ts query --recipe deprecated-symbols --format sarif` · `… --format annotations`                                                                                                                                           |
 
 **Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
@@ -109,6 +110,10 @@ If the question looks like any of these → use the index:
 | "Is symbol X deprecated?" / "What does X do?"                | `symbols` (`doc_comment`)                                |
 | "What's `@internal` / `@beta` / `@alpha` / `@private`?"      | `symbols.visibility` (parsed JSDoc tag — not regex)      |
 | "Who calls X?" / "What does X call?"                         | `calls`                                                  |
+| "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `ingest-coverage`)                     |
+| "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                             |
+| "Rank files by test coverage"                                | `--recipe files-by-coverage`                             |
+| "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                         |
 
 ## When Grep / Read IS appropriate
 
@@ -156,6 +161,8 @@ bun src/index.ts query --json "<SQL>"
 | Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
 | What does X call?         | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
 | Call hotspots             | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
+| Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`          |
+| Untested + dead exports   | `bun src/index.ts query --json --recipe untested-and-dead`                                                   |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

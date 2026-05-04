@@ -4,9 +4,15 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../src/api";
+import { ingestIstanbul, ingestLcov } from "../src/application/coverage-engine";
 import { getQueryRecipeSql } from "../src/application/query-recipes";
+import { closeDb, openDb } from "../src/db";
 import { parseScenariosJson } from "./query-golden/schema";
-import type { GoldenMatch, GoldenScenario } from "./query-golden/schema";
+import type {
+  GoldenMatch,
+  GoldenScenario,
+  GoldenSetupStep,
+} from "./query-golden/schema";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -92,6 +98,46 @@ function defaultMatch(s: GoldenScenario): GoldenMatch {
   return s.match ?? { kind: "exact" };
 }
 
+/**
+ * Run one-time setup steps after the corpus is indexed and before the first
+ * scenario. Today: `ingest-coverage` (Istanbul / LCOV — auto-detected by
+ * extension, mirrors the CLI verb). Extend the dispatch as more one-shot
+ * ingest verbs land.
+ */
+function runSetup(steps: GoldenSetupStep[], fixtureRoot: string): void {
+  const db = openDb();
+  try {
+    for (const step of steps) {
+      if (step.kind !== "ingest-coverage") continue;
+      const absPath = resolve(fixtureRoot, step.path);
+      if (absPath.endsWith(".json")) {
+        const payload = JSON.parse(
+          readFileSync(absPath, "utf-8"),
+        ) as Parameters<typeof ingestIstanbul>[0]["payload"];
+        ingestIstanbul({
+          db,
+          projectRoot: fixtureRoot,
+          payload,
+          sourcePath: absPath,
+        });
+      } else if (absPath.endsWith(".info")) {
+        ingestLcov({
+          db,
+          projectRoot: fixtureRoot,
+          payload: readFileSync(absPath, "utf-8"),
+          sourcePath: absPath,
+        });
+      } else {
+        throw new Error(
+          `query-golden setup: cannot auto-detect coverage format from ${absPath}`,
+        );
+      }
+    }
+  } finally {
+    closeDb(db);
+  }
+}
+
 function evaluateMatch(
   rows: unknown[],
   match: GoldenMatch,
@@ -160,12 +206,13 @@ async function main(): Promise<void> {
   }
 
   const raw = readFileSync(scenariosFile, "utf-8");
-  const scenarios = parseScenariosJson(raw);
+  const { setup, scenarios } = parseScenariosJson(raw);
 
   mkdirSync(goldenDir, { recursive: true });
 
   const cm = await createCodemap({ root: fixtureRoot });
   await cm.index({ mode: "full", quiet: true });
+  if (setup.length > 0) runSetup(setup, fixtureRoot);
 
   const modeLabel = UPDATE ? "--update" : "compare";
   const corpusLabel = argv.corpus;

@@ -99,6 +99,25 @@ CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses:
 
 React components (PascalCase + JSX return or hook usage). PascalCase functions that neither return JSX nor call hooks stay in `symbols` only — never `components`. `hooks_used` is JSON-encoded. See `ComponentRow`.
 
+### `coverage` (table)
+
+Static statement coverage ingested from Istanbul JSON or LCOV via `codemap ingest-coverage <path>`. Natural-key PK `(file_path, name, line_start)` — intentionally **not** a FK to `symbols.id` because `symbols` re-creates with fresh AUTOINCREMENT ids on every `--full` reindex; the natural-key approach lets coverage rows survive that churn (`coverage` is also intentionally absent from `dropAll()`, joins the `query_baselines` precedent). Columns: `coverage_pct REAL` (`NULL` when `total_statements = 0` — "untested" and "no testable code" are different signals), `hit_statements`, `total_statements`. Orphan rows (file deleted from project) are cleaned by an explicit `DELETE FROM coverage WHERE file_path NOT IN (SELECT path FROM files)` at the end of every ingest. Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record freshness — single ingest at a time, so format is meta-level not per-row.
+
+### `codemap ingest-coverage` / Istanbul JSON / LCOV / static coverage ingestion
+
+`codemap ingest-coverage <path> [--json]` reads a static coverage artifact and writes statement-level rows into the `coverage` table. Two formats in v1:
+
+- **Istanbul JSON** (`coverage-final.json`) — emitted natively by `c8`, `nyc`, `vitest --coverage --coverage.reporter=json`, `jest --coverage --coverageReporters=json`. Parser reads `statementMap` + `s` (per-statement hit counts).
+- **LCOV** (`lcov.info`) — emitted by `bun test --coverage`, `c8 --reporter=lcov`, every legacy stack. Parser tokenises `SF:` / `DA:<line>,<count>` / `end_of_record` records; ignores `TN:` / `FN:` / `BRDA:` / `LF:` / `LH:` (statement coverage only in v1).
+
+Format auto-detected from extension (`.json` → istanbul, `.info` → lcov, directory → probe both, error if ambiguous). No `--source` flag (per the plan's "no half-way APIs" principle — adding a flag for what the engine can detect is API noise). Each statement projects onto the **innermost** enclosing symbol via JS-side `(line_end - line_start) ASC` tie-break — required because nested symbols (class methods inside classes, closures inside functions) would otherwise inflate `total_statements`. Statements that fall outside every symbol range (top-level expressions, side-effect imports) increment `skipped.statements_no_symbol` for observability. Three bundled recipes consume the table at first-class agent surface (no agent ever has to hand-compose the JOIN):
+
+- `untested-and-dead` — exported functions with no callers AND zero coverage (the killer recipe; ships with a name-collision mitigation guide in the recipe `.md`).
+- `files-by-coverage` — files ranked ascending by statement coverage (replaces a deferred `file_coverage` rollup table; aggregates the symbol-level table via index-bounded `GROUP BY`).
+- `worst-covered-exports` — top-20 worst-covered exported functions.
+
+Engine: `application/coverage-engine.ts` — pure `upsertCoverageRows({db, projectRoot, rows, format, sourcePath})` core consumed by both `ingestIstanbul` and `ingestLcov`.
+
 ### `content_hash`
 
 Column on the `files` table. Lowercase SHA-256 hex of file bytes computed by `src/hash.ts`. Drives incremental staleness detection (`getChangedFiles`) and powers the `files-hashes` recipe + `codemap validate` CLI.

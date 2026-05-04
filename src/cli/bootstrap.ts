@@ -42,6 +42,9 @@ Targeted reads (precise lookup by symbol name):
 Impact analysis (graph walk for refactor blast-radius):
   codemap impact <target> [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]
 
+Coverage ingest (Istanbul JSON or LCOV from any test runner):
+  codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected
+
 Other:
   codemap version
   codemap --version, -V
@@ -77,6 +80,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "show") return;
   if (rest[0] === "snippet") return;
   if (rest[0] === "impact") return;
+  if (rest[0] === "ingest-coverage") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;

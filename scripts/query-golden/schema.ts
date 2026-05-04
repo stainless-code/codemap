@@ -41,9 +41,38 @@ export const scenarioSchema = z
 
 export type GoldenScenario = z.infer<typeof scenarioSchema>;
 
-export const scenariosFileSchema = z.array(scenarioSchema);
+/**
+ * One-time setup step run after `cm.index()` and before the first scenario.
+ * Currently only `ingest-coverage` (Istanbul / LCOV); extend the union as
+ * other one-shot ingest verbs land.
+ */
+export const setupStepSchema = z.object({
+  kind: z.literal("ingest-coverage"),
+  /** Path relative to the fixture root (e.g. `coverage/coverage-final.json`). */
+  path: z.string().min(1),
+});
 
-export function parseScenariosJson(raw: string): GoldenScenario[] {
+export type GoldenSetupStep = z.infer<typeof setupStepSchema>;
+
+const legacyArraySchema = z.array(scenarioSchema);
+const objectShapeSchema = z.object({
+  setup: z.array(setupStepSchema).optional(),
+  scenarios: z.array(scenarioSchema),
+});
+
+export const scenariosFileSchema = z.union([
+  legacyArraySchema,
+  objectShapeSchema,
+]);
+
+export interface ParsedScenariosFile {
+  setup: GoldenSetupStep[];
+  scenarios: GoldenScenario[];
+}
+
+export function parseScenariosJson(raw: string): ParsedScenariosFile {
   const data: unknown = JSON.parse(raw);
-  return scenariosFileSchema.parse(data);
+  const parsed = scenariosFileSchema.parse(data);
+  if (Array.isArray(parsed)) return { setup: [], scenarios: parsed };
+  return { setup: parsed.setup ?? [], scenarios: parsed.scenarios };
 }

@@ -1,97 +1,122 @@
-[
-  {
-    "id": "files-count",
-    "prompt": "How many indexed files exist?",
-    "sql": "SELECT COUNT(*) AS n FROM files"
-  },
-  {
-    "id": "symbol-usePermissions",
-    "prompt": "Where is the usePermissions symbol defined?",
-    "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'usePermissions'"
-  },
-  {
-    "id": "index-summary",
-    "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
-    "recipe": "index-summary"
-  },
-  {
-    "id": "imports-consumer-alias",
-    "prompt": "Which alias import does consumer.ts use for the API client?",
-    "sql": "SELECT file_path, source, specifiers, is_type_only FROM imports WHERE file_path = 'src/consumer.ts' AND source = '~/api/client'"
-  },
-  {
-    "id": "dependencies-from-consumer",
-    "prompt": "What files does src/consumer.ts depend on (resolved edges)?",
-    "sql": "SELECT from_path, to_path FROM dependencies WHERE from_path = 'src/consumer.ts' ORDER BY to_path"
-  },
-  {
-    "id": "markers-notes-todo",
-    "prompt": "TODO marker in fixture notes markdown",
-    "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
-  },
-  {
-    "id": "exports-client",
-    "prompt": "What does src/api/client.ts export?",
-    "sql": "SELECT name, kind FROM exports WHERE file_path = 'src/api/client.ts'"
-  },
-  {
-    "id": "css-variables",
-    "prompt": "Which CSS custom properties (design tokens) are defined?",
-    "sql": "SELECT name, value FROM css_variables ORDER BY name"
-  },
-  {
-    "id": "css-classes-module",
-    "prompt": "Which CSS classes exist and are any from CSS modules?",
-    "sql": "SELECT name, file_path, is_module FROM css_classes ORDER BY name"
-  },
-  {
-    "id": "css-keyframes",
-    "prompt": "Which @keyframes animations are defined?",
-    "sql": "SELECT name, file_path FROM css_keyframes"
-  },
-  {
-    "id": "css-imports",
-    "prompt": "Which CSS files import other stylesheets?",
-    "sql": "SELECT file_path, source FROM imports WHERE file_path LIKE '%.css'"
-  },
-  {
-    "id": "markers-all-kinds",
-    "prompt": "How many markers of each kind exist?",
-    "sql": "SELECT kind, COUNT(*) as n FROM markers GROUP BY kind ORDER BY kind"
-  },
-  {
-    "id": "components-no-false-positives",
-    "prompt": "Which components are detected (FormatPrice should not appear)?",
-    "sql": "SELECT name FROM components ORDER BY name"
-  },
-  {
-    "id": "type-members-client-config",
-    "prompt": "What fields does ClientConfig have?",
-    "sql": "SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = 'ClientConfig' ORDER BY name"
-  },
-  {
-    "id": "calls-consumer",
-    "prompt": "What does the run function in consumer.ts call?",
-    "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
-  },
-  {
-    "id": "deprecated-symbols",
-    "prompt": "Which symbols are flagged @deprecated in JSDoc?",
-    "recipe": "deprecated-symbols"
-  },
-  {
-    "id": "visibility-tags",
-    "prompt": "Which symbols are tagged @internal / @private / @alpha / @beta?",
-    "recipe": "visibility-tags"
-  },
-  {
-    "id": "files-hashes",
-    "prompt": "All indexed files with content_hash (recipe powers `codemap validate`)",
-    "recipe": "files-hashes"
-  },
-  {
-    "id": "barrel-files",
-    "prompt": "Top files by export count (barrel candidates)",
-    "recipe": "barrel-files"
-  }
-]
+{
+  "setup": [
+    { "kind": "ingest-coverage", "path": "coverage/coverage-final.json" }
+  ],
+  "scenarios": [
+    {
+      "id": "files-count",
+      "prompt": "How many indexed files exist?",
+      "sql": "SELECT COUNT(*) AS n FROM files"
+    },
+    {
+      "id": "symbol-usePermissions",
+      "prompt": "Where is the usePermissions symbol defined?",
+      "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'usePermissions'"
+    },
+    {
+      "id": "index-summary",
+      "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
+      "recipe": "index-summary"
+    },
+    {
+      "id": "imports-consumer-alias",
+      "prompt": "Which alias import does consumer.ts use for the API client?",
+      "sql": "SELECT file_path, source, specifiers, is_type_only FROM imports WHERE file_path = 'src/consumer.ts' AND source = '~/api/client'"
+    },
+    {
+      "id": "dependencies-from-consumer",
+      "prompt": "What files does src/consumer.ts depend on (resolved edges)?",
+      "sql": "SELECT from_path, to_path FROM dependencies WHERE from_path = 'src/consumer.ts' ORDER BY to_path"
+    },
+    {
+      "id": "markers-notes-todo",
+      "prompt": "TODO marker in fixture notes markdown",
+      "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
+    },
+    {
+      "id": "exports-client",
+      "prompt": "What does src/api/client.ts export?",
+      "sql": "SELECT name, kind FROM exports WHERE file_path = 'src/api/client.ts'"
+    },
+    {
+      "id": "css-variables",
+      "prompt": "Which CSS custom properties (design tokens) are defined?",
+      "sql": "SELECT name, value FROM css_variables ORDER BY name"
+    },
+    {
+      "id": "css-classes-module",
+      "prompt": "Which CSS classes exist and are any from CSS modules?",
+      "sql": "SELECT name, file_path, is_module FROM css_classes ORDER BY name"
+    },
+    {
+      "id": "css-keyframes",
+      "prompt": "Which @keyframes animations are defined?",
+      "sql": "SELECT name, file_path FROM css_keyframes"
+    },
+    {
+      "id": "css-imports",
+      "prompt": "Which CSS files import other stylesheets?",
+      "sql": "SELECT file_path, source FROM imports WHERE file_path LIKE '%.css'"
+    },
+    {
+      "id": "markers-all-kinds",
+      "prompt": "How many markers of each kind exist?",
+      "sql": "SELECT kind, COUNT(*) as n FROM markers GROUP BY kind ORDER BY kind"
+    },
+    {
+      "id": "components-no-false-positives",
+      "prompt": "Which components are detected (FormatPrice should not appear)?",
+      "sql": "SELECT name FROM components ORDER BY name"
+    },
+    {
+      "id": "type-members-client-config",
+      "prompt": "What fields does ClientConfig have?",
+      "sql": "SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = 'ClientConfig' ORDER BY name"
+    },
+    {
+      "id": "calls-consumer",
+      "prompt": "What does the run function in consumer.ts call?",
+      "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
+    },
+    {
+      "id": "deprecated-symbols",
+      "prompt": "Which symbols are flagged @deprecated in JSDoc?",
+      "recipe": "deprecated-symbols"
+    },
+    {
+      "id": "visibility-tags",
+      "prompt": "Which symbols are tagged @internal / @private / @alpha / @beta?",
+      "recipe": "visibility-tags"
+    },
+    {
+      "id": "files-hashes",
+      "prompt": "All indexed files with content_hash (recipe powers `codemap validate`)",
+      "recipe": "files-hashes"
+    },
+    {
+      "id": "barrel-files",
+      "prompt": "Top files by export count (barrel candidates)",
+      "recipe": "barrel-files"
+    },
+    {
+      "id": "coverage-rows-after-ingest",
+      "prompt": "Coverage rows after ingesting fixtures/minimal/coverage/coverage-final.json",
+      "sql": "SELECT file_path, name, hit_statements, total_statements, coverage_pct FROM coverage ORDER BY file_path, line_start"
+    },
+    {
+      "id": "untested-and-dead",
+      "prompt": "Exported functions with no callers AND zero coverage (the killer recipe)",
+      "recipe": "untested-and-dead"
+    },
+    {
+      "id": "files-by-coverage",
+      "prompt": "Files ranked ascending by statement coverage",
+      "recipe": "files-by-coverage"
+    },
+    {
+      "id": "worst-covered-exports",
+      "prompt": "Top 20 worst-covered exported functions",
+      "recipe": "worst-covered-exports"
+    }
+  ]
+}
