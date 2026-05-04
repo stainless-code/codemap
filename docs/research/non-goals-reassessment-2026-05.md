@@ -6,7 +6,7 @@
 >
 > **Companion doc:** [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md) — closed; historical three-tool scan.
 >
-> **Positioning:** codemap is **structurally unique** — the only SQL-based code index in the market (SQLite + agent-composable predicates). Inspiration comes from the free and open internet (LSP spec, SQLite extensions, AST tooling) — not from cloning specific peer tools. The mission is to extract maximum value from the SQL-index architecture and grow its ecosystem.
+> **Positioning:** codemap occupies a specific niche in the **SQLite-backed-code-index cohort** for AI agents (peers: `srclight`, `Sverklo`, `ctxpp`, `KotaDB`, `codemogger`, `@squirrelsoft/code-index`, `QuickAST`, etc. — most use tree-sitter + SQLite + embeddings). Codemap's differentiation is along three axes: **(1) predicate-as-API** — raw SQL + recipes as the agent-facing surface; peers ship pre-baked verbs / MCP tools. **(2) Pure structural** — no embeddings, no LLM in box; peers add semantic search by default. **(3) JS/TS/CSS-ecosystem-deep extraction** — CSS variables/classes/keyframes, React `components.hooks_used`, `type_members`, `markers`; peers focus on cross-language symbol+call surface via tree-sitter. The depth axis is structurally enabled by parser choice (`oxc` for JS/TS, `lightningcss` for CSS — both Rust-based, ecosystem-specialized vs tree-sitter's multi-language breadth). Inspiration comes from open specs and primitive sources (LSP, SQLite, oxc, MCP), not code-by-code cloning of peers. **Mission:** extract maximum value from the predicate-as-API thesis on this specific niche; grow the ecosystem.
 >
 > **Errata note (2026-05):** Three claims in v1 of this doc were softened or corrected after cross-checking against the codebase (item 1.3 effort + scope, § 2.3 framing of `fan-in.sql`, plus a citation gap on closed-dead-subgraph evidence). See § 8 for the full diff and the process lesson it surfaced.
 
@@ -136,7 +136,7 @@ The **real** boundary lives in **§ 3 moat A** ("verdicts are an OUTPUT mode, ne
 
 ## 3. True architectural limits — preserve
 
-Two layers. **Moat** rows are load-bearing under the "extract maximum value from the SQL-index architecture; grow the ecosystem" mission — eroding either turns codemap into a generic linting / static-analysis tool indistinguishable from a long tail of others. **Ergonomic / safety** rows are real shape constraints but not differentiators; they're floors, not moats. Codemap is the **only SQL-based code index** in the market — both moats below codify what makes that uniqueness durable.
+Two layers. **Moat** rows are load-bearing under the "extract maximum value from the SQL-index architecture; grow the ecosystem" mission — eroding either turns codemap into yet-another-tool-in-the-cohort instead of the predicate-shaped specialist. **Ergonomic / safety** rows are real shape constraints but not differentiators; they're floors, not moats. Codemap occupies a **specific niche** in the SQLite-backed-code-index cohort (per the header positioning) — predicate-as-API + pure structural + JS/TS/CSS-deep extraction. Both moats below codify the axes that keep that niche durable.
 
 ### Moat (load-bearing — every PR reviewer should defend these)
 
