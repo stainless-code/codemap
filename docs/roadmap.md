@@ -35,6 +35,7 @@ Codemap stays a structural-index primitive that other tools can consume. Out of 
 
 ## Backlog
 
+- [ ] **Static coverage ingestion** — `codemap ingest-coverage <path>` reads Istanbul `coverage-final.json` into a `coverage` table, joinable to `symbols` for "what's structurally dead AND untested?" queries. Plan: [plans/coverage-ingestion.md](./plans/coverage-ingestion.md). Adapted from [research/fallow.md § C.11](./research/fallow.md#tier-c--ship-eventually-months-high-payoff-large-surface).
 - [ ] **`codemap audit` verdict + thresholds** (v1.x) — `verdict: "pass" | "warn" | "fail"` driven by `codemap.config.audit.deltas[<key>].{added_max, action}`. Triggers: two consumers ship `jq`-based threshold scripts with similar shapes, OR one consumer asks with a concrete config sketch. Until then, raw deltas + consumer-side `jq` is the CI exit-code idiom.
 - [ ] **Monorepo / workspace awareness** — discover workspaces from `pnpm-workspace.yaml` / `package.json` and index per-workspace dependency graphs
 - [ ] **Cross-agent handoff artifact** — _speculative_; layered prefix/delta JSON written on session-stop, read on session-start. Complementary to indexing rather than core to it; revisit if user demand emerges
