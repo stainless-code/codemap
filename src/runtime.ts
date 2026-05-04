@@ -43,6 +43,10 @@ export function getTsconfigPath(): string | null {
   return getCodemapConfig().tsconfigPath;
 }
 
+export function getFts5Enabled(): boolean {
+  return getCodemapConfig().fts5;
+}
+
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
   const set = getExcludeDirNames();

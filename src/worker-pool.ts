@@ -5,7 +5,7 @@ import { Worker as NodeWorker } from "node:worker_threads";
 
 import { CODEMAP_BUILD_OUTPUT_DIR } from "./build-output";
 import type { ParsedFile, WorkerInput, WorkerOutput } from "./parse-worker";
-import { getProjectRoot } from "./runtime";
+import { getFts5Enabled, getProjectRoot } from "./runtime";
 
 const fromDist =
   basename(dirname(fileURLToPath(import.meta.url))) ===
@@ -32,6 +32,7 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
   }
 
   const projectRoot = getProjectRoot();
+  const fts5Enabled = getFts5Enabled();
 
   return Promise.all(
     chunks.map(
@@ -40,6 +41,7 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
           const input: WorkerInput = {
             files: chunk,
             projectRoot,
+            fts5Enabled,
           };
 
           if (IS_BUN) {

@@ -22,6 +22,8 @@ export interface BootstrapCodemapOpts {
   root: string;
   configFile: string | undefined;
   stateDir?: string | undefined;
+  /** CLI `--with-fts`; `undefined` defers to `codemap.config.ts` `fts5`. */
+  fts5Cli?: boolean | undefined;
 }
 
 export async function bootstrapCodemap(
@@ -36,7 +38,9 @@ export async function bootstrapCodemap(
   ensureStateConfig(stateDir);
 
   const user = await loadUserConfig(opts.root, opts.configFile, { stateDir });
-  initCodemap(resolveCodemapConfig(opts.root, user, { stateDir }));
+  initCodemap(
+    resolveCodemapConfig(opts.root, user, { stateDir, fts5Cli: opts.fts5Cli }),
+  );
   configureResolver(getProjectRoot(), getTsconfigPath());
   // Sanity: getStateDir() must mirror what we passed into resolveCodemapConfig.
   if (getStateDir() !== stateDir) {

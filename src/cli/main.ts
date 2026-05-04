@@ -12,7 +12,8 @@ import {
  */
 export async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const { root, configFile, stateDir, rest } = parseBootstrapArgs(argv);
+  const { root, configFile, stateDir, fts5Cli, rest } =
+    parseBootstrapArgs(argv);
 
   if (rest[0] === "--help" || rest[0] === "-h") {
     printCliUsage();
@@ -371,5 +372,5 @@ Copies bundled agent templates into .agents/ under the project root.
   }
 
   const { runIndexCmd } = await import("./cmd-index.js");
-  await runIndexCmd({ root, configFile, stateDir, rest });
+  await runIndexCmd({ root, configFile, stateDir, fts5Cli, rest });
 }

@@ -2,7 +2,14 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
+
+/**
+ * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
+ * current resolved config triggers a forced `--full` rebuild
+ * (`docs/plans/fts5-mermaid.md` Q3).
+ */
+export const META_FTS5_ENABLED_KEY = "fts5_enabled";
 
 export type { CodemapDatabase };
 
@@ -175,6 +182,48 @@ export function createTables(db: CodemapDatabase) {
       PRIMARY KEY (file_path, name, line_start)
     ) STRICT, WITHOUT ROWID;
   `);
+
+  // Separate statement: FTS5 virtual-table CREATE doesn't accept STRICT and
+  // can't live inside the createTables block above. Always-create (empty when
+  // disabled) so toggling fts5: false → true needs only a --full, not a
+  // schema bump. Tokeniser per `docs/plans/fts5-mermaid.md` Q1.
+  db.run(
+    `CREATE VIRTUAL TABLE IF NOT EXISTS source_fts USING fts5(
+      file_path UNINDEXED,
+      content,
+      tokenize = 'porter unicode61'
+    )`,
+  );
+}
+
+/**
+ * Upsert one file's source into `source_fts`. DELETE + INSERT because FTS5
+ * virtual tables don't support `INSERT OR REPLACE`. Caller gates on the
+ * FTS5 toggle.
+ */
+export function upsertSourceFts(
+  db: CodemapDatabase,
+  filePath: string,
+  content: string,
+) {
+  db.run("DELETE FROM source_fts WHERE file_path = ?", [filePath]);
+  db.run("INSERT INTO source_fts (file_path, content) VALUES (?, ?)", [
+    filePath,
+    content,
+  ]);
+}
+
+/**
+ * `source_fts` isn't FK-linked to `files` (FTS5 virtual tables can't be FK
+ * targets), so CASCADE doesn't reach it — incremental-delete callers must
+ * mirror the DELETE explicitly.
+ */
+export function deleteSourceFts(db: CodemapDatabase, filePath: string) {
+  db.run("DELETE FROM source_fts WHERE file_path = ?", [filePath]);
+}
+
+export function clearSourceFts(db: CodemapDatabase) {
+  db.run("DELETE FROM source_fts");
 }
 
 export function createIndexes(db: CodemapDatabase) {
@@ -265,6 +314,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS css_variables;
     DROP TABLE IF EXISTS css_classes;
     DROP TABLE IF EXISTS css_keyframes;
+    DROP TABLE IF EXISTS source_fts;
     DROP TABLE IF EXISTS files;
     DROP TABLE IF EXISTS meta;
   `);

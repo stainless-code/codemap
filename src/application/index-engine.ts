@@ -14,6 +14,7 @@ import {
   getMeta,
   setMeta,
   deleteFileData,
+  deleteSourceFts,
   insertFile,
   insertSymbols,
   insertImports,
@@ -27,6 +28,8 @@ import {
   insertTypeMembers,
   insertCalls,
   getAllFileHashes,
+  upsertSourceFts,
+  META_FTS5_ENABLED_KEY,
   SCHEMA_VERSION,
 } from "../db";
 import type { CodemapDatabase, FileRow } from "../db";
@@ -37,7 +40,12 @@ import { extractMarkers } from "../markers";
 import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
-import { getIncludePatterns, getProjectRoot, isPathExcluded } from "../runtime";
+import {
+  getFts5Enabled,
+  getIncludePatterns,
+  getProjectRoot,
+  isPathExcluded,
+} from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
 import type {
   IndexPerformanceReport,
@@ -186,6 +194,10 @@ function insertParsedResults(
 
       insertFile(db, parsed.fileRow);
 
+      if (parsed.content !== undefined) {
+        upsertSourceFts(db, parsed.fileRow.path, parsed.content);
+      }
+
       try {
         if (parsed.category === "text") {
           if (parsed.markers?.length) insertMarkers(db, parsed.markers);
@@ -289,6 +301,10 @@ export async function indexFiles(
     createTables(db);
     db.run("PRAGMA synchronous = OFF");
     db.run("PRAGMA foreign_keys = OFF");
+    // dropAll wiped meta; re-seed `fts5_enabled` + `schema_version` so the
+    // next run's toggle-change detection has a reference point.
+    setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
+    setMeta(db, "schema_version", String(SCHEMA_VERSION));
   } else {
     createSchema(db);
   }
@@ -353,6 +369,10 @@ export async function indexFiles(
           indexed_at: Date.now(),
         };
         insertFile(db, fileRow);
+
+        if (getFts5Enabled()) {
+          upsertSourceFts(db, relPath, source);
+        }
 
         try {
           const category = fileCategory(relPath);
@@ -498,6 +518,8 @@ export function deleteFilesFromIndex(
     const batch = deleted.slice(i, i + CHUNK);
     const placeholders = batch.map(() => "?").join(",");
     db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
+    // FK CASCADE doesn't reach `source_fts` (virtual table); mirror manually.
+    for (const path of batch) deleteSourceFts(db, path);
   }
   if (!quiet) {
     console.log(`  Removed ${deleted.length} deleted files from index`);

@@ -41,4 +41,10 @@ export interface ParsedFile {
   cssKeyframes?: CssKeyframeRow[];
   /** Raw `@import` strings; main thread converts these to `imports` rows. */
   cssImportSources?: string[];
+  /**
+   * Verbatim file source — populated by the worker only when
+   * `WorkerInput.fts5Enabled`; indexer writes to `source_fts`. Default-OFF
+   * keeps worker→main serialization cost zero.
+   */
+  content?: string;
 }

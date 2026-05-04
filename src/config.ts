@@ -84,6 +84,12 @@ export const codemapUserConfigSchema = z
       .describe(
         "Path to `tsconfig.json` for import alias resolution. Use `null` to disable.",
       ),
+    fts5: z
+      .boolean()
+      .optional()
+      .describe(
+        "Enable FTS5 full-text indexing of file content into the `source_fts` virtual table. Default `false` — FTS5 grows `.codemap/index.db` ~30–50% on text-heavy projects. Override at the CLI with `--with-fts` (CLI wins; logs a stderr line on override).",
+      ),
   })
   .strict();
 
@@ -124,6 +130,13 @@ export interface ResolvedCodemapConfig {
   readonly excludeDirNames: ReadonlySet<string>;
   /** Absolute path to `tsconfig.json` for alias resolution, or `null` to disable. */
   readonly tsconfigPath: string | null;
+  /**
+   * FTS5 full-text indexing toggle. `true` populates the `source_fts`
+   * virtual table at index time; `false` (default) leaves it empty.
+   * Resolved from `codemap.config.ts` `fts5` plus the `--with-fts` CLI
+   * flag; CLI wins. See `docs/plans/fts5-mermaid.md`.
+   */
+  readonly fts5: boolean;
 }
 
 /**
@@ -156,6 +169,13 @@ export interface ResolveCodemapConfigOpts {
    * inside `<state-dir>/` so we'd hit a chicken-and-egg).
    */
   stateDir?: string | undefined;
+  /**
+   * CLI override for `fts5` — when `true`, forces the toggle on
+   * regardless of `codemap.config.ts`. When `undefined` (default), the
+   * config value (or false default) wins. Set by `--with-fts` argv
+   * parsing in the bootstrap layer.
+   */
+  fts5Cli?: boolean | undefined;
 }
 
 /**
@@ -197,6 +217,18 @@ export function resolveCodemapConfig(
     tsconfigPath = existsSync(d) ? d : null;
   }
 
+  // CLI > config (mirrors `--root` / `--state-dir`); explicit log on
+  // override so quiet-divergence from `codemap.config.ts` is visible.
+  let fts5: boolean;
+  if (opts.fts5Cli === true) {
+    fts5 = true;
+    if (parsed?.fts5 === false) {
+      console.error("[fts5] CLI override: enabled despite config fts5=false");
+    }
+  } else {
+    fts5 = parsed?.fts5 === true;
+  }
+
   return {
     root: absRoot,
     stateDir,
@@ -204,6 +236,7 @@ export function resolveCodemapConfig(
     include,
     excludeDirNames,
     tsconfigPath,
+    fts5,
   };
 }
 
