@@ -6,7 +6,7 @@
 >
 > **Other companion docs:** [`research/fallow.md`](./fallow.md) (capability tracker — what to adopt _from fallow_); [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md) (closed; original three-tool scan).
 >
-> **Local clone for deep-dives:** [`/Users/sutusebastian/Developer/OSS/fallow`](file:///Users/sutusebastian/Developer/OSS/fallow) — Cargo workspace with `crates/{lsp,mcp,v8-coverage,graph,extract,cli}`, `decisions/` (ADR-style), `editors/{vscode,zed}`, `docs/plugin-authoring.md`. Inspect for patterns we can adapt before each shipped feature.
+> **Source for deep-dives:** [fallow upstream](https://github.com/fallow-rs/fallow) — Cargo workspace with `crates/{lsp,mcp,v8-coverage,graph,extract,cli}`, `decisions/` (ADR-style), `editors/{vscode,zed}`, `docs/plugin-authoring.md`. Inspect for patterns we can adapt before each shipped feature.
 >
 > **Triangulation errata (2026-05):** Cross-checked against the descriptive baseline above. Three claims in this doc were softened or corrected (item 1.3 effort + scope, § 2.3 framing of `fan-in.sql`, plus a citation gap on closed-dead-subgraph evidence). See § 8 for the full diff.
 
@@ -134,9 +134,9 @@ These aren't defensive prejudices; they're real shape constraints that the SQL-i
 
 ---
 
-## 4. What to inspect in the local fallow clone
+## 4. What to inspect in the fallow source tree
 
-`/Users/sutusebastian/Developer/OSS/fallow` (Cargo workspace; ~149 releases as of 2026-04). Areas worth a deep-dive _before_ each shipped feature so we adopt patterns rather than reinvent:
+Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~149 releases as of 2026-04). Areas worth a deep-dive _before_ each shipped feature so we adopt patterns rather than reinvent:
 
 | Fallow surface                     | Codemap relevance                                                                                                        | When to inspect                                            |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
@@ -196,7 +196,7 @@ These aren't defensive prejudices; they're real shape constraints that the SQL-i
 - [`research/fallow.md`](./fallow.md) — capability tracker for adopt-from-fallow items (different lens from this doc)
 - [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md) — original three-tool scan (closed; this doc supersedes its non-goals shaping)
 - [`docs/why-codemap.md § What Codemap is not`](../why-codemap.md#what-codemap-is-not) — consumer-facing framing of non-goals (must be updated in lockstep when § 2 items ship)
-- Local fallow clone — `/Users/sutusebastian/Developer/OSS/fallow` (see § 4 for what to inspect when)
+- [fallow upstream](https://github.com/fallow-rs/fallow) — see § 4 for what to inspect when
 
 ---
 
