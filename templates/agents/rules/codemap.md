@@ -125,6 +125,7 @@ If the question looks like any of these → use the index:
 | "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                         |
 | "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                |
 | "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                         |
+| "Which exports has nobody imported?"                         | `--recipe unimported-exports`                            |
 
 ## When Grep / Read IS appropriate
 
@@ -176,6 +177,7 @@ codemap query --json "<SQL>"
 | Untested + dead exports           | `codemap query --json --recipe untested-and-dead`                                                            |
 | Components touching `@deprecated` | `codemap query --json --recipe components-touching-deprecated`                                               |
 | Refactor-risk-ranked files        | `codemap query --json --recipe refactor-risk-ranking`                                                        |
+| Exports nobody imports            | `codemap query --json --recipe unimported-exports`                                                           |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 
