@@ -1,14 +1,26 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { parseMcpRest } from "./cmd-mcp";
 
 describe("parseMcpRest", () => {
-  it("returns run with defaults (no flags)", () => {
+  // CODEMAP_WATCH may be set in dev shells; clear it so default-ON
+  // assertions below are deterministic.
+  let savedWatchEnv: string | undefined;
+  beforeEach(() => {
+    savedWatchEnv = process.env["CODEMAP_WATCH"];
+    delete process.env["CODEMAP_WATCH"];
+  });
+  afterEach(() => {
+    if (savedWatchEnv === undefined) delete process.env["CODEMAP_WATCH"];
+    else process.env["CODEMAP_WATCH"] = savedWatchEnv;
+  });
+
+  it("returns run with defaults — watch ON since 2026-05", () => {
     const r = parseMcpRest(["mcp"]);
     expect(r.kind).toBe("run");
     if (r.kind === "run") {
-      // CODEMAP_WATCH env may be set in dev shells; ignore in this assertion.
+      expect(r.watch).toBe(true);
       expect(r.debounceMs).toBe(DEFAULT_DEBOUNCE_MS);
     }
   });
@@ -18,10 +30,36 @@ describe("parseMcpRest", () => {
     expect(parseMcpRest(["mcp", "-h"]).kind).toBe("help");
   });
 
-  it("parses --watch", () => {
+  it("parses --watch (no-op after default-ON flip; backwards-compat)", () => {
     const r = parseMcpRest(["mcp", "--watch"]);
     if (r.kind !== "run") throw new Error("expected run");
     expect(r.watch).toBe(true);
+  });
+
+  it("parses --no-watch (explicit opt-out)", () => {
+    const r = parseMcpRest(["mcp", "--no-watch"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it("CODEMAP_WATCH=0 opts out of default-ON watcher", () => {
+    process.env["CODEMAP_WATCH"] = "0";
+    const r = parseMcpRest(["mcp"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it('CODEMAP_WATCH="false" opts out of default-ON watcher', () => {
+    process.env["CODEMAP_WATCH"] = "false";
+    const r = parseMcpRest(["mcp"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it("--no-watch wins over --watch (last-write semantics)", () => {
+    const r = parseMcpRest(["mcp", "--watch", "--no-watch"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
   });
 
   it("parses --debounce <ms>", () => {

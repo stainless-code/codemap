@@ -43,12 +43,16 @@ export function parseServeRest(rest: string[]):
   let host: string = DEFAULT_HOST;
   let port: number = DEFAULT_PORT;
   let token: string | undefined;
-  // CODEMAP_WATCH=1 / "true" is the env shortcut for IDE / CI launches
-  // that can't easily edit the launch command.
-  const envWatch =
-    process.env["CODEMAP_WATCH"] === "1" ||
-    process.env["CODEMAP_WATCH"] === "true";
-  let watch = envWatch;
+  // Default-ON watcher (PR adds default-ON; pre-flip default was OFF).
+  // `serve` is inherently long-running — stale-index friction is the
+  // most-frequent UX issue, so the watcher pays for itself immediately.
+  // CODEMAP_WATCH=0 / "false" is the env shortcut to opt out (mirrors
+  // --no-watch). CODEMAP_WATCH=1 / "true" is redundant after the default
+  // flip but kept for backwards-compat.
+  const envWatchOff =
+    process.env["CODEMAP_WATCH"] === "0" ||
+    process.env["CODEMAP_WATCH"] === "false";
+  let watch = !envWatchOff;
   let debounceMs = DEFAULT_DEBOUNCE_MS;
 
   for (let i = 1; i < rest.length; i++) {
@@ -107,7 +111,14 @@ export function parseServeRest(rest: string[]):
     }
 
     if (a === "--watch") {
+      // No-op after default-ON flip; kept so existing scripts/launch
+      // commands that pass --watch explicitly still parse cleanly.
       watch = true;
+      continue;
+    }
+
+    if (a === "--no-watch") {
+      watch = false;
       continue;
     }
 
@@ -160,10 +171,16 @@ Flags:
                   Require Authorization: Bearer <secret> on every request.
                   GET /health is exempt so liveness probes work without
                   leaking the token. Use a long random string.
-  --watch         Boot a co-process file watcher so every tool reads a
-                  live index — eliminates the per-request reindex prelude.
-                  Killer combo for IDE plugins / CI scripts that hit the
-                  HTTP API repeatedly. Also enabled when CODEMAP_WATCH=1.
+  --watch         [default ON] Boot a co-process file watcher so every
+                  tool reads a live index — eliminates the per-request
+                  reindex prelude. Default-ON since 2026-05; explicit
+                  flag kept for backwards-compat with existing launch
+                  scripts.
+  --no-watch      Opt out of the default watcher. Use when you want
+                  one-shot HTTP requests without spawning the chokidar
+                  co-process (CI scripts that fire-and-forget, ephemeral
+                  indexes, etc.). Same effect as CODEMAP_WATCH=0 /
+                  "false" in the environment.
   --debounce <ms> Coalesce burst events into one reindex after <ms> of
                   quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with --watch.
   --help, -h      Show this help.

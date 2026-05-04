@@ -21,19 +21,30 @@ export function parseMcpRest(rest: string[]):
     throw new Error("parseMcpRest: expected mcp");
   }
 
-  // CODEMAP_WATCH=1 / "true" is the env shortcut for IDE / CI launches
-  // that can't easily edit the agent host's tool spawn command.
-  const envWatch =
-    process.env["CODEMAP_WATCH"] === "1" ||
-    process.env["CODEMAP_WATCH"] === "true";
-  let watch = envWatch;
+  // Default-ON watcher (PR adds default-ON; pre-flip default was OFF).
+  // `mcp` is inherently long-running — stale-index friction is the
+  // most-frequent agent UX issue, so the watcher pays for itself
+  // immediately. CODEMAP_WATCH=0 / "false" is the env shortcut to opt
+  // out (mirrors --no-watch) for IDE / CI launches that can't easily
+  // edit the agent host's tool spawn command. CODEMAP_WATCH=1 / "true"
+  // is redundant after the default flip but kept for backwards-compat.
+  const envWatchOff =
+    process.env["CODEMAP_WATCH"] === "0" ||
+    process.env["CODEMAP_WATCH"] === "false";
+  let watch = !envWatchOff;
   let debounceMs = DEFAULT_DEBOUNCE_MS;
 
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--watch") {
+      // No-op after default-ON flip; kept so existing scripts/launch
+      // commands that pass --watch explicitly still parse cleanly.
       watch = true;
+      continue;
+    }
+    if (a === "--no-watch") {
+      watch = false;
       continue;
     }
     if (a === "--debounce" || a.startsWith("--debounce=")) {
@@ -106,12 +117,17 @@ envelope (no re-mapping). See docs/architecture.md § MCP wiring for
 the engine seam and the agent rule + skill for query examples.
 
 Flags:
-  --watch              Boot a co-process file watcher so every tool reads
-                       a live index — eliminates the per-request reindex
-                       prelude. Equivalent to \`codemap watch\` running in
-                       parallel; use this killer combo to remove the
-                       'is the index stale?' friction agents hit today.
-                       Also enabled when CODEMAP_WATCH=1.
+  --watch              [default ON] Boot a co-process file watcher so
+                       every tool reads a live index — eliminates the
+                       per-request reindex prelude. Equivalent to
+                       \`codemap watch\` running in parallel. Default-ON
+                       since 2026-05; explicit flag kept for backwards-
+                       compat with existing launch scripts.
+  --no-watch           Opt out of the default watcher. Use when you
+                       want one-shot tool calls without spawning the
+                       chokidar co-process (CI scripts that fire-and-
+                       forget, ephemeral indexes, etc.). Same effect as
+                       CODEMAP_WATCH=0 / "false" in the environment.
   --debounce <ms>      Coalesce burst events into one reindex after <ms>
                        of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with
                        --watch.

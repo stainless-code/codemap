@@ -1,17 +1,29 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
 import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { DEFAULT_HOST, DEFAULT_PORT, parseServeRest } from "./cmd-serve";
 
 describe("parseServeRest", () => {
-  it("returns run with defaults when no flags", () => {
+  // CODEMAP_WATCH may be set in dev shells; clear it so default-ON
+  // assertions below are deterministic.
+  let savedWatchEnv: string | undefined;
+  beforeEach(() => {
+    savedWatchEnv = process.env["CODEMAP_WATCH"];
+    delete process.env["CODEMAP_WATCH"];
+  });
+  afterEach(() => {
+    if (savedWatchEnv === undefined) delete process.env["CODEMAP_WATCH"];
+    else process.env["CODEMAP_WATCH"] = savedWatchEnv;
+  });
+
+  it("returns run with defaults when no flags (watch: true since 2026-05)", () => {
     const r = parseServeRest(["serve"]);
     expect(r).toEqual({
       kind: "run",
       host: DEFAULT_HOST,
       port: DEFAULT_PORT,
       token: undefined,
-      watch: false,
+      watch: true,
       debounceMs: DEFAULT_DEBOUNCE_MS,
     });
   });
@@ -95,7 +107,7 @@ describe("parseServeRest", () => {
       host: "0.0.0.0",
       port: 9000,
       token: "secret",
-      watch: false,
+      watch: true,
       debounceMs: DEFAULT_DEBOUNCE_MS,
     });
   });
@@ -104,10 +116,43 @@ describe("parseServeRest", () => {
     expect(() => parseServeRest(["query"])).toThrow();
   });
 
-  it("parses --watch", () => {
+  it("parses --watch (no-op after default-ON flip; backwards-compat)", () => {
     const r = parseServeRest(["serve", "--watch"]);
     if (r.kind !== "run") throw new Error("expected run");
     expect(r.watch).toBe(true);
+  });
+
+  it("parses --no-watch (explicit opt-out)", () => {
+    const r = parseServeRest(["serve", "--no-watch"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it("CODEMAP_WATCH=0 opts out of default-ON watcher", () => {
+    process.env["CODEMAP_WATCH"] = "0";
+    const r = parseServeRest(["serve"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it('CODEMAP_WATCH="false" opts out of default-ON watcher', () => {
+    process.env["CODEMAP_WATCH"] = "false";
+    const r = parseServeRest(["serve"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
+  });
+
+  it("CODEMAP_WATCH=1 still honored (redundant after flip but back-compat)", () => {
+    process.env["CODEMAP_WATCH"] = "1";
+    const r = parseServeRest(["serve"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(true);
+  });
+
+  it("--no-watch wins over --watch (last-write semantics)", () => {
+    const r = parseServeRest(["serve", "--watch", "--no-watch"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.watch).toBe(false);
   });
 
   it("parses --debounce <ms>", () => {
