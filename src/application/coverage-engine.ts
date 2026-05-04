@@ -280,3 +280,74 @@ export function ingestIstanbul(opts: ParserOpts): IngestResult {
     sourcePath,
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* LCOV parser                                                         */
+/* ------------------------------------------------------------------ */
+
+interface LcovParserOpts {
+  db: CodemapDatabase;
+  projectRoot: string;
+  /** Raw LCOV text (read by the CLI from `lcov.info`). */
+  payload: string;
+  sourcePath: string;
+}
+
+/**
+ * Parse an LCOV record stream and dispatch to {@link upsertCoverageRows}.
+ *
+ * Recognised lines (everything else — `TN:` / `FN:` / `FNDA:` / `FNF:` /
+ * `FNH:` / `BRDA:` / `BRF:` / `BRH:` / `LF:` / `LH:` — is ignored; we only
+ * need statement coverage in v1 per D5):
+ * - `SF:<path>` — start of a file record; sets the "current file"
+ * - `DA:<line>,<exec_count>[,<checksum>]` — one statement per record
+ * - `end_of_record` — closes the current file record
+ *
+ * Throws when a `DA:` line appears outside an `SF:` block (malformed
+ * LCOV — the file would have nowhere to attach to). Missing
+ * `end_of_record` is tolerated (the last block flushes implicitly when
+ * the next `SF:` arrives or the input ends).
+ */
+export function ingestLcov(opts: LcovParserOpts): IngestResult {
+  const { payload, sourcePath, ...rest } = opts;
+  const rows: CoverageRow[] = [];
+  let currentFile: string | undefined;
+  let lineNumber = 0;
+  for (const rawLine of payload.split(/\r?\n/)) {
+    lineNumber++;
+    const line = rawLine.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    if (line.startsWith("SF:")) {
+      currentFile = line.slice(3);
+      continue;
+    }
+    if (line === "end_of_record") {
+      currentFile = undefined;
+      continue;
+    }
+    if (line.startsWith("DA:")) {
+      if (!currentFile) {
+        throw new Error(
+          `LCOV parse error at line ${lineNumber}: DA: record outside SF: block`,
+        );
+      }
+      // DA:<line>,<count>[,<checksum>]
+      const parts = line.slice(3).split(",");
+      const lineNum = Number.parseInt(parts[0] ?? "", 10);
+      const hitCount = Number.parseInt(parts[1] ?? "", 10);
+      if (!Number.isFinite(lineNum) || !Number.isFinite(hitCount)) continue;
+      rows.push({
+        file_path: currentFile,
+        line: lineNum,
+        hit_count: hitCount,
+      });
+    }
+    // Everything else (TN:, FN:, BRDA:, etc.) silently skipped per D5.
+  }
+  return upsertCoverageRows({
+    ...rest,
+    rows,
+    format: "lcov",
+    sourcePath,
+  });
+}

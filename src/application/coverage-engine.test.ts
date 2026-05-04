@@ -8,7 +8,11 @@ import {
   insertSymbols,
 } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
-import { ingestIstanbul, upsertCoverageRows } from "./coverage-engine";
+import {
+  ingestIstanbul,
+  ingestLcov,
+  upsertCoverageRows,
+} from "./coverage-engine";
 import type { IstanbulPayload } from "./coverage-engine";
 
 const PROJECT_ROOT = "/repo";
@@ -366,6 +370,61 @@ describe("coverage-engine", () => {
       }
     });
 
+    it("Istanbul + LCOV produce identical rows for equivalent inputs (cross-format equivalence)", () => {
+      const istanbulDb = setupDb();
+      const lcovDb = setupDb();
+      try {
+        for (const db of [istanbulDb, lcovDb]) {
+          insertFile(db, indexedFile("src/lib/cache.ts"));
+          insertSymbols(db, [fnSym("src/lib/cache.ts", "get", 9, 15)]);
+        }
+        ingestIstanbul({
+          db: istanbulDb,
+          projectRoot: PROJECT_ROOT,
+          sourcePath: "/repo/coverage-final.json",
+          payload: {
+            "/repo/src/lib/cache.ts": {
+              path: "/repo/src/lib/cache.ts",
+              statementMap: {
+                "0": {
+                  start: { line: 10, column: 0 },
+                  end: { line: 10, column: 1 },
+                },
+                "1": {
+                  start: { line: 11, column: 0 },
+                  end: { line: 11, column: 1 },
+                },
+              },
+              s: { "0": 5, "1": 0 },
+            },
+          },
+        });
+        ingestLcov({
+          db: lcovDb,
+          projectRoot: PROJECT_ROOT,
+          sourcePath: "/repo/lcov.info",
+          payload: [
+            "TN:",
+            "SF:/repo/src/lib/cache.ts",
+            "DA:10,5",
+            "DA:11,0",
+            "end_of_record",
+            "",
+          ].join("\n"),
+        });
+        const cols =
+          "file_path, name, line_start, hit_statements, total_statements, coverage_pct";
+        const istanbulRows = istanbulDb
+          .query(`SELECT ${cols} FROM coverage`)
+          .all();
+        const lcovRows = lcovDb.query(`SELECT ${cols} FROM coverage`).all();
+        expect(lcovRows).toEqual(istanbulRows);
+      } finally {
+        closeDb(istanbulDb);
+        closeDb(lcovDb);
+      }
+    });
+
     it("tolerates malformed file entries (missing statementMap or s)", () => {
       const db = setupDb();
       try {
@@ -388,6 +447,139 @@ describe("coverage-engine", () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             "/repo/broken.ts": { path: "/repo/broken.ts" } as any,
           },
+        });
+        expect(result.ingested.symbols).toBe(1);
+      } finally {
+        closeDb(db);
+      }
+    });
+  });
+
+  describe("ingestLcov (parser)", () => {
+    function lcovDb() {
+      const db = setupDb();
+      insertFile(db, indexedFile("src/api/client.ts"));
+      insertSymbols(db, [
+        fnSym("src/api/client.ts", "fetchUser", 5, 12),
+        fnSym("src/api/client.ts", "fetchPosts", 14, 20),
+      ]);
+      return db;
+    }
+
+    it("parses well-formed LCOV with multiple SF records", () => {
+      const db = lcovDb();
+      try {
+        const lcov = [
+          "TN:",
+          "SF:/repo/src/api/client.ts",
+          "FN:5,fetchUser",
+          "FN:14,fetchPosts",
+          "DA:6,3",
+          "DA:7,3",
+          "DA:15,0",
+          "DA:16,0",
+          "LF:4",
+          "LH:2",
+          "end_of_record",
+          "",
+        ].join("\n");
+        const result = ingestLcov({
+          db,
+          projectRoot: PROJECT_ROOT,
+          sourcePath: "/repo/lcov.info",
+          payload: lcov,
+        });
+        expect(result.format).toBe("lcov");
+        expect(result.ingested).toEqual({ symbols: 2, files: 1 });
+        const rows = db
+          .query(
+            "SELECT name, hit_statements, total_statements, coverage_pct FROM coverage ORDER BY name",
+          )
+          .all() as Array<{
+          name: string;
+          hit_statements: number;
+          total_statements: number;
+          coverage_pct: number;
+        }>;
+        expect(rows).toEqual([
+          {
+            name: "fetchPosts",
+            hit_statements: 0,
+            total_statements: 2,
+            coverage_pct: 0,
+          },
+          {
+            name: "fetchUser",
+            hit_statements: 2,
+            total_statements: 2,
+            coverage_pct: 100,
+          },
+        ]);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("ignores TN/FN/FNDA/BRDA/LF/LH and supports CRLF + comments + blank lines", () => {
+      const db = lcovDb();
+      try {
+        const lcov = [
+          "# header comment",
+          "TN:test-suite",
+          "",
+          "SF:/repo/src/api/client.ts",
+          "FN:5,fetchUser",
+          "FNDA:1,fetchUser",
+          "FNF:1",
+          "FNH:1",
+          "DA:6,1",
+          "BRDA:6,0,0,1",
+          "BRF:1",
+          "BRH:1",
+          "LF:1",
+          "LH:1",
+          "end_of_record",
+        ].join("\r\n");
+        const result = ingestLcov({
+          db,
+          projectRoot: PROJECT_ROOT,
+          sourcePath: "/x",
+          payload: lcov,
+        });
+        expect(result.ingested.symbols).toBe(1);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("DA: outside SF: block throws (malformed)", () => {
+      const db = lcovDb();
+      try {
+        expect(() =>
+          ingestLcov({
+            db,
+            projectRoot: PROJECT_ROOT,
+            sourcePath: "/x",
+            payload: "DA:1,1\n",
+          }),
+        ).toThrow(/DA: record outside SF: block/);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("DA: with optional checksum (third comma-field) is parsed", () => {
+      const db = lcovDb();
+      try {
+        const result = ingestLcov({
+          db,
+          projectRoot: PROJECT_ROOT,
+          sourcePath: "/x",
+          payload: [
+            "SF:/repo/src/api/client.ts",
+            "DA:6,3,abc1234checksum",
+            "end_of_record",
+          ].join("\n"),
         });
         expect(result.ingested.symbols).toBe(1);
       } finally {
