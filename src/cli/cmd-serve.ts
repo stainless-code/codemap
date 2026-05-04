@@ -178,14 +178,20 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
   POST /tool/validate
   POST /tool/show
   POST /tool/snippet
+  POST /tool/impact
   POST /tool/save_baseline
   POST /tool/list_baselines
   POST /tool/drop_baseline
   GET  /health                        Liveness probe (auth-exempt).
   GET  /tools                         Tool catalog.
   GET  /resources                     Resource catalog.
-  GET  /resources/{encoded-uri}       Mirror of MCP resources
-                                      (codemap://recipes, schema, skill, ...).
+  GET  /resources/{encoded-uri}       Mirror of MCP resources:
+                                        codemap://recipes
+                                        codemap://recipes/{id}
+                                        codemap://schema
+                                        codemap://skill
+                                        codemap://files/{path}
+                                        codemap://symbols/{name}
 
 Errors are JSON: {"error": "<msg>"} with HTTP status 400 (bad input)
 / 401 (auth) / 403 (cross-origin / DNS rebinding) / 404 (unknown

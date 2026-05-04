@@ -83,12 +83,23 @@ Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
   drop_baseline        Delete a baseline.
   context              Project bootstrap envelope.
   validate             On-disk hash vs indexed hash.
+  show                 Symbol metadata: file:line + signature.
+  snippet              Same lookup + source text from disk.
+  impact               Symbol/file blast-radius walker (callers, callees,
+                       dependents, dependencies).
 
-Resources (lazy-cached on first read):
-  codemap://recipes              Full recipe catalog.
-  codemap://recipes/{id}         Single recipe (id, description, sql).
-  codemap://schema               Live DDL of every table.
-  codemap://skill                Bundled SKILL.md.
+Resources:
+  Lazy-cached catalog (reads once per server lifetime):
+    codemap://recipes            Full recipe catalog.
+    codemap://recipes/{id}       Single recipe (id, description, sql).
+    codemap://schema             Live DDL of every table.
+    codemap://skill              Bundled SKILL.md.
+  Live read-per-call (no caching — see latest indexed state every read):
+    codemap://files/{path}       Per-file roll-up (symbols, imports,
+                                 exports, coverage). URI-encode the path.
+    codemap://symbols/{name}     Symbol lookup; \`?in=<path-prefix>\`
+                                 mirrors \`show --in <path>\`. Returns
+                                 {matches, disambiguation?}.
 
 Output shape is verbatim from each tool's CLI counterpart \`--json\`
 envelope (no re-mapping). See docs/architecture.md § MCP wiring for
