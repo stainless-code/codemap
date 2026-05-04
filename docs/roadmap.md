@@ -26,7 +26,7 @@ Codemap stays a structural-index primitive that other tools can consume. Out of 
 
 - **Full-text search** across all file bodies — use ripgrep / IDE / opt-in FTS5 (see backlog)
 - **Replacing LSP** or language servers — no rename / go-to-definition / hover types
-- **Static analysis** — dead code, duplication, complexity, architecture-boundary detection, fix actions are a different product class (e.g. [fallow](https://github.com/fallow-rs/fallow), `knip`, `jscpd`)
+- **Static analysis** — dead code, duplication, complexity, architecture-boundary detection, fix actions are a different product class (e.g. `knip`, `jscpd`)
 - **Visualization** — skyline / ASCII art / animated diagrams; the index emits structured rows, rendering belongs to the consumer
 - **Embedded intent classification** beyond the thin keyword classifier in `codemap context --for "<intent>"` — deeper routing belongs in the agent host (Cursor / Claude Code / MCP client)
 - **Persistent daemon process** — SQLite supports concurrent readers and our one-shot CLI startup is sub-100ms; revisit only if MCP / HTTP measurements demand it
