@@ -222,8 +222,8 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
 
-    -- Mirrors the typical join shape symbols.{file_path,name,line_start};
-    -- the (file_path, name) prefix also covers GROUP BY file_path scans
+    -- Mirrors the typical join shape symbols.(file_path, name, line_start).
+    -- The (file_path, name) prefix also covers GROUP BY file_path scans
     -- used by the bundled files-by-coverage recipe (D2 + D13).
     CREATE INDEX IF NOT EXISTS idx_coverage_file_name ON coverage(file_path, name);
   `);
