@@ -120,7 +120,7 @@ The **real** boundary lives in **§ 3 moat A** ("verdicts are an OUTPUT mode, ne
 
 **Capability unlocked:** caching parsed ASTs in memory between requests would drop incremental reindex from ms to µs. Worth measuring; the data path already exists (we just throw away the AST per request). Lives downstream of the § 6 Q1 daemon-default decision.
 
-**Verdict:** rewrite as "**daemon stays opt-in**; one-shot CLI never requires it." The current `--watch` flag is the right shape; just stop saying we don't have one. **Default-on for `mcp` / `serve`** is a config-UX question — see [§ 6 Q1](#6-open-questions).
+**Verdict:** rewrite as "**daemon stays opt-in for one-shot CLI; default-ON for inherently-long-running modes (`mcp` / `serve`)**." Per [§ 6 Q1 (resolved 2026-05)](#resolved-2026-05): both default `--watch` ON with `--no-watch` opt-out; one-shot CLI defaults preserved.
 
 ### 2.5 ❓ "No LSP replacement"
 
@@ -213,11 +213,16 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 
 ## 6. Open questions
 
-- **Daemon-by-default for MCP / HTTP** — even with one-shot CLI preserved, should `mcp` and `serve` default to `--watch` since both are inherently long-running? Reduces "is index stale?" friction agents already complain about. Downstream measurement once defaults stabilise: AST in-memory caching between requests (per § 2.4) — would drop incremental reindex ms → µs; data path already exists (AST currently thrown away per request).
-- **FTS5 opt-in vs default-on** — index size tax is real on big repos. First pass: opt-in via `codemap.config.ts` `fts5: true`. Revisit after measurements on the fallow / external corpus.
-- **LSP shim vs new-process LSP server** — shim wraps the existing engines via stdio (cheap, no new transport); standalone LSP server forks a daemon (matches LSP convention, more code). Probably shim first; standalone if VSCode extension demand emerges.
-- **Plugin contract scope (C.9)** — entry-point hints only (option (i) per fallow.md § 6) vs arbitrary `dependencies` edges (option (ii)). Bias toward (i) per the existing fallow.md note; revisit during plan PR.
-- **`history` table** — would unlock "when did coverage drop?" / "when did symbol X last have a caller?". Schema-shape question: per-commit snapshots (large) vs append-only event log (small but harder to query). Defer until a recipe demands it.
+### Resolved (2026-05)
+
+- ✅ **Q1 — Daemon-by-default for `mcp` / `serve`** — **default `--watch` ON for both**; opt-out via `--no-watch` / `CODEMAP_WATCH=0`. One-shot CLI defaults preserved (still no watcher on `query` / `show` / `snippet`). Both modes are inherently long-running; stale-index friction is the #1 agent UX complaint per [`fallow.md § 6`](./fallow.md#6-open-questions); chokidar startup validated tiny on Bun + Node by the [PR #46 6-watcher audit](https://github.com/stainless-code/codemap/pull/46). **Downstream:** AST in-memory caching between requests (per § 2.4) — would drop incremental reindex ms → µs; data path already exists. Worth measuring once defaults stabilise. Flip is a small follow-up PR (flag default + test + patch changeset + agent rule update per [`docs/README.md` Rule 10](../README.md)).
+- ✅ **Q3 — LSP shape** — **thin shim, no engine**; consume existing `application/show-engine.ts` + `application/impact-engine.ts` + watch-mode via stdio. Per § 2.5 reframe — building an LSP _engine_ would re-extract structure inside the protocol layer, duplicating moat B substrate. Standalone LSP server deferred to "if VSCode-extension demand emerges" (no measurement today supports it).
+- ✅ **Q4 — C.9 plugin contract scope** — **entry-point hints only for v1** (option (i) per [`fallow.md § 6`](./fallow.md#6-open-questions)). Plugins contribute `glob → is_entry: true` annotations on `files`; reachability sweep over `dependencies` from entry points closes the closed-dead-subgraph case (8-file widget pack via [`fallow.md § 0`](./fallow.md#0-fresh-evidence--what-a-hands-on-graph-audit-surfaced)). Arbitrary `dependencies` edge injection deferred to v2 if a real recipe demands it. Static config only — respects § 3 ergonomic "no JS exec at index time" floor. Pre-locked into the (b) plan PR per § 5.
+
+### Still open
+
+- ❓ **Q2 — FTS5 opt-in vs default-on** — index size tax is real on big repos. First pass: opt-in via `codemap.config.ts` `fts5: true`. Revisit after measurements on the fallow / external corpus.
+- ❓ **Q5 — `history` table** — would unlock "when did coverage drop?" / "when did symbol X last have a caller?". Schema-shape question: per-commit snapshots (large) vs append-only event log (small but harder to query). Defer until a recipe demands it.
 
 ---
 
