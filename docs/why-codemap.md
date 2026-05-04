@@ -20,7 +20,7 @@ Codemap is intentionally narrow. It is **not**:
 - **Full-text search** — use `ripgrep` / your IDE for raw string queries on file bodies.
 - **A language server (LSP)** — no rename, no go-to-definition wired to your editor, no hover types.
 - **An AI agent** — Codemap does not reason, decide, or generate. Agents call Codemap; Codemap does not call agents.
-- **A static analyzer** — no dead-code detection, duplication detection, complexity scoring, or boundary enforcement (those are different products — e.g. [fallow](https://github.com/fallow-rs/fallow), `knip`, `jscpd`).
+- **A static analyzer** — no dead-code detection, duplication detection, complexity scoring, or boundary enforcement (those are different products — e.g. `knip`, `jscpd`).
 - **A semantic / embedding index** — no vector search, no PageRank summarization, no "what's relevant" inference.
 - **A replacement for reading code** — the index returns paths, line ranges, signatures; the agent still reads the snippets it needs.
 
