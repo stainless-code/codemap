@@ -188,6 +188,106 @@ describe("SQLite layer (in-memory)", () => {
     }
   });
 
+  it("coverage table round-trips, survives dropAll(), and orphan sweep removes deleted-file rows", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      createIndexes(db);
+
+      // Two files; the second will be deleted to exercise the orphan-cleanup
+      // DELETE that lives in application/coverage-engine.ts (D6).
+      for (const path of ["a.ts", "b.ts"]) {
+        insertFile(db, {
+          path,
+          content_hash: `h-${path}`,
+          size: 1,
+          line_count: 1,
+          language: "ts",
+          last_modified: 0,
+          indexed_at: 0,
+        });
+      }
+
+      // Natural-key insert (no FK to symbols.id; D6).
+      db.run(
+        `INSERT INTO coverage (file_path, name, line_start, coverage_pct, hit_statements, total_statements)
+         VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
+        [
+          "a.ts",
+          "fnA",
+          1,
+          100.0,
+          3,
+          3,
+          "a.ts",
+          "fnB",
+          5,
+          50.0,
+          1,
+          2,
+          "b.ts",
+          "fnC",
+          1,
+          null,
+          0,
+          0, // total = 0 → coverage_pct NULL (D5 edge)
+        ],
+      );
+
+      const rows = db
+        .query(
+          "SELECT file_path, name, coverage_pct FROM coverage ORDER BY file_path, line_start",
+        )
+        .all() as Array<{
+        file_path: string;
+        name: string;
+        coverage_pct: number | null;
+      }>;
+      expect(rows).toEqual([
+        { file_path: "a.ts", name: "fnA", coverage_pct: 100.0 },
+        { file_path: "a.ts", name: "fnB", coverage_pct: 50.0 },
+        { file_path: "b.ts", name: "fnC", coverage_pct: null },
+      ]);
+
+      // dropAll() drops symbols + indices + every CASCADE-bearing table; the
+      // headline contract for coverage (D6) is that user rows survive that path.
+      dropAll(db);
+      createTables(db);
+      createIndexes(db);
+      expect(
+        (db.query("SELECT COUNT(*) AS n FROM coverage").get() as { n: number })
+          .n,
+      ).toBe(3);
+
+      // After --full reindex, files would normally be re-inserted by the
+      // indexer. Simulate "b.ts was deleted from the project before re-index"
+      // by re-inserting only a.ts.
+      insertFile(db, {
+        path: "a.ts",
+        content_hash: "h-a.ts",
+        size: 1,
+        line_count: 1,
+        language: "ts",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+
+      // Orphan-cleanup DELETE — lives in application/coverage-engine.ts at the
+      // end of every ingest. Exercised here so a future schema refactor can't
+      // silently break the contract that motivated D6 (no FK / CASCADE).
+      db.run(
+        "DELETE FROM coverage WHERE file_path NOT IN (SELECT path FROM files)",
+      );
+
+      const remaining = db
+        .query("SELECT file_path FROM coverage ORDER BY file_path, line_start")
+        .all() as Array<{ file_path: string }>;
+      expect(remaining.map((r) => r.file_path)).toEqual(["a.ts", "a.ts"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("query_baselines survives dropAll() — the schema-rebuild contract", () => {
     const db = openCodemapDatabase(":memory:");
     try {

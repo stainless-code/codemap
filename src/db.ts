@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export type { CodemapDatabase };
 
@@ -154,6 +154,26 @@ export function createTables(db: CodemapDatabase) {
       git_ref TEXT,
       created_at INTEGER NOT NULL
     ) STRICT;
+
+    -- User-data table: static coverage snapshots ingested via codemap ingest-coverage
+    -- (Istanbul coverage-final.json + LCOV lcov.info, written by every modern test
+    -- runner). Joins to symbols on the natural key (file_path, name, line_start) —
+    -- intentionally NOT a FK to symbols.id, because dropAll() drops symbols on every
+    -- --full reindex and the recreated rows get fresh AUTOINCREMENT ids. Natural-key
+    -- rows survive that churn. Like query_baselines, intentionally excluded from
+    -- dropAll() so a --full rebuild doesn't nuke the user's last ingest. Orphan
+    -- cleanup (file deleted from project) lives at the end of every ingest in
+    -- application/coverage-engine.ts, not here. See docs/plans/coverage-ingestion.md
+    -- (D6) for the unwind on why CASCADE was rejected.
+    CREATE TABLE IF NOT EXISTS coverage (
+      file_path        TEXT    NOT NULL,
+      name             TEXT    NOT NULL,
+      line_start       INTEGER NOT NULL,
+      coverage_pct     REAL,
+      hit_statements   INTEGER NOT NULL,
+      total_statements INTEGER NOT NULL,
+      PRIMARY KEY (file_path, name, line_start)
+    ) STRICT, WITHOUT ROWID;
   `);
 }
 
@@ -201,6 +221,11 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
+
+    -- Mirrors the typical join shape symbols.{file_path,name,line_start};
+    -- the (file_path, name) prefix also covers GROUP BY file_path scans
+    -- used by the bundled files-by-coverage recipe (D2 + D13).
+    CREATE INDEX IF NOT EXISTS idx_coverage_file_name ON coverage(file_path, name);
   `);
 }
 
