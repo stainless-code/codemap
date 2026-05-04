@@ -280,6 +280,31 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "ingest-coverage") {
+    const {
+      parseIngestCoverageRest,
+      printIngestCoverageCmdHelp,
+      runIngestCoverageCmd,
+    } = await import("./cmd-ingest-coverage.js");
+    const parsed = parseIngestCoverageRest(rest);
+    if (parsed.kind === "help") {
+      printIngestCoverageCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runIngestCoverageCmd({
+      root,
+      configFile,
+      stateDir,
+      path: parsed.path,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "query") {
     const {
       parseQueryRest,
