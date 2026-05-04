@@ -81,6 +81,8 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`codemap://recipes/{id}`** — single recipe `{id, description, body?, sql, actions?, source, shadows?}`. Replaces `--print-sql <id>`.
 - **`codemap://schema`** — DDL of every table in `.codemap/index.db` (queried live from `sqlite_schema`).
 - **`codemap://skill`** — full text of this skill file. Agents that don't preload the skill at session start can fetch it here.
+- **`codemap://files/{path}`** — per-file roll-up. Returns `{path, language, line_count, symbols, imports, exports, coverage}` where `imports.specifiers` is parsed JSON and `coverage` is `{measured_symbols, avg_coverage_pct, per_symbol}` or `null` when the file has no measured coverage. URI-encode the path. Reads live (no caching).
+- **`codemap://symbols/{name}`** — symbol lookup by exact name. Returns `{matches, disambiguation?}` envelope (same shape as `show <name>`). Optional `?in=<path-prefix>` query parameter mirrors `show --in <path>` (directory prefix or exact file). Reads live.
 
 **Launching:** point your agent host at `codemap mcp` as the stdio command. Most hosts (Claude Code, Cursor, Codex) accept `{command: "codemap", args: ["mcp"], cwd: "/path/to/project"}`. The server inherits `cwd` as the project root unless `--root` overrides it.
 

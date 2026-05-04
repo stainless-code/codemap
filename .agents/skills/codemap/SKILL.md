@@ -81,6 +81,8 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`codemap://recipes/{id}`** — single recipe `{id, description, body?, sql, actions?, source, shadows?}`. Replaces `--print-sql <id>`.
 - **`codemap://schema`** — DDL of every table in `.codemap/index.db` (queried live from `sqlite_schema`).
 - **`codemap://skill`** — full text of bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.
+- **`codemap://files/{path}`** — per-file roll-up. Returns `{path, language, line_count, symbols, imports, exports, coverage}` where `imports.specifiers` is parsed JSON and `coverage` is `{measured_symbols, avg_coverage_pct, per_symbol}` or `null` when the file has no measured coverage. URI-encode the path. Reads live (no caching).
+- **`codemap://symbols/{name}`** — symbol lookup by exact name. Returns `{matches, disambiguation?}` envelope (same shape as `show <name>` per PR #39). Optional `?in=<path-prefix>` query parameter mirrors `show --in <path>` (directory prefix or exact file). Reads live.
 
 **Implementation:** `src/cli/cmd-mcp.ts` (CLI shell — argv + lifecycle) + `src/application/mcp-server.ts` (transport — SDK glue). Tool bodies live in `src/application/tool-handlers.ts` (pure transport-agnostic — same handlers `codemap serve` dispatches over HTTP); resource fetchers in `src/application/resource-handlers.ts`. Mirrors the `cmd-audit.ts ↔ audit-engine.ts` seam. `--changed-since` git lookups are memoised per `(root, ref)` pair across batch items so a `query_batch` of N items sharing the same ref does one git invocation, not N.
 
