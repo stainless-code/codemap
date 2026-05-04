@@ -1,4 +1,16 @@
-# Fallow — adoption candidates (ongoing)
+# Fallow — adoption candidates (closed historical)
+
+> **Status:** Closed (2026-05) — adoption-from-fallow framing is no longer the codemap mission. See [`research/non-goals-reassessment-2026-05.md`](./non-goals-reassessment-2026-05.md) for the current positioning: codemap occupies a specific niche in the SQLite-backed-code-index cohort (peers: `srclight`, `Sverklo`, `ctxpp`, `KotaDB`, `codemogger`, etc.) — fallow is one of many, not a yardstick. Codemap's differentiation axes (predicate-as-API + pure structural + JS/TS/CSS-deep extraction) stand on intrinsic merit, not on cloning peer features.
+>
+> **Body preserved** as historical record of what shipped from fallow inspirations during the 2026-04 → 2026-05 window. The Status snapshot below is the authoritative "what actually landed" log; do not extend it. New adoption candidates (if any) get authored against open specs and primitive sources per [`non-goals-reassessment-2026-05.md § 4`](./non-goals-reassessment-2026-05.md#4-inspiration-sources-for-plan-pr-authoring), not against fallow's source tree.
+>
+> **Outstanding open items** were lifted to canonical homes: C.9 plugin layer → in-flight plan PR ([`docs/plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md)); C.10 LSP → covered by [`non-goals-reassessment-2026-05.md § 2.5`](./non-goals-reassessment-2026-05.md#25--no-lsp-replacement) (resolved as thin shim); C.11 coverage → shipped. Tier D defers (suppressions, fix engine, dupes, runtime intel) are aligned with [`non-goals-reassessment-2026-05.md § 3` ergonomic floors](./non-goals-reassessment-2026-05.md#3-true-architectural-limits--preserve).
+>
+> Originally an **ongoing** capability tracker; closure rationale captured below.
+
+---
+
+## Original framing (preserved verbatim from before 2026-05 closure)
 
 > Ongoing capability tracker for [`fallow-rs/fallow`](https://github.com/fallow-rs/fallow). Complement to [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md), which captured the first three-tool scan (fallow, AZidan/codemap, JordanCoin/codemap) and the items it drove into PR [#23](https://github.com/stainless-code/codemap/pull/23).
 >
