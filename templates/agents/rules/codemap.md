@@ -105,30 +105,32 @@ Violating this order is wrong even if you get the right answer — it wastes tim
 
 If the question looks like any of these → use the index:
 
-| Question shape                                                | Table(s)                                                 |
-| ------------------------------------------------------------- | -------------------------------------------------------- |
-| "What/which files import X?"                                  | `imports` (by `source`) or `dependencies` (by `to_path`) |
-| "Where is X defined?"                                         | `symbols`                                                |
-| "What does file X export?"                                    | `exports`                                                |
-| "What hooks does component X use?" / "List React components"  | `components`                                             |
-| "What are the CSS variables/tokens for X?"                    | `css_variables`                                          |
-| "Find all TODOs/FIXMEs"                                       | `markers`                                                |
-| "Who depends on file X?" / "What does file X depend on?"      | `dependencies`                                           |
-| "How many files/symbols/components are there?"                | any table with `COUNT(*)`                                |
-| "What are the CSS classes in X?"                              | `css_classes`                                            |
-| "What keyframe animations exist?"                             | `css_keyframes`                                          |
-| "What fields does interface/type X have?"                     | `type_members`                                           |
-| "Is symbol X deprecated?" / "What does X do?"                 | `symbols` (`doc_comment`)                                |
-| "What's `@internal` / `@beta` / `@alpha` / `@private`?"       | `symbols.visibility` (parsed JSDoc tag — not regex)      |
-| "Who calls X?" / "What does X call?"                          | `calls`                                                  |
-| "Is symbol X tested?" / "What's the coverage of file Y?"      | `coverage` (after `ingest-coverage`)                     |
-| "What's structurally dead AND untested?"                      | `--recipe untested-and-dead`                             |
-| "Rank files by test coverage"                                 | `--recipe files-by-coverage`                             |
-| "Worst-covered exported functions"                            | `--recipe worst-covered-exports`                         |
-| "Which components touch deprecated APIs?"                     | `--recipe components-touching-deprecated`                |
-| "What's risky to refactor right now?"                         | `--recipe refactor-risk-ranking`                         |
-| "Which exports has nobody imported?"                          | `--recipe unimported-exports`                            |
-| "Find @deprecated functions with TODO/FIXME and low coverage" | `--recipe text-in-deprecated-functions` (needs FTS5 on)  |
+| Question shape                                                | Table(s)                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------- |
+| "What/which files import X?"                                  | `imports` (by `source`) or `dependencies` (by `to_path`)  |
+| "Where is X defined?"                                         | `symbols`                                                 |
+| "What does file X export?"                                    | `exports`                                                 |
+| "What hooks does component X use?" / "List React components"  | `components`                                              |
+| "What are the CSS variables/tokens for X?"                    | `css_variables`                                           |
+| "Find all TODOs/FIXMEs"                                       | `markers`                                                 |
+| "Who depends on file X?" / "What does file X depend on?"      | `dependencies`                                            |
+| "How many files/symbols/components are there?"                | any table with `COUNT(*)`                                 |
+| "What are the CSS classes in X?"                              | `css_classes`                                             |
+| "What keyframe animations exist?"                             | `css_keyframes`                                           |
+| "What fields does interface/type X have?"                     | `type_members`                                            |
+| "Is symbol X deprecated?" / "What does X do?"                 | `symbols` (`doc_comment`)                                 |
+| "What's `@internal` / `@beta` / `@alpha` / `@private`?"       | `symbols.visibility` (parsed JSDoc tag — not regex)       |
+| "Who calls X?" / "What does X call?"                          | `calls`                                                   |
+| "Is symbol X tested?" / "What's the coverage of file Y?"      | `coverage` (after `ingest-coverage`)                      |
+| "What's structurally dead AND untested?"                      | `--recipe untested-and-dead`                              |
+| "Rank files by test coverage"                                 | `--recipe files-by-coverage`                              |
+| "Worst-covered exported functions"                            | `--recipe worst-covered-exports`                          |
+| "Which components touch deprecated APIs?"                     | `--recipe components-touching-deprecated`                 |
+| "What's risky to refactor right now?"                         | `--recipe refactor-risk-ranking`                          |
+| "Which exports has nobody imported?"                          | `--recipe unimported-exports`                             |
+| "Find @deprecated functions with TODO/FIXME and low coverage" | `--recipe text-in-deprecated-functions` (needs FTS5 on)   |
+| "What's high-complexity AND undertested?"                     | `--recipe high-complexity-untested`                       |
+| "What's the cyclomatic complexity of symbol X?"               | `SELECT name, complexity FROM symbols WHERE name = '...'` |
 
 ## When Grep / Read IS appropriate
 
