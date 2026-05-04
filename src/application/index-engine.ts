@@ -308,6 +308,8 @@ export async function indexFiles(
   } else {
     createSchema(db);
   }
+  const fts5WasEmpty =
+    fullRebuild && getFts5Enabled() && !quiet && countFts5Rows(db) === 0;
 
   const indexedPaths = knownIndexedPaths ?? new Set(filePaths);
 
@@ -460,6 +462,15 @@ export async function indexFiles(
       total_ms: elapsed,
       slowest_files: slowest,
     };
+  }
+
+  if (fts5WasEmpty && getFts5Enabled()) {
+    const fts5Rows = countFts5Rows(db);
+    if (fts5Rows > 0) {
+      console.error(
+        `[fts5] source_fts populated: ${fts5Rows} files / ${formatFts5SizeDelta(db)}`,
+      );
+    }
   }
 
   if (!quiet) {
@@ -654,5 +665,35 @@ export function queryRows(sql: string): unknown[] {
     return db.query(sql).all();
   } finally {
     closeDb(db, { readonly: true });
+  }
+}
+
+function countFts5Rows(db: CodemapDatabase): number {
+  const row = db
+    .query<{ c: number }>("SELECT COUNT(*) AS c FROM source_fts")
+    .get();
+  return row?.c ?? 0;
+}
+
+/**
+ * Best-effort FTS5 size telemetry. SQLite's `dbstat` virtual table requires
+ * the SQLITE_ENABLE_DBSTAT_VTAB build flag (not always available); fall
+ * back to file-bytes accounting via `sum(length(content))` so the line is
+ * informational regardless of build flags. (`docs/plans/fts5-mermaid.md` Q7.)
+ */
+function formatFts5SizeDelta(db: CodemapDatabase): string {
+  try {
+    const row = db
+      .query<{ b: number }>(
+        "SELECT IFNULL(SUM(length(content)), 0) AS b FROM source_fts",
+      )
+      .get();
+    const bytes = row?.b ?? 0;
+    if (bytes < 1024) return `${bytes} B (uncompressed content)`;
+    if (bytes < 1024 * 1024)
+      return `${Math.round(bytes / 1024)} KB (uncompressed content)`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB (uncompressed content)`;
+  } catch {
+    return "size unknown";
   }
 }

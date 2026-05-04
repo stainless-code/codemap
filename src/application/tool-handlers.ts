@@ -39,7 +39,11 @@ import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
-import { formatAnnotations, formatSarif } from "./output-formatters";
+import {
+  formatAnnotations,
+  formatMermaid,
+  formatSarif,
+} from "./output-formatters";
 import { executeQuery } from "./query-engine";
 import {
   getQueryRecipeActions,
@@ -72,6 +76,7 @@ export type ToolResult =
   | { ok: true; format: "json"; payload: unknown }
   | { ok: true; format: "sarif"; payload: string }
   | { ok: true; format: "annotations"; payload: string }
+  | { ok: true; format: "mermaid"; payload: string }
   | { ok: false; error: string; status?: 400 | 404 | 500 };
 
 const ok = (payload: unknown): ToolResult => ({
@@ -138,7 +143,7 @@ export const groupByEnum = z.enum(
   GROUP_BY_MODES as unknown as readonly [GroupByMode, ...GroupByMode[]],
 );
 
-export const formatEnum = z.enum(["json", "sarif", "annotations"]);
+export const formatEnum = z.enum(["json", "sarif", "annotations", "mermaid"]);
 
 export const batchItemSchema = z.union([
   z.string().min(1, "sql must be a non-empty string"),
@@ -165,7 +170,7 @@ export interface QueryArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations";
+  format?: "json" | "sarif" | "annotations" | "mermaid";
 }
 
 export function handleQuery(args: QueryArgs, root: string): ToolResult {
@@ -175,7 +180,11 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
     if (changed && typeof changed === "object" && "error" in changed) {
       return err(changed.error);
     }
-    if (args.format === "sarif" || args.format === "annotations") {
+    if (
+      args.format === "sarif" ||
+      args.format === "annotations" ||
+      args.format === "mermaid"
+    ) {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       return runFormattedQuery({
@@ -216,7 +225,7 @@ export interface QueryRecipeArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations";
+  format?: "json" | "sarif" | "annotations" | "mermaid";
 }
 
 export function handleQueryRecipe(
@@ -237,7 +246,11 @@ export function handleQueryRecipe(
     if (changed && typeof changed === "object" && "error" in changed) {
       return err(changed.error);
     }
-    if (args.format === "sarif" || args.format === "annotations") {
+    if (
+      args.format === "sarif" ||
+      args.format === "annotations" ||
+      args.format === "mermaid"
+    ) {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       return runFormattedQuery({
@@ -730,19 +743,19 @@ export function handleImpact(args: ImpactArgs): ToolResult {
 // === shared format helpers (sarif / annotations) ============================
 
 /**
- * Reject `format: "sarif" | "annotations"` combinations that change the
- * output shape away from a flat row list. Mirrors the CLI parser's
- * `formatIncompatibility` (parser-side) for the tool wrapper layer.
+ * Reject `format: "sarif" | "annotations" | "mermaid"` combinations that
+ * change the output shape away from a flat row list. Mirrors the CLI
+ * parser's `formatIncompatibility` for the tool wrapper layer.
  */
 function formatToolIncompatibility(
-  fmt: "sarif" | "annotations",
+  fmt: "sarif" | "annotations" | "mermaid",
   args: { summary?: boolean; group_by?: GroupByMode },
 ): string | undefined {
   const offenders: string[] = [];
   if (args.summary === true) offenders.push("summary");
   if (args.group_by !== undefined) offenders.push("group_by");
   if (offenders.length === 0) return undefined;
-  return `codemap: format=${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations only support flat row lists).`;
+  return `codemap: format=${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations/mermaid only support flat row lists).`;
 }
 
 function runFormattedQuery(args: {
@@ -750,7 +763,7 @@ function runFormattedQuery(args: {
   recipeId: string | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
   changedFiles: Set<string> | undefined;
-  format: "sarif" | "annotations";
+  format: "sarif" | "annotations" | "mermaid";
   root: string;
 }): ToolResult {
   const payload = executeQuery({
@@ -776,6 +789,14 @@ function runFormattedQuery(args: {
       recipeBody: catalog?.body,
     });
     return { ok: true, format: "sarif", payload: text };
+  }
+  if (args.format === "mermaid") {
+    try {
+      const text = formatMermaid({ rows, recipeId: args.recipeId });
+      return { ok: true, format: "mermaid", payload: text };
+    } catch (e) {
+      return err(e instanceof Error ? e.message : String(e));
+    }
   }
   const text = formatAnnotations({
     rows,

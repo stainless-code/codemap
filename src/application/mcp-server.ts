@@ -130,7 +130,7 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
     "query",
     {
       description:
-        'Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` or `"annotations"` to receive a formatted text payload (incompatible with `summary` / `group_by`). Use `query_batch` for N statements in one round-trip.',
+        'Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` to receive a formatted text payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; rejects unbounded inputs (>50 edges).',
       inputSchema: queryArgsSchema,
     },
     (args) => wrapToolResult(handleQuery(args, opts.root)),
@@ -142,7 +142,7 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
     "query_recipe",
     {
       description:
-        'Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` or `"annotations"` to receive a formatted text payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
+        'Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` to receive a formatted text payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: queryRecipeArgsSchema,
     },
     (args) => wrapToolResult(handleQueryRecipe(args, opts.root)),
