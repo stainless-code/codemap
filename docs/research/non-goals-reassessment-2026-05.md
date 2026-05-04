@@ -2,13 +2,13 @@
 
 > **Status:** open · **Trigger:** post-C.11 ship; user observation that several non-goals were inherited from when the project was 1/10th its current size and never re-examined as the surface grew.
 >
-> **Lens:** **Prescriptive** — proposes specific non-goal flips, ship sequence, open questions. The **descriptive baseline** (what's implemented today, with file:line cites for each claim) lives in [`research/codemap-capability-surface-2026-05.md`](./codemap-capability-surface-2026-05.md) — read that one first.
+> **Lens:** **Prescriptive** — proposes specific non-goal flips, ship sequence, open questions. Every concrete capability claim is grounded in a file path + a `codemap query` / `rg` invocation a reviewer can re-run; canonical references live in [`architecture.md § Schema`](../architecture.md#schema), [`src/db.ts`](../../src/db.ts), [`src/adapters/builtin.ts`](../../src/adapters/builtin.ts), and [`src/application/audit-engine.ts`](../../src/application/audit-engine.ts) (`V1_DELTAS`).
 >
-> **Other companion docs:** [`research/fallow.md`](./fallow.md) (capability tracker — what to adopt _from fallow_); [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md) (closed; original three-tool scan).
+> **Companion docs:** [`research/fallow.md`](./fallow.md) (capability tracker — what to adopt _from fallow_); [`research/competitive-scan-2026-04.md`](./competitive-scan-2026-04.md) (closed; original three-tool scan).
 >
 > **Source for deep-dives:** [fallow upstream](https://github.com/fallow-rs/fallow) — Cargo workspace with `crates/{lsp,mcp,v8-coverage,graph,extract,cli}`, `decisions/` (ADR-style), `editors/{vscode,zed}`, `docs/plugin-authoring.md`. Inspect for patterns we can adapt before each shipped feature.
 >
-> **Triangulation errata (2026-05):** Cross-checked against the descriptive baseline above. Three claims in this doc were softened or corrected (item 1.3 effort + scope, § 2.3 framing of `fan-in.sql`, plus a citation gap on closed-dead-subgraph evidence). See § 8 for the full diff.
+> **Errata note (2026-05):** Three claims in v1 of this doc were softened or corrected after cross-checking against the codebase (item 1.3 effort + scope, § 2.3 framing of `fan-in.sql`, plus a citation gap on closed-dead-subgraph evidence). See § 8 for the full diff and the process lesson it surfaced.
 
 ---
 
@@ -190,7 +190,7 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 
 ## 7. Cross-references
 
-- [`research/codemap-capability-surface-2026-05.md`](./codemap-capability-surface-2026-05.md) — descriptive baseline (what's implemented, with file:line cites). Read first; this doc layers prescription on top.
+- [`architecture.md § Schema`](../architecture.md#schema) — canonical schema reference; the prescriptive items in § 1 are layered on top of these tables.
 - [`roadmap.md § Non-goals (v1)`](../roadmap.md#non-goals-v1) — current non-goals list (this doc proposes amendments)
 - [`roadmap.md § Backlog`](../roadmap.md#backlog) — backlog items this doc reorders
 - [`research/fallow.md`](./fallow.md) — capability tracker for adopt-from-fallow items (different lens from this doc)
@@ -202,7 +202,7 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 
 ## 8. Triangulation errata (2026-05)
 
-Cross-checked against [`research/codemap-capability-surface-2026-05.md`](./codemap-capability-surface-2026-05.md) (descriptive baseline). Three corrections applied; documenting here so future reviewers can see the diff between v1 (initial draft) and v2 (post-triangulation).
+v1 of this doc was reasoned-from-substrate without enough pinning to actual file:line / `codemap query` references. A peer-model review (`composer-2-fast`) cross-checked every concrete claim against `db.ts`, `builtin.ts`, `audit-engine.ts`, `--recipes-json`, and `templates/recipes/*.sql` — caught three errors. Corrections applied below; documenting them here so future reviewers can see the diff between v1 and v2.
 
 | Section   | Original claim                                                                                                                 | Corrected claim                                                                                                                                                                                                                                                                                                                                                                        | Evidence (codebase = source of truth)                                |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -210,4 +210,4 @@ Cross-checked against [`research/codemap-capability-surface-2026-05.md`](./codem
 | **§ 1.3** | "AST node count from parser already in place" + "S effort"                                                                     | Node-counting is **not** in place; needs an extension to the AST walker in `src/parser.ts`. **M** effort.                                                                                                                                                                                                                                                                              | `rg 'complexity\|node_count\|nodeCount' src/` returns zero matches   |
 | **§ 2.3** | "We already ship `deprecated-symbols`, `untested-and-dead`, `barrel-files`, `fan-in`, `fan-out` — those _are_ static analysis" | Same list, but with the caveat that `fan-in` / `fan-out` are **hotspot rankers** (`ORDER BY DESC LIMIT 15`), not orphan / dead-code detectors. They don't cover the closed-dead-subgraph case from [`research/fallow.md` § 0](./fallow.md#0-fresh-evidence--what-a-hands-on-graph-audit-surfaced) — that gap motivates C.9 (framework plugin layer), not the "no static analysis" flip | `templates/recipes/fan-in.sql` shows `ORDER BY fan_in DESC LIMIT 15` |
 
-**Process lesson:** The descriptive baseline doc came in via a different model (`composer-2-fast`) and grounded every claim in file paths or `codemap query` invocations. My initial draft of this prescriptive doc reasoned from capability-from-substrate intuition without enough pinning. The triangulation step caught all three errors before they propagated into a plan PR. Pattern worth repeating: **every prescriptive research note should triangulate against a descriptive baseline (own doc or peer model) before recommending a ship sequence.**
+**Process lesson** (also in [`.agents/lessons.md`](../../.agents/lessons.md)): every prescriptive research note should pin every concrete claim to a file path / `codemap query` / `rg` invocation a reviewer can re-run, and ideally cross-check against a peer model or self-audit before recommending a ship sequence. The triangulation step on this doc caught all three errors before they propagated into a plan PR.
