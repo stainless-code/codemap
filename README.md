@@ -2,7 +2,7 @@
 
 **Query your codebase.** Codemap builds a **local SQLite index** of structural metadata (symbols, imports, exports, components, dependencies, CSS tokens, markers, and more) so **AI agents and tools** can answer “where / what / who” questions with **SQL** instead of scanning the whole tree.
 
-- **Not** full-text search or grep on arbitrary strings — use those when you need raw file-body search.
+- **Not** grep semantics by default — use `ripgrep` / your IDE for raw text matches. Codemap ships **opt-in FTS5** (`--with-fts` / `fts5: true`) when you want body matches that JOIN with `symbols` / `coverage` / `markers` in one SQL.
 - **Is** a fast, token-efficient way to navigate **structure**: definitions, imports, dependency direction, components, and other extracted facts.
 
 **Documentation:** [docs/README.md](docs/README.md) is the hub (topic index + single-source rules). Topics: [architecture](docs/architecture.md), [agents](docs/agents.md) (`codemap agents init`), [benchmark](docs/benchmark.md), [golden queries](docs/golden-queries.md), [packaging](docs/packaging.md), [roadmap](docs/roadmap.md), [why Codemap](docs/why-codemap.md). **Bundled rules/skills:** [`.agents/rules/`](.agents/rules/), [`.agents/skills/codemap/SKILL.md`](.agents/skills/codemap/SKILL.md). **Consumers:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
@@ -51,6 +51,7 @@ codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  #
 codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
 codemap validate --json                                      # detect stale / missing / unindexed files
 codemap context --compact --for "refactor auth"              # JSON envelope + intent-matched recipes
+codemap ingest-coverage coverage/coverage-final.json --json  # Istanbul / LCOV (auto-detected) → coverage table; joins with symbols
 codemap agents init                                          # scaffold .agents/ rules + skills
 ```
 

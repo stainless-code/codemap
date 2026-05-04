@@ -13,18 +13,20 @@ AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning fil
 
 This burns context window, wastes tokens, slows response time, and produces less accurate results.
 
-## What Codemap is not
+## When to reach for something else
 
-Codemap is intentionally narrow. It is **not**:
+Codemap is intentionally narrow. Pick the right tool for each question:
 
-- **Full-text search** — use `ripgrep` / your IDE for raw string queries on file bodies.
-- **A language server (LSP)** — no rename, no go-to-definition wired to your editor, no hover types.
-- **An AI agent** — Codemap does not reason, decide, or generate. Agents call Codemap; Codemap does not call agents.
-- **A static analyzer** — no dead-code detection, duplication detection, complexity scoring, or boundary enforcement (those are different products — e.g. `knip`, `jscpd`).
-- **A semantic / embedding index** — no vector search, no PageRank summarization, no "what's relevant" inference.
-- **A replacement for reading code** — the index returns paths, line ranges, signatures; the agent still reads the snippets it needs.
+- **Raw text / grep semantics** — `ripgrep` or your IDE search. **Reach for codemap** when you want body matches that JOIN with `symbols` / `coverage` / `markers` — opt-in FTS5 (`--with-fts` / `fts5: true`) ships a `source_fts` virtual table for that.
+- **In-editor types / refactor / hover** — `tsserver` and the LSP your editor wires up. **Reach for codemap** for read-side blast-radius questions — `codemap show` / `snippet` / `impact` ship as CLI / MCP / HTTP verbs.
+- **Verdict-shaped lints** (severity levels, suppression comments, fix patches) — `knip` / `jscpd` / `eslint`. **Reach for codemap** when you want predicate-as-API analysis you compose yourself — `query --recipe untested-and-dead` / `worst-covered-exports` / `visibility-tags` / `barrel-files` / `deprecated-symbols`. SQL is the API; verdicts are an output mode of recipes (e.g. `--format sarif` / `annotations`), never a primitive.
+- **Semantic / embedding search** — an embedding index (different product class). **Reach for codemap** for structural facts; we don't ship LLM-in-the-box.
+- **Whole-file reading** — your editor / `Read` tool. Codemap returns paths, line ranges, signatures; the agent still reads the snippets it needs.
+- **Agent / decision-maker** — your agent host (Cursor, Claude Code, Codex). Codemap doesn't reason or generate; it answers.
 
 What Codemap **is**: a deterministic, AST-backed SQLite index of structural facts (symbols, imports, exports, components, calls, dependencies, CSS tokens, markers) that an agent can query in **one SQL round-trip** instead of scanning the tree.
+
+For the canonical v1 product-shape contract — moats and floors — see [`roadmap.md § Non-goals (v1)`](./roadmap.md#non-goals-v1).
 
 ## The Solution
 
@@ -120,7 +122,7 @@ Other "AI-friendly code intelligence" tools occupy different points in the desig
 
 **Why this matters:** Codemap deliberately **doesn't try to be smart**. Other tools predict what context an agent will need; Codemap lets the agent decide and just makes each decision cheap. The same agent can use Codemap **and** fallow **and** an LSP — they don't compete for the same slot.
 
-For more on what Codemap deliberately does **not** do, see [What Codemap is not](#what-codemap-is-not) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
+For more on what Codemap deliberately does **not** do, see [When to reach for something else](#when-to-reach-for-something-else) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
 
 ## Cost Summary
 

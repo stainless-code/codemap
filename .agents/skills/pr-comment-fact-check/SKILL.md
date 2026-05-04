@@ -154,7 +154,7 @@ The thread node ID (`PRRT_…`) comes from the GraphQL `reviewThreads` query in 
 
 ## Common hallucination patterns to watch for
 
-These come up repeatedly with LLM reviewers and warrant extra scrutiny. The codemap-shape ones (1–4) come from the codemap thesis — what Codemap deliberately is and isn't (per [`docs/why-codemap.md` § What Codemap is not](../../../docs/why-codemap.md#what-codemap-is-not) and [`docs/roadmap.md` § Non-goals](../../../docs/roadmap.md#non-goals-v1)). The shape-5+ ones are universal across TS projects:
+These come up repeatedly with LLM reviewers and warrant extra scrutiny. The codemap-shape ones (1–4) come from the codemap thesis — what Codemap deliberately is and isn't (per [`docs/why-codemap.md` § When to reach for something else](../../../docs/why-codemap.md#when-to-reach-for-something-else) and [`docs/roadmap.md` § Non-goals](../../../docs/roadmap.md#non-goals-v1)). The shape-5+ ones are universal across TS projects:
 
 1. **"Just regex this"** when the file is in `src/parsers/` or `src/adapters/` — codemap is AST-backed by design (oxc for TS, lightningcss for CSS). Suggesting a regex replacement undoes the architectural choice. Verify against [`docs/architecture.md` § Parsers / Adapters](../../../docs/architecture.md) before accepting.
 2. **"Add full-text search"** — explicitly a non-goal per [`docs/roadmap.md` § Non-goals (v1)](../../../docs/roadmap.md#non-goals-v1). Push back with that anchor.

@@ -17,7 +17,7 @@ Sources:
 
 **Codemap is:** a **structural SQLite index** → agents call **SQL** for symbols, imports, exports, components, calls, type members, deps, CSS tokens/classes/keyframes, markers. AST-backed (oxc, lightningcss, oxc-resolver). Bun + Node, TS/CSS-first. CLI **`codemap query --json`** + **`codemap agents init`** for IDE wiring.
 
-**Codemap is not:** a dead-code detector, duplication finder, dependency-flow visualizer, semantic understanding layer, or agent runtime. The canonical "what Codemap is not" list now lives in [why-codemap.md § What Codemap is not](../why-codemap.md#what-codemap-is-not) and the explicit non-goals are in [roadmap.md § Non-goals](../roadmap.md#non-goals-v1) — keep this doc free of duplicates.
+**Codemap is not:** a dead-code detector, duplication finder, dependency-flow visualizer, semantic understanding layer, or agent runtime. The canonical alternatives positioning lives in [why-codemap.md § When to reach for something else](../why-codemap.md#when-to-reach-for-something-else) and the explicit non-goals are in [roadmap.md § Non-goals](../roadmap.md#non-goals-v1) — keep this doc free of duplicates.
 
 ---
 
@@ -42,23 +42,23 @@ Sources:
 
 ## 3. What shipped from this scan
 
-| Idea (originally §3 / §4 / §5 of this scan)                                             | Shipped where                                                                           | Inspired by                                           |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `codemap context` JSON envelope (incl. `--for "<intent>"` thin classifier, `--compact`) | `src/cli/cmd-context.ts` + `src/application/context-engine.ts`                          | JordanCoin (`codemap context`)                        |
-| `codemap validate` (hash-based staleness, no re-read)                                   | `src/cli/cmd-validate.ts` + `src/application/validate-engine.ts`                        | AZidan (`codemap validate`)                           |
-| `--performance` per-phase timing + top-10 slowest files                                 | `src/application/index-engine.ts`                                                       | own roadmap, sharpened by JordanCoin's daemon framing |
-| `deprecated-symbols` recipe                                                             | `src/application/query-recipes.ts`                                                      | fallow JSDoc visibility tags                          |
-| `visibility-tags` recipe (`@internal` / `@private` / `@alpha` / `@beta`)                | `src/application/query-recipes.ts`                                                      | fallow JSDoc visibility tags                          |
-| `barrel-files` recipe (top files by export count)                                       | `src/application/query-recipes.ts`                                                      | own derivation from JordanCoin "hubs" framing         |
-| `files-hashes` recipe powering `validate`                                               | `src/application/query-recipes.ts`                                                      | AZidan                                                |
-| `-r` short alias for `--recipe`, cleaner `--help`                                       | `src/cli/cmd-query.ts`                                                                  | own UX polish                                         |
-| Friendlier "no `.codemap/index.db`" error                                               | `src/application/index-engine.ts`                                                       | own UX polish                                         |
-| Anti-pitch — "What Codemap is not"                                                      | [why-codemap.md § What Codemap is not](../why-codemap.md#what-codemap-is-not)           | AZidan                                                |
-| Scenario-keyed token-savings table                                                      | [why-codemap.md § Across a Typical Session](../why-codemap.md#across-a-typical-session) | AZidan                                                |
-| "Grep/Read vs Codemap" capability table                                                 | [README.md § What you get](../../README.md#what-you-get)                                | fallow ("Linter vs Fallow")                           |
-| "Daily commands" stripe + version-matched skill framing                                 | [README.md § CLI](../../README.md#cli)                                                  | JordanCoin / fallow packaging                         |
-| Alternatives comparison table                                                           | [why-codemap.md § Codemap vs alternatives](../why-codemap.md#codemap-vs-alternatives)   | AZidan ("CodeMap vs RepoMap/Serena/RepoPrompt")       |
-| Schema v3 — `NOT NULL` audit (orthogonal to scan but landed in same PR)                 | `src/db.ts`                                                                             | CodeRabbit review during PR #23                       |
+| Idea (originally §3 / §4 / §5 of this scan)                                             | Shipped where                                                                                           | Inspired by                                           |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `codemap context` JSON envelope (incl. `--for "<intent>"` thin classifier, `--compact`) | `src/cli/cmd-context.ts` + `src/application/context-engine.ts`                                          | JordanCoin (`codemap context`)                        |
+| `codemap validate` (hash-based staleness, no re-read)                                   | `src/cli/cmd-validate.ts` + `src/application/validate-engine.ts`                                        | AZidan (`codemap validate`)                           |
+| `--performance` per-phase timing + top-10 slowest files                                 | `src/application/index-engine.ts`                                                                       | own roadmap, sharpened by JordanCoin's daemon framing |
+| `deprecated-symbols` recipe                                                             | `src/application/query-recipes.ts`                                                                      | fallow JSDoc visibility tags                          |
+| `visibility-tags` recipe (`@internal` / `@private` / `@alpha` / `@beta`)                | `src/application/query-recipes.ts`                                                                      | fallow JSDoc visibility tags                          |
+| `barrel-files` recipe (top files by export count)                                       | `src/application/query-recipes.ts`                                                                      | own derivation from JordanCoin "hubs" framing         |
+| `files-hashes` recipe powering `validate`                                               | `src/application/query-recipes.ts`                                                                      | AZidan                                                |
+| `-r` short alias for `--recipe`, cleaner `--help`                                       | `src/cli/cmd-query.ts`                                                                                  | own UX polish                                         |
+| Friendlier "no `.codemap/index.db`" error                                               | `src/application/index-engine.ts`                                                                       | own UX polish                                         |
+| Anti-pitch — "When to reach for something else"                                         | [why-codemap.md § When to reach for something else](../why-codemap.md#when-to-reach-for-something-else) | AZidan                                                |
+| Scenario-keyed token-savings table                                                      | [why-codemap.md § Across a Typical Session](../why-codemap.md#across-a-typical-session)                 | AZidan                                                |
+| "Grep/Read vs Codemap" capability table                                                 | [README.md § What you get](../../README.md#what-you-get)                                                | fallow ("Linter vs Fallow")                           |
+| "Daily commands" stripe + version-matched skill framing                                 | [README.md § CLI](../../README.md#cli)                                                                  | JordanCoin / fallow packaging                         |
+| Alternatives comparison table                                                           | [why-codemap.md § Codemap vs alternatives](../why-codemap.md#codemap-vs-alternatives)                   | AZidan ("CodeMap vs RepoMap/Serena/RepoPrompt")       |
+| Schema v3 — `NOT NULL` audit (orthogonal to scan but landed in same PR)                 | `src/db.ts`                                                                                             | CodeRabbit review during PR #23                       |
 
 All shipped under PR [#23](https://github.com/stainless-code/codemap/pull/23) as schema-bump-driven minor release.
 

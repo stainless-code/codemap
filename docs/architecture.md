@@ -175,6 +175,8 @@ Optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; def
 
 ## Schema
 
+> **Schema-growth principle:** schema breadth is the substrate every recipe layers on. Slimming a column for theoretical perf / simplicity is a regression unless empirically unread. See [`roadmap.md § Non-goals (v1) → Moats`](./roadmap.md#moats-load-bearing) — Moat B is the canonical home for this discipline.
+
 **Fingerprints:** incremental runs compare **`files.content_hash`** — SHA-256 hex of raw file bytes from [`src/hash.ts`](../src/hash.ts) (same on Node and Bun). Details in the **`files`** table below.
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap/index.db`**.

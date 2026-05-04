@@ -45,7 +45,7 @@ Today's Tier-2 rules:
 
 - `agents-tier-system` (this rule) — auto-attaches when authoring under `.agents/**` or `.cursor/**`.
 - `docs-governance` — primes the docs framework when authoring under `docs/**` or `.agents/**` (paired with [`docs-governance` skill](../skills/docs-governance/SKILL.md)).
-- `plan-pr-inspiration-discipline` — primes plan-PR / recipe authoring with the open-spec inspection list when authoring under `docs/plans/**` or `templates/recipes/**` (paired with [`docs/research/non-goals-reassessment-2026-05.md § 4`](../../docs/research/non-goals-reassessment-2026-05.md#4-inspiration-sources-for-plan-pr-authoring) as the canonical inspection-sources list).
+- `plan-pr-inspiration-discipline` — primes plan-PR / recipe authoring with the open-spec inspection list when authoring under `docs/plans/**` or `templates/recipes/**`. The canonical inspection-sources table lives in the rule body itself (lifted from `research/non-goals-reassessment-2026-05.md § 4` in 2026-05; see [§ 7 Lifted to](../../docs/research/non-goals-reassessment-2026-05.md#7-lifted-to)).
 
 ### Tier 3 — Discoverable skills (no rule)
 
