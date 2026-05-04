@@ -1,6 +1,6 @@
 # (a) FTS5 + Mermaid output — plan
 
-> **Status:** open · plan iterates while the (b) C.9 plan PR runs in parallel (per [`docs/research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-recommended-next-pick-under-the-new-framing))
+> **Status:** open · all design decisions resolved (iteration round 1, 2026-05); ready for Slice 1 impl. Plan iterates while the (b) C.9 plan PR runs in parallel (per [`docs/research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-recommended-next-pick-under-the-new-framing))
 >
 > **Slot:** track-1 shipping cadence T+0 → +1w. First moat-flipping ship after the research note merge.
 >
@@ -21,15 +21,41 @@
 
 ---
 
-## Open decisions (iterate as the plan converges)
+## Open decisions
 
-- **Q1 — `source_fts` virtual-table schema.** Single `(file_path UNINDEXED, content)` columns? Add `last_modified` for cache-busting? Tokeniser choice (`porter unicode61`? `trigram`?)? `WITHOUT ROWID`-equivalent for FTS5?
-- **Q2 — Indexer integration point.** Where in the index pipeline does FTS5 population happen — same pass as `files` insert, or a separate post-pass? Incremental (`--files`) vs full (`--full`) handling — does FTS5 incremental delete-then-insert cleanly?
-- **Q3 — `--full` rebuild semantics on toggle change.** If a user flips `fts5: false → true` in config, do we auto-detect and force `--full`? Or document "you must `--full` after toggling"? Auto-detection requires storing the toggle's effective value somewhere queryable (likely `meta` table).
-- **Q4 — Mermaid edge-count threshold value.** Default 50 (per § 1.7); make configurable (`mermaid_max_edges`)? Or hard-coded for v1?
-- **Q5 — Mermaid output target shape.** Which graph shapes does the formatter accept? `impact` engine output is bounded (depth/limit). Recipe results need explicit `LIMIT` ≤ 50. Ad-hoc SQL same. Spec the input row shape (`{from, to, label?}` vs `{node1, node2}` etc.) — pick a normalised contract so all recipe shapes can adapt.
-- **Q6 — `--with-fts` CLI flag precedence.** When both config has `fts5: true` AND `--with-fts` is passed (or vice versa), does CLI override? Probably yes (matches existing `--root` / `--state-dir` precedent).
-- **Q7 — DB size telemetry.** Should the indexer log a warning when FTS5 is first populated, with the size delta vs without? Helps users measure the tax.
+All seven Q's resolved in **iteration round 1 (2026-05)**. Recommendations baked from research-note pre-locked decisions, existing codebase patterns (`coverage` table substrate for FTS5 plumbing, `meta` table for toggle state, `--root` / `--state-dir` precedent for CLI / config precedence), and the [SQLite FTS5 docs](https://www.sqlite.org/fts5.html). User can override any decision before Slice 1 starts.
+
+### Resolved (2026-05)
+
+- ✅ **Q1 — `source_fts` virtual-table schema** — **`(file_path UNINDEXED, content)`** columns, **`tokenize = 'porter unicode61'`** tokeniser. Reasoning:
+  - **`file_path UNINDEXED`** — never tokenise paths; filtering is exact via `WHERE file_path = ?`. UNINDEXED skips the tokeniser cost.
+  - **`content`** — full file source (UTF-8 text, no normalisation beyond the tokeniser's). Stored verbatim so JOIN-with-other-tables matches line numbers from `markers` / `symbols`.
+  - **`porter unicode61`** — Porter stemmer over Unicode-aware tokeniser. Catches `auth` / `authenticate` / `authentication` as related; `unicode61` handles non-ASCII identifiers cleanly. `trigram` was the alternative — better for partial-string matches but ~3× larger index. Per the [SQLite FTS5 docs § Tokenizers](https://www.sqlite.org/fts5.html#tokenizers), `porter unicode61` is the standard for code search where stemming-of-camelCase isn't a concern.
+  - **No `last_modified` column** — FTS5 deletion + re-insertion at incremental reindex handles freshness; storing it separately would duplicate `files.last_modified` (Rule 1 violation).
+  - **No `WITHOUT ROWID` equivalent** — FTS5 virtual tables don't support that pragma; the implicit rowid-keyed shape is fine.
+- ✅ **Q2 — Indexer integration point** — **Same pass as `files` insert**, in the indexer's per-file write path. After the file content is loaded for parsing (already in memory), tee a copy to `source_fts` when `getCodemapConfig().fts5 === true`. Reasoning:
+  - File content is already in memory at parse time — no extra disk I/O.
+  - Same transaction as the `files` row insert → atomic; either both land or neither does.
+  - `--files <paths>` incremental: each path's `source_fts` row is `DELETE` + `INSERT` (FTS5 supports both). `--full` rebuild: `DELETE FROM source_fts;` followed by per-file inserts.
+- ✅ **Q3 — `--full` rebuild semantics on toggle change** — **Auto-detect via `meta` table; force `--full` on next reindex.** Reasoning:
+  - Existing `meta` table accommodates the toggle state via key-value (`meta.fts5_enabled`). Indexer reads on startup; if it differs from the resolved config / CLI flag, log a clear stderr line and force `--full` (drop existing `source_fts` rows + repopulate).
+  - "You must `--full` after toggling" was the simpler alternative but ships a UX trap — quiet user changes config, next `codemap` run silently produces stale FTS5 data, queries return wrong rows. Auto-detect + clear log is worth the small `meta`-table surface.
+- ✅ **Q4 — Mermaid edge-count threshold value** — **Hard-coded 50 for v1**, named constant (`MERMAID_MAX_EDGES`) in `src/application/output-formatters.ts`. Reasoning:
+  - § 1.7 of research note locked **50** as the default. Make-configurable (`mermaid_max_edges` config field) is YAGNI for v1; tune the constant in code if 50 proves wrong on real-world data.
+  - Cheap to promote to a config field later (additive; backwards-compat).
+- ✅ **Q5 — Mermaid output target shape** — **Normalised input contract: `{from, to, label?, kind?}`** rows. Recipes / ad-hoc SQL must alias their columns to match. The formatter renders `from -->|label| to` (with `kind` styling node shape if present). Reasoning:
+  - `dependencies.from_path → to_path` aliases trivially: `SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50`.
+  - `calls.caller_name → callee_name` same pattern.
+  - `impact` engine output already shapes `{from, to, edge, kind}` — minor rename `edge` → `label` in the formatter input adapter.
+  - Optional `label` lets recipes add edge-text (`"calls"` vs `"imports"`); optional `kind` lets node shape vary (`"file"` vs `"function"`).
+  - Recipes that don't shape correctly → formatter rejects with: `[mermaid] expected columns: from, to (with optional label, kind). Got: <actual columns>. Alias via 'SELECT col AS "from", col2 AS "to"'.`
+- ✅ **Q6 — `--with-fts` CLI flag precedence** — **CLI overrides config.** Reasoning:
+  - Matches existing `--root` / `--state-dir` precedent (CLI wins). Mirrored in `bootstrap.ts` argv parsing.
+  - When `--with-fts` passed AND `fts5: false` in config, log a stderr line: `[fts5] CLI override: enabled despite config fts5=false`. Quiet-divergence is the trap; explicit log avoids it.
+- ✅ **Q7 — DB size telemetry** — **Yes, log size delta when `source_fts` is first populated.** One stderr line at end of full-FTS5 reindex: `[fts5] source_fts populated: <N> files / <X> KB / +<Y>% over base index`. Reasoning:
+  - Cheap (single SELECT on `source_fts` size + `files` size at end of indexing).
+  - Helps users measure the tax post-flip — informs the v2 default-on decision per the research note § 6 Q2 ("re-evaluate default in v2 once external-corpus size measurements land").
+  - Stderr (not a config-toggleable verbose flag) — informational, one-line, on the first FTS5 populate only (subsequent reindexes don't re-log unless `--verbose`).
 
 ---
 
