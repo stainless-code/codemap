@@ -131,21 +131,12 @@ export function extractFileData(
     _scopeStr = scopeStack.join(".");
   };
 
-  // Cyclomatic-complexity stack: pushed on every function-shaped node
-  // (FunctionDeclaration / ArrowFunctionExpression / FunctionExpression)
-  // enter, popped on exit. `symbolIndex >= 0` writes the count back to
-  // `symbols[symbolIndex].complexity` on pop; `-1` is anonymous (callbacks,
-  // IIFEs, etc.) — counted but not persisted, so nested anonymous arrows
-  // don't bleed branches into the outer function.
-  //
-  // Named arrow / function expressions from a `VariableDeclaration` are
-  // associated with their owning symbol via `arrowFnSymbolIndex` (keyed by
-  // the AST node identity) — the VariableDeclaration handler creates the
-  // symbol then records the mapping; the ArrowFunctionExpression /
-  // FunctionExpression enter handler reads it. This keeps multi-declarator
-  // statements (`const a = () => …, b = () => …`) correct: each function
-  // body gets its own stack entry instead of all branches accumulating
-  // onto the last-pushed declarator's counter.
+  // `symbolIndex = -1` marks anonymous functions (callbacks, IIFEs) — counted
+  // but never persisted, so their branches don't bleed into outer scopes.
+  // `arrowFnSymbolIndex` maps each named-arrow init node back to its symbol
+  // row index — must push from the function-shaped visitors (not the
+  // VariableDeclaration loop) so multi-declarator `const a = () => …,
+  // b = () => …` shapes attribute branches per-function, not per-statement.
   const complexityStack: { symbolIndex: number; count: number }[] = [];
   const arrowFnSymbolIndex = new WeakMap<object, number>();
   const pushComplexityFor = (symbolIndex: number) => {
@@ -245,10 +236,6 @@ export function extractFileData(
 
         if (isArrowOrFn) {
           scopePush(name);
-          // Defer complexity push to the ArrowFunctionExpression /
-          // FunctionExpression visitor so multi-declarator shapes like
-          // `const a = () => {…}, b = () => {…}` push per-function
-          // (not per-declarator) — see the complexityStack comment above.
           if (init) arrowFnSymbolIndex.set(init, symbolIndex);
         }
         if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {

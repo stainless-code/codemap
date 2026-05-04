@@ -110,12 +110,21 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # non-git projects get a clean `--base requires a git repository` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
-# --format <text|json|sarif|annotations> — pipe results into GitHub Code Scanning (SARIF
-# 2.1.0) or surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg). Both
-# require a flat row list (no --summary / --group-by / baseline). Auto-detects file_path /
-# path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc for ad-hoc).
+# --format <text|json|sarif|annotations|mermaid> — pipe results into GitHub Code Scanning
+# (SARIF 2.1.0), surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg), or
+# render edge-shaped recipes as Mermaid `flowchart LR`. All four require a flat row list
+# (no --summary / --group-by / baseline). SARIF / annotations auto-detect file_path /
+# path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc). Mermaid
+# requires {from, to, label?, kind?} rows and rejects unbounded inputs (>50 edges) with a
+# scope-suggestion error — alias columns via SELECT col AS "from", col2 AS "to".
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
+codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'
+# --with-fts — opt-in FTS5 virtual table populated at index time. Default OFF (preserves
+# .codemap/index.db size); CLI flag wins over codemap.config.ts `fts5` field. Toggle change
+# auto-detects and forces a full rebuild so `source_fts` stays consistent.
+codemap --with-fts --full
+codemap query --recipe text-in-deprecated-functions    # demonstrates FTS5 ⨯ symbols ⨯ coverage JOIN
 # HTTP API — same tool taxonomy as `codemap mcp`, exposed over POST /tool/{name} for
 # non-MCP consumers (CI scripts, curl, IDE plugins). Loopback default; optional --token.
 TOKEN=$(openssl rand -hex 32)
