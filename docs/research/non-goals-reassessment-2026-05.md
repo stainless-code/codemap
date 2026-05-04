@@ -221,9 +221,26 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 
 - ✅ **Q2 — FTS5 opt-in vs default-on** — **opt-in via either `codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; default OFF.** Both surfaces because config-only forces CI / ephemeral-index workflows to commit `fts5: true`; CLI-only forces every long-term user to remember the flag on `--full`. Default OFF respects backwards-compat: existing users wouldn't see `.codemap/index.db` grow ~30–50% silently on the next `--full`. Cold-start is unaffected either way (FTS5 is index-time cost only) — the earlier "default OFF to keep cold-start sub-100ms" framing was a wrong reason. **Re-evaluate default** in v2 once external-corpus size measurements (`bun run benchmark:query` shape) land. Default-ON is reserved for capabilities without disk-size tax (Mermaid output, parametrised recipes, complexity column).
 
-### Still open
+- ✅ **Q5 — `history` table** — **deferred (2026-05)**. Cost / use-case / shape analysis below; revisit triggers pinned for the next reviewer.
 
-- ❓ **Q5 — `history` table** — would unlock "when did coverage drop?" / "when did symbol X last have a caller?". Schema-shape question: per-commit snapshots (large) vs append-only event log (small but harder to query). Defer until a recipe demands it.
+  **What it would do.** Today's index is a **point-in-time snapshot** — `symbols`, `dependencies`, `coverage` describe "what the code looks like _now_." A `history` table adds a **temporal dimension**: queries like "when did symbol X get `@deprecated`?", "show coverage trend over the last 50 commits", "files that became dead this week" become expressible.
+
+  **What `audit --base <ref>` already covers (and what it doesn't).** The shipped `codemap audit --base origin/main` does a **two-snapshot pairwise diff** — current branch vs one ref (cached worktree+reindex; sub-100ms second run). That answers "what changed between A and B." It does **not** answer "how did it evolve over commits 1..N" — that's the longitudinal gap a `history` table would fill. The pairwise primitive serves the most-common temporal question (PR-scoped delta) without any schema growth.
+
+  **Two shapes (if it ever ships).**
+
+  | Shape                     | Storage                                                                      | Query cost                                                                | Per-commit overhead                   |
+  | ------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------- |
+  | **Per-commit snapshots**  | ~N × current DB size (linear in retention; e.g. 500 commits × 50 MB ≈ 25 GB) | Trivial — `JOIN ON commit_sha`                                            | Full snapshot insert                  |
+  | **Append-only event log** | Deltas only (~1–5% per commit; 500 commits ≈ 5–25 MB extra)                  | Heavy — recursive CTEs walking event log to reconstruct state at commit X | Diff-against-previous + insert deltas |
+
+  Both pay an **N-reindexes backfill cost** to populate history for existing commits (worktree-checkout each; ~30s per reindex; 500 commits ≈ 4 hours first-run). Backfill is the deal-breaker today.
+
+  **Architecture impact summary.** Schema bump (minor per pre-v1 changesets lesson); `db.ts` + indexer hooks for emitting history events / snapshots; retention policy (`history.max_commits` config); deepens git integration (`getCurrentCommit()` per pass + `audit --base`-style worktree pipeline reused).
+
+  **Why defer.** (1) No bundled recipe wants history today — adding the table = schema bloat without a paying use case (anti-bloat meta-rule per [`docs-governance` skill](../../.agents/skills/docs-governance/SKILL.md)). (2) `audit --base <ref>` already covers the most-common temporal question. (3) Backfill cost is prohibitive without a clear win. (4) Snapshots-vs-event-log is wasted analysis without empirical access-pattern data.
+
+  **Revisit triggers.** Two consumers ship `jq`-based "audit runs over time" workflows that genuinely want persistence (mirrors B.5 verdict-threshold deferral pattern — wait for **two** asks, not one), OR `query_baselines` evolution queries become a recurring agent need.
 
 ---
 
