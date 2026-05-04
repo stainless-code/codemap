@@ -18,4 +18,4 @@ Returns nothing useful until you've run `codemap ingest-coverage <coverage-final
 
 1. **Scope by directory**: `AND s.file_path LIKE 'src/api/%'` — restricts the predicate to a single owner / package.
 2. **Exclude framework entry-point exports**: `AND s.is_default_export = 0` — Next.js page / layout / route handler default exports show up as "no callers" but are live entry points.
-3. **Restrict to a kind / visibility**: already filters `kind = 'function'`; add `AND s.visibility IS NULL OR s.visibility = 'public'` to skip `@internal` / `@beta` symbols whose lifecycle you don't yet own.
+3. **Restrict to a kind / visibility**: already filters `kind = 'function'`; add `AND (s.visibility IS NULL OR s.visibility = 'public')` to skip `@internal` / `@beta` symbols whose lifecycle you don't yet own. The parentheses are load-bearing — without them SQL precedence (`AND` binds tighter than `OR`) would let every `visibility = 'public'` row bypass the `WHERE` clause entirely and balloon the result set.
