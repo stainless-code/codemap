@@ -114,6 +114,8 @@ If the question looks like any of these → use the index:
 | "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                             |
 | "Rank files by test coverage"                                | `--recipe files-by-coverage`                             |
 | "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                         |
+| "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                |
+| "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                         |
 
 ## When Grep / Read IS appropriate
 
@@ -135,34 +137,36 @@ bun src/index.ts query --json "<SQL>"
 
 ## Quick reference queries
 
-| I need to...              | Query                                                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Find a symbol             | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'`              |
-| Find a symbol (fuzzy)     | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                              |
-| See file exports          | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'`                                     |
-| See file imports          | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'`                           |
-| Who imports this module?  | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'`                                  |
-| Who imports this file?    | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                      |
-| What does this depend on? | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                      |
-| Component info            | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                     |
-| All components            | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name`                               |
-| TODOs in a file           | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                     |
-| Most complex files        | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10`        |
-| CSS design tokens         | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'`                                      |
-| CSS module classes        | `SELECT name, file_path FROM css_classes WHERE is_module = 1`                                                |
-| CSS keyframes             | `SELECT name, file_path FROM css_keyframes`                                                                  |
-| Type/interface shape      | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                    |
-| Deprecated symbols        | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`              |
-| Visibility-tagged symbols | `SELECT name, kind, visibility, file_path FROM symbols WHERE visibility IS NOT NULL` (or `= 'beta'`, etc.)   |
-| Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`            |
-| Const values              | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
-| Class members             | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                        |
-| Top-level only            | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'`              |
-| Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
-| What does X call?         | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
-| Call hotspots             | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
-| Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`          |
-| Untested + dead exports   | `bun src/index.ts query --json --recipe untested-and-dead`                                                   |
+| I need to...                      | Query                                                                                                        |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Find a symbol                     | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'`              |
+| Find a symbol (fuzzy)             | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                              |
+| See file exports                  | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'`                                     |
+| See file imports                  | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'`                           |
+| Who imports this module?          | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'`                                  |
+| Who imports this file?            | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                      |
+| What does this depend on?         | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                      |
+| Component info                    | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                     |
+| All components                    | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name`                               |
+| TODOs in a file                   | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                     |
+| Most complex files                | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10`        |
+| CSS design tokens                 | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'`                                      |
+| CSS module classes                | `SELECT name, file_path FROM css_classes WHERE is_module = 1`                                                |
+| CSS keyframes                     | `SELECT name, file_path FROM css_keyframes`                                                                  |
+| Type/interface shape              | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                    |
+| Deprecated symbols                | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`              |
+| Visibility-tagged symbols         | `SELECT name, kind, visibility, file_path FROM symbols WHERE visibility IS NOT NULL` (or `= 'beta'`, etc.)   |
+| Symbol docs                       | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`            |
+| Const values                      | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
+| Class members                     | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                        |
+| Top-level only                    | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'`              |
+| Who calls X?                      | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
+| What does X call?                 | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
+| Call hotspots                     | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
+| Symbol coverage                   | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`          |
+| Untested + dead exports           | `bun src/index.ts query --json --recipe untested-and-dead`                                                   |
+| Components touching `@deprecated` | `bun src/index.ts query --json --recipe components-touching-deprecated`                                      |
+| Refactor-risk-ranked files        | `bun src/index.ts query --json --recipe refactor-risk-ranking`                                               |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 
