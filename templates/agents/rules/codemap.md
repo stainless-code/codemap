@@ -6,7 +6,7 @@ alwaysApply: true
 
 > **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
 
-A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** — codemap version bumps auto-apply on next run, no manual cleanup needed.
+A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes, and (after `codemap ingest-coverage <path>`) static coverage from Istanbul JSON or LCOV. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** — codemap version bumps auto-apply on next run, no manual cleanup needed.
 
 **Generic defaults:** This rule is **project-agnostic**. After **`codemap agents init`** (or copying these files into **`.agents/`**), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
 
@@ -37,6 +37,7 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | Targeted read (metadata)          | `codemap show <name> [--kind <k>] [--in <path>] [--json]` — file:line + signature                                                                                                                                                               |
 | Targeted read (source text)       | `codemap snippet <name> [--kind <k>] [--in <path>] [--json]` — same lookup + source from disk + stale flag                                                                                                                                      |
 | Impact (blast-radius walker)      | `codemap impact <target> [--direction up\|down\|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]` — replaces hand-composed `WITH RECURSIVE` queries                                                                               |
+| Coverage ingest                   | `codemap ingest-coverage <path> [--json]` — Istanbul (`coverage-final.json`) or LCOV (`lcov.info`); format auto-detected. Joinable to `symbols` for "untested AND dead" queries.                                                                |
 | SARIF / GH annotations            | `codemap query --recipe deprecated-symbols --format sarif` · `… --format annotations`                                                                                                                                                           |
 | HTTP server (for non-MCP)         | `codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>] [--watch] [--debounce <ms>]` — same tool taxonomy over POST /tool/{name}.                                                                                                    |
 | Watch mode (live reindex)         | `codemap watch [--debounce 250] [--quiet]` — long-running; debounced reindex on file changes. Combine with `codemap mcp --watch` / `codemap serve --watch` (or `CODEMAP_WATCH=1`) so every tool reads a live index without per-request prelude. |
@@ -118,6 +119,10 @@ If the question looks like any of these → use the index:
 | "Is symbol X deprecated?" / "What does X do?"                | `symbols` (`doc_comment`)                                |
 | "What's `@internal` / `@beta` / `@alpha` / `@private`?"      | `symbols.visibility` (parsed JSDoc tag — not regex)      |
 | "Who calls X?" / "What does X call?"                         | `calls`                                                  |
+| "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `ingest-coverage`)                     |
+| "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                             |
+| "Rank files by test coverage"                                | `--recipe files-by-coverage`                             |
+| "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                         |
 
 ## When Grep / Read IS appropriate
 
@@ -165,6 +170,8 @@ codemap query --json "<SQL>"
 | Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
 | What does X call?         | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
 | Call hotspots             | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
+| Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`          |
+| Untested + dead exports   | `codemap query --json --recipe untested-and-dead`                                                            |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

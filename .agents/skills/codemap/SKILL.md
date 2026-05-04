@@ -267,6 +267,21 @@ User-facing baselines saved by `codemap query --save-baseline`, replayed by `cod
 | git_ref    | TEXT    | `git rev-parse HEAD` at save time, or NULL when not a git working tree                   |
 | created_at | INTEGER | `Date.now()` at save time (epoch ms)                                                     |
 
+### `coverage` — Statement coverage (user data, ingested via `codemap ingest-coverage`)
+
+Static coverage from Istanbul JSON or LCOV. Joinable to `symbols` for "what's untested?" queries. **Survives `--full` and SCHEMA bumps** — intentionally absent from `dropAll()`. Empty until first ingest.
+
+| Column           | Type    | Description                                                                                              |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| file_path        | TEXT PK | Project-relative path; matches `symbols.file_path`. Forward-slashed (Windows paths normalised on ingest) |
+| name             | TEXT PK | Symbol name (matches `symbols.name`). Same `(file_path, name, line_start)` is unique by construction     |
+| line_start       | INT PK  | Symbol's starting line (matches `symbols.line_start`). Disambiguates re-declared names                   |
+| coverage_pct     | REAL    | Percentage 0.0–100.0; `NULL` when `total_statements = 0` (zero-statement scope; not the same as 0%)      |
+| hit_statements   | INTEGER | Count of statements with non-zero hit count after innermost-wins projection                              |
+| total_statements | INTEGER | Count of statements that projected onto this symbol                                                      |
+
+Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record freshness — single ingest at a time, format is meta-level.
+
 ## Query patterns
 
 ### Basic lookups
