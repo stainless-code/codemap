@@ -33,7 +33,7 @@ The canonical Rules (1–9) live in [`docs/README.md`](../../docs/README.md) —
 
 1. **Anchor preservation** — slim READMEs keep cited rule numbers and section anchors. Grep before any slim: `rg "Rule [0-9]+" docs/` and `rg "<doc-path>(#[a-z-]+)?"`.
 2. **Anti-bloat meta-rule** — don't add a rule until there's content that needs it. Same for ownership-table rows.
-3. **Repo-level vs in-source** — repo-wide tool evaluations + adoption (fallow, future plugins) live in `.agents/`, not as permanent `docs/research/` files. A `docs/research/` file may motivate the adoption, but the rule + skill earn the permanent home.
+3. **Repo-level vs in-source** — repo-wide tool evaluations + adoption (oxlint, future plugins) live in `.agents/`, not as permanent `docs/research/` files. A `docs/research/` file may motivate the adoption, but the rule + skill earn the permanent home. (Precedent: [`research/fallow.md`](../../docs/research/fallow.md) was closed in 2026-05 once peer-tool framing went off-mission — its tracker shape is no longer the ongoing-research pattern; for current positioning see [`research/non-goals-reassessment-2026-05.md`](../../docs/research/non-goals-reassessment-2026-05.md).)
 
 ## Existence test (apply on every doc-touching PR)
 
