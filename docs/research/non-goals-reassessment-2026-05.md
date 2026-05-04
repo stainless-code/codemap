@@ -56,6 +56,14 @@ The data and pipeline exist. Each row needs only a recipe / formatter / verb to 
 
 These were defensive choices made when the project was small. The codebase has matured past the original constraint.
 
+**Reading note (post-§ 3 moat reframe):** each flip below relates to the moats (§ 3 rows A and B) differently:
+
+- **§ 2.1, § 2.3** — extend the substrate **moat B** protects (richer extraction, more first-class recipes inside the SQL-as-API thesis).
+- **§ 2.2** — aligns with **moat A** (`--format mermaid` is an output mode, never a verdict-shaped primitive).
+- **§ 2.4, § 2.5** — moat-orthogonal **transport / config-UX** questions; flipping doesn't touch either moat because the substrate isn't moved, just re-exposed.
+
+The `Verdict` rows below tie each flip back to the moat it touches; `❓` is preserved as the open-flip marker.
+
 ### 2.1 ❓ "No FTS5 / use ripgrep for full-text"
 
 **Original framing:** [`roadmap.md § Non-goals`](../roadmap.md#non-goals-v1) — "Full-text search across all file bodies — use ripgrep / IDE / opt-in FTS5".
@@ -96,27 +104,31 @@ ripgrep can't compose with `symbols` / `coverage` / `markers` in one shot — it
 
 **Caveat (caught by triangulation):** `fan-in` and `fan-out` are **hotspot rankers**, not dead-code detectors — `fan-in.sql` literally `ORDER BY fan_in DESC LIMIT 15` ([source](../../templates/recipes/fan-in.sql)). They're structural-property recipes (legitimate static analysis), but they don't cover the closed-dead-subgraph case ([`research/fallow.md` § 0](./fallow.md#0-fresh-evidence--what-a-hands-on-graph-audit-surfaced) documents the 8-file widget pack where every file had non-zero `dependencies` fan-in via self-import; the fan-in recipe missed the entire pack). That gap is a multi-axis case the C.9 framework plugin layer addresses, not the "no static analysis" non-goal.
 
-The **real** boundary: **no opinionated rule engine + no fix mutation**. Recipes that compute structural properties (complexity, boundary checks, unused exports) are pure SQL on top of the index — exactly the niche we own.
+The **real** boundary lives in **§ 3 moat A** ("verdicts are an OUTPUT mode, never a primitive") + **§ 3 ergonomic "No fix engine"** row. § 2.3 doesn't restate that boundary — it names the static-analysis _category_ as in-scope; § 3 names the _shape_ it must take.
 
-**Verdict:** rewrite the non-goal as "no opinionated rule engine, no fix engine"; promote complexity / boundary / unused-exports to **first-class recipes** (items 1.3 / 1.5 / 1.2 above).
+**Verdict:** static analysis is in scope as **predicate-as-API recipes** (per moat A). Promote complexity / boundary / unused-exports to **first-class recipes** (items 1.3 / 1.5 / 1.2 above). The previously-stated "no opinionated rule engine + no fix engine" wording now lives canonically in § 3 (moat A + ergonomic row); cross-reference, don't restate.
 
 ### 2.4 ❓ "No persistent daemon"
 
 **Original framing:** "Persistent daemon process — SQLite supports concurrent readers and our one-shot CLI startup is sub-100ms; revisit only if MCP / HTTP measurements demand it."
 
-**What's actually true:** we **have** a daemon — `codemap watch`, `codemap mcp --watch`, `codemap serve --watch`. The non-goal preserves a constraint that no longer exists. The CLI cold-start argument still applies for one-shot `codemap query` invocations, but the long-running modes are explicitly daemon-shaped.
+**What's actually true:** we **have** a daemon — `codemap watch`, `codemap mcp --watch`, `codemap serve --watch`. The non-goal preserves a constraint that no longer exists. The CLI cold-start argument still applies for one-shot `codemap query` invocations (preserved as a § 3 ergonomic floor), but the long-running modes are explicitly daemon-shaped.
 
-**Capability unlocked:** caching parsed ASTs in memory between requests would drop incremental reindex from ms to µs. Worth measuring; the data path already exists (we just throw away the AST per request).
+**Moat relation:** orthogonal — daemon is a transport / process-model concern; neither moat A (predicate-as-API) nor moat B (extracted structure) is touched by flipping it. This is why § 2.4 stays a flip but doesn't gain new flip-shape arguments from the moat reframe.
 
-**Verdict:** rewrite as "**daemon stays opt-in**; one-shot CLI never requires it." The current `--watch` flag is the right shape; just stop saying we don't have one.
+**Capability unlocked:** caching parsed ASTs in memory between requests would drop incremental reindex from ms to µs. Worth measuring; the data path already exists (we just throw away the AST per request). Lives downstream of the § 6 Q1 daemon-default decision.
+
+**Verdict:** rewrite as "**daemon stays opt-in**; one-shot CLI never requires it." The current `--watch` flag is the right shape; just stop saying we don't have one. **Default-on for `mcp` / `serve`** is a config-UX question — see [§ 6 Q1](#6-open-questions).
 
 ### 2.5 ❓ "No LSP replacement"
 
 **Original framing:** "Replacing LSP or language servers — no rename / go-to-definition / hover types".
 
-**What's actually true:** we have `show <name>` (file:line + signature → "go to definition"), `impact <target>` (callers / callees → "find references"), `watch` (live index → "background analysis"). That's 80% of LSP read-side. We don't have hover types or rename, but we don't need to **be** an LSP — we can ship a **thin LSP shim** that proxies to existing engines (fallow has `crates/lsp/` we can study for the protocol shape).
+**What's actually true:** we have `show <name>` (file:line + signature → "go to definition"), `impact <target>` (callers / callees → "find references"), `watch` (live index → "background analysis") — LSP read-side capabilities **already in shipped engines** (`application/show-engine.ts`, `application/impact-engine.ts`, watch-mode chokidar). An LSP shim wraps them via stdio without re-extracting structure; fallow has `crates/lsp/` to study for the protocol shape.
 
-**Verdict:** rewrite as "no LSP **engine**; LSP **shim** consuming the existing index is in scope." Defer the shim until plugin layer (C.9) lands — entry-point awareness sharpens "find references" accuracy.
+**Moat relation:** transport-only. Shim wraps existing engines; doesn't move substrate (moat B) or pre-bake verdicts (moat A). The reason _not_ to ship an LSP **engine** is that an engine would re-extract structure inside the protocol layer — duplicating the substrate moat B already owns. The shim approach explicitly respects this.
+
+**Verdict:** no LSP **engine** (would duplicate moat B substrate); LSP **shim** consuming existing engines is in scope. Defer the shim until plugin layer (C.9) impl lands — entry-point awareness sharpens "find references" accuracy.
 
 ---
 
@@ -199,7 +211,7 @@ Fallow is a Cargo workspace ([upstream](https://github.com/fallow-rs/fallow); ~1
 
 ## 6. Open questions
 
-- **Daemon-by-default for MCP / HTTP** — even with one-shot CLI preserved, should `mcp` and `serve` default to `--watch` since both are inherently long-running? Reduces "is index stale?" friction agents already complain about.
+- **Daemon-by-default for MCP / HTTP** — even with one-shot CLI preserved, should `mcp` and `serve` default to `--watch` since both are inherently long-running? Reduces "is index stale?" friction agents already complain about. Downstream measurement once defaults stabilise: AST in-memory caching between requests (per § 2.4) — would drop incremental reindex ms → µs; data path already exists (AST currently thrown away per request).
 - **FTS5 opt-in vs default-on** — index size tax is real on big repos. First pass: opt-in via `codemap.config.ts` `fts5: true`. Revisit after measurements on the fallow / external corpus.
 - **LSP shim vs new-process LSP server** — shim wraps the existing engines via stdio (cheap, no new transport); standalone LSP server forks a daemon (matches LSP convention, more code). Probably shim first; standalone if VSCode extension demand emerges.
 - **Plugin contract scope (C.9)** — entry-point hints only (option (i) per fallow.md § 6) vs arbitrary `dependencies` edges (option (ii)). Bias toward (i) per the existing fallow.md note; revisit during plan PR.
