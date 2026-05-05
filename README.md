@@ -126,6 +126,7 @@ codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
 codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'
 codemap query --format diff 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern'
+codemap query --format diff-json 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern' | jq '.summary'
 # --with-fts — opt-in FTS5 virtual table populated at index time. Default OFF (preserves
 # .codemap/index.db size); CLI flag wins over codemap.config.ts `fts5` field. Toggle change
 # auto-detects and forces a full rebuild so `source_fts` stays consistent.

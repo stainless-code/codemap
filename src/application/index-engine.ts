@@ -47,7 +47,7 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
-import type { RecipeParamValue } from "./recipe-params";
+import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
   IndexRunStats,
@@ -583,7 +583,7 @@ export function printQueryResult(
     summary?: boolean;
     changedFiles?: Set<string> | undefined;
     recipeActions?: ReadonlyArray<unknown> | undefined;
-    bindValues?: RecipeParamValue[] | undefined;
+    bindValues?: QueryBindValue[] | undefined;
   },
 ): number {
   const json = opts?.json === true;
@@ -663,7 +663,7 @@ function enrichQueryError(message: string): string {
  */
 export function queryRows(
   sql: string,
-  bindValues?: RecipeParamValue[] | undefined,
+  bindValues?: QueryBindValue[] | undefined,
 ): unknown[] {
   const db = openDb();
   try {

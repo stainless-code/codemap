@@ -296,37 +296,32 @@ export function extractFrontmatterAndBody(md: string): {
 // (string). Returns undefined when no actions key is found. Other top-level
 // keys are tolerated (forward-compat for future recipe metadata).
 function parseActionsFromFrontmatter(fm: string): RecipeAction[] | undefined {
-  const lines = fm.split(/\r?\n/);
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i]!;
-    if (/^\s*$/.test(line)) {
-      i++;
-      continue;
-    }
-    const keyMatch = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/);
-    if (keyMatch !== null && keyMatch[1] === "actions") {
-      return parseActionList(lines, i + 1);
-    }
-    i++;
-  }
-  return undefined;
+  return scanFrontmatterBlock(fm, "actions", parseActionList);
 }
 
 function parseParamsFromFrontmatter(fm: string): RecipeParam[] | undefined {
+  return scanFrontmatterBlock(fm, "params", parseParamList);
+}
+
+/**
+ * Find the top-level YAML key `key` in `fm` and delegate the value-list
+ * parsing to `parseList`. Skips blank lines; ignores other top-level keys
+ * (forward-compat for future recipe metadata). Returns `undefined` when
+ * the key is absent.
+ */
+function scanFrontmatterBlock<T>(
+  fm: string,
+  key: string,
+  parseList: (lines: string[], startIdx: number) => T[],
+): T[] | undefined {
   const lines = fm.split(/\r?\n/);
-  let i = 0;
-  while (i < lines.length) {
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (/^\s*$/.test(line)) {
-      i++;
-      continue;
-    }
+    if (/^\s*$/.test(line)) continue;
     const keyMatch = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/);
-    if (keyMatch !== null && keyMatch[1] === "params") {
-      return parseParamList(lines, i + 1);
+    if (keyMatch !== null && keyMatch[1] === key) {
+      return parseList(lines, i + 1);
     }
-    i++;
   }
   return undefined;
 }

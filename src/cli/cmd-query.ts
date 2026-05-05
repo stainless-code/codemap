@@ -740,6 +740,12 @@ export async function runQueryCmd(opts: {
   const effectiveFormat: OutputFormat =
     opts.format ?? (opts.json === true ? "json" : "text");
   const isJson = effectiveFormat === "json";
+  // Every non-text format expects a structured `{"error":"..."}` envelope
+  // (formatter-side errors already emit one in `printFormattedQuery`).
+  // Without this, bootstrap / param / `--changed-since` failures would
+  // emit plain stderr for `--format diff-json` / `sarif` / etc., breaking
+  // pipelines that key off the JSON envelope.
+  const structuredErrors = effectiveFormat !== "text";
   try {
     await bootstrapCodemap(opts);
 
@@ -747,7 +753,7 @@ export async function runQueryCmd(opts: {
     if (opts.changedSince !== undefined) {
       const result = getFilesChangedSince(opts.changedSince, getProjectRoot());
       if (!result.ok) {
-        emitErrorMaybeJson(result.error, isJson);
+        emitErrorMaybeJson(result.error, structuredErrors);
         return;
       }
       changedFiles = result.files;
@@ -760,7 +766,7 @@ export async function runQueryCmd(opts: {
     const bindValues = resolveRecipeBindValues({
       recipeId: opts.recipeId,
       params: opts.recipeParams,
-      json: isJson,
+      json: structuredErrors,
     });
     if ("error" in bindValues) return;
 
@@ -830,7 +836,7 @@ export async function runQueryCmd(opts: {
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitErrorMaybeJson(msg, isJson);
+    emitErrorMaybeJson(msg, structuredErrors);
   }
 }
 

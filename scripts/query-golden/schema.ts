@@ -40,6 +40,21 @@ export const scenarioSchema = z
       return hasSql !== hasRecipe;
     },
     { message: "Scenario must have exactly one of sql or recipe" },
+  )
+  .refine(
+    (s) => {
+      // Raw-SQL scenarios cannot declare params; recipe-param validation
+      // (`resolveRecipeParams`) only runs on the recipe path. The runtime
+      // check in `query-golden.ts` enforces the same invariant; this
+      // schema-level refine fails at parse time with a clearer message.
+      const hasParams = s.params !== undefined;
+      const hasSql = typeof s.sql === "string" && s.sql.length > 0;
+      return !hasParams || !hasSql;
+    },
+    {
+      message:
+        "Scenario params are only allowed alongside `recipe`, not raw `sql`",
+    },
   );
 
 export type GoldenScenario = z.infer<typeof scenarioSchema>;

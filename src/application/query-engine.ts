@@ -8,7 +8,14 @@ import {
   makePackageBucketizer,
 } from "../group-by";
 import type { Bucketizer, GroupByMode } from "../group-by";
-import type { RecipeParamValue } from "./recipe-params";
+
+/**
+ * SQLite bind value — the union accepted by `db.query(sql).all(...values)`.
+ * Kept here at the DB boundary so `executeQuery` doesn't depend on any
+ * recipe-layer type. Recipe coercion lives in `application/recipe-params.ts`
+ * and produces values assignable to this union.
+ */
+export type QueryBindValue = string | number | bigint | boolean | null;
 
 /**
  * Pure, transport-agnostic query execution. Mirrors the layering of
@@ -35,7 +42,7 @@ export interface ExecuteQueryOpts {
   changedFiles?: Set<string> | undefined;
   groupBy?: GroupByMode | undefined;
   recipeActions?: ReadonlyArray<unknown> | undefined;
-  bindValues?: RecipeParamValue[] | undefined;
+  bindValues?: QueryBindValue[] | undefined;
   root: string;
 }
 
