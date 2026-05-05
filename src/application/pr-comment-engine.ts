@@ -1,16 +1,10 @@
 /**
- * Pure transport-agnostic engine for `codemap pr-comment`. Takes the
- * stdout of a `codemap audit --json` or `codemap query --format sarif`
- * invocation and renders a markdown summary suitable for posting via
- * `gh pr comment`. Designed for cases SARIF→Code-Scanning doesn't cover
- * well: private repos without GHAS, repos that haven't enabled Code
- * Scanning, aggregate audit deltas that lack a single `file:line`
- * anchor, trend / delta narratives, and bot-context seeding (review
- * bots read PR conversation, not workflow artifacts).
- *
- * Slice 3 of `docs/plans/github-marketplace-action.md`. v1.0 ships the
- * (b) summary-comment shape; (c) inline-review comments deferred per
- * Q4 resolution.
+ * Markdown PR-summary renderer for `codemap audit --json` or
+ * `codemap query --format sarif` output. Targets the surfaces SARIF →
+ * Code-Scanning doesn't cover (private repos without GHAS, aggregate
+ * audit deltas, bot-context seeding). v1.0 ships (b) summary-comment
+ * shape; (c) inline reviews deferred per Q4. Plan:
+ * `docs/plans/github-marketplace-action.md`.
  */
 
 interface SarifResult {
@@ -50,27 +44,14 @@ interface AuditEnvelope {
   deltas: Record<string, AuditDelta>;
 }
 
-/**
- * Rendered markdown payload + metadata. The markdown is the body to
- * post; `findings_count` is the ≥0 aggregate count for consumers that
- * want to skip the comment entirely when the PR is clean.
- */
+/** `findings_count` lets callers skip posting on clean PRs. */
 export interface RenderedComment {
   markdown: string;
   findings_count: number;
-  /**
-   * `kind` reflects the input shape — useful for downstream callers
-   * (e.g. action.yml step that picks a comment header based on shape).
-   */
   kind: "audit" | "sarif" | "empty";
 }
 
-/**
- * Detect input shape from a parsed JSON object. SARIF docs carry
- * `runs[].tool.driver`; audit envelopes carry `deltas`. Empty objects
- * (e.g. literal `{}`) treated as "empty" so consumers handle the
- * "nothing to comment" case explicitly.
- */
+/** SARIF → `runs[]`; audit → `deltas`; `{}` → `empty` for explicit no-data handling. */
 export function detectCommentInputShape(
   obj: unknown,
 ): "audit" | "sarif" | "empty" | "unknown" {
@@ -82,13 +63,7 @@ export function detectCommentInputShape(
   return "unknown";
 }
 
-/**
- * Render an audit envelope as a markdown comment. One section per delta
- * with non-zero `added.length`; collapsed-section per delta with rows
- * (GitHub auto-collapses `<details>` blocks). Removed rows surface in
- * the same delta section but in a sub-list — losing a dependency or
- * deprecation tag is also signal worth seeing.
- */
+/** Removed rows render in the same delta section — losing a dep / deprecation is signal too. */
 export function renderAuditComment(envelope: AuditEnvelope): RenderedComment {
   const lines: string[] = [];
   lines.push("## codemap audit");
@@ -111,7 +86,6 @@ export function renderAuditComment(envelope: AuditEnvelope): RenderedComment {
     };
   }
 
-  // Header summary line
   const summaryParts = deltaEntries
     .map(([key, delta]) => {
       const a = delta.added.length;
@@ -166,11 +140,7 @@ export function renderAuditComment(envelope: AuditEnvelope): RenderedComment {
   };
 }
 
-/**
- * Render a SARIF doc as a markdown comment. Groups results by ruleId so
- * agents see "5 deprecated-symbols, 12 untested-and-dead" not a flat
- * list. Per-result lines link to file:line where available.
- */
+/** Grouped by ruleId so consumers see "5 deprecated · 12 untested-and-dead", not a flat list. */
 export function renderSarifComment(doc: SarifDocument): RenderedComment {
   const lines: string[] = [];
   lines.push("## codemap findings");
@@ -186,7 +156,6 @@ export function renderSarifComment(doc: SarifDocument): RenderedComment {
     };
   }
 
-  // Group by ruleId.
   const byRule = new Map<string, SarifResult[]>();
   for (const r of results) {
     const list = byRule.get(r.ruleId) ?? [];
@@ -238,7 +207,6 @@ function describeBase(base: AuditDelta["base"]): string {
 }
 
 function formatRowLine(row: Record<string, unknown>): string {
-  // Prefer the most-specific identity columns first.
   const path =
     (row["file_path"] as string | undefined) ??
     (row["path"] as string | undefined) ??
@@ -262,7 +230,6 @@ function formatRowLine(row: Record<string, unknown>): string {
     }
     return `\`${loc}\``;
   }
-  // Unknown shape — fall through to JSON.
   return `\`${JSON.stringify(row)}\``;
 }
 

@@ -203,7 +203,6 @@ runs:
       run: |
         set +e
 
-        # Build args based on inputs (or use raw command).
         if [ -n "$COMMAND" ]; then
           ARGS="$COMMAND"
         elif [ "$MODE" = "audit" ]; then

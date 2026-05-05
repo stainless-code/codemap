@@ -95,6 +95,10 @@ Codemap-managed `.gitignore` inside `<state-dir>/` (blacklist of generated artif
 
 CLI subcommand emitting a JSON envelope (`ContextEnvelope`) with project metadata, top hubs, sample markers, recipe catalog, and optional intent classification via `--for "<intent>"`.
 
+### `--ci` (CLI flag)
+
+CI-aggregate flag on `codemap query` and `codemap audit`. Aliases `--format sarif` + `process.exitCode = 1` on findings/additions + suppresses the no-locatable-rows stderr warning (CI templates would surface it as red noise; the row-set is the gating signal). Mutually exclusive with `--json` (different format aliases) and with `--format <other>` (contradicts the alias); `--ci --format sarif` redundant but accepted. Designed for the GitHub Marketplace Action's headline default (`audit --base ${{ github.base_ref }} --ci`); independently useful for any non-Action CI consumer.
+
 ### `codemap validate`
 
 CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses: `stale | missing | unindexed`. Exits `1` on any drift.
@@ -357,6 +361,10 @@ Code that turns source bytes into structured rows. Three implementations: `parse
 ### plan
 
 A `docs/plans/<feature-name>.md` file tracking in-flight work. Created on commit; deleted when the feature ships per [README § Rule 3](./README.md#rules-for-agents).
+
+### `pr-comment` (CLI verb)
+
+Markdown PR-summary renderer. `codemap pr-comment <input>` (or `-` for stdin) reads a `codemap audit --json` envelope or a `codemap query --format sarif` doc and emits a markdown comment suitable for `gh pr comment <PR> -F -`. Auto-detects shape via `runs[]` (SARIF) vs `deltas` (audit); `--shape audit|sarif` overrides. Audit-mode groups by delta with collapsed `<details>` for added + removed rows; SARIF-mode groups by `ruleId`. Lists >50 entries collapse to `… and N more`. `--json` envelope `{markdown, findings_count, kind}` is the structured form action.yml consumers read. Targets the surfaces SARIF → Code Scanning doesn't cover (private repos without GHAS, aggregate audit deltas without `file:line` anchors, bot-context seeding). v1.0 ships the (b) summary-comment shape; (c) inline-review comments deferred per Q4 of [`plans/github-marketplace-action.md`](./plans/github-marketplace-action.md). Engine: `application/pr-comment-engine.ts` (pure transport-agnostic).
 
 ### pointer file
 

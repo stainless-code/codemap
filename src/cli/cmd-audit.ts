@@ -13,13 +13,7 @@ import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
-/**
- * Output formats supported by `codemap audit`. `text` is the default human
- * terminal renderer; `json` matches the legacy `--json` flag's envelope;
- * `sarif` emits a SARIF 2.1.0 doc per {@link formatAuditSarif} for GitHub
- * Code Scanning + any SARIF-aware viewer. `--json` and `--format json` are
- * equivalent; mixing `--json` with `--format <other>` is a parse error.
- */
+/** `--json` is the back-compat shortcut for `--format json`; mixing with `--format <other>` is a parse error. */
 export const AUDIT_OUTPUT_FORMATS = ["text", "json", "sarif"] as const;
 export type AuditOutputFormat = (typeof AUDIT_OUTPUT_FORMATS)[number];
 
@@ -44,7 +38,7 @@ export function parseAuditRest(rest: string[]):
       base: string | undefined;
       perDelta: Record<string, string>;
       format: AuditOutputFormat;
-      /** `--ci` was set: SARIF + non-zero exit when any delta has additions. */
+      /** `--ci`: SARIF + non-zero exit on additions. */
       ci: boolean;
       summary: boolean;
       noIndex: boolean;
@@ -54,12 +48,10 @@ export function parseAuditRest(rest: string[]):
   }
 
   let i = 1;
-  // `--json` and `--format json` are equivalent; track whether the user passed
-  // `--json` so we can reject `--json --format sarif` as a contradiction.
+  // Tracked separately so `--json --format sarif` can be rejected.
   let jsonShortcut = false;
   let format: AuditOutputFormat | undefined;
-  // `--ci` is the CI-aggregate flag: aliases `--format sarif` + non-zero
-  // exit-on-issue + suppresses chatty stderr. Plan: docs/plans/github-marketplace-action.md (Slice 1b).
+  // Aliases `--format sarif` + non-zero exit + quiet. Plan: docs/plans/github-marketplace-action.md.
   let ci = false;
   let summary = false;
   let noIndex = false;
@@ -163,9 +155,7 @@ export function parseAuditRest(rest: string[]):
     };
   }
 
-  // Reconcile --json / --ci / --format. `--ci` aliases `--format sarif`; mutually
-  // exclusive with --json (different format aliases) and with --format <other>
-  // (contradicts the alias). `--ci --format sarif` is redundant but accepted.
+  // Precedence: --ci → sarif (rejects --json + --format <non-sarif>); else --json → json.
   let resolvedFormat: AuditOutputFormat;
   if (ci) {
     if (jsonShortcut) {
@@ -343,7 +333,7 @@ export async function runAuditCmd(opts: {
   base: string | undefined;
   perDelta: Record<string, string>;
   format: AuditOutputFormat;
-  /** `--ci`: exit non-zero when any delta has `added.length > 0`. */
+  /** `--ci`: exit non-zero on additions. */
   ci?: boolean;
   summary: boolean;
   noIndex: boolean;
@@ -385,9 +375,7 @@ export async function runAuditCmd(opts: {
       }
       renderAudit(result, { format: opts.format, summary: opts.summary });
 
-      // `--ci`: exit non-zero when any delta has additions. SARIF results
-      // already surfaced via Code Scanning; non-zero exit fails the runner
-      // step so the workflow gates the PR.
+      // `--ci` gates the runner step on additions (non-zero exit).
       if (opts.ci === true) {
         const hasAdditions = Object.values(result.deltas).some(
           (d) => d.added.length > 0,
@@ -405,9 +393,7 @@ export async function runAuditCmd(opts: {
   }
 }
 
-// Errors are JSON-shaped for any structured format (`json` / `sarif`) so
-// programmatic consumers always parse the same envelope; text-mode errors
-// stay on stderr for terminal users.
+// Structured formats (json / sarif) emit `{"error": "..."}` on stdout for parseability.
 function emitAuditError(message: string, format: AuditOutputFormat) {
   if (format === "text") {
     console.error(message);
@@ -422,9 +408,7 @@ function renderAudit(
   opts: { format: AuditOutputFormat; summary: boolean },
 ): void {
   if (opts.format === "sarif") {
-    // SARIF flattens added rows across deltas. `--summary` is a no-op here:
-    // SARIF results are individual rows, not counts. Document this in
-    // --help; surface a stderr warning if both are set.
+    // SARIF results are per-row; `--summary` is meaningless here.
     if (opts.summary) {
       console.error(
         "codemap audit: --summary has no effect with --format sarif (SARIF emits one result per added row, not counts).",

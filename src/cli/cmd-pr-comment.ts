@@ -13,19 +13,12 @@ interface PrCommentOpts {
   stateDir?: string | undefined;
   /** Path to a JSON file. `-` reads stdin. */
   inputPath: string;
-  /**
-   * Override automatic shape detection. By default we sniff `runs[]`
-   * vs `deltas` in the parsed payload; explicit override is for
-   * downstream callers that already know the shape.
-   */
+  /** `undefined` triggers `runs[]` vs `deltas` sniffing. */
   shape: "audit" | "sarif" | undefined;
-  /** Emit JSON envelope instead of bare markdown. Useful for action.yml. */
+  /** Emit `{ markdown, findings_count, kind }` envelope; default = bare markdown. */
   json: boolean;
 }
 
-/**
- * Print `codemap pr-comment` usage.
- */
 export function printPrCommentCmdHelp(): void {
   console.log(`Usage: codemap pr-comment <input-file> [--shape audit|sarif] [--json]
 
@@ -131,10 +124,6 @@ export function parsePrCommentRest(rest: string[]): ParsedPrCommentRest {
   return { kind: "run", inputPath, shape, json };
 }
 
-/**
- * Initialize Codemap (so error envelopes route through the same
- * `bootstrapCodemap` machinery), read the input file, render markdown.
- */
 export async function runPrCommentCmd(opts: PrCommentOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
@@ -173,7 +162,6 @@ export async function runPrCommentCmd(opts: PrCommentOpts): Promise<void> {
       return;
     }
 
-    // detected here is "audit" | "sarif"
     const rendered =
       detected === "audit"
         ? renderAuditComment(parsed as Parameters<typeof renderAuditComment>[0])
@@ -203,10 +191,7 @@ function emitPrCommentError(message: string, json: boolean) {
   process.exitCode = 1;
 }
 
-/**
- * Synchronous stdin reader. Bun + Node both support `node:fs` reading
- * from fd 0, but it can return EAGAIN on a TTY. We loop until EOF.
- */
+/** Bun + Node fd-0 reads can EAGAIN on a TTY; loop until EOF. */
 function readStdinSync(): string {
   const chunks: Buffer[] = [];
   const buffer = Buffer.alloc(4096);

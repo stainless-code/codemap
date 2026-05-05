@@ -167,27 +167,18 @@ export function formatSarif(opts: FormatOpts): string {
   return JSON.stringify(sarif, null, 2);
 }
 
-/**
- * One delta's added rows + the delta key (`files` / `dependencies` /
- * `deprecated` in v1; arbitrary string for forward-compat). Removed rows
- * are intentionally excluded — SARIF is for findings to act on, not
- * cleanups.
- */
+/** Removed rows intentionally excluded — SARIF surfaces findings to act on, not cleanups. */
 export interface AuditSarifDelta {
   key: string;
   added: Record<string, unknown>[];
 }
 
 /**
- * Format an audit envelope as a SARIF 2.1.0 document. One rule per delta
- * key (id `codemap.audit.<key>-added`); one result per `added` row across
- * all deltas. Severity = `warning` (audit deltas are more actionable than
- * a single recipe finding — a new dependency edge or `@deprecated` symbol
- * landing in a PR is a structural change worth flagging). Locations
- * auto-detected via {@link detectLocationColumn} from the existing
- * priority list (`file_path` / `path` / `to_path` / `from_path`); aggregate
- * rows without a location column emit a result with no `locations` field
- * (SARIF spec allows this).
+ * One rule per delta key (id `codemap.audit.<key>-added`); one result per
+ * `added` row. Severity = `warning` (more actionable than per-recipe `note`
+ * — a new dependency edge in a PR is a structural change). Locations
+ * auto-detected via {@link detectLocationColumn}; aggregate rows without
+ * a location field omit `locations` per SARIF spec.
  */
 export function formatAuditSarif(deltas: AuditSarifDelta[]): string {
   const rules = deltas.map((d) => ({
@@ -201,10 +192,8 @@ export function formatAuditSarif(deltas: AuditSarifDelta[]): string {
     d.added.map((row) => {
       const ruleId = `codemap.audit.${d.key}-added`;
       const locCol = detectLocationColumn(row);
-      // For audit deltas, location-only rows (e.g. files: `{path: "..."}`)
-      // produce "(no message)" via the generic builder because every column
-      // sits in the location-skip set. Fall back to a message that names the
-      // delta + URI so SARIF consumers see something actionable.
+      // Files-added rows have only `path` (in the skip-set), so
+      // buildMessageText returns "(no message)". Fall back to "new <key>: <uri>".
       const builtText = buildMessageText(row);
       const messageText =
         builtText === "(no message)" && locCol !== null

@@ -87,7 +87,7 @@ export function parseQueryRest(rest: string[]):
       sql: string;
       json: boolean;
       format: OutputFormat;
-      /** `--ci` flag — aliases `--format sarif` + non-zero exit on findings + suppresses no-findings stderr warning. */
+      /** `--ci` aliases `--format sarif` + non-zero exit + quiet. */
       ci: boolean;
       summary: boolean;
       changedSince: string | undefined;
@@ -115,9 +115,7 @@ export function parseQueryRest(rest: string[]):
   let i = 1;
   let json = false;
   let format: OutputFormat | undefined;
-  // `--ci` is the CI-aggregate flag: aliases `--format sarif` + non-zero
-  // exit-on-issue + suppresses the no-findings stderr warning. Mirrored in
-  // `cmd-audit.ts`. Plan: docs/plans/github-marketplace-action.md (Slice 1b).
+  // Aliases `--format sarif` + non-zero exit + quiet (mirrors `cmd-audit.ts`).
   let ci = false;
   let summary = false;
   let changedSince: string | undefined;
@@ -544,13 +542,8 @@ export function parseQueryRest(rest: string[]):
 }
 
 /**
- * Resolve the effective format. Per plan § D9, `--format` overrides `--json`;
- * `--json` alone implies `--format json`; absence of both → `text`.
- *
- * `--ci` is the CI-aggregate flag — aliases `--format sarif`. Mutually
- * exclusive with explicit `--format <other>` (rejected as a contradiction);
- * `--ci --json` likewise rejected. `--ci` + `--format sarif` is redundant
- * but accepted (consumers may set both for clarity in CI templates).
+ * Per plan § D9: `--format` > `--json` > default `text`.
+ * `--ci` aliases `--format sarif`; rejects `--json` and `--format <non-sarif>`.
  */
 function resolveFormat(
   explicit: OutputFormat | undefined,
@@ -762,12 +755,7 @@ export async function runQueryCmd(opts: {
    * caller must reject those combos at parse time.
    */
   format?: OutputFormat;
-  /**
-   * `--ci` flag — flips exit code to 1 when the query produces ≥1 row(s)
-   * and suppresses the stderr no-locatable-rows warning. Format must be
-   * `"sarif"` (parser enforces this — `--ci` aliases `--format sarif`);
-   * passing `ci: true` with another format is undefined behavior.
-   */
+  /** `--ci`: exit 1 on ≥1 row + suppress no-locatable-rows warning. Parser enforces format=sarif. */
   ci?: boolean;
   summary?: boolean;
   changedSince?: string | undefined;
@@ -985,12 +973,7 @@ function printFormattedQuery(
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
     bindValues: RecipeParamValue[] | undefined;
-    /**
-     * `--ci` was set on the parser. When true: (a) suppress the
-     * no-locatable-rows stderr warning (CI templates would surface it
-     * as red noise), (b) return exit code 1 when rows.length > 0 so the
-     * runner step fails on findings.
-     */
+    /** `--ci`: suppress no-locatable-rows warning + return 1 on `rows.length > 0`. */
     ci?: boolean;
   },
 ): number {
@@ -1008,10 +991,8 @@ function printFormattedQuery(
       >[];
     }
 
-    // SARIF / annotations require a location column; mermaid requires
-    // the from/to graph contract (checked inside formatMermaid). `--ci`
-    // suppresses this warning — the row-set is the gating signal under
-    // CI; the warning is consumer-facing dev guidance.
+    // SARIF / annotations need locations; mermaid validates inside formatMermaid.
+    // `--ci` suppresses this warning — the row-set is the gating signal under CI.
     if (
       opts.format !== "mermaid" &&
       rows.length > 0 &&
@@ -1036,8 +1017,7 @@ function printFormattedQuery(
         recipeBody: catalog?.body,
       });
       console.log(out);
-      // `--ci`: exit non-zero when the recipe produced ≥1 finding so the
-      // CI runner step fails. Without `--ci`, SARIF emit is informational.
+      // `--ci` gates the runner step on findings (non-zero exit).
       return opts.ci === true && rows.length > 0 ? 1 : 0;
     }
 

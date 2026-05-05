@@ -1,24 +1,14 @@
 #!/usr/bin/env node
 /**
- * Action pre-step: detect the host project's package manager + resolve the
- * codemap CLI invocation. Wraps `package-manager-detector` (antfu/userquin,
- * MIT, 0 transitive deps). Outputs are written to `$GITHUB_OUTPUT` per
- * GitHub Actions' current convention (`::set-output` was deprecated 2022-10).
+ * Action pre-step. Resolves package manager + codemap CLI invocation;
+ * writes to `$GITHUB_OUTPUT` (`::set-output` deprecated 2022-10).
  *
- * Inputs (env, all optional):
- *   PACKAGE_MANAGER       Override autodetect with explicit `npm|pnpm|yarn|bun`.
- *   VERSION               Pin codemap CLI version (e.g. `1.2.3`).
- *                         Empty → use project-installed binary if present,
- *                         else fall back to `<pm> dlx codemap@latest`.
- *   WORKING_DIRECTORY     Where to start the lockfile + package.json walk.
- *                         Defaults to process.cwd() (the runner's repo root).
+ * Env contract:
+ *   PACKAGE_MANAGER     Override autodetect (npm|pnpm|yarn|yarn@berry|bun).
+ *   VERSION             Pin codemap CLI version; empty → project-installed → dlx-latest.
+ *   WORKING_DIRECTORY   Lockfile + package.json walk root (default cwd).
  *
- * Outputs (written to $GITHUB_OUTPUT):
- *   agent                 Resolved package manager (`npm` / `pnpm` / `yarn` / `bun`).
- *   exec                  Shell-ready command to run codemap (e.g.
- *                         `pnpm exec codemap` or `pnpm dlx codemap@1.2.3`).
- *   install_method        `project-installed` | `dlx-pinned` | `dlx-latest`
- *                         (debug breadcrumb; surfaces in Action logs).
+ * Outputs: `agent` / `exec` (shell-ready) / `install_method` (debug breadcrumb).
  *
  * Q2 + Q3 of docs/plans/github-marketplace-action.md.
  */
@@ -38,7 +28,6 @@ async function main() {
   const workingDir =
     (process.env["WORKING_DIRECTORY"] ?? "").trim() || process.cwd();
 
-  // Step 1: resolve the agent.
   let agent;
   if (explicitAgent !== "") {
     if (!VALID_AGENTS.has(explicitAgent)) {
@@ -52,7 +41,7 @@ async function main() {
     agent = detected?.agent ?? "npm";
   }
 
-  // Step 2: resolve the CLI invocation per Q3's three-branch logic.
+  // Per Q3's three-branch resolution (docs/plans/github-marketplace-action.md).
   let intent;
   let commandArgs;
   let installMethod;
@@ -79,10 +68,9 @@ async function main() {
   const { command, args } = resolved;
   const exec = [command, ...args].join(" ");
 
-  // Step 3: write to $GITHUB_OUTPUT.
   const outputFile = process.env["GITHUB_OUTPUT"];
   if (outputFile === undefined || outputFile === "") {
-    // Local / non-Actions invocation — print to stdout for inspection.
+    // Local / non-Actions invocation: dump to stdout.
     console.log(`agent=${agent}`);
     console.log(`exec=${exec}`);
     console.log(`install_method=${installMethod}`);
@@ -94,10 +82,7 @@ async function main() {
   );
 }
 
-/**
- * Read `<workingDir>/package.json` and check whether `codemap` is a
- * direct dependency. Returns `false` on read errors / missing manifest.
- */
+/** False on read errors / missing manifest. */
 function codemapInDevDependencies(workingDir) {
   try {
     const manifestPath = join(workingDir, "package.json");
