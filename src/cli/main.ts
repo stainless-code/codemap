@@ -275,6 +275,7 @@ Copies bundled agent templates into .agents/ under the project root.
       base: parsed.base,
       perDelta: parsed.perDelta,
       format: parsed.format,
+      ci: parsed.ci,
       summary: parsed.summary,
       noIndex: parsed.noIndex,
     });
@@ -361,6 +362,7 @@ Copies bundled agent templates into .agents/ under the project root.
       sql: parsed.sql,
       json: parsed.json,
       format: parsed.format,
+      ci: parsed.ci,
       summary: parsed.summary,
       changedSince: parsed.changedSince,
       recipeId: parsed.recipeId,

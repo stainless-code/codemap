@@ -44,6 +44,8 @@ export function parseAuditRest(rest: string[]):
       base: string | undefined;
       perDelta: Record<string, string>;
       format: AuditOutputFormat;
+      /** `--ci` was set: SARIF + non-zero exit when any delta has additions. */
+      ci: boolean;
       summary: boolean;
       noIndex: boolean;
     } {
@@ -56,6 +58,9 @@ export function parseAuditRest(rest: string[]):
   // `--json` so we can reject `--json --format sarif` as a contradiction.
   let jsonShortcut = false;
   let format: AuditOutputFormat | undefined;
+  // `--ci` is the CI-aggregate flag: aliases `--format sarif` + non-zero
+  // exit-on-issue + suppresses chatty stderr. Plan: docs/plans/github-marketplace-action.md (Slice 1b).
+  let ci = false;
   let summary = false;
   let noIndex = false;
   let baselinePrefix: string | undefined;
@@ -67,6 +72,11 @@ export function parseAuditRest(rest: string[]):
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--json") {
       jsonShortcut = true;
+      i++;
+      continue;
+    }
+    if (a === "--ci") {
+      ci = true;
       i++;
       continue;
     }
@@ -153,10 +163,26 @@ export function parseAuditRest(rest: string[]):
     };
   }
 
-  // Reconcile --json shortcut with --format. Both → must agree on `json`.
-  // Neither → default to `text`.
+  // Reconcile --json / --ci / --format. `--ci` aliases `--format sarif`; mutually
+  // exclusive with --json (different format aliases) and with --format <other>
+  // (contradicts the alias). `--ci --format sarif` is redundant but accepted.
   let resolvedFormat: AuditOutputFormat;
-  if (jsonShortcut && format !== undefined) {
+  if (ci) {
+    if (jsonShortcut) {
+      return {
+        kind: "error",
+        message:
+          'codemap audit: "--ci" and "--json" are mutually exclusive (--ci aliases --format sarif; --json aliases --format json).',
+      };
+    }
+    if (format !== undefined && format !== "sarif") {
+      return {
+        kind: "error",
+        message: `codemap audit: "--ci" aliases "--format sarif"; cannot combine with --format ${format}.`,
+      };
+    }
+    resolvedFormat = "sarif";
+  } else if (jsonShortcut && format !== undefined) {
     if (format !== "json") {
       return {
         kind: "error",
@@ -176,6 +202,7 @@ export function parseAuditRest(rest: string[]):
     base,
     perDelta,
     format: resolvedFormat,
+    ci,
     summary,
     noIndex,
   };
@@ -262,6 +289,10 @@ Other flags:
                       one result per added row) for GitHub Code Scanning.
   --json              Shortcut for --format json. Cannot combine with --format
                       <other>. Emits {head, deltas} envelope; on error: {"error":"<message>"}.
+  --ci                CI-aggregate flag. Aliases --format sarif + non-zero exit
+                      when any delta has additions. Mutually exclusive with --json
+                      and --format <other>. Recommended in GitHub Actions / GitLab
+                      CI to fail the runner step on structural drift.
   --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N}.
                       With --format text: a single line "drift: files +1/-0, dependencies +3/-2, ...".
                       No-op with --format sarif (results are per-row).
@@ -312,6 +343,8 @@ export async function runAuditCmd(opts: {
   base: string | undefined;
   perDelta: Record<string, string>;
   format: AuditOutputFormat;
+  /** `--ci`: exit non-zero when any delta has `added.length > 0`. */
+  ci?: boolean;
   summary: boolean;
   noIndex: boolean;
 }): Promise<void> {
@@ -351,6 +384,16 @@ export async function runAuditCmd(opts: {
         return;
       }
       renderAudit(result, { format: opts.format, summary: opts.summary });
+
+      // `--ci`: exit non-zero when any delta has additions. SARIF results
+      // already surfaced via Code Scanning; non-zero exit fails the runner
+      // step so the workflow gates the PR.
+      if (opts.ci === true) {
+        const hasAdditions = Object.values(result.deltas).some(
+          (d) => d.added.length > 0,
+        );
+        if (hasAdditions) process.exitCode = 1;
+      }
     } finally {
       closeDb(db, { readonly: opts.noIndex });
     }

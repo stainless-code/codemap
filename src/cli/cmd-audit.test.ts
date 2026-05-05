@@ -45,6 +45,7 @@ describe("parseAuditRest", () => {
       base: undefined,
       perDelta: {},
       format: "text",
+      ci: false,
       summary: false,
       noIndex: false,
     });
@@ -58,6 +59,7 @@ describe("parseAuditRest", () => {
       base: undefined,
       perDelta: {},
       format: "text",
+      ci: false,
       summary: false,
       noIndex: false,
     });
@@ -79,6 +81,7 @@ describe("parseAuditRest", () => {
       base: undefined,
       perDelta: { files: "X", dependencies: "Y", deprecated: "Z" },
       format: "text",
+      ci: false,
       summary: false,
       noIndex: false,
     });
@@ -98,6 +101,7 @@ describe("parseAuditRest", () => {
       base: undefined,
       perDelta: { dependencies: "experimental-deps" },
       format: "text",
+      ci: false,
       summary: false,
       noIndex: false,
     });
@@ -175,6 +179,46 @@ describe("parseAuditRest", () => {
     expect(r.format).toBe("json");
   });
 
+  it("parses --ci as alias for --format sarif + ci flag", () => {
+    const r = parseAuditRest(["audit", "--ci", "--baseline", "base"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+    expect(r.ci).toBe(true);
+  });
+
+  it("rejects --ci + --json (mutually exclusive aliases)", () => {
+    const r = parseAuditRest(["audit", "--ci", "--json", "--baseline", "base"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--ci");
+  });
+
+  it("rejects --ci + --format json (contradicting alias)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--ci",
+      "--format",
+      "json",
+      "--baseline",
+      "base",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--ci");
+  });
+
+  it("accepts --ci + --format sarif (redundant but consistent)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--ci",
+      "--format",
+      "sarif",
+      "--baseline",
+      "base",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+    expect(r.ci).toBe(true);
+  });
+
   it("errors when --baseline has no value", () => {
     const r = parseAuditRest(["audit", "--baseline"]);
     expect(r.kind).toBe("error");
@@ -219,6 +263,7 @@ describe("parseAuditRest", () => {
       base: "origin/main",
       perDelta: {},
       format: "text",
+      ci: false,
       summary: false,
       noIndex: false,
     });
