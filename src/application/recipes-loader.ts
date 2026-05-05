@@ -16,6 +16,16 @@ export interface RecipeAction {
   description?: string;
 }
 
+export type RecipeParamType = "string" | "number" | "boolean";
+
+export interface RecipeParam {
+  name: string;
+  type: RecipeParamType;
+  required?: boolean;
+  default?: string | number | boolean;
+  description?: string;
+}
+
 /**
  * One loaded recipe — the canonical shape the loader returns. Bundled and
  * project recipes share this shape; `source` discriminates them. `shadows`
@@ -29,6 +39,7 @@ export interface LoadedRecipe {
   description: string | undefined;
   body: string | undefined;
   actions: RecipeAction[] | undefined;
+  params: RecipeParam[] | undefined;
   source: "bundled" | "project";
   shadows: boolean;
 }
@@ -123,10 +134,10 @@ export function readRecipesFromDir(
 
     const mdPath = join(dir, `${id}.md`);
     const md = existsSync(mdPath) ? readFileSync(mdPath, "utf8") : undefined;
-    const { actions, body } =
+    const { actions, params, body } =
       md !== undefined
         ? extractFrontmatterAndBody(md)
-        : { actions: undefined, body: undefined };
+        : { actions: undefined, params: undefined, body: undefined };
     const description =
       body !== undefined ? firstNonEmptyLine(body) : undefined;
 
@@ -136,6 +147,7 @@ export function readRecipesFromDir(
       description,
       body,
       actions,
+      params,
       source,
       shadows: false,
     });
@@ -245,23 +257,25 @@ function firstNonEmptyLine(text: string): string | undefined {
  */
 export function extractFrontmatterAndBody(md: string): {
   actions: RecipeAction[] | undefined;
+  params: RecipeParam[] | undefined;
   body: string;
 } {
   // Frontmatter must start at byte 0 with three dashes + newline (LF or
   // CRLF); anything else is treated as plain Markdown.
   const startMatch = md.match(/^---\r?\n/);
   if (startMatch === null) {
-    return { actions: undefined, body: md };
+    return { actions: undefined, params: undefined, body: md };
   }
   const afterStart = md.slice(startMatch[0].length);
   const endMatch = afterStart.match(/\n---\r?\n/);
   if (endMatch === null) {
-    return { actions: undefined, body: md };
+    return { actions: undefined, params: undefined, body: md };
   }
   const fmText = afterStart.slice(0, endMatch.index);
   const body = afterStart.slice(endMatch.index! + endMatch[0].length);
   const actions = parseActionsFromFrontmatter(fmText);
-  return { actions, body };
+  const params = parseParamsFromFrontmatter(fmText);
+  return { actions, params, body };
 }
 
 // Parses the actions block from the frontmatter text. Strict shape — one
@@ -281,6 +295,24 @@ function parseActionsFromFrontmatter(fm: string): RecipeAction[] | undefined {
     const keyMatch = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/);
     if (keyMatch !== null && keyMatch[1] === "actions") {
       return parseActionList(lines, i + 1);
+    }
+    i++;
+  }
+  return undefined;
+}
+
+function parseParamsFromFrontmatter(fm: string): RecipeParam[] | undefined {
+  const lines = fm.split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (/^\s*$/.test(line)) {
+      i++;
+      continue;
+    }
+    const keyMatch = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*$/);
+    if (keyMatch !== null && keyMatch[1] === "params") {
+      return parseParamList(lines, i + 1);
     }
     i++;
   }
@@ -329,7 +361,53 @@ function parseActionList(lines: string[], startIdx: number): RecipeAction[] {
   return out.filter((a) => a.type.length > 0);
 }
 
-function parseScalar(raw: string): string | boolean {
+function parseParamList(lines: string[], startIdx: number): RecipeParam[] {
+  const out: RecipeParam[] = [];
+  let i = startIdx;
+  let current: Partial<RecipeParam> | undefined;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (/^[A-Za-z_]/.test(line)) break;
+
+    const itemMatch = line.match(/^\s*-\s+(\w+)\s*:\s*(.*)$/);
+    if (itemMatch !== null) {
+      if (current !== undefined) pushParam(out, current);
+      const [, key, raw] = itemMatch;
+      current = applyParamKey({}, key!, parseScalar(raw!));
+      i++;
+      continue;
+    }
+
+    const contMatch = line.match(/^\s+(\w+)\s*:\s*(.*)$/);
+    if (contMatch !== null && current !== undefined) {
+      const [, key, raw] = contMatch;
+      current = applyParamKey(current, key!, parseScalar(raw!));
+      i++;
+      continue;
+    }
+
+    break;
+  }
+
+  if (current !== undefined) pushParam(out, current);
+  return out.length === 0 ? [] : out;
+}
+
+function pushParam(out: RecipeParam[], param: Partial<RecipeParam>): void {
+  if (param.name === undefined || param.type === undefined) return;
+  out.push({
+    name: param.name,
+    type: param.type,
+    ...(param.required !== undefined ? { required: param.required } : {}),
+    ...(param.default !== undefined ? { default: param.default } : {}),
+    ...(param.description !== undefined
+      ? { description: param.description }
+      : {}),
+  });
+}
+
+function parseScalar(raw: string): string | boolean | number {
   const trimmed = raw.trim();
   if (trimmed === "true") return true;
   if (trimmed === "false") return false;
@@ -340,13 +418,14 @@ function parseScalar(raw: string): string | boolean {
   ) {
     return trimmed.slice(1, -1);
   }
+  if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) return Number(trimmed);
   return trimmed;
 }
 
 function applyKey(
   action: RecipeAction,
   key: string,
-  value: string | boolean,
+  value: string | boolean | number,
 ): RecipeAction {
   const next = { ...action };
   if (key === "type" && typeof value === "string") next.type = value;
@@ -355,5 +434,25 @@ function applyKey(
   else if (key === "description" && typeof value === "string")
     next.description = value;
   // Unknown keys silently ignored (forward-compat).
+  return next;
+}
+
+function applyParamKey(
+  param: Partial<RecipeParam>,
+  key: string,
+  value: string | boolean | number,
+): Partial<RecipeParam> {
+  const next = { ...param };
+  if (key === "name" && typeof value === "string") next.name = value;
+  else if (
+    key === "type" &&
+    (value === "string" || value === "number" || value === "boolean")
+  )
+    next.type = value;
+  else if (key === "required" && typeof value === "boolean")
+    next.required = value;
+  else if (key === "default") next.default = value;
+  else if (key === "description" && typeof value === "string")
+    next.description = value;
   return next;
 }

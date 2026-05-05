@@ -27,6 +27,9 @@ export const scenarioSchema = z
     prompt: z.string().optional(),
     sql: z.string().optional(),
     recipe: z.string().optional(),
+    params: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional(),
     match: matchSchema.optional(),
     budgetMs: z.number().positive().optional(),
   })

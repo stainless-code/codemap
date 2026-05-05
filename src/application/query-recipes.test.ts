@@ -149,3 +149,24 @@ describe("getQueryRecipeCatalogEntry (single-id lookup)", () => {
     expect(getQueryRecipeCatalogEntry("no-such-recipe")).toBeUndefined();
   });
 });
+
+describe("query-recipes shim — params metadata", () => {
+  it("bundled parametrised recipe carries params in the catalog", () => {
+    const entry = getQueryRecipeCatalogEntry("find-symbol-by-kind");
+    expect(entry?.params).toEqual([
+      {
+        name: "kind",
+        type: "string",
+        required: true,
+        description:
+          "Symbol kind to match (function, const, class, interface, ...)",
+      },
+      {
+        name: "name_pattern",
+        type: "string",
+        required: true,
+        description: "SQL LIKE pattern for the symbol name",
+      },
+    ]);
+  });
+});

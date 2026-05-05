@@ -14,6 +14,12 @@
       "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'usePermissions'"
     },
     {
+      "id": "find-symbol-by-kind",
+      "prompt": "Parametrised recipe: functions matching usePermissions.",
+      "recipe": "find-symbol-by-kind",
+      "params": { "kind": "function", "name_pattern": "%usePermissions%" }
+    },
+    {
       "id": "index-summary",
       "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
       "recipe": "index-summary"

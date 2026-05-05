@@ -122,6 +122,7 @@ describe("mergeRecipes", () => {
       description: undefined,
       body: undefined,
       actions: undefined,
+      params: undefined,
       source,
       shadows: false,
     };
@@ -328,6 +329,7 @@ describe("extractFrontmatterAndBody — YAML actions parser", () => {
     const md = "Just some plain markdown.\n";
     const r = extractFrontmatterAndBody(md);
     expect(r.actions).toBeUndefined();
+    expect(r.params).toBeUndefined();
     expect(r.body).toBe(md);
   });
 
@@ -401,6 +403,7 @@ body
 `;
     const r = extractFrontmatterAndBody(md);
     expect(r.actions).toBeUndefined();
+    expect(r.params).toBeUndefined();
     expect(r.body.startsWith("body")).toBe(true);
   });
 
@@ -412,7 +415,47 @@ this never closes
 `;
     const r = extractFrontmatterAndBody(md);
     expect(r.actions).toBeUndefined();
+    expect(r.params).toBeUndefined();
     expect(r.body).toBe(md);
+  });
+
+  it("parses params block-list frontmatter", () => {
+    const md = `---
+params:
+  - name: kind
+    type: string
+    required: true
+    description: Symbol kind
+  - name: min_coverage
+    type: number
+    required: false
+    default: 80
+  - name: include_tests
+    type: boolean
+    default: true
+---
+body
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.params).toEqual([
+      {
+        name: "kind",
+        type: "string",
+        required: true,
+        description: "Symbol kind",
+      },
+      {
+        name: "min_coverage",
+        type: "number",
+        required: false,
+        default: 80,
+      },
+      {
+        name: "include_tests",
+        type: "boolean",
+        default: true,
+      },
+    ]);
   });
 });
 

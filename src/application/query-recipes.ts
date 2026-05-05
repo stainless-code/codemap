@@ -6,8 +6,8 @@ import { getProjectRoot } from "../runtime";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
 
-export type { RecipeAction } from "./recipes-loader";
-import type { RecipeAction } from "./recipes-loader";
+export type { RecipeAction, RecipeParam } from "./recipes-loader";
+import type { RecipeAction, RecipeParam } from "./recipes-loader";
 
 /**
  * Catalog entry surfaced to `--recipes-json`, the `codemap://recipes` MCP
@@ -29,6 +29,7 @@ export interface QueryRecipeCatalogEntry {
   body?: string;
   sql: string;
   actions?: RecipeAction[];
+  params?: RecipeParam[];
   source: "bundled" | "project";
   shadows?: boolean;
 }
@@ -187,6 +188,7 @@ function buildCatalogEntry(r: LoadedRecipe): QueryRecipeCatalogEntry {
   };
   if (r.body !== undefined) entry.body = r.body;
   if (r.actions !== undefined) entry.actions = r.actions;
+  if (r.params !== undefined) entry.params = r.params;
   if (r.shadows) entry.shadows = true;
   return entry;
 }
@@ -205,4 +207,8 @@ export function getQueryRecipeSql(id: string): string | undefined {
  */
 export function getQueryRecipeActions(id: string): RecipeAction[] | undefined {
   return getRegistry().find((r) => r.id === id)?.actions;
+}
+
+export function getQueryRecipeParams(id: string): RecipeParam[] | undefined {
+  return getRegistry().find((r) => r.id === id)?.params;
 }

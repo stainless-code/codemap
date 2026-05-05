@@ -8,6 +8,7 @@ import {
   makePackageBucketizer,
 } from "../group-by";
 import type { Bucketizer, GroupByMode } from "../group-by";
+import type { RecipeParamValue } from "./recipe-params";
 
 /**
  * Pure, transport-agnostic query execution. Mirrors the layering of
@@ -34,6 +35,7 @@ export interface ExecuteQueryOpts {
   changedFiles?: Set<string> | undefined;
   groupBy?: GroupByMode | undefined;
   recipeActions?: ReadonlyArray<unknown> | undefined;
+  bindValues?: RecipeParamValue[] | undefined;
   root: string;
 }
 
@@ -82,7 +84,7 @@ export function executeQuery(
     // proof boundary. Doesn't bleed across calls — `closeDb()` discards the
     // connection.
     db.run("PRAGMA query_only = 1");
-    let rows = db.query(opts.sql).all() as unknown[];
+    let rows = db.query(opts.sql).all(...(opts.bindValues ?? [])) as unknown[];
 
     if (opts.changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, opts.changedFiles);

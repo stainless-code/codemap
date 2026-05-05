@@ -12,11 +12,21 @@ import {
 import {
   getQueryRecipeActions,
   getQueryRecipeCatalogEntry,
+  getQueryRecipeParams,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
   listQueryRecipeIds,
   QUERY_RECIPES,
 } from "../application/query-recipes";
+import {
+  mergeParams,
+  parseParamsCli,
+  resolveRecipeParams,
+} from "../application/recipe-params";
+import type {
+  RecipeParamValue,
+  RecipeParamValues,
+} from "../application/recipe-params";
 import {
   closeDb,
   deleteQueryBaseline,
@@ -79,6 +89,7 @@ export function parseQueryRest(rest: string[]):
       groupBy: GroupByMode | undefined;
       saveBaseline: string | true | undefined;
       baseline: string | true | undefined;
+      recipeParams?: RecipeParamValues | undefined;
     }
   | { kind: "recipesCatalog" }
   | { kind: "printRecipeSql"; id: string }
@@ -108,6 +119,7 @@ export function parseQueryRest(rest: string[]):
   let dropBaselineName: string | undefined;
   let saveBaseline: string | true | undefined;
   let baseline: string | true | undefined;
+  let recipeParams: RecipeParamValues | undefined;
 
   while (i < rest.length) {
     const a = rest[i];
@@ -272,15 +284,33 @@ export function parseQueryRest(rest: string[]):
       i += 2;
       continue;
     }
+    if (a === "--params" || a.startsWith("--params=")) {
+      const eq = a.indexOf("=");
+      const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
+      if (v === undefined || v.startsWith("-")) {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--params" requires key=value pairs. Example: --params old=foo,new=bar',
+        };
+      }
+      recipeParams = mergeParams(recipeParams, parseParamsCli(v));
+      i += eq !== -1 ? 1 : 2;
+      continue;
+    }
     break;
   }
 
   if (recipesJson) {
-    if (recipeId !== undefined || printSqlId !== undefined) {
+    if (
+      recipeId !== undefined ||
+      printSqlId !== undefined ||
+      recipeParams !== undefined
+    ) {
       return {
         kind: "error",
         message:
-          "codemap: --recipes-json cannot be combined with --recipe or --print-sql.",
+          "codemap: --recipes-json cannot be combined with --recipe, --params, or --print-sql.",
       };
     }
     if (i < rest.length) {
@@ -303,12 +333,13 @@ export function parseQueryRest(rest: string[]):
       summary ||
       changedSince !== undefined ||
       groupBy !== undefined ||
+      recipeParams !== undefined ||
       i < rest.length
     ) {
       return {
         kind: "error",
         message:
-          "codemap: --baselines is a list-only operation; it does not take SQL or any other --recipe / --save-baseline / --baseline / --drop-baseline / --summary / --changed-since / --group-by flag.",
+          "codemap: --baselines is a list-only operation; it does not take SQL or any other --recipe / --params / --save-baseline / --baseline / --drop-baseline / --summary / --changed-since / --group-by flag.",
       };
     }
     return { kind: "listBaselines", json };
@@ -323,12 +354,13 @@ export function parseQueryRest(rest: string[]):
       summary ||
       changedSince !== undefined ||
       groupBy !== undefined ||
+      recipeParams !== undefined ||
       i < rest.length
     ) {
       return {
         kind: "error",
         message:
-          "codemap: --drop-baseline only takes a name; it does not compose with SQL or any other --recipe / --save-baseline / --baseline / --summary / --changed-since / --group-by flag.",
+          "codemap: --drop-baseline only takes a name; it does not compose with SQL or any other --recipe / --params / --save-baseline / --baseline / --summary / --changed-since / --group-by flag.",
       };
     }
     return { kind: "dropBaseline", name: dropBaselineName, json };
@@ -339,6 +371,20 @@ export function parseQueryRest(rest: string[]):
       kind: "error",
       message:
         "codemap: --save-baseline and --baseline are mutually exclusive in one run.",
+    };
+  }
+  if (recipeParams !== undefined && saveBaseline === true) {
+    return {
+      kind: "error",
+      message:
+        'codemap: "--save-baseline" needs an explicit name when used with --params so different parameter sets do not overwrite each other. Use --save-baseline=<name>.',
+    };
+  }
+  if (recipeParams !== undefined && baseline === true) {
+    return {
+      kind: "error",
+      message:
+        'codemap: "--baseline" needs an explicit name when used with --params. Use --baseline=<name>.',
     };
   }
   if (
@@ -357,6 +403,12 @@ export function parseQueryRest(rest: string[]):
       return {
         kind: "error",
         message: "codemap: use either --recipe or --print-sql, not both.",
+      };
+    }
+    if (recipeParams !== undefined) {
+      return {
+        kind: "error",
+        message: "codemap: --params can only be used with --recipe.",
       };
     }
     if (i < rest.length) {
@@ -412,6 +464,7 @@ export function parseQueryRest(rest: string[]):
       groupBy,
       saveBaseline,
       baseline,
+      recipeParams,
     };
   }
 
@@ -421,6 +474,12 @@ export function parseQueryRest(rest: string[]):
       kind: "error",
       message:
         'codemap: missing SQL or recipe. Usage: codemap query [--json | --format <fmt>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--save-baseline[=<name>] | --baseline[=<name>]] "<SQL>" | codemap query [...] --recipe <id> | codemap query --recipes-json | codemap query --print-sql <id> | codemap query --baselines | codemap query --drop-baseline <name>',
+    };
+  }
+  if (recipeParams !== undefined) {
+    return {
+      kind: "error",
+      message: "codemap: --params can only be used with --recipe.",
     };
   }
   // Ad-hoc SQL needs an explicit baseline name (no recipe id default).
@@ -457,6 +516,7 @@ export function parseQueryRest(rest: string[]):
     groupBy,
     saveBaseline,
     baseline,
+    recipeParams: undefined,
   };
 }
 
@@ -584,6 +644,9 @@ Flags:
   --baselines             List saved baselines (name, recipe_id, row_count, git_ref, created_at).
   --drop-baseline <name>  Delete a saved baseline. Exits 1 if the name doesn't exist.
   --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
+  --params <k=v[,k=v]>    Bind params for a parametrised recipe. May be repeated;
+                          last value wins on duplicate keys. Example:
+                          --params kind=function,name_pattern=%Query%
   --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
   --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
   --help, -h              Show this help.
@@ -653,6 +716,7 @@ export async function runQueryCmd(opts: {
   groupBy?: GroupByMode | undefined;
   saveBaseline?: string | true | undefined;
   baseline?: string | true | undefined;
+  recipeParams?: RecipeParamValues | undefined;
 }): Promise<void> {
   // Resolve --format / --json once so every render path keys off the same
   // value. Pre-PR #43 callers pass only `json`; post-PR #43 the parser
@@ -679,6 +743,12 @@ export async function runQueryCmd(opts: {
       opts.recipeId !== undefined
         ? getQueryRecipeActions(opts.recipeId)
         : undefined;
+    const bindValues = resolveRecipeBindValues({
+      recipeId: opts.recipeId,
+      params: opts.recipeParams,
+      json: isJson,
+    });
+    if ("error" in bindValues) return;
 
     // Baseline ops branch off here — they don't compose with --group-by because
     // the diff semantics are about row identity, not bucketing. (--summary still
@@ -693,6 +763,7 @@ export async function runQueryCmd(opts: {
             ? (opts.recipeId as string)
             : opts.saveBaseline,
         changedFiles,
+        bindValues: bindValues.values,
       });
       return;
     }
@@ -705,6 +776,7 @@ export async function runQueryCmd(opts: {
           opts.baseline === true ? (opts.recipeId as string) : opts.baseline,
         changedFiles,
         recipeActions,
+        bindValues: bindValues.values,
       });
       return;
     }
@@ -717,6 +789,7 @@ export async function runQueryCmd(opts: {
         groupBy: opts.groupBy,
         changedFiles,
         recipeActions,
+        bindValues: bindValues.values,
         root: getProjectRoot(),
       });
       return;
@@ -731,6 +804,7 @@ export async function runQueryCmd(opts: {
         format: effectiveFormat,
         recipeId: opts.recipeId,
         changedFiles,
+        bindValues: bindValues.values,
       });
       if (code !== 0) process.exitCode = code;
       return;
@@ -741,12 +815,31 @@ export async function runQueryCmd(opts: {
       summary: opts.summary,
       changedFiles,
       recipeActions,
+      bindValues: bindValues.values,
     });
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, isJson);
   }
+}
+
+function resolveRecipeBindValues(opts: {
+  recipeId: string | undefined;
+  params: RecipeParamValues | undefined;
+  json: boolean;
+}): { values: RecipeParamValue[] } | { error: true } {
+  if (opts.recipeId === undefined) return { values: [] };
+  const resolved = resolveRecipeParams({
+    recipeId: opts.recipeId,
+    declared: getQueryRecipeParams(opts.recipeId),
+    provided: opts.params,
+  });
+  if (!resolved.ok) {
+    emitErrorMaybeJson(resolved.error, opts.json);
+    return { error: true };
+  }
+  return { values: resolved.values };
 }
 
 /** Bootstrap a DB connection and run the list-baselines command. */
@@ -829,12 +922,16 @@ function printFormattedQuery(
     format: "sarif" | "annotations" | "mermaid";
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
+    bindValues: RecipeParamValue[] | undefined;
   },
 ): number {
   let db: Awaited<ReturnType<typeof openDb>> | undefined;
   try {
     db = openDb();
-    let rows = db.query(sql).all() as Record<string, unknown>[];
+    let rows = db.query(sql).all(...(opts.bindValues ?? [])) as Record<
+      string,
+      unknown
+    >[];
     if (opts.changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, opts.changedFiles) as Record<
         string,
@@ -910,6 +1007,7 @@ function runGroupedQuery(opts: {
   groupBy: GroupByMode;
   changedFiles: Set<string> | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
+  bindValues: RecipeParamValue[] | undefined;
   root: string;
 }) {
   let bucketize: Bucketizer;
@@ -932,7 +1030,7 @@ function runGroupedQuery(opts: {
 
   let rows: unknown[];
   try {
-    rows = queryRows(opts.sql);
+    rows = queryRows(opts.sql, opts.bindValues);
   } catch (err) {
     emitErrorMaybeJson(
       err instanceof Error ? err.message : String(err),
@@ -1012,10 +1110,11 @@ function runSaveBaseline(opts: {
   recipeId: string | undefined;
   baselineName: string;
   changedFiles: Set<string> | undefined;
+  bindValues: RecipeParamValue[] | undefined;
 }) {
   let rows: unknown[];
   try {
-    rows = queryRows(opts.sql);
+    rows = queryRows(opts.sql, opts.bindValues);
   } catch (err) {
     emitErrorMaybeJson(
       err instanceof Error ? err.message : String(err),
@@ -1084,6 +1183,7 @@ function runBaselineDiff(opts: {
   baselineName: string;
   changedFiles: Set<string> | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
+  bindValues: RecipeParamValue[] | undefined;
 }) {
   const db = openDb();
   let baseline: ReturnType<typeof getQueryBaseline>;
@@ -1114,7 +1214,7 @@ function runBaselineDiff(opts: {
 
   let currentRows: unknown[];
   try {
-    currentRows = queryRows(opts.sql);
+    currentRows = queryRows(opts.sql, opts.bindValues);
   } catch (err) {
     emitErrorMaybeJson(
       err instanceof Error ? err.message : String(err),

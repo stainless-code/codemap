@@ -77,6 +77,8 @@ codemap query "SELECT name, file_path FROM symbols LIMIT 10"
 # Bundled SQL (same as skill examples): fan-out rankings
 codemap query --json --recipe fan-out
 codemap query --json --recipe fan-out-sample
+# Parametrised recipes validate params from <id>.md frontmatter before SQL binding.
+codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%
 # Counts only (skip the rows) — pairs well with --recipe for dashboards / agent context windows
 codemap query --json --summary -r deprecated-symbols
 # PR-scoped: filter result rows to those touching files changed since <ref>

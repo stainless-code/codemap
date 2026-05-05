@@ -47,9 +47,12 @@ import {
 import { executeQuery } from "./query-engine";
 import {
   getQueryRecipeActions,
+  getQueryRecipeParams,
   getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
 } from "./query-recipes";
+import { resolveRecipeParams } from "./recipe-params";
+import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
 import { runCodemapIndex } from "./run-index";
 import {
   buildShowResult,
@@ -218,6 +221,9 @@ export const queryRecipeArgsSchema = {
   changed_since: z.string().optional(),
   group_by: groupByEnum.optional(),
   format: formatEnum.optional(),
+  params: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional(),
 };
 
 export interface QueryRecipeArgs {
@@ -226,6 +232,7 @@ export interface QueryRecipeArgs {
   changed_since?: string;
   group_by?: GroupByMode;
   format?: "json" | "sarif" | "annotations" | "mermaid";
+  params?: RecipeParamValues;
 }
 
 export function handleQueryRecipe(
@@ -240,6 +247,12 @@ export function handleQueryRecipe(
         404,
       );
     }
+    const resolvedParams = resolveRecipeParams({
+      recipeId: args.recipe,
+      declared: getQueryRecipeParams(args.recipe),
+      provided: args.params,
+    });
+    if (!resolvedParams.ok) return err(resolvedParams.error);
     const recipeActions = getQueryRecipeActions(args.recipe);
     const resolveChanged = makeChangedFilesResolver(root);
     const changed = resolveChanged(args.changed_since);
@@ -258,6 +271,7 @@ export function handleQueryRecipe(
         recipeId: args.recipe,
         recipeActions,
         changedFiles: changed as Set<string> | undefined,
+        bindValues: resolvedParams.values,
         format: args.format,
         root,
       });
@@ -268,6 +282,7 @@ export function handleQueryRecipe(
       changedFiles: changed as Set<string> | undefined,
       groupBy: args.group_by,
       recipeActions,
+      bindValues: resolvedParams.values,
       root,
     });
     if (isEnginePayloadError(payload)) return err(payload.error);
@@ -763,6 +778,7 @@ function runFormattedQuery(args: {
   recipeId: string | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
   changedFiles: Set<string> | undefined;
+  bindValues?: RecipeParamValue[] | undefined;
   format: "sarif" | "annotations" | "mermaid";
   root: string;
 }): ToolResult {
@@ -770,6 +786,7 @@ function runFormattedQuery(args: {
     sql: args.sql,
     changedFiles: args.changedFiles,
     recipeActions: args.recipeActions,
+    bindValues: args.bindValues,
     root: args.root,
   });
   if (isEnginePayloadError(payload)) return err(payload.error);

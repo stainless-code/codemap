@@ -18,6 +18,7 @@ A local database (default **`.codemap/index.db`**) indexes structure: symbols, i
 | Same entry                     | `bun run dev`      | (same as first row)                                                                                                                                                                                                                     |
 | Query (ASCII table — optional) | —                  | `bun src/index.ts query "<SQL>"`                                                                                                                                                                                                        |
 | Recipe                         | —                  | `bun src/index.ts query --json --recipe fan-out` (see **`bun src/index.ts query --help`**)                                                                                                                                              |
+| Parametrised recipe            | —                  | `bun src/index.ts query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%` — params declared in recipe `.md` frontmatter and validated before SQL binding.                                                |
 | Recipe catalog / SQL           | —                  | `bun src/index.ts query --recipes-json` · `bun src/index.ts query --print-sql fan-out`                                                                                                                                                  |
 | Counts only                    | —                  | `bun src/index.ts query --json --summary -r deprecated-symbols`                                                                                                                                                                         |
 | PR-scoped rows                 | —                  | `bun src/index.ts query --json --changed-since origin/main -r fan-out`                                                                                                                                                                  |
@@ -37,12 +38,17 @@ A local database (default **`.codemap/index.db`**) indexes structure: symbols, i
 | Mermaid graph (≤50 edges)      | —                  | `bun src/index.ts query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'` — recipes / SQL must alias columns to `{from, to, label?, kind?}`; rejects unbounded inputs.                         |
 | FTS5 full-text (opt-in)        | `--with-fts`       | `bun src/index.ts --with-fts --full` enables `source_fts` virtual table; `query --recipe text-in-deprecated-functions` demos JOINs.                                                                                                     |
 
-**Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
+**Recipe metadata:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Parametrised recipes declare `params` in `.md` frontmatter; pass values with `--params key=value[,key=value]` (repeatable; last value wins). Inspect both via **`--recipes-json`**. Ad-hoc SQL never carries actions or params.
 
 **Project-local recipes:** drop `<id>.sql` (and optional `<id>.md` for description + actions) into **`<projectRoot>/.codemap/recipes/`** — auto-discovered, runs via `--recipe <id>` like bundled. Project recipes win on id collision; check `--recipes-json` for **`shadows: true`** entries to know when a project recipe overrides the documented bundled version. `<id>.md` supports YAML frontmatter for the per-row action template — block-list shape only (the loader's hand-rolled parser doesn't accept inline-flow `[{...}]`):
 
 ```markdown
 ---
+params:
+  - name: kind
+    type: string
+    required: true
+    description: "Symbol kind to match."
 actions:
   - type: review-coupling
     auto_fixable: false
