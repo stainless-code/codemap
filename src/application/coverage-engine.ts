@@ -434,6 +434,11 @@ export function ingestV8(opts: V8ParserOpts): IngestResult {
     const lineHits: (number | undefined)[] = new Array(lineOffsets.length + 1);
 
     for (const script of urlScripts) {
+      // Per-script innermost-wins, cross-script `Math.max` merge — a
+      // process that didn't hit a line must NOT zero out another's count.
+      const scriptHits: (number | undefined)[] = new Array(
+        lineOffsets.length + 1,
+      );
       for (const fn of script.functions ?? []) {
         const sorted = (fn.ranges ?? [])
           .slice()
@@ -445,10 +450,15 @@ export function ingestV8(opts: V8ParserOpts): IngestResult {
           const startLine = offsetToLine(lineOffsets, range.startOffset);
           const endLine = offsetToLine(lineOffsets, range.endOffset);
           for (let line = startLine; line <= endLine; line++) {
-            // Innermost-wins: last write here is from the smallest range.
-            lineHits[line] = range.count;
+            // Innermost-wins within this script: last write is the smallest range.
+            scriptHits[line] = range.count;
           }
         }
+      }
+      for (let line = 1; line < scriptHits.length; line++) {
+        const hit = scriptHits[line];
+        if (hit === undefined) continue;
+        lineHits[line] = Math.max(lineHits[line] ?? 0, hit);
       }
     }
 
@@ -468,9 +478,9 @@ export function ingestV8(opts: V8ParserOpts): IngestResult {
 }
 
 /**
- * `offsets[i]` = byte offset of line `i + 1` start. Approximation: we walk
- * char codes (UTF-16) not bytes, so a multi-byte char before column 0
- * shifts subsequent offsets by 1; acceptable for line-resolution coverage.
+ * `offsets[i]` = UTF-16 code-unit position where line `i + 1` starts —
+ * matches V8's source-offset units (Chrome DevTools `Profiler.CoverageRange`
+ * spec); no UTF-8 byte conversion needed.
  */
 function buildLineOffsets(source: string): number[] {
   const offsets: number[] = [0];

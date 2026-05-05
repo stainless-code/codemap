@@ -737,5 +737,60 @@ describe("coverage-engine", () => {
         closeDb(db);
       }
     });
+
+    it("merges duplicate-URL scripts via Math.max (multi-process must not zero out another process's hit)", () => {
+      const source = "function a() { return 1; }\n";
+      const { root, url } = makeTempProject(source);
+
+      const db = setupDb();
+      try {
+        insertFile(db, { ...indexedFile("src/a.ts"), language: "ts" });
+        insertSymbols(db, [fnSym("src/a.ts", "a", 1, 1)]);
+
+        // Process A hit `a()` 7 times; process B never hit it (count 0).
+        const hot: V8ScriptCoverage = {
+          scriptId: "1",
+          url,
+          functions: [
+            {
+              functionName: "a",
+              isBlockCoverage: false,
+              ranges: [{ startOffset: 0, endOffset: source.length, count: 7 }],
+            },
+          ],
+        };
+        const cold: V8ScriptCoverage = {
+          scriptId: "2",
+          url,
+          functions: [
+            {
+              functionName: "a",
+              isBlockCoverage: false,
+              ranges: [{ startOffset: 0, endOffset: source.length, count: 0 }],
+            },
+          ],
+        };
+
+        const result = ingestV8({
+          db,
+          projectRoot: root,
+          sourcePath: join(root, ".cov"),
+          // `cold` last — would have zeroed line 1 with last-writer-wins.
+          scripts: [hot, cold],
+        });
+        expect(result.ingested.files).toBe(1);
+
+        const row = db
+          .query(
+            "SELECT hit_statements, total_statements FROM coverage WHERE name = 'a'",
+          )
+          .get() as { hit_statements: number; total_statements: number };
+        // Line 1 carries hot's count=7 → line is hit; total = total = 1.
+        expect(row.hit_statements).toBe(row.total_statements);
+        expect(row.hit_statements).toBeGreaterThan(0);
+      } finally {
+        closeDb(db);
+      }
+    });
   });
 });

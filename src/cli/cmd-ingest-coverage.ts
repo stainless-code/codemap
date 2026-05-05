@@ -156,7 +156,9 @@ function resolveArtifact(
   );
 }
 
-/** Reads every top-level `*.json` so multi-process test runs aggregate. */
+/** Filters to NODE_V8_COVERAGE's `coverage-<pid>-<ts>-<seq>.json` shape so a wrong dir errors loudly instead of producing a zero-row "successful" ingest. */
+const V8_FILENAME_RE = /^coverage-.*\.json$/;
+
 function resolveV8Directory(
   inputPath: string,
   cwd: string,
@@ -172,11 +174,11 @@ function resolveV8Directory(
     );
   }
   const jsonFiles = readdirSync(abs)
-    .filter((f) => f.endsWith(".json"))
+    .filter((f) => V8_FILENAME_RE.test(f))
     .map((f) => join(abs, f));
   if (jsonFiles.length === 0) {
     throw new Error(
-      `codemap ingest-coverage --runtime: directory ${abs} contains no *.json files. NODE_V8_COVERAGE writes coverage-<pid>-<ts>-<seq>.json files.`,
+      `codemap ingest-coverage --runtime: directory ${abs} contains no coverage-*.json files. NODE_V8_COVERAGE writes coverage-<pid>-<ts>-<seq>.json — point --runtime at the directory the test runner wrote to.`,
     );
   }
   return { absDir: abs, jsonFiles };
@@ -220,6 +222,11 @@ export async function runIngestCoverageCmd(
         for (const file of jsonFiles) {
           const payload = (await readJsonFile(file)) as V8CoveragePayload;
           if (Array.isArray(payload?.result)) scripts.push(...payload.result);
+        }
+        if (scripts.length === 0) {
+          throw new Error(
+            `codemap ingest-coverage --runtime: ${jsonFiles.length} coverage-*.json file(s) under ${absDir} contained no V8 \`result\` arrays. Confirm the directory is the one NODE_V8_COVERAGE wrote to.`,
+          );
         }
         result = ingestV8({
           db,

@@ -158,11 +158,11 @@ The _one_ lifecycle, no "Slim & keep in plans/" option:
 
 ### Closing research
 
-A research file's job is the evaluation. When the evaluation concludes:
+A research file's job is the evaluation. When the evaluation concludes, follow the canonical [`docs/README.md` Rule 8](../../../docs/README.md) lifecycle:
 
-- **Adopted** → lift the decision-of-record into the relevant reference doc (`architecture.md`, `glossary.md`, etc.) or — for repo-level tools — into `.agents/rules/` + `.agents/skills/`. Delete the research file unless its comparison framework is reusable for future similar evaluations.
+- **Adopted** → lift the decision-of-record into the relevant reference doc (`architecture.md`, `glossary.md`, etc.) or — for repo-level tools — into `.agents/rules/` + `.agents/skills/`. **Slim the note to a "What shipped" appendix** linking to canonical homes (precedent: [`research/non-goals-reassessment-2026-05.md`](../../../docs/research/non-goals-reassessment-2026-05.md) — its § 8 errata + § Closed-out items pattern). **Exception:** § 6 anti-pattern files (per-tool trackers; peer-tool framing) get **deleted**, not slimmed — the framing was off-mission, not just stale, and a "What shipped" appendix would re-anchor the wrong mental model.
 - **Rejected** → add a `Status: Rejected (date) — <one-line reason>` header at the top. Keep the file. The rejection rationale is exactly what saves the next agent from re-litigating it.
-- **Open / Ongoing** → stays in `research/` with no status header (open is the default). Ongoing tool trackers (e.g. `research/<tool-name>.md`) are explicitly long-lived; they don't close until the tool is irrelevant.
+- **Open / Ongoing** → stays in `research/` with no status header (open is the default). Ongoing tool trackers (e.g. `research/<tool-name>.md`) are explicitly long-lived but **only when they aren't peer-tool trackers** — see § 6.
 
 ---
 
