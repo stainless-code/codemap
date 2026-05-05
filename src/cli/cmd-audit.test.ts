@@ -44,7 +44,7 @@ describe("parseAuditRest", () => {
       baselinePrefix: "base",
       base: undefined,
       perDelta: {},
-      json: false,
+      format: "text",
       summary: false,
       noIndex: false,
     });
@@ -57,7 +57,7 @@ describe("parseAuditRest", () => {
       baselinePrefix: "base",
       base: undefined,
       perDelta: {},
-      json: false,
+      format: "text",
       summary: false,
       noIndex: false,
     });
@@ -78,7 +78,7 @@ describe("parseAuditRest", () => {
       baselinePrefix: undefined,
       base: undefined,
       perDelta: { files: "X", dependencies: "Y", deprecated: "Z" },
-      json: false,
+      format: "text",
       summary: false,
       noIndex: false,
     });
@@ -97,13 +97,13 @@ describe("parseAuditRest", () => {
       baselinePrefix: "base",
       base: undefined,
       perDelta: { dependencies: "experimental-deps" },
-      json: false,
+      format: "text",
       summary: false,
       noIndex: false,
     });
   });
 
-  it("parses --json --summary --no-index alongside baseline flags", () => {
+  it("parses --json as shortcut for --format json", () => {
     const r = parseAuditRest([
       "audit",
       "--json",
@@ -113,10 +113,66 @@ describe("parseAuditRest", () => {
       "base",
     ]);
     if (r.kind !== "run") throw new Error("expected run");
-    expect(r.json).toBe(true);
+    expect(r.format).toBe("json");
     expect(r.summary).toBe(true);
     expect(r.noIndex).toBe(true);
     expect(r.baselinePrefix).toBe("base");
+  });
+
+  it("parses --format sarif", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--format",
+      "sarif",
+      "--baseline",
+      "base",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+  });
+
+  it("parses --format=json (equals form)", () => {
+    const r = parseAuditRest(["audit", "--format=json", "--baseline", "base"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("json");
+  });
+
+  it("rejects unknown --format value", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--format",
+      "yaml",
+      "--baseline",
+      "base",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("yaml");
+  });
+
+  it("rejects --json + --format sarif (contradiction)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--json",
+      "--format",
+      "sarif",
+      "--baseline",
+      "base",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--json");
+  });
+
+  it("accepts --json + --format json (redundant but consistent)", () => {
+    const r = parseAuditRest([
+      "audit",
+      "--json",
+      "--format",
+      "json",
+      "--baseline",
+      "base",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("json");
   });
 
   it("errors when --baseline has no value", () => {
@@ -162,7 +218,7 @@ describe("parseAuditRest", () => {
       baselinePrefix: undefined,
       base: "origin/main",
       perDelta: {},
-      json: false,
+      format: "text",
       summary: false,
       noIndex: false,
     });

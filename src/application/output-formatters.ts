@@ -167,6 +167,98 @@ export function formatSarif(opts: FormatOpts): string {
   return JSON.stringify(sarif, null, 2);
 }
 
+/**
+ * One delta's added rows + the delta key (`files` / `dependencies` /
+ * `deprecated` in v1; arbitrary string for forward-compat). Removed rows
+ * are intentionally excluded — SARIF is for findings to act on, not
+ * cleanups.
+ */
+export interface AuditSarifDelta {
+  key: string;
+  added: Record<string, unknown>[];
+}
+
+/**
+ * Format an audit envelope as a SARIF 2.1.0 document. One rule per delta
+ * key (id `codemap.audit.<key>-added`); one result per `added` row across
+ * all deltas. Severity = `warning` (audit deltas are more actionable than
+ * a single recipe finding — a new dependency edge or `@deprecated` symbol
+ * landing in a PR is a structural change worth flagging). Locations
+ * auto-detected via {@link detectLocationColumn} from the existing
+ * priority list (`file_path` / `path` / `to_path` / `from_path`); aggregate
+ * rows without a location column emit a result with no `locations` field
+ * (SARIF spec allows this).
+ */
+export function formatAuditSarif(deltas: AuditSarifDelta[]): string {
+  const rules = deltas.map((d) => ({
+    id: `codemap.audit.${d.key}-added`,
+    name: `audit-${d.key}-added`,
+    shortDescription: { text: `New ${d.key} since baseline` },
+    defaultConfiguration: { level: "warning" },
+  }));
+
+  const results = deltas.flatMap((d) =>
+    d.added.map((row) => {
+      const ruleId = `codemap.audit.${d.key}-added`;
+      const locCol = detectLocationColumn(row);
+      // For audit deltas, location-only rows (e.g. files: `{path: "..."}`)
+      // produce "(no message)" via the generic builder because every column
+      // sits in the location-skip set. Fall back to a message that names the
+      // delta + URI so SARIF consumers see something actionable.
+      const builtText = buildMessageText(row);
+      const messageText =
+        builtText === "(no message)" && locCol !== null
+          ? `new ${d.key}: ${row[locCol] as string}`
+          : builtText;
+      const result: Record<string, unknown> = {
+        ruleId,
+        level: "warning",
+        message: { text: messageText },
+      };
+      if (locCol !== null) {
+        const uri = row[locCol] as string;
+        const lineStartRaw = row["line_start"];
+        const lineEndRaw = row["line_end"];
+        const region: Record<string, number> = {};
+        if (typeof lineStartRaw === "number" && lineStartRaw > 0) {
+          region["startLine"] = lineStartRaw;
+        }
+        if (typeof lineEndRaw === "number" && lineEndRaw > 0) {
+          region["endLine"] = lineEndRaw;
+        }
+        const physicalLocation: Record<string, unknown> = {
+          artifactLocation: { uri },
+        };
+        if (Object.keys(region).length > 0) {
+          physicalLocation["region"] = region;
+        }
+        result["locations"] = [{ physicalLocation }];
+      }
+      return result;
+    }),
+  );
+
+  const sarif = {
+    $schema:
+      "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "codemap",
+            informationUri: "https://github.com/stainless-code/codemap",
+            version: CODEMAP_VERSION,
+            rules,
+          },
+        },
+        results,
+      },
+    ],
+  };
+  return JSON.stringify(sarif, null, 2);
+}
+
 export interface AnnotationsOpts {
   rows: Record<string, unknown>[];
   /** Same `recipeId` shape as {@link FormatOpts}; not currently rendered (annotation lines don't carry rule id). */

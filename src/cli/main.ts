@@ -274,7 +274,7 @@ Copies bundled agent templates into .agents/ under the project root.
       baselinePrefix: parsed.baselinePrefix,
       base: parsed.base,
       perDelta: parsed.perDelta,
-      json: parsed.json,
+      format: parsed.format,
       summary: parsed.summary,
       noIndex: parsed.noIndex,
     });
