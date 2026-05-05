@@ -31,8 +31,9 @@ The original capability inventory contained 10 rows. Items that have shipped sin
 | 2.2 Visualisation flip → output formatter  | `--format mermaid` (above); SARIF + annotations were the precedent                                                                                                                           | Same                                                                                                                                             |
 | 1.10 rename-preview + parametrised recipes | `params:` frontmatter + `--params key=value` CLI / `query_recipe.params` MCP/HTTP; `find-symbol-by-kind.sql` exemplar; `rename-preview.sql` recipe; `--format diff` / `diff-json` formatters | [`README.md § CLI`](../../README.md#cli), `templates/recipes/find-symbol-by-kind.{sql,md}`, `templates/recipes/rename-preview.{sql,md}` (PR #71) |
 | § 6 Q1 daemon-default flip                 | `mcp` / `serve` watcher default-ON; `--no-watch` and `CODEMAP_WATCH=0` opt-outs                                                                                                              | [`architecture.md § Watch wiring`](../architecture.md#cli-usage), [`docs/glossary.md`](../glossary.md)                                           |
+| 1.5 Boundary violations                    | `boundaries` config + `boundary_rules` table + bundled `boundary-violations` recipe; SARIF auto-detects via `from_path` location column                                                      | [`architecture.md § Schema`](../architecture.md#schema), `templates/recipes/boundary-violations.{sql,md}` (PR #72)                               |
 
-Pending picks (§ 1.1, 1.2, 1.4, 1.5, 1.6, 1.9, plus § 5 (b) and (d)) moved to canonical homes — see [§ 7](#7-lifted-to).
+Pending picks (§ 1.1, 1.2, 1.4, 1.6, 1.9, plus § 5 (b) and (d)) moved to canonical homes — see [§ 7](#7-lifted-to).
 
 ---
 
@@ -140,7 +141,7 @@ The lift trail — for future archaeologists asking "where did this idea / decis
 | § 1.7 Mermaid output (shipped)                         | `templates/recipes/` + `README.md § CLI`                                                                                                  | PR #59 (FTS5 + Mermaid)       |
 | § 1.3 cyclomatic complexity (shipped)                  | `architecture.md § Schema` + `templates/recipes/high-complexity-untested.{sql,md}`                                                        | PR #70                        |
 | § 1.8 MCP resources (shipped)                          | `templates/agents/skills/codemap/SKILL.md` + `docs/glossary.md`                                                                           | post-PR #35 follow-ups        |
-| § 1.5 boundary violations (pending)                    | [`roadmap.md § Backlog`](../roadmap.md#backlog) (inline rationale)                                                                        | docs-capability-sync Slice 5c |
+| § 1.5 boundary violations (shipped)                    | `templates/recipes/boundary-violations.{sql,md}` + `boundaries` config field + `boundary_rules` table                                     | PR #72                        |
 | § 1.10 rename-preview + parametrised recipes (shipped) | `templates/recipes/find-symbol-by-kind.{sql,md}` + `templates/recipes/rename-preview.{sql,md}` + `--format diff` / `diff-json` formatters | PR #71                        |
 | § 1.9 recipe-recency (pending)                         | [`roadmap.md § Backlog`](../roadmap.md#backlog) (inline rationale)                                                                        | docs-capability-sync Slice 5c |
 | § 1.6 unused type members (advisory; pending)          | [`roadmap.md § Backlog`](../roadmap.md#backlog) (inline rationale)                                                                        | docs-capability-sync Slice 5c |

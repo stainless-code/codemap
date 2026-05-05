@@ -87,6 +87,8 @@ export function parseQueryRest(rest: string[]):
       sql: string;
       json: boolean;
       format: OutputFormat;
+      /** `--ci` aliases `--format sarif` + non-zero exit + quiet. */
+      ci: boolean;
       summary: boolean;
       changedSince: string | undefined;
       recipeId: string | undefined;
@@ -113,6 +115,8 @@ export function parseQueryRest(rest: string[]):
   let i = 1;
   let json = false;
   let format: OutputFormat | undefined;
+  // Aliases `--format sarif` + non-zero exit + quiet (mirrors `cmd-audit.ts`).
+  let ci = false;
   let summary = false;
   let changedSince: string | undefined;
   let recipeId: string | undefined;
@@ -132,6 +136,11 @@ export function parseQueryRest(rest: string[]):
     }
     if (a === "--json") {
       json = true;
+      i++;
+      continue;
+    }
+    if (a === "--ci") {
+      ci = true;
       i++;
       continue;
     }
@@ -449,7 +458,10 @@ export function parseQueryRest(rest: string[]):
         message: `codemap: unknown recipe "${recipeId}". Known recipes: ${known}`,
       };
     }
-    const resolved = resolveFormat(format, json);
+    const resolved = resolveFormat(format, json, ci);
+    if (resolved instanceof Error) {
+      return { kind: "error", message: resolved.message };
+    }
     const incompat = formatIncompatibility(resolved, {
       summary,
       groupBy,
@@ -462,6 +474,7 @@ export function parseQueryRest(rest: string[]):
       sql,
       json,
       format: resolved,
+      ci,
       summary,
       changedSince,
       recipeId,
@@ -501,7 +514,10 @@ export function parseQueryRest(rest: string[]):
         'codemap: "--baseline" needs an explicit name when used without --recipe. Use --baseline=<name>.',
     };
   }
-  const resolved = resolveFormat(format, json);
+  const resolved = resolveFormat(format, json, ci);
+  if (resolved instanceof Error) {
+    return { kind: "error", message: resolved.message };
+  }
   const incompat = formatIncompatibility(resolved, {
     summary,
     groupBy,
@@ -514,6 +530,7 @@ export function parseQueryRest(rest: string[]):
     sql,
     json,
     format: resolved,
+    ci,
     summary,
     changedSince,
     recipeId: undefined,
@@ -525,13 +542,27 @@ export function parseQueryRest(rest: string[]):
 }
 
 /**
- * Resolve the effective format. Per plan § D9, `--format` overrides `--json`;
- * `--json` alone implies `--format json`; absence of both → `text`.
+ * Per plan § D9: `--format` > `--json` > default `text`.
+ * `--ci` aliases `--format sarif`; rejects `--json` and `--format <non-sarif>`.
  */
 function resolveFormat(
   explicit: OutputFormat | undefined,
   json: boolean,
-): OutputFormat {
+  ci: boolean,
+): OutputFormat | Error {
+  if (ci) {
+    if (json) {
+      return new Error(
+        'codemap: "--ci" and "--json" are mutually exclusive (--ci aliases --format sarif; --json aliases --format json).',
+      );
+    }
+    if (explicit !== undefined && explicit !== "sarif") {
+      return new Error(
+        `codemap: "--ci" aliases "--format sarif"; cannot combine with --format ${explicit}.`,
+      );
+    }
+    return "sarif";
+  }
   if (explicit !== undefined) return explicit;
   return json ? "json" : "text";
 }
@@ -724,6 +755,8 @@ export async function runQueryCmd(opts: {
    * caller must reject those combos at parse time.
    */
   format?: OutputFormat;
+  /** `--ci`: exit 1 on ≥1 row + suppress no-locatable-rows warning. Parser enforces format=sarif. */
+  ci?: boolean;
   summary?: boolean;
   changedSince?: string | undefined;
   recipeId?: string | undefined;
@@ -821,6 +854,7 @@ export async function runQueryCmd(opts: {
         recipeId: opts.recipeId,
         changedFiles,
         bindValues: bindValues.values,
+        ci: opts.ci === true,
       });
       if (code !== 0) process.exitCode = code;
       return;
@@ -939,6 +973,8 @@ function printFormattedQuery(
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
     bindValues: RecipeParamValue[] | undefined;
+    /** `--ci`: suppress no-locatable-rows warning + return 1 on `rows.length > 0`. */
+    ci?: boolean;
   },
 ): number {
   let db: Awaited<ReturnType<typeof openDb>> | undefined;
@@ -955,12 +991,13 @@ function printFormattedQuery(
       >[];
     }
 
-    // SARIF / annotations require a location column; mermaid requires
-    // the from/to graph contract (checked inside formatMermaid).
+    // SARIF / annotations need locations; mermaid validates inside formatMermaid.
+    // `--ci` suppresses this warning — the row-set is the gating signal under CI.
     if (
       opts.format !== "mermaid" &&
       rows.length > 0 &&
-      !hasLocatableRows(rows)
+      !hasLocatableRows(rows) &&
+      opts.ci !== true
     ) {
       console.error(
         `codemap: --format ${opts.format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${opts.format} v1.)`,
@@ -980,7 +1017,8 @@ function printFormattedQuery(
         recipeBody: catalog?.body,
       });
       console.log(out);
-      return 0;
+      // `--ci` gates the runner step on findings (non-zero exit).
+      return opts.ci === true && rows.length > 0 ? 1 : 0;
     }
 
     if (opts.format === "mermaid") {

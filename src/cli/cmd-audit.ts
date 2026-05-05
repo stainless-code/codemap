@@ -6,10 +6,16 @@ import {
   V1_DELTAS,
 } from "../application/audit-engine";
 import type { AuditEnvelope } from "../application/audit-engine";
+import { formatAuditSarif } from "../application/output-formatters";
+import type { AuditSarifDelta } from "../application/output-formatters";
 import { runCodemapIndex } from "../application/run-index";
 import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+
+/** `--json` is the back-compat shortcut for `--format json`; mixing with `--format <other>` is a parse error. */
+export const AUDIT_OUTPUT_FORMATS = ["text", "json", "sarif"] as const;
+export type AuditOutputFormat = (typeof AUDIT_OUTPUT_FORMATS)[number];
 
 // Per-delta CLI flag → delta key. Generated from V1_DELTAS so adding a delta
 // in the engine surfaces a `--<key>-baseline` flag automatically.
@@ -21,7 +27,7 @@ const PER_DELTA_FLAGS: Record<string, string> = Object.fromEntries(
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"audit"`.
  * v1 supports `--baseline <prefix>` (auto-resolve sugar), per-delta
  * `--<key>-baseline <name>` flags (explicit), `--json`, `--summary`,
- * `--no-index`.
+ * `--format <text|json|sarif>`, `--no-index`.
  */
 export function parseAuditRest(rest: string[]):
   | { kind: "help" }
@@ -31,7 +37,9 @@ export function parseAuditRest(rest: string[]):
       baselinePrefix: string | undefined;
       base: string | undefined;
       perDelta: Record<string, string>;
-      json: boolean;
+      format: AuditOutputFormat;
+      /** `--ci`: SARIF + non-zero exit on additions. */
+      ci: boolean;
       summary: boolean;
       noIndex: boolean;
     } {
@@ -40,7 +48,11 @@ export function parseAuditRest(rest: string[]):
   }
 
   let i = 1;
-  let json = false;
+  // Tracked separately so `--json --format sarif` can be rejected.
+  let jsonShortcut = false;
+  let format: AuditOutputFormat | undefined;
+  // Aliases `--format sarif` + non-zero exit + quiet. Plan: docs/plans/github-marketplace-action.md.
+  let ci = false;
   let summary = false;
   let noIndex = false;
   let baselinePrefix: string | undefined;
@@ -51,8 +63,26 @@ export function parseAuditRest(rest: string[]):
     const a = rest[i];
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--json") {
-      json = true;
+      jsonShortcut = true;
       i++;
+      continue;
+    }
+    if (a === "--ci") {
+      ci = true;
+      i++;
+      continue;
+    }
+    if (a === "--format" || a.startsWith("--format=")) {
+      const value = consumeFlagValue(rest, i, "--format");
+      if (value.kind === "error") return value;
+      if (!(AUDIT_OUTPUT_FORMATS as readonly string[]).includes(value.value)) {
+        return {
+          kind: "error",
+          message: `codemap audit: --format must be one of ${AUDIT_OUTPUT_FORMATS.join(" / ")}; got "${value.value}".`,
+        };
+      }
+      format = value.value as AuditOutputFormat;
+      i = value.next;
       continue;
     }
     if (a === "--summary") {
@@ -125,12 +155,44 @@ export function parseAuditRest(rest: string[]):
     };
   }
 
+  // Precedence: --ci → sarif (rejects --json + --format <non-sarif>); else --json → json.
+  let resolvedFormat: AuditOutputFormat;
+  if (ci) {
+    if (jsonShortcut) {
+      return {
+        kind: "error",
+        message:
+          'codemap audit: "--ci" and "--json" are mutually exclusive (--ci aliases --format sarif; --json aliases --format json).',
+      };
+    }
+    if (format !== undefined && format !== "sarif") {
+      return {
+        kind: "error",
+        message: `codemap audit: "--ci" aliases "--format sarif"; cannot combine with --format ${format}.`,
+      };
+    }
+    resolvedFormat = "sarif";
+  } else if (jsonShortcut && format !== undefined) {
+    if (format !== "json") {
+      return {
+        kind: "error",
+        message: `codemap audit: --json is shorthand for --format json; cannot combine with --format ${format}.`,
+      };
+    }
+    resolvedFormat = "json";
+  } else if (jsonShortcut) {
+    resolvedFormat = "json";
+  } else {
+    resolvedFormat = format ?? "text";
+  }
+
   return {
     kind: "run",
     baselinePrefix,
     base,
     perDelta,
-    json,
+    format: resolvedFormat,
+    ci,
     summary,
     noIndex,
   };
@@ -212,10 +274,18 @@ ${perDeltaLines}
                                composes with both --base and --baseline.
 
 Other flags:
-  --json              Emit the {head, deltas} envelope as JSON to stdout
-                      (default for agents). On error: {"error":"<message>"}.
-  --summary           Collapse rows to counts. With --json: deltas.<key>.{added: N, removed: N}.
-                      Without: a single line "drift: files +1/-0, dependencies +3/-2, ...".
+  --format <fmt>      Output format: text | json | sarif. Default: text.
+                      sarif emits a SARIF 2.1.0 doc (one rule per delta key,
+                      one result per added row) for GitHub Code Scanning.
+  --json              Shortcut for --format json. Cannot combine with --format
+                      <other>. Emits {head, deltas} envelope; on error: {"error":"<message>"}.
+  --ci                CI-aggregate flag. Aliases --format sarif + non-zero exit
+                      when any delta has additions. Mutually exclusive with --json
+                      and --format <other>. Recommended in GitHub Actions / GitLab
+                      CI to fail the runner step on structural drift.
+  --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N}.
+                      With --format text: a single line "drift: files +1/-0, dependencies +3/-2, ...".
+                      No-op with --format sarif (results are per-row).
   --no-index          Skip the auto-incremental-index prelude. Default: re-index first
                       so 'head' reflects the current source tree.
   --help, -h          Show this help.
@@ -262,7 +332,9 @@ export async function runAuditCmd(opts: {
   baselinePrefix: string | undefined;
   base: string | undefined;
   perDelta: Record<string, string>;
-  json: boolean;
+  format: AuditOutputFormat;
+  /** `--ci`: exit non-zero on additions. */
+  ci?: boolean;
   summary: boolean;
   noIndex: boolean;
 }): Promise<void> {
@@ -298,32 +370,61 @@ export async function runAuditCmd(opts: {
             });
 
       if ("error" in result) {
-        emitAuditError(result.error, opts.json);
+        emitAuditError(result.error, opts.format);
         return;
       }
-      renderAudit(result, { json: opts.json, summary: opts.summary });
+      renderAudit(result, { format: opts.format, summary: opts.summary });
+
+      // `--ci` gates the runner step on additions (non-zero exit).
+      if (opts.ci === true) {
+        const hasAdditions = Object.values(result.deltas).some(
+          (d) => d.added.length > 0,
+        );
+        if (hasAdditions) process.exitCode = 1;
+      }
     } finally {
       closeDb(db, { readonly: opts.noIndex });
     }
   } catch (err) {
-    emitAuditError(err instanceof Error ? err.message : String(err), opts.json);
+    emitAuditError(
+      err instanceof Error ? err.message : String(err),
+      opts.format,
+    );
   }
 }
 
-function emitAuditError(message: string, json: boolean) {
-  if (json) {
-    console.log(JSON.stringify({ error: message }));
-  } else {
+// Structured formats (json / sarif) emit `{"error": "..."}` on stdout for parseability.
+function emitAuditError(message: string, format: AuditOutputFormat) {
+  if (format === "text") {
     console.error(message);
+  } else {
+    console.log(JSON.stringify({ error: message }));
   }
   process.exitCode = 1;
 }
 
 function renderAudit(
   envelope: AuditEnvelope,
-  opts: { json: boolean; summary: boolean },
+  opts: { format: AuditOutputFormat; summary: boolean },
 ): void {
-  if (opts.json) {
+  if (opts.format === "sarif") {
+    // SARIF results are per-row; `--summary` is meaningless here.
+    if (opts.summary) {
+      console.error(
+        "codemap audit: --summary has no effect with --format sarif (SARIF emits one result per added row, not counts).",
+      );
+    }
+    const sarifDeltas: AuditSarifDelta[] = Object.entries(envelope.deltas).map(
+      ([key, delta]) => ({
+        key,
+        added: delta.added as Record<string, unknown>[],
+      }),
+    );
+    console.log(formatAuditSarif(sarifDeltas));
+    return;
+  }
+
+  if (opts.format === "json") {
     if (opts.summary) {
       const counts: Record<
         string,
@@ -346,6 +447,8 @@ function renderAudit(
     }
     return;
   }
+
+  // format === "text"
   renderAuditTerminal(envelope, opts.summary);
 }
 

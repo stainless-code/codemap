@@ -167,6 +167,87 @@ export function formatSarif(opts: FormatOpts): string {
   return JSON.stringify(sarif, null, 2);
 }
 
+/** Removed rows intentionally excluded — SARIF surfaces findings to act on, not cleanups. */
+export interface AuditSarifDelta {
+  key: string;
+  added: Record<string, unknown>[];
+}
+
+/**
+ * One rule per delta key (id `codemap.audit.<key>-added`); one result per
+ * `added` row. Severity = `warning` (more actionable than per-recipe `note`
+ * — a new dependency edge in a PR is a structural change). Locations
+ * auto-detected via {@link detectLocationColumn}; aggregate rows without
+ * a location field omit `locations` per SARIF spec.
+ */
+export function formatAuditSarif(deltas: AuditSarifDelta[]): string {
+  const rules = deltas.map((d) => ({
+    id: `codemap.audit.${d.key}-added`,
+    name: `audit-${d.key}-added`,
+    shortDescription: { text: `New ${d.key} since baseline` },
+    defaultConfiguration: { level: "warning" },
+  }));
+
+  const results = deltas.flatMap((d) =>
+    d.added.map((row) => {
+      const ruleId = `codemap.audit.${d.key}-added`;
+      const locCol = detectLocationColumn(row);
+      // Files-added rows have only `path` (in the skip-set), so
+      // buildMessageText returns "(no message)". Fall back to "new <key>: <uri>".
+      const builtText = buildMessageText(row);
+      const messageText =
+        builtText === "(no message)" && locCol !== null
+          ? `new ${d.key}: ${row[locCol] as string}`
+          : builtText;
+      const result: Record<string, unknown> = {
+        ruleId,
+        level: "warning",
+        message: { text: messageText },
+      };
+      if (locCol !== null) {
+        const uri = row[locCol] as string;
+        const lineStartRaw = row["line_start"];
+        const lineEndRaw = row["line_end"];
+        const region: Record<string, number> = {};
+        if (typeof lineStartRaw === "number" && lineStartRaw > 0) {
+          region["startLine"] = lineStartRaw;
+        }
+        if (typeof lineEndRaw === "number" && lineEndRaw > 0) {
+          region["endLine"] = lineEndRaw;
+        }
+        const physicalLocation: Record<string, unknown> = {
+          artifactLocation: { uri },
+        };
+        if (Object.keys(region).length > 0) {
+          physicalLocation["region"] = region;
+        }
+        result["locations"] = [{ physicalLocation }];
+      }
+      return result;
+    }),
+  );
+
+  const sarif = {
+    $schema:
+      "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+    version: "2.1.0",
+    runs: [
+      {
+        tool: {
+          driver: {
+            name: "codemap",
+            informationUri: "https://github.com/stainless-code/codemap",
+            version: CODEMAP_VERSION,
+            rules,
+          },
+        },
+        results,
+      },
+    ],
+  };
+  return JSON.stringify(sarif, null, 2);
+}
+
 export interface AnnotationsOpts {
   rows: Record<string, unknown>[];
   /** Same `recipeId` shape as {@link FormatOpts}; not currently rendered (annotation lines don't carry rule id). */

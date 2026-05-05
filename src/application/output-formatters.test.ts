@@ -8,6 +8,7 @@ import {
   detectLocationColumn,
   escapeAnnotationData,
   escapeAnnotationProperty,
+  formatAuditSarif,
   formatDiff,
   formatDiffJson,
   formatAnnotations,
@@ -580,6 +581,106 @@ describe("formatDiff / formatDiffJson", () => {
     );
     expect(payload.files[0].missing).toBe(true);
     expect(payload.summary.skipped).toBe(1);
+  });
+});
+
+describe("formatAuditSarif", () => {
+  it("emits one rule per delta key + one result per added row", () => {
+    const sarif = JSON.parse(
+      formatAuditSarif([
+        { key: "files", added: [{ path: "src/new.ts" }] },
+        {
+          key: "dependencies",
+          added: [{ from_path: "src/a.ts", to_path: "src/b.ts" }],
+        },
+        {
+          key: "deprecated",
+          added: [{ name: "oldFn", kind: "function", file_path: "src/x.ts" }],
+        },
+      ]),
+    );
+    expect(sarif.version).toBe("2.1.0");
+    const run = sarif.runs[0];
+    expect(run.tool.driver.name).toBe("codemap");
+    const ruleIds = run.tool.driver.rules.map((r: { id: string }) => r.id);
+    expect(ruleIds).toEqual([
+      "codemap.audit.files-added",
+      "codemap.audit.dependencies-added",
+      "codemap.audit.deprecated-added",
+    ]);
+    expect(run.results).toHaveLength(3);
+    // Severity = warning (audit deltas are more actionable than per-recipe `note`)
+    expect(
+      run.results.every((r: { level: string }) => r.level === "warning"),
+    ).toBe(true);
+    // Locations auto-detected per row
+    expect(
+      run.results[0].locations[0].physicalLocation.artifactLocation.uri,
+    ).toBe("src/new.ts");
+    expect(
+      run.results[1].locations[0].physicalLocation.artifactLocation.uri,
+    ).toBe("src/b.ts"); // to_path wins per LOCATION_COLUMNS priority
+    expect(
+      run.results[2].locations[0].physicalLocation.artifactLocation.uri,
+    ).toBe("src/x.ts");
+  });
+
+  it("emits empty results array when all deltas are empty", () => {
+    const sarif = JSON.parse(
+      formatAuditSarif([
+        { key: "files", added: [] },
+        { key: "dependencies", added: [] },
+      ]),
+    );
+    expect(sarif.runs[0].results).toEqual([]);
+    // Rules are still declared even when no findings hit them — Code Scanning
+    // expects rule registration to be stable across runs.
+    expect(sarif.runs[0].tool.driver.rules).toHaveLength(2);
+  });
+
+  it("omits locations field for rows without a location column", () => {
+    const sarif = JSON.parse(
+      formatAuditSarif([
+        { key: "files", added: [{ unrelated_column: "foo", count: 5 }] },
+      ]),
+    );
+    const result = sarif.runs[0].results[0];
+    expect(result.ruleId).toBe("codemap.audit.files-added");
+    expect(result.locations).toBeUndefined();
+    // Message still has the row data via buildMessageText
+    expect(result.message.text).toContain("count=5");
+  });
+
+  it("falls back to 'new <key>: <uri>' message for location-only rows (e.g. files-added)", () => {
+    // Files-added rows have only `path` — buildMessageText returns "(no
+    // message)" because `path` sits in the location-skip set. Audit-SARIF
+    // catches this and produces a meaningful message.
+    const sarif = JSON.parse(
+      formatAuditSarif([{ key: "files", added: [{ path: "src/new.ts" }] }]),
+    );
+    expect(sarif.runs[0].results[0].message.text).toBe("new files: src/new.ts");
+  });
+
+  it("includes line_start / line_end region when present", () => {
+    const sarif = JSON.parse(
+      formatAuditSarif([
+        {
+          key: "deprecated",
+          added: [
+            {
+              name: "oldFn",
+              file_path: "src/x.ts",
+              line_start: 12,
+              line_end: 18,
+            },
+          ],
+        },
+      ]),
+    );
+    const region =
+      sarif.runs[0].results[0].locations[0].physicalLocation.region;
+    expect(region.startLine).toBe(12);
+    expect(region.endLine).toBe(18);
   });
 });
 

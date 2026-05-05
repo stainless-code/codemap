@@ -159,6 +159,35 @@ jobs:
       - name: bun audit
         run: bun audit
 
+  action-smoke:
+    # Dogfood Slice 4 of plan PR #73: invoke `uses: ./` from this very repo
+    # so the action.yml + scripts/detect-pm.mjs are exercised on every PR.
+    # Smoke uses `command: --version` to avoid the real-audit dependency
+    # chain (audit baselines etc.) — this validates the composite-step
+    # flow + npm-pulled codemap binary, not the audit logic itself
+    # (which is covered by the unit-test suite).
+    name: 🤖 Action smoke (dogfood)
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    # Non-blocking until we've published codemap@<v1> matching the Action.
+    # Today the Action pulls codemap@latest from npm (0.4.0), which works
+    # for `--version` but doesn't validate v1.x flags. Promote to a hard
+    # gate when v1.0.0 ships.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run the local-path action
+        uses: ./
+        with:
+          command: "--version"
+          format: "json"
+          upload-sarif: "false"
+          pr-comment: "false"
+          fail-on: "never"
+
   ci-complete:
     name: CI complete
     needs: [skip-ci, format, lint, typecheck, test, build, benchmark]

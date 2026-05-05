@@ -274,9 +274,33 @@ Copies bundled agent templates into .agents/ under the project root.
       baselinePrefix: parsed.baselinePrefix,
       base: parsed.base,
       perDelta: parsed.perDelta,
-      json: parsed.json,
+      format: parsed.format,
+      ci: parsed.ci,
       summary: parsed.summary,
       noIndex: parsed.noIndex,
+    });
+    return;
+  }
+
+  if (rest[0] === "pr-comment") {
+    const { parsePrCommentRest, printPrCommentCmdHelp, runPrCommentCmd } =
+      await import("./cmd-pr-comment.js");
+    const parsed = parsePrCommentRest(rest);
+    if (parsed.kind === "help") {
+      printPrCommentCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runPrCommentCmd({
+      root,
+      configFile,
+      stateDir,
+      inputPath: parsed.inputPath as string,
+      shape: parsed.shape,
+      json: parsed.json === true,
     });
     return;
   }
@@ -361,6 +385,7 @@ Copies bundled agent templates into .agents/ under the project root.
       sql: parsed.sql,
       json: parsed.json,
       format: parsed.format,
+      ci: parsed.ci,
       summary: parsed.summary,
       changedSince: parsed.changedSince,
       recipeId: parsed.recipeId,

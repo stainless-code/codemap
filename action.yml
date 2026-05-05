@@ -1,0 +1,269 @@
+name: "Codemap"
+description: "SQL-queryable structural index of your codebase. Run any predicate as a recipe; CI gating via SARIF → Code Scanning."
+author: "stainless-code"
+branding:
+  icon: "database"
+  color: "blue"
+
+inputs:
+  # WHERE TO RUN
+  working-directory:
+    description: "Subdirectory to run codemap in (for monorepos). Defaults to the repository root."
+    required: false
+    default: "."
+  package-manager:
+    description: "Override package-manager autodetect. Accepts npm | pnpm | yarn | yarn@berry | bun. Empty = autodetect via package-manager-detector (lockfile + packageManager field + devEngines.packageManager + install-metadata + parent-dir walk)."
+    required: false
+    default: ""
+  version:
+    description: "Pin codemap CLI version (e.g. 1.2.3). Empty = use the project's devDependency if present, else fall back to <pm> dlx codemap@latest."
+    required: false
+    default: ""
+  state-dir:
+    description: "Override codemap state directory location. Empty = .codemap/ at the working-directory root (codemap default)."
+    required: false
+    default: ""
+
+  # WHAT TO RUN — high-level (mutually exclusive; precedence: command > mode > defaults)
+  mode:
+    description: "Run shape: 'audit' | 'recipe' | 'aggregate' | 'command'. Default: 'audit' on pull_request events; ignored on other events (Action no-ops). 'aggregate' is reserved for v1.x — currently rejected."
+    required: false
+    default: "audit"
+  recipe:
+    description: "Recipe id (when mode=recipe). Use --recipes-json on the CLI to list known recipes."
+    required: false
+    default: ""
+  params:
+    description: "Recipe params for parametrised recipes (when mode=recipe). Multiline `key=value` pairs, one per line."
+    required: false
+    default: ""
+  baseline:
+    description: "Saved baseline name to diff against (when mode=recipe + a baseline was previously saved with --save-baseline)."
+    required: false
+    default: ""
+  audit-base:
+    description: "Git ref to audit against (when mode=audit). Empty (default) → falls back to `github.base_ref` on `pull_request` events; on other events the action no-ops unless an explicit `command:` is set."
+    required: false
+    default: ""
+  changed-since:
+    description: "Filter results to files changed since the given git ref (e.g. 'origin/main')."
+    required: false
+    default: ""
+  group-by:
+    description: "Bucket results by 'owner' (CODEOWNERS) | 'directory' | 'package' (workspace package). Empty = no bucketing."
+    required: false
+    default: ""
+  command:
+    description: "Raw CLI args to invoke codemap with (escape hatch). When set, overrides mode / recipe / params / baseline / audit-base / changed-since / group-by — those are silently ignored with a warning."
+    required: false
+    default: ""
+
+  # WHAT TO DO WITH OUTPUT
+  format:
+    description: "Output format: 'sarif' | 'json' | 'annotations' | 'mermaid' | 'diff' (per-mode availability varies; audit supports text/json/sarif). Default: 'sarif' (SARIF 2.1.0 → Code Scanning)."
+    required: false
+    default: "sarif"
+  output-path:
+    description: "Where to write the output file. Used as the artifact-upload source when format=sarif and upload-sarif=true."
+    required: false
+    default: "codemap.sarif"
+  upload-sarif:
+    description: "Upload the SARIF artifact to GitHub Code Scanning. Requires GitHub Advanced Security on private repos. Set 'false' if your repo can't use Code Scanning (still produces the artifact for manual download / pr-comment writer)."
+    required: false
+    default: "true"
+  pr-comment:
+    description: "Post a markdown summary comment on the PR (Slice 3 — opt-in for v1.0). Set 'true' to enable. Useful when SARIF→Code-Scanning isn't available (private repos without GHAS, or repos that haven't enabled Code Scanning)."
+    required: false
+    default: "false"
+  fail-on:
+    description: "Exit-code policy: 'any' | 'error' | 'warning' | 'never'. v1.0 ships only 'any' (fails when any finding) and 'never' (no exit code). 'error' / 'warning' deferred until per-recipe severity overrides ship."
+    required: false
+    default: "any"
+  token:
+    description: "GitHub token for SARIF upload + PR comment posting. Empty (default) → falls back to `github.token` automatically. Pass an explicit fine-grained PAT only if you need elevated permissions."
+    required: false
+    default: ""
+
+outputs:
+  agent:
+    description: "Resolved package manager (npm / pnpm / yarn / bun)."
+    value: ${{ steps.detect-pm.outputs.agent }}
+  exec:
+    description: "Shell-ready command used to invoke codemap."
+    value: ${{ steps.detect-pm.outputs.exec }}
+  install_method:
+    description: "How codemap was located: 'project-installed' | 'dlx-pinned' | 'dlx-latest'."
+    value: ${{ steps.detect-pm.outputs.install_method }}
+  output-file:
+    description: "Path to the written output file (echoes inputs.output-path)."
+    value: ${{ inputs.output-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Skip on non-PR events when defaulting to audit
+      id: gate
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_REF: ${{ github.base_ref }}
+        MODE: ${{ inputs.mode }}
+        COMMAND: ${{ inputs.command }}
+        AUDIT_BASE_INPUT: ${{ inputs.audit-base }}
+      run: |
+        if [ -n "$COMMAND" ]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ "$MODE" != "audit" ]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        BASE="${AUDIT_BASE_INPUT:-$BASE_REF}"
+        if [ -z "$BASE" ]; then
+          echo "codemap action: no PR context (event_name=$EVENT_NAME, base_ref empty), skipping. Pass an explicit 'command:' input to run on non-PR events."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js (for the package-manager-detector wrapper)
+      if: steps.gate.outputs.skip != 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Detect package manager + resolve CLI invocation
+      if: steps.gate.outputs.skip != 'true'
+      id: detect-pm
+      shell: bash
+      env:
+        PACKAGE_MANAGER: ${{ inputs.package-manager }}
+        VERSION: ${{ inputs.version }}
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        # Action runs without its own node_modules; install the detector lazily.
+        # Pinned to a known version so consumers get reproducible builds.
+        npm install --no-save --prefix "$RUNNER_TEMP/codemap-action" package-manager-detector@1.6.0 >/dev/null
+        cp "${{ github.action_path }}/scripts/detect-pm.mjs" "$RUNNER_TEMP/codemap-action/detect-pm.mjs"
+        cd "$RUNNER_TEMP/codemap-action"
+        node detect-pm.mjs
+
+    - name: Validate inputs (mode + flag interactions)
+      if: steps.gate.outputs.skip != 'true'
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        RECIPE: ${{ inputs.recipe }}
+        COMMAND: ${{ inputs.command }}
+      run: |
+        # Precedence: command > mode. If command is set, mode/recipe are silently
+        # ignored but we surface a single warning so consumers notice.
+        if [ -n "$COMMAND" ] && [ -n "$RECIPE" ]; then
+          echo "::warning::codemap action: 'command' input takes precedence; 'recipe' (and other mode-* inputs) are ignored."
+        fi
+
+        case "$MODE" in
+          audit | recipe | command) ;;
+          aggregate)
+            echo "::error::codemap action: mode='aggregate' is reserved for v1.x and not yet implemented. Use mode='audit' or pass a 'command:' input."
+            exit 1
+            ;;
+          *)
+            echo "::error::codemap action: unknown mode '$MODE'. Expected: audit | recipe | aggregate | command."
+            exit 1
+            ;;
+        esac
+
+        if [ "$MODE" = "recipe" ] && [ -z "$RECIPE" ] && [ -z "$COMMAND" ]; then
+          echo "::error::codemap action: mode='recipe' requires the 'recipe' input (a recipe id). Run codemap query --recipes-json to list known recipes."
+          exit 1
+        fi
+
+        if [ "$MODE" = "command" ] && [ -z "$COMMAND" ]; then
+          echo "::error::codemap action: mode='command' requires the 'command' input (raw CLI args)."
+          exit 1
+        fi
+
+    - name: Run codemap
+      if: steps.gate.outputs.skip != 'true'
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        EXEC: ${{ steps.detect-pm.outputs.exec }}
+        MODE: ${{ inputs.mode }}
+        RECIPE: ${{ inputs.recipe }}
+        PARAMS: ${{ inputs.params }}
+        BASELINE: ${{ inputs.baseline }}
+        AUDIT_BASE: ${{ inputs.audit-base }}
+        CHANGED_SINCE: ${{ inputs.changed-since }}
+        GROUP_BY: ${{ inputs.group-by }}
+        COMMAND: ${{ inputs.command }}
+        FORMAT: ${{ inputs.format }}
+        OUTPUT_PATH: ${{ inputs.output-path }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        STATE_DIR: ${{ inputs.state-dir }}
+        BASE_REF: ${{ github.base_ref }}
+      run: |
+        set +e
+
+        if [ -n "$COMMAND" ]; then
+          ARGS="$COMMAND"
+        elif [ "$MODE" = "audit" ]; then
+          BASE="${AUDIT_BASE:-$BASE_REF}"
+          ARGS="audit --base $BASE --format $FORMAT"
+        elif [ "$MODE" = "recipe" ]; then
+          ARGS="query --recipe $RECIPE --format $FORMAT"
+          [ -n "$PARAMS" ] && while IFS= read -r line; do
+            [ -n "$line" ] && ARGS="$ARGS --params $line"
+          done <<< "$PARAMS"
+          [ -n "$BASELINE" ] && ARGS="$ARGS --baseline $BASELINE"
+        fi
+
+        [ -n "$CHANGED_SINCE" ] && ARGS="$ARGS --changed-since $CHANGED_SINCE"
+        [ -n "$GROUP_BY" ] && ARGS="$ARGS --group-by $GROUP_BY"
+        [ -n "$STATE_DIR" ] && ARGS="--state-dir $STATE_DIR $ARGS"
+
+        echo "+ $EXEC $ARGS"
+        $EXEC $ARGS > "$OUTPUT_PATH"
+        EXIT=$?
+
+        echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+
+        # `fail-on` policy. v1.0 supports 'any' (default) and 'never'. Other
+        # values fall back to passing the underlying exit code through.
+        case "$FAIL_ON" in
+          never) exit 0 ;;
+          any | *) exit "$EXIT" ;;
+        esac
+
+    - name: Upload SARIF to Code Scanning
+      if: steps.gate.outputs.skip != 'true' && inputs.upload-sarif == 'true' && inputs.format == 'sarif' && always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.working-directory }}/${{ inputs.output-path }}
+        token: ${{ inputs.token != '' && inputs.token || github.token }}
+
+    - name: Post PR summary comment
+      if: steps.gate.outputs.skip != 'true' && inputs.pr-comment == 'true' && github.event_name == 'pull_request' && always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        EXEC: ${{ steps.detect-pm.outputs.exec }}
+        OUTPUT_PATH: ${{ inputs.output-path }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        GH_TOKEN: ${{ inputs.token != '' && inputs.token || github.token }}
+      run: |
+        # Render the markdown body via `codemap pr-comment`, then post via
+        # `gh pr comment`. The same binary that produced the SARIF / JSON
+        # output renders the comment — keeps the version stream coherent.
+        BODY=$($EXEC pr-comment "$OUTPUT_PATH" 2>/dev/null) || {
+          echo "::warning::codemap action: pr-comment renderer failed; skipping PR comment."
+          exit 0
+        }
+        if [ -z "$BODY" ]; then
+          echo "::notice::codemap action: pr-comment produced empty body; skipping."
+          exit 0
+        fi
+        echo "$BODY" | gh pr comment "$PR_NUMBER" -F -

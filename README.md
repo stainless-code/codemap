@@ -112,6 +112,8 @@ codemap audit --files-baseline base-files                       # explicit per-d
 codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto-resolve deps + deprecated; override files
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
 codemap audit --base origin/main --json                         # ad-hoc — worktree+reindex against any committish; no --save-baseline needed
+codemap audit --base origin/main --format sarif                 # emit SARIF 2.1.0 directly (Code Scanning); also: --ci alias
+codemap audit --base origin/main --ci                           # CI shortcut: --format sarif + non-zero exit on additions + quiet
 codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override
 # --base materialises <ref> via `git worktree add` to .codemap/audit-cache/<sha>/, reindexes into
 # a temp DB, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
@@ -127,7 +129,11 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # requires {from, to, label?, kind?} rows and rejects unbounded inputs (>50 edges) with a
 # scope-suggestion error — alias columns via SELECT col AS "from", col2 AS "to".
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
+codemap query --recipe deprecated-symbols --ci                    # CI shortcut: --format sarif + non-zero exit + quiet
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
+# Render any audit/SARIF output as a markdown PR-summary comment (for repos without
+# Code Scanning / aggregate audit deltas / bot-context seeding):
+codemap audit --base origin/main --json | codemap pr-comment - | gh pr comment <PR> -F -
 codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'
 codemap query --format diff 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern'
 codemap query --format diff-json 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern' | jq '.summary'

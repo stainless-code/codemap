@@ -26,6 +26,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: false,
       format: "text",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -42,6 +43,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -58,6 +60,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: false,
       format: "text",
+      ci: false,
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
@@ -74,6 +77,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: true,
       format: "json",
+      ci: false,
       summary: true,
       changedSince: undefined,
       recipeId: undefined,
@@ -92,6 +96,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: false,
       format: "text",
+      ci: false,
       summary: true,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -113,6 +118,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT 1",
       json: false,
       format: "text",
+      ci: false,
       summary: false,
       changedSince: "origin/main",
       recipeId: undefined,
@@ -138,6 +144,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: "HEAD~3",
       recipeId: "fan-out",
@@ -160,6 +167,7 @@ describe("parseQueryRest", () => {
       sql: "SELECT * FROM symbols",
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: undefined,
@@ -178,6 +186,7 @@ describe("parseQueryRest", () => {
       sql: sql!,
       json: false,
       format: "text",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-in",
@@ -185,6 +194,52 @@ describe("parseQueryRest", () => {
       saveBaseline: undefined,
       baseline: undefined,
     });
+  });
+
+  it("parses --ci as alias for --format sarif + ci flag", () => {
+    const r = parseQueryRest(["query", "--ci", "-r", "deprecated-symbols"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+    expect(r.ci).toBe(true);
+  });
+
+  it("rejects --ci + --json (mutually exclusive aliases)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--ci",
+      "--json",
+      "-r",
+      "deprecated-symbols",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--ci");
+  });
+
+  it("rejects --ci + --format json (contradicting alias)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--ci",
+      "--format",
+      "json",
+      "-r",
+      "deprecated-symbols",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--ci");
+  });
+
+  it("accepts --ci + --format sarif (redundant but consistent)", () => {
+    const r = parseQueryRest([
+      "query",
+      "--ci",
+      "--format",
+      "sarif",
+      "-r",
+      "deprecated-symbols",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("sarif");
+    expect(r.ci).toBe(true);
   });
 
   it("errors when --group-by has no mode", () => {
@@ -382,6 +437,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       sql: sql!,
       json: false,
       format: "text",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample-json",
@@ -400,6 +456,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       sql: sql!,
       json: false,
       format: "text",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -465,6 +522,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       sql: sql!,
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out-sample",
@@ -483,6 +541,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       sql: sql!,
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
@@ -501,6 +560,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
       sql: sql!,
       json: true,
       format: "json",
+      ci: false,
       summary: false,
       changedSince: undefined,
       recipeId: "fan-out",
