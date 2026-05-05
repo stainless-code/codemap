@@ -217,4 +217,33 @@ describe("renderSarifComment", () => {
     expect(r.findings_count).toBe(75);
     expect(r.markdown).toContain("… and 25 more");
   });
+
+  it("aggregates results across multi-run SARIF docs (not just runs[0])", () => {
+    // SARIF spec allows multiple runs (merged / multi-tool); aggregator
+    // shouldn't drop entries from runs[1+].
+    const r = renderSarifComment({
+      version: "2.1.0",
+      runs: [
+        {
+          tool: {
+            driver: { name: "codemap", rules: [{ id: "rule.a", name: "a" }] },
+          },
+          results: [{ ruleId: "rule.a", message: { text: "from run 0" } }],
+        },
+        {
+          tool: {
+            driver: { name: "other", rules: [{ id: "rule.b", name: "b" }] },
+          },
+          results: [
+            { ruleId: "rule.b", message: { text: "from run 1" } },
+            { ruleId: "rule.b", message: { text: "another from run 1" } },
+          ],
+        },
+      ],
+    });
+    expect(r.findings_count).toBe(3);
+    expect(r.markdown).toContain("from run 0");
+    expect(r.markdown).toContain("from run 1");
+    expect(r.markdown).toContain("another from run 1");
+  });
 });

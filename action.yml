@@ -180,6 +180,11 @@ runs:
           exit 1
         fi
 
+        if [ "$MODE" = "command" ] && [ -z "$COMMAND" ]; then
+          echo "::error::codemap action: mode='command' requires the 'command' input (raw CLI args)."
+          exit 1
+        fi
+
     - name: Run codemap
       if: steps.gate.outputs.skip != 'true'
       id: run

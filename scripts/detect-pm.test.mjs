@@ -86,30 +86,43 @@ describe("scripts/detect-pm.mjs", () => {
     expect(out.install_method).toBe("dlx-latest");
   });
 
-  it("uses execute-local when codemap is in devDependencies", () => {
-    const dir = makeFixture("dev-dep-fixture", {
+  it("uses execute-local when @stainless-code/codemap is in devDependencies (scoped name)", () => {
+    const dir = makeFixture("scoped-dev-dep-fixture", {
       "package.json": JSON.stringify({
-        devDependencies: { codemap: "^1.0.0" },
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
       }),
       "package-lock.json": "{}",
     });
     const out = runDetect({ WORKING_DIRECTORY: dir });
     expect(out.agent).toBe("npm");
     expect(out.install_method).toBe("project-installed");
+    // bin alias is `codemap` regardless of the scoped package name
     expect(out.exec).toContain("codemap");
-    expect(out.exec).not.toContain("codemap@");
+    expect(out.exec).not.toContain("@stainless-code/codemap@");
   });
 
-  it("uses dlx-pinned when version input is set (overrides project install)", () => {
+  it("uses execute-local when bare `codemap` key is set (workspace alias case)", () => {
+    const dir = makeFixture("bare-dev-dep-fixture", {
+      "package.json": JSON.stringify({
+        devDependencies: { codemap: "workspace:*" },
+      }),
+      "package-lock.json": "{}",
+    });
+    const out = runDetect({ WORKING_DIRECTORY: dir });
+    expect(out.install_method).toBe("project-installed");
+  });
+
+  it("uses dlx-pinned with scoped published name when version input is set", () => {
     const dir = makeFixture("pinned-fixture", {
       "package.json": JSON.stringify({
-        devDependencies: { codemap: "^1.0.0" },
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
       }),
       "package-lock.json": "{}",
     });
     const out = runDetect({ WORKING_DIRECTORY: dir, VERSION: "1.2.3" });
     expect(out.install_method).toBe("dlx-pinned");
-    expect(out.exec).toContain("codemap@1.2.3");
+    // dlx must use the scoped name so the right registry entry resolves
+    expect(out.exec).toContain("@stainless-code/codemap@1.2.3");
   });
 
   it("respects PACKAGE_MANAGER override", () => {

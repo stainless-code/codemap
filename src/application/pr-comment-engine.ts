@@ -146,7 +146,8 @@ export function renderSarifComment(doc: SarifDocument): RenderedComment {
   lines.push("## codemap findings");
   lines.push("");
 
-  const results = doc.runs?.[0]?.results ?? [];
+  // SARIF supports multi-run docs (merged / multi-tool); flatten so we don't under-report.
+  const results = (doc.runs ?? []).flatMap((run) => run.results ?? []);
   if (results.length === 0) {
     lines.push("✅ No findings.");
     return {

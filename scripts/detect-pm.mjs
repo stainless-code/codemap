@@ -41,13 +41,15 @@ async function main() {
     agent = detected?.agent ?? "npm";
   }
 
-  // Per Q3's three-branch resolution (docs/plans/github-marketplace-action.md).
+  // Per Q3 (docs/plans/github-marketplace-action.md). `execute-local` resolves
+  // the `codemap` bin alias; `execute` (dlx) needs the scoped registry name.
+  const PUBLISHED_NAME = "@stainless-code/codemap";
   let intent;
   let commandArgs;
   let installMethod;
   if (versionInput !== "") {
     intent = "execute";
-    commandArgs = [`codemap@${versionInput}`];
+    commandArgs = [`${PUBLISHED_NAME}@${versionInput}`];
     installMethod = "dlx-pinned";
   } else if (codemapInDevDependencies(workingDir)) {
     intent = "execute-local";
@@ -55,7 +57,7 @@ async function main() {
     installMethod = "project-installed";
   } else {
     intent = "execute";
-    commandArgs = ["codemap@latest"];
+    commandArgs = [`${PUBLISHED_NAME}@latest`];
     installMethod = "dlx-latest";
   }
 
@@ -82,16 +84,24 @@ async function main() {
   );
 }
 
-/** False on read errors / missing manifest. */
+// Scoped published name + bare bin name (workspace aliases use the latter).
+const CODEMAP_DEP_KEYS = ["@stainless-code/codemap", "codemap"];
+
 function codemapInDevDependencies(workingDir) {
   try {
     const manifestPath = join(workingDir, "package.json");
     if (!existsSync(manifestPath)) return false;
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    return Boolean(
-      manifest?.dependencies?.codemap ||
-      manifest?.devDependencies?.codemap ||
-      manifest?.optionalDependencies?.codemap,
+    const buckets = [
+      manifest?.dependencies,
+      manifest?.devDependencies,
+      manifest?.optionalDependencies,
+    ];
+    return buckets.some(
+      (b) =>
+        b !== null &&
+        b !== undefined &&
+        CODEMAP_DEP_KEYS.some((k) => b[k] !== undefined),
     );
   } catch {
     return false;

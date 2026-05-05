@@ -610,7 +610,9 @@ describe("formatAuditSarif", () => {
     ]);
     expect(run.results).toHaveLength(3);
     // Severity = warning (audit deltas are more actionable than per-recipe `note`)
-    expect(run.results.every((r: { level: string }) => r.level === "warning"));
+    expect(
+      run.results.every((r: { level: string }) => r.level === "warning"),
+    ).toBe(true);
     // Locations auto-detected per row
     expect(
       run.results[0].locations[0].physicalLocation.artifactLocation.uri,

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readSync } from "node:fs";
 
 import {
   detectCommentInputShape,
@@ -199,7 +199,7 @@ function readStdinSync(): string {
   while (true) {
     let n: number;
     try {
-      n = require("node:fs").readSync(0, buffer, 0, buffer.length, null);
+      n = readSync(0, buffer, 0, buffer.length, null);
     } catch {
       break;
     }
