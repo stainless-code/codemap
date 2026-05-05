@@ -38,7 +38,7 @@ That's the full setup. On every PR, the Action audits structural drift against t
 
 Most static-analysis tools answer their own questions and hand you a verdict. Codemap inverts that posture: it ships the **substrate**, you write the question.
 
-The substrate is a SQLite database with 14 tables — `symbols`, `imports`, `exports`, `dependencies`, `calls`, `components`, `type_members`, `markers`, `css_variables`, `css_classes`, `css_keyframes`, `coverage`, `boundary_rules`, `query_baselines`. The questions are SQL: 20+ bundled recipes you can read with `--print-sql`, modify, fork, or replace. JOINs across tables let you ask things no verdict-shaped tool can pre-bake:
+The substrate is a SQLite database. The questions are SQL: 20+ bundled recipes you can read with `--print-sql`, modify, fork, or replace. JOINs across tables let you ask things no verdict-shaped tool can pre-bake:
 
 ```sql
 -- "TODO comments inside @deprecated functions in files with <50% coverage"
@@ -104,26 +104,16 @@ Each runs through the same `--format sarif | annotations | json | mermaid | diff
 
 ## What's in the index
 
-Indexed at parse time via [oxc](https://oxc.rs) (JS/TS) + [lightningcss](https://lightningcss.dev) (CSS) + a regex pass for markers:
+Indexed at parse time via [oxc](https://oxc.rs) (JS/TS) + [lightningcss](https://lightningcss.dev) (CSS) + a regex pass for markers. Highlights worth knowing:
 
-| Substrate             | What it captures                                                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `symbols`             | Functions, classes, consts, types — name, kind, file:line range, signature, JSDoc, `@deprecated`, `complexity`, `visibility` |
-| `imports` / `exports` | Per-file specifier lists with type-only flag, default flag, re-export source                                                 |
-| `dependencies`        | Resolved import edges (`from_path` → `to_path`)                                                                              |
-| `calls`               | Function-scoped call edges (`caller_scope` → `callee_name`), deduped per file                                                |
-| `components`          | React components with `props_type` + `hooks_used` JSON                                                                       |
-| `type_members`        | Field-level type inventory (interface / type alias / class member)                                                           |
-| `markers`             | TODO / FIXME / HACK / NOTE / XXX with file:line + content                                                                    |
-| `css_variables`       | CSS custom properties (`--token`) with scope                                                                                 |
-| `css_classes`         | CSS class names with `is_module` flag                                                                                        |
-| `css_keyframes`       | `@keyframes` declarations                                                                                                    |
-| `coverage`            | Istanbul JSON / LCOV ingested via `codemap ingest-coverage` — joinable to `symbols` for "untested AND dead" queries          |
-| `source_fts`          | Opt-in (`--with-fts` / `fts5: true`) full-text search joinable to every other table                                          |
-| `boundary_rules`      | Config-derived from `codemap.config.{ts,js,json}` — feeds the `boundary-violations` recipe                                   |
-| `query_baselines`     | Saved `query --save-baseline` snapshots; survive `--full` rebuilds                                                           |
+- **`calls`** — function-scoped caller → callee edges. Lets you ask "who calls this?" without grep.
+- **`components.hooks_used`** — JSON column listing the React hooks each component invokes.
+- **`coverage`** — Istanbul JSON / LCOV joinable to `symbols` for "structurally dead AND untested" queries.
+- **CSS substrate** — `css_variables` / `css_classes` / `css_keyframes` queryable alongside JS/TS, so design-token JOINs are one SQL away.
+- **`markers`** — TODO / FIXME / HACK / NOTE with file:line, JOINable to symbols for "TODOs inside `@deprecated` functions"-shaped questions.
+- **`source_fts`** (opt-in) — full-text body search JOINable to every other table when you flip on `fts5: true`.
 
-All `STRICT` mode tables. Schema versioned; reindex is idempotent + sub-second on incremental changes.
+Full schema reference: [`docs/architecture.md`](https://github.com/stainless-code/codemap/blob/main/docs/architecture.md#schema). All tables `STRICT` mode; schema versioned.
 
 ## Supported file types
 
@@ -156,26 +146,6 @@ export default {
   ],
 };
 ```
-
-## CI gating
-
-Audit drift since the base ref:
-
-```bash
-codemap audit --base origin/main --ci
-```
-
-Recipe-driven gating on findings:
-
-```bash
-codemap query --recipe untested-and-dead --ci
-codemap query --recipe boundary-violations --ci
-codemap query --recipe deprecated-symbols --ci
-```
-
-`--ci` aliases `--format sarif` + non-zero exit on findings + quiet stdout. Pipe directly to GitHub Code Scanning, or render as a PR-conversation comment via `codemap pr-comment`.
-
----
 
 ## Quick start
 
@@ -293,13 +263,13 @@ The Action also exposes a few step outputs (`exec`, `agent`, `install_method`, `
 
 ## Four transports, one engine
 
-The same engines back every surface; switch transports without re-learning anything.
+The same engines back every surface — pick the right transport for each consumer:
 
-- **CLI** — `npx @stainless-code/codemap …`. 12+ verbs: `query`, `audit`, `show`, `snippet`, `impact`, `context`, `validate`, `watch`, `ingest-coverage`, `pr-comment`, `agents init`, `mcp`, `serve`.
-- **MCP server** — `codemap mcp` over stdio. Every CLI verb maps to a JSON-RPC tool; six lazy-cached resources (`codemap://recipes`, `codemap://recipes/{id}`, `codemap://schema`, `codemap://files/{path}`, `codemap://symbols/{name}`, `codemap://skill`).
-- **HTTP server** — `codemap serve` exposes the same tool set over `POST /tool/{name}` for non-MCP consumers (curl, IDE plugins, CI scripts that don't speak MCP). Loopback default; optional `--token` Bearer auth.
-- **GitHub Action** — this listing. Wraps the CLI for CI; emits SARIF → Code Scanning + optional PR comment.
-- **Watch mode** (standalone or layered into `mcp` / `serve`, default ON) — chokidar-backed live reindex; consumers always read fresh state.
+- **GitHub Action** — this listing. CI wrapper; SARIF → Code Scanning + optional PR comment.
+- **CLI** (`npx @stainless-code/codemap`) — local development, scripts, CI without the Action wrapper.
+- **MCP server** (`codemap mcp`) — stdio JSON-RPC for Claude Code, Cursor, Codex, Windsurf.
+- **HTTP server** (`codemap serve`) — `POST /tool/{name}` for non-MCP consumers (curl, IDE plugins, CI scripts that don't speak MCP).
+- **Watch mode** — layered into `mcp` / `serve` by default (or run standalone). Live reindex via chokidar so consumers always read fresh state.
 
 LSP support (recipes-as-squigglies in VS Code + Open VSX) is tracked on the roadmap.
 
@@ -314,16 +284,6 @@ LSP support (recipes-as-squigglies in VS Code + Open VSX) is tracked on the road
 - `contents: read` — checkout the repo.
 - `security-events: write` — `upload-sarif: true` (default) writes to Code Scanning.
 - `pull-requests: write` — `pr-comment: true` posts a comment.
-
-## How it works
-
-1. **Skip-on-non-PR-events** without `command:` set — friendly log + exit 0.
-2. **Detect package manager** via [`package-manager-detector`](https://github.com/antfu-collective/package-manager-detector) (lockfile → `packageManager` field → `devEngines.packageManager` → install-metadata → walk-up → `npm` fallback).
-3. **Resolve CLI invocation** — project-installed first, `dlx` fallback. `version:` input forces a pinned `dlx`.
-4. **Validate inputs** — `mode: recipe` without `recipe:` is a hard error; `mode: aggregate` reserved for v1.x.
-5. **Run codemap** — SARIF / JSON / annotations / mermaid / diff written to `output-path`.
-6. **Upload SARIF** to Code Scanning (if `upload-sarif: true` and `format: sarif`).
-7. **Post PR comment** via `codemap pr-comment | gh pr comment` (if `pr-comment: true` on `pull_request`).
 
 ## Versioning
 
