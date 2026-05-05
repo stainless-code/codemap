@@ -1,0 +1,18 @@
+[
+  {
+    "owner_type": "Transport",
+    "member": "handshakeMs",
+    "member_type": "number",
+    "is_optional": 0,
+    "is_readonly": 1,
+    "file_path": "src/api/client.ts"
+  },
+  {
+    "owner_type": "Transport",
+    "member": "socketUrl",
+    "member_type": "string",
+    "is_optional": 0,
+    "is_readonly": 1,
+    "file_path": "src/api/client.ts"
+  }
+]

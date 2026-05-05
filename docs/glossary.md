@@ -121,22 +121,23 @@ Output mode rendering `{from, to, label?, kind?}` rows as a Mermaid `flowchart L
 
 ### `coverage` (table)
 
-Static statement coverage ingested from Istanbul JSON or LCOV via `codemap ingest-coverage <path>`. Natural-key PK `(file_path, name, line_start)` — intentionally **not** a FK to `symbols.id` because `symbols` re-creates with fresh AUTOINCREMENT ids on every `--full` reindex; the natural-key approach lets coverage rows survive that churn (`coverage` is also intentionally absent from `dropAll()`, joins the `query_baselines` precedent). Columns: `coverage_pct REAL` (`NULL` when `total_statements = 0` — "untested" and "no testable code" are different signals), `hit_statements`, `total_statements`. Orphan rows (file deleted from project) are cleaned by an explicit `DELETE FROM coverage WHERE file_path NOT IN (SELECT path FROM files)` at the end of every ingest. Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record freshness — single ingest at a time, so format is meta-level not per-row.
+Statement coverage ingested from Istanbul JSON, LCOV, or V8 runtime (`NODE_V8_COVERAGE=...` directory via `--runtime`) via `codemap ingest-coverage <path>`. Natural-key PK `(file_path, name, line_start)` — intentionally **not** a FK to `symbols.id` because `symbols` re-creates with fresh AUTOINCREMENT ids on every `--full` reindex; the natural-key approach lets coverage rows survive that churn (`coverage` is also intentionally absent from `dropAll()`, joins the `query_baselines` precedent). Columns: `coverage_pct REAL` (`NULL` when `total_statements = 0` — "untested" and "no testable code" are different signals), `hit_statements`, `total_statements`. Orphan rows (file deleted from project) are cleaned by an explicit `DELETE FROM coverage WHERE file_path NOT IN (SELECT path FROM files)` at the end of every ingest. Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record freshness — single ingest at a time, so format is meta-level not per-row.
 
-### `codemap ingest-coverage` / Istanbul JSON / LCOV / static coverage ingestion
+### `codemap ingest-coverage` / Istanbul JSON / LCOV / V8 runtime / static coverage ingestion
 
-`codemap ingest-coverage <path> [--json]` reads a static coverage artifact and writes statement-level rows into the `coverage` table. Two formats in v1:
+`codemap ingest-coverage <path> [--runtime] [--json]` reads a coverage artifact and writes statement-level rows into the `coverage` table. Three formats:
 
 - **Istanbul JSON** (`coverage-final.json`) — emitted natively by `c8`, `nyc`, `vitest --coverage --coverage.reporter=json`, `jest --coverage --coverageReporters=json`. Parser reads `statementMap` + `s` (per-statement hit counts).
-- **LCOV** (`lcov.info`) — emitted by `bun test --coverage`, `c8 --reporter=lcov`, every legacy stack. Parser tokenises `SF:` / `DA:<line>,<count>` / `end_of_record` records; ignores `TN:` / `FN:` / `BRDA:` / `LF:` / `LH:` (statement coverage only in v1).
+- **LCOV** (`lcov.info`) — emitted by `bun test --coverage`, `c8 --reporter=lcov`, every legacy stack. Parser tokenises `SF:` / `DA:<line>,<count>` / `end_of_record` records; ignores `TN:` / `FN:` / `BRDA:` / `LF:` / `LH:` (statement coverage only).
+- **V8 runtime** (with `--runtime`) — opt-in directory mode reading `NODE_V8_COVERAGE=...` per-process dumps (`coverage-<pid>-<ts>-<seq>.json`). Each script's byte-offset ranges are converted to per-line hit counts (innermost-wins: smaller ranges override the function-as-a-whole count). Skips non-`file://` URLs (Node internals, `evalmachine.<anonymous>`); merges duplicate-URL scripts across dumps. Useful for "delete cold code with stronger evidence" agent flows. **Local-only — SaaS aggregation explicitly out of scope** (different product class).
 
-Format auto-detected from extension (`.json` → istanbul, `.info` → lcov, directory → probe both, error if ambiguous). No `--source` flag (per the plan's "no half-way APIs" principle — adding a flag for what the engine can detect is API noise). Each statement projects onto the **innermost** enclosing symbol via JS-side `(line_end - line_start) ASC` tie-break — required because nested symbols (class methods inside classes, closures inside functions) would otherwise inflate `total_statements`. Statements that fall outside every symbol range (top-level expressions, side-effect imports) increment `skipped.statements_no_symbol` for observability. Three bundled recipes consume the table at first-class agent surface (no agent ever has to hand-compose the JOIN):
+Format auto-detected from extension (`.json` → istanbul, `.info` → lcov, directory → probe both, error if ambiguous); `--runtime` opts into V8 directory mode. Each statement projects onto the **innermost** enclosing symbol via JS-side `(line_end - line_start) ASC` tie-break — required because nested symbols (class methods inside classes, closures inside functions) would otherwise inflate `total_statements`. Statements that fall outside every symbol range (top-level expressions, side-effect imports) increment `skipped.statements_no_symbol` for observability. Three bundled recipes consume the table at first-class agent surface (no agent ever has to hand-compose the JOIN):
 
 - `untested-and-dead` — exported functions with no callers AND zero coverage (the killer recipe; ships with a name-collision mitigation guide in the recipe `.md`).
 - `files-by-coverage` — files ranked ascending by statement coverage (replaces a deferred `file_coverage` rollup table; aggregates the symbol-level table via index-bounded `GROUP BY`).
 - `worst-covered-exports` — top-20 worst-covered exported functions.
 
-Engine: `application/coverage-engine.ts` — pure `upsertCoverageRows({db, projectRoot, rows, format, sourcePath})` core consumed by both `ingestIstanbul` and `ingestLcov`.
+Engine: `application/coverage-engine.ts` — pure `upsertCoverageRows({db, projectRoot, rows, format, sourcePath})` core consumed by `ingestIstanbul`, `ingestLcov`, and `ingestV8`.
 
 ### `content_hash`
 
@@ -330,6 +331,10 @@ Key-value metadata table. Holds `schema_version`, `last_indexed_commit`, `indexe
 
 ## O
 
+### outcome aliases (`dead-code` / `deprecated` / `boundaries` / `hotspots` / `coverage-gaps`)
+
+Top-level CLI verbs that thin-wrap `query --recipe <id>`: `dead-code` → `untested-and-dead`, `deprecated` → `deprecated-symbols`, `boundaries` → `boundary-violations`, `hotspots` → `fan-in`, `coverage-gaps` → `worst-covered-exports`. Every `query` flag passes through (`--json`, `--format`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Mapping lives in `src/cli/aliases.ts` (`OUTCOME_ALIASES`). Capped at 5 to avoid alias-sprawl — promote a sixth only when the recipe becomes a headline outcome. Moat-A clean: the alias is a one-line rewrite, not a new primitive; the recipe IS the SQL.
+
 ### oxc-parser
 
 Rust-based TypeScript / JavaScript parser (NAPI bindings). Codemap's `src/parser.ts` uses it to extract symbols, imports, exports, components, type members, calls, and markers from `.ts` / `.tsx` / `.js` / `.jsx` (and `.mts` / `.cts` / `.mjs` / `.cjs`).
@@ -442,6 +447,10 @@ Integer constant in `src/db.ts`. Bumped whenever the DDL changes. `createSchema(
 ### snippet
 
 `codemap snippet <name>` — same lookup as **show**, but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since last index — line range may have shifted), and `missing` (true when file is gone). Per-execution shape mirrors `show`'s envelope; source/stale/missing are additive fields. Stale-file behavior: `source` is ALWAYS returned when the file exists; `stale: true` is metadata the agent reads (no refusal, no auto-reindex side-effects from a read tool — agent decides whether to act on possibly-shifted lines or run `codemap` first). See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+
+### `suppressions` (table) / `// codemap-ignore-next-line` / `// codemap-ignore-file`
+
+Opt-in substrate. Markers parser recognises `// codemap-ignore-next-line <recipe-id>` and `// codemap-ignore-file <recipe-id>` directives (also `#`, `--`, `<!--`, `/*` leaders for non-JS files) and writes to `suppressions(file_path, line_number, recipe_id)`. Two scopes encoded by `line_number`: positive integer = next-line (the directive sits one line above; `line_number` points at the suppressed line), `0` = file scope. Recipe authors opt in by `LEFT JOIN suppressions s ON s.file_path = … AND s.recipe_id = '<id>' AND (s.line_number = 0 OR s.line_number = <row's line>) WHERE s.id IS NULL`; ad-hoc SQL is unaffected. **Stays consistent with the "no opinionated rule engine" Floor** — no severity, no suppression-by-default, no universal-honor; the suppression is consumer-chosen substrate. The leader regex requires the directive to start a line (modulo whitespace) so it never matches inside string literals — both this clone's tests and recipe `.md` examples use the directive in prose without polluting the index. Bundled recipes that opt in: `untested-and-dead` (next-line + file), `unimported-exports` (file scope only — exports table has no `line_number` column).
 
 ### `codemap watch` / watch mode
 

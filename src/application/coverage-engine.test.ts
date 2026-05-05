@@ -1,4 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   closeDb,
@@ -11,9 +15,10 @@ import { openCodemapDatabase } from "../sqlite-db";
 import {
   ingestIstanbul,
   ingestLcov,
+  ingestV8,
   upsertCoverageRows,
 } from "./coverage-engine";
-import type { IstanbulPayload } from "./coverage-engine";
+import type { IstanbulPayload, V8ScriptCoverage } from "./coverage-engine";
 
 const PROJECT_ROOT = "/repo";
 
@@ -582,6 +587,207 @@ describe("coverage-engine", () => {
           ].join("\n"),
         });
         expect(result.ingested.symbols).toBe(1);
+      } finally {
+        closeDb(db);
+      }
+    });
+  });
+
+  describe("ingestV8", () => {
+    function makeTempProject(source: string): { root: string; url: string } {
+      const root = mkdtempSync(join(tmpdir(), "codemap-v8-"));
+      mkdirSync(join(root, "src"), { recursive: true });
+      const absSrcPath = join(root, "src", "a.ts");
+      writeFileSync(absSrcPath, source, "utf-8");
+      return { root, url: pathToFileURL(absSrcPath).toString() };
+    }
+
+    it("maps V8 byte-offset ranges to per-line hits and aggregates per symbol", () => {
+      // 4-line source. `outer` spans lines 1–4; `inner` spans line 2 only.
+      const source = [
+        "function outer() {",
+        "  function inner() { return 1; }",
+        "  inner();",
+        "}",
+      ].join("\n");
+      const { root, url } = makeTempProject(source);
+
+      const db = setupDb();
+      try {
+        // Symbols + files use project-relative paths (matches the indexer).
+        insertFile(db, { ...indexedFile("src/a.ts"), language: "ts" });
+        insertSymbols(db, [
+          fnSym("src/a.ts", "outer", 1, 4),
+          fnSym("src/a.ts", "inner", 2, 2),
+        ]);
+
+        // Whole-file range hit twice; inner range (line 2 only) hit zero times.
+        const scripts: V8ScriptCoverage[] = [
+          {
+            scriptId: "1",
+            url,
+            functions: [
+              {
+                functionName: "outer",
+                isBlockCoverage: true,
+                ranges: [
+                  { startOffset: 0, endOffset: source.length, count: 2 },
+                  {
+                    // The byte offsets of line 2: from end of line 1's \n
+                    startOffset: source.indexOf("function inner"),
+                    endOffset: source.indexOf("}", source.indexOf("inner")),
+                    count: 0,
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+
+        const result = ingestV8({
+          db,
+          projectRoot: root,
+          scripts,
+          sourcePath: join(root, ".cov"),
+        });
+        expect(result.format).toBe("v8");
+        expect(result.ingested.symbols).toBe(2);
+
+        const rows = db
+          .query(
+            "SELECT name, hit_statements, total_statements FROM coverage ORDER BY name",
+          )
+          .all() as Array<{
+          name: string;
+          hit_statements: number;
+          total_statements: number;
+        }>;
+        // Innermost-wins: inner range (count 0) overrode outer range (count 2) for line 2.
+        const inner = rows.find((r) => r.name === "inner")!;
+        const outer = rows.find((r) => r.name === "outer")!;
+        expect(inner.hit_statements).toBe(0);
+        expect(inner.total_statements).toBeGreaterThan(0);
+        expect(outer.hit_statements).toBe(outer.total_statements);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("skips scripts whose url isn't a file:// URL (Node internals, eval)", () => {
+      const db = setupDb();
+      try {
+        const result = ingestV8({
+          db,
+          projectRoot: "/repo",
+          sourcePath: "/cov",
+          scripts: [
+            {
+              scriptId: "1",
+              url: "node:internal/process/task_queues",
+              functions: [
+                {
+                  functionName: "x",
+                  isBlockCoverage: false,
+                  ranges: [{ startOffset: 0, endOffset: 10, count: 1 }],
+                },
+              ],
+            },
+            {
+              scriptId: "2",
+              url: "evalmachine.<anonymous>",
+              functions: [],
+            },
+          ],
+        });
+        expect(result.ingested).toEqual({ symbols: 0, files: 0 });
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("merges duplicate URL scripts (same file ingested by multiple V8 dumps)", () => {
+      const source = "function a() { return 1; }\n";
+      const { root, url } = makeTempProject(source);
+
+      const db = setupDb();
+      try {
+        insertFile(db, { ...indexedFile("src/a.ts"), language: "ts" });
+        insertSymbols(db, [fnSym("src/a.ts", "a", 1, 1)]);
+
+        const dup: V8ScriptCoverage = {
+          scriptId: "x",
+          url,
+          functions: [
+            {
+              functionName: "a",
+              isBlockCoverage: false,
+              ranges: [{ startOffset: 0, endOffset: source.length, count: 5 }],
+            },
+          ],
+        };
+        const result = ingestV8({
+          db,
+          projectRoot: root,
+          sourcePath: join(root, ".cov"),
+          scripts: [dup, dup, dup], // 3 duplicate dumps
+        });
+        // Deduplicated by URL → ingested once.
+        expect(result.ingested.files).toBe(1);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    it("merges duplicate-URL scripts via Math.max (multi-process must not zero out another process's hit)", () => {
+      const source = "function a() { return 1; }\n";
+      const { root, url } = makeTempProject(source);
+
+      const db = setupDb();
+      try {
+        insertFile(db, { ...indexedFile("src/a.ts"), language: "ts" });
+        insertSymbols(db, [fnSym("src/a.ts", "a", 1, 1)]);
+
+        // Process A hit `a()` 7 times; process B never hit it (count 0).
+        const hot: V8ScriptCoverage = {
+          scriptId: "1",
+          url,
+          functions: [
+            {
+              functionName: "a",
+              isBlockCoverage: false,
+              ranges: [{ startOffset: 0, endOffset: source.length, count: 7 }],
+            },
+          ],
+        };
+        const cold: V8ScriptCoverage = {
+          scriptId: "2",
+          url,
+          functions: [
+            {
+              functionName: "a",
+              isBlockCoverage: false,
+              ranges: [{ startOffset: 0, endOffset: source.length, count: 0 }],
+            },
+          ],
+        };
+
+        const result = ingestV8({
+          db,
+          projectRoot: root,
+          sourcePath: join(root, ".cov"),
+          // `cold` last — would have zeroed line 1 with last-writer-wins.
+          scripts: [hot, cold],
+        });
+        expect(result.ingested.files).toBe(1);
+
+        const row = db
+          .query(
+            "SELECT hit_statements, total_statements FROM coverage WHERE name = 'a'",
+          )
+          .get() as { hit_statements: number; total_statements: number };
+        // Line 1 carries hot's count=7 → line is hit; total = total = 1.
+        expect(row.hit_statements).toBe(row.total_statements);
+        expect(row.hit_statements).toBeGreaterThan(0);
       } finally {
         closeDb(db);
       }

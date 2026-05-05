@@ -5,6 +5,7 @@ import type {
   ExportRow,
   ComponentRow,
   MarkerRow,
+  SuppressionRow,
   CssVariableRow,
   CssClassRow,
   CssKeyframeRow,
@@ -33,6 +34,7 @@ export interface ParsedFile {
   exports?: ExportRow[];
   components?: ComponentRow[];
   markers?: MarkerRow[];
+  suppressions?: SuppressionRow[];
   typeMembers?: TypeMemberRow[];
   calls?: CallRow[];
   /** CSS-only fields (populated when `category === "css"`). */

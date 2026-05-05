@@ -1,12 +1,18 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
-import { ingestIstanbul, ingestLcov } from "../application/coverage-engine";
+import {
+  ingestIstanbul,
+  ingestLcov,
+  ingestV8,
+} from "../application/coverage-engine";
 import type {
   CoverageFormat,
   IngestResult,
   IstanbulPayload,
+  V8CoveragePayload,
+  V8ScriptCoverage,
 } from "../application/coverage-engine";
 import { closeDb, openDb } from "../db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
@@ -18,34 +24,41 @@ interface IngestCoverageOpts {
   /** Resolved absolute path to coverage-final.json, lcov.info, or a directory. */
   path: string;
   json: boolean;
+  /** Treat <path> as a NODE_V8_COVERAGE directory (one or more `coverage-*.json` files). */
+  runtime: boolean;
 }
 
 const ISTANBUL_FILENAME = "coverage-final.json";
 const LCOV_FILENAME = "lcov.info";
 
 export function printIngestCoverageCmdHelp(): void {
-  console.log(`Usage: codemap ingest-coverage <path> [--json]
+  console.log(`Usage: codemap ingest-coverage <path> [--runtime] [--json]
 
-Ingest a static coverage artifact into the index so structural queries
-can compose coverage filters in pure SQL. No test runner is invoked —
-codemap reads what \`bun test\`, \`vitest\`, \`jest\`, \`c8\`, \`nyc\`
-already produce.
+Ingest a coverage artifact into the index so structural queries can
+compose coverage filters in pure SQL. No test runner is invoked —
+codemap reads what \`bun test\`, \`vitest\`, \`jest\`, \`c8\`, \`nyc\`,
+or Node's V8 protocol already produce.
 
 Args:
   <path>          Path to one of:
                     - coverage-final.json (Istanbul)
                     - lcov.info (LCOV; e.g. \`bun test --coverage\`)
                     - a directory containing exactly one of the above
+                    - a NODE_V8_COVERAGE directory (with --runtime)
 
 Format auto-detected from filename / extension. Errors if a directory
 holds both \`coverage-final.json\` and \`lcov.info\` (no precedence guess).
 
 Flags:
+  --runtime       Treat <path> as a NODE_V8_COVERAGE directory and merge
+                  every \`coverage-*.json\` inside it. Skip files whose
+                  \`url\` isn't \`file://\` (Node internals, eval). Local
+                  use only — no SaaS aggregation.
   --json          Emit the result envelope on stdout. Default: human text.
   --help, -h      Show this help.
 
 Output (JSON):
-  { "format": "istanbul"|"lcov",
+  { "format": "istanbul"|"lcov"|"v8",
     "ingested": { "symbols": N, "files": M },
     "skipped": { "unmatched_files": K, "statements_no_symbol": S },
     "pruned_orphans": O }
@@ -54,6 +67,8 @@ Examples:
   codemap ingest-coverage coverage/coverage-final.json
   codemap ingest-coverage coverage/lcov.info
   codemap ingest-coverage coverage --json
+  NODE_V8_COVERAGE=.cov bun test
+  codemap ingest-coverage .cov --runtime --json
 `);
 }
 
@@ -62,17 +77,22 @@ export function parseIngestCoverageRest(
 ):
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; path: string; json: boolean } {
+  | { kind: "run"; path: string; json: boolean; runtime: boolean } {
   if (rest[0] !== "ingest-coverage") {
     throw new Error("parseIngestCoverageRest: expected ingest-coverage");
   }
   let path: string | undefined;
   let json = false;
+  let runtime = false;
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--json") {
       json = true;
+      continue;
+    }
+    if (a === "--runtime") {
+      runtime = true;
       continue;
     }
     if (a.startsWith("-")) {
@@ -95,7 +115,7 @@ export function parseIngestCoverageRest(
       message: `codemap ingest-coverage: missing <path>. Run \`codemap ingest-coverage --help\` for usage.`,
     };
   }
-  return { kind: "run", path, json };
+  return { kind: "run", path, json, runtime };
 }
 
 /**
@@ -136,6 +156,34 @@ function resolveArtifact(
   );
 }
 
+/** Filters to NODE_V8_COVERAGE's `coverage-<pid>-<ts>-<seq>.json` shape so a wrong dir errors loudly instead of producing a zero-row "successful" ingest. */
+const V8_FILENAME_RE = /^coverage-.*\.json$/;
+
+function resolveV8Directory(
+  inputPath: string,
+  cwd: string,
+): { absDir: string; jsonFiles: string[] } {
+  const abs = isAbsolute(inputPath) ? inputPath : resolve(cwd, inputPath);
+  if (!existsSync(abs)) {
+    throw new Error(`codemap ingest-coverage: path not found: ${abs}`);
+  }
+  const stat = statSync(abs);
+  if (!stat.isDirectory()) {
+    throw new Error(
+      `codemap ingest-coverage --runtime: expected a directory (NODE_V8_COVERAGE-style), got file ${abs}`,
+    );
+  }
+  const jsonFiles = readdirSync(abs)
+    .filter((f) => V8_FILENAME_RE.test(f))
+    .map((f) => join(abs, f));
+  if (jsonFiles.length === 0) {
+    throw new Error(
+      `codemap ingest-coverage --runtime: directory ${abs} contains no coverage-*.json files. NODE_V8_COVERAGE writes coverage-<pid>-<ts>-<seq>.json — point --runtime at the directory the test runner wrote to.`,
+    );
+  }
+  return { absDir: abs, jsonFiles };
+}
+
 /**
  * Read a JSON file via the canonical Node-vs-Bun split — Bun.file().json()
  * uses Bun's native parser (materially faster on multi-MB Istanbul payloads);
@@ -162,27 +210,50 @@ export async function runIngestCoverageCmd(
 ): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-    const { format, absPath } = resolveArtifact(opts.path, opts.root);
 
     let result: IngestResult;
+    let displayPath: string;
     const db = openDb();
     try {
-      if (format === "istanbul") {
-        const payload = (await readJsonFile(absPath)) as IstanbulPayload;
-        result = ingestIstanbul({
+      if (opts.runtime) {
+        const { absDir, jsonFiles } = resolveV8Directory(opts.path, opts.root);
+        displayPath = absDir;
+        const scripts: V8ScriptCoverage[] = [];
+        for (const file of jsonFiles) {
+          const payload = (await readJsonFile(file)) as V8CoveragePayload;
+          if (Array.isArray(payload?.result)) scripts.push(...payload.result);
+        }
+        if (scripts.length === 0) {
+          throw new Error(
+            `codemap ingest-coverage --runtime: ${jsonFiles.length} coverage-*.json file(s) under ${absDir} contained no V8 \`result\` arrays. Confirm the directory is the one NODE_V8_COVERAGE wrote to.`,
+          );
+        }
+        result = ingestV8({
           db,
           projectRoot: opts.root,
-          payload,
-          sourcePath: absPath,
+          scripts,
+          sourcePath: absDir,
         });
       } else {
-        const payload = await readTextFile(absPath);
-        result = ingestLcov({
-          db,
-          projectRoot: opts.root,
-          payload,
-          sourcePath: absPath,
-        });
+        const { format, absPath } = resolveArtifact(opts.path, opts.root);
+        displayPath = absPath;
+        if (format === "istanbul") {
+          const payload = (await readJsonFile(absPath)) as IstanbulPayload;
+          result = ingestIstanbul({
+            db,
+            projectRoot: opts.root,
+            payload,
+            sourcePath: absPath,
+          });
+        } else {
+          const payload = await readTextFile(absPath);
+          result = ingestLcov({
+            db,
+            projectRoot: opts.root,
+            payload,
+            sourcePath: absPath,
+          });
+        }
       }
     } finally {
       closeDb(db);
@@ -192,7 +263,7 @@ export async function runIngestCoverageCmd(
       console.log(JSON.stringify(result));
       return;
     }
-    renderTerminal(result, absPath);
+    renderTerminal(result, displayPath);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (opts.json) {

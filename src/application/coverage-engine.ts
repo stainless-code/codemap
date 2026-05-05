@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import type { CodemapDatabase } from "../db";
 import { toProjectRelative } from "./validate-engine";
 
@@ -17,7 +20,7 @@ export interface CoverageRow {
 }
 
 /** Source format detected by the CLI auto-detector. */
-export type CoverageFormat = "istanbul" | "lcov";
+export type CoverageFormat = "istanbul" | "lcov" | "v8";
 
 export interface IngestResult {
   ingested: { symbols: number; files: number };
@@ -350,4 +353,151 @@ export function ingestLcov(opts: LcovParserOpts): IngestResult {
     format: "lcov",
     sourcePath,
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* V8 runtime coverage parser                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Subset of V8's coverage protocol shape (`NODE_V8_COVERAGE=...` per-process dump).
+ * `ranges` carry byte offsets, NOT lines; with `isBlockCoverage: true` the outer
+ * range is function-level and inner ranges are nested basic blocks.
+ */
+export interface V8FunctionCoverage {
+  functionName: string;
+  isBlockCoverage: boolean;
+  ranges: Array<{
+    startOffset: number;
+    endOffset: number;
+    count: number;
+  }>;
+}
+
+export interface V8ScriptCoverage {
+  scriptId: string;
+  url: string;
+  functions: V8FunctionCoverage[];
+}
+
+export interface V8CoveragePayload {
+  result: V8ScriptCoverage[];
+}
+
+interface V8ParserOpts {
+  db: CodemapDatabase;
+  projectRoot: string;
+  /** All `result` entries merged from every `coverage-*.json` in the dir. */
+  scripts: V8ScriptCoverage[];
+  /** Absolute path of the directory; threaded into `meta`. */
+  sourcePath: string;
+}
+
+/**
+ * Parse merged V8 ScriptCoverage entries and dispatch to {@link upsertCoverageRows}.
+ * Per-line hit counts: walk each function's ranges largest→smallest, last write
+ * wins → innermost-wins semantics matching V8's documented model.
+ */
+export function ingestV8(opts: V8ParserOpts): IngestResult {
+  const { scripts, sourcePath, ...rest } = opts;
+  const rows: CoverageRow[] = [];
+
+  // Group by URL so duplicate dumps (multi-process test run) merge before
+  // emit; otherwise upsert would inflate `total_statements`.
+  const scriptsByUrl = new Map<string, V8ScriptCoverage[]>();
+  for (const script of scripts) {
+    if (!script?.url) continue;
+    // V8 reports `node:internal/...`, `evalmachine.<anonymous>`, etc.
+    if (!script.url.startsWith("file://")) continue;
+    const list = scriptsByUrl.get(script.url) ?? [];
+    list.push(script);
+    scriptsByUrl.set(script.url, list);
+  }
+
+  for (const [url, urlScripts] of scriptsByUrl) {
+    let absPath: string;
+    try {
+      absPath = fileURLToPath(url);
+    } catch {
+      continue;
+    }
+    let source: string;
+    try {
+      source = readFileSync(absPath, "utf-8");
+    } catch {
+      // File deleted between test run and ingest; upsertCoverageRows would
+      // also surface this as `unmatched_files` if we'd let it through.
+      continue;
+    }
+
+    const lineOffsets = buildLineOffsets(source);
+    const lineHits: (number | undefined)[] = new Array(lineOffsets.length + 1);
+
+    for (const script of urlScripts) {
+      // Per-script innermost-wins, cross-script `Math.max` merge — a
+      // process that didn't hit a line must NOT zero out another's count.
+      const scriptHits: (number | undefined)[] = new Array(
+        lineOffsets.length + 1,
+      );
+      for (const fn of script.functions ?? []) {
+        const sorted = (fn.ranges ?? [])
+          .slice()
+          .sort(
+            (a, b) =>
+              b.endOffset - b.startOffset - (a.endOffset - a.startOffset),
+          );
+        for (const range of sorted) {
+          const startLine = offsetToLine(lineOffsets, range.startOffset);
+          const endLine = offsetToLine(lineOffsets, range.endOffset);
+          for (let line = startLine; line <= endLine; line++) {
+            // Innermost-wins within this script: last write is the smallest range.
+            scriptHits[line] = range.count;
+          }
+        }
+      }
+      for (let line = 1; line < scriptHits.length; line++) {
+        const hit = scriptHits[line];
+        if (hit === undefined) continue;
+        lineHits[line] = Math.max(lineHits[line] ?? 0, hit);
+      }
+    }
+
+    for (let line = 1; line < lineHits.length; line++) {
+      const hit = lineHits[line];
+      if (hit === undefined) continue;
+      rows.push({ file_path: absPath, line, hit_count: hit });
+    }
+  }
+
+  return upsertCoverageRows({
+    ...rest,
+    rows,
+    format: "v8",
+    sourcePath,
+  });
+}
+
+/**
+ * `offsets[i]` = UTF-16 code-unit position where line `i + 1` starts —
+ * matches V8's source-offset units (Chrome DevTools `Profiler.CoverageRange`
+ * spec); no UTF-8 byte conversion needed.
+ */
+function buildLineOffsets(source: string): number[] {
+  const offsets: number[] = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source.charCodeAt(i) === 10) offsets.push(i + 1);
+  }
+  return offsets;
+}
+
+/** Binary search → 1-indexed line containing `offset`. */
+function offsetToLine(lineOffsets: number[], offset: number): number {
+  let lo = 0;
+  let hi = lineOffsets.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (lineOffsets[mid] <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1;
 }

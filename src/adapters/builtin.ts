@@ -1,5 +1,5 @@
 import { extractCssData } from "../css-parser";
-import { extractMarkers } from "../markers";
+import { extractMarkers, extractSuppressions } from "../markers";
 import { extractFileData } from "../parser";
 import type { LanguageAdapter, ParsedFilePayload, ParseContext } from "./types";
 
@@ -23,6 +23,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     exports: data.exports,
     components: data.components,
     markers: data.markers,
+    suppressions: extractSuppressions(ctx.source, ctx.relPath),
     typeMembers: data.typeMembers,
     calls: data.calls,
   };
@@ -36,6 +37,7 @@ function parseCss(ctx: ParseContext): ParsedFilePayload {
     cssClasses: cssData.classes,
     cssKeyframes: cssData.keyframes,
     markers: cssData.markers,
+    suppressions: extractSuppressions(ctx.source, ctx.relPath),
     cssImportSources: cssData.importSources,
   };
 }
@@ -44,6 +46,7 @@ function parseText(ctx: ParseContext): ParsedFilePayload {
   return {
     category: "text",
     markers: extractMarkers(ctx.source, ctx.relPath),
+    suppressions: extractSuppressions(ctx.source, ctx.relPath),
   };
 }
 

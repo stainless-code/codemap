@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -142,6 +142,16 @@ export function createTables(db: CodemapDatabase) {
       is_readonly INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
+    -- Opt-in suppressions — recipes LEFT JOIN to honor, ad-hoc SQL unaffected.
+    -- line_number > 0 = next-line scope (suppressed line). 0 = file scope.
+    -- Sourced from // codemap-ignore-{next-line,file} <recipe-id> directives (see markers.ts).
+    CREATE TABLE IF NOT EXISTS suppressions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      line_number INTEGER NOT NULL,
+      recipe_id TEXT NOT NULL
+    ) STRICT;
+
     CREATE TABLE IF NOT EXISTS meta (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -270,6 +280,10 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_markers_kind ON markers(kind, file_path, line_number, content);
     CREATE INDEX IF NOT EXISTS idx_markers_file ON markers(file_path);
 
+    -- Suppressions: most recipe LEFT JOINs key on (recipe_id, file_path[, line_number]).
+    CREATE INDEX IF NOT EXISTS idx_suppressions_lookup ON suppressions(recipe_id, file_path, line_number);
+    CREATE INDEX IF NOT EXISTS idx_suppressions_file ON suppressions(file_path);
+
     CREATE INDEX IF NOT EXISTS idx_css_variables_name ON css_variables(name, value, scope, file_path);
     CREATE INDEX IF NOT EXISTS idx_css_variables_file ON css_variables(file_path);
     CREATE INDEX IF NOT EXISTS idx_css_classes_name ON css_classes(name, file_path, is_module);
@@ -317,6 +331,7 @@ export function createSchema(db: CodemapDatabase) {
 export function dropAll(db: CodemapDatabase) {
   db.run(`
     DROP TABLE IF EXISTS calls;
+    DROP TABLE IF EXISTS suppressions;
     DROP TABLE IF EXISTS type_members;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
@@ -634,6 +649,26 @@ export function insertMarkers(db: CodemapDatabase, markers: MarkerRow[]) {
     "INSERT INTO markers (file_path, line_number, kind, content)",
     "(?,?,?,?)",
     (m, v) => v.push(m.file_path, m.line_number, m.kind, m.content),
+  );
+}
+
+/** Suppression marker; `line_number > 0` = next-line scope, `0` = file scope. See markers.ts + the `suppressions` DDL. */
+export interface SuppressionRow {
+  file_path: string;
+  line_number: number;
+  recipe_id: string;
+}
+
+export function insertSuppressions(
+  db: CodemapDatabase,
+  suppressions: SuppressionRow[],
+) {
+  batchInsert(
+    db,
+    suppressions,
+    "INSERT INTO suppressions (file_path, line_number, recipe_id)",
+    "(?,?,?)",
+    (s, v) => v.push(s.file_path, s.line_number, s.recipe_id),
   );
 }
 

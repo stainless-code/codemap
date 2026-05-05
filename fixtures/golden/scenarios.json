@@ -133,6 +133,11 @@
       "id": "worst-covered-exports",
       "prompt": "Top 20 worst-covered exported functions",
       "recipe": "worst-covered-exports"
+    },
+    {
+      "id": "unused-type-members",
+      "prompt": "Members of exported types whose owning type has no detectable importer (advisory; field-level enumeration of `unimported-exports`)",
+      "recipe": "unused-type-members"
     }
   ]
 }

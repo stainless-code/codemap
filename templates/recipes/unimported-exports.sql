@@ -19,6 +19,7 @@ WITH direct_uses AS (
   CROSS JOIN json_each(i.specifiers) j
   WHERE j.value = e.name OR j.value = '*'
 )
+-- File-scope suppressions only — `exports` has no line_number column.
 SELECT
   e.name,
   e.kind,
@@ -26,8 +27,13 @@ SELECT
   e.is_default,
   e.re_export_source
 FROM exports e
+LEFT JOIN suppressions s
+  ON s.file_path = e.file_path
+ AND s.recipe_id = 'unimported-exports'
+ AND s.line_number = 0
 WHERE e.id NOT IN (SELECT id FROM direct_uses)
   AND e.is_default = 0
   AND e.kind != 're-export'
+  AND s.id IS NULL
 ORDER BY e.file_path, e.name
 LIMIT 50
