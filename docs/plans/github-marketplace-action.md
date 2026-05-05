@@ -233,7 +233,54 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) — ship one verti
 2. **Slice 2: `action.yml` minimum.** Composite action with `command` + `working-directory` inputs only. Steps: detect package-manager (per Q2), install codemap (per Q3 — project-installed first, `'execute'` fallback), run `<resolved-cli> <input.command>`, upload SARIF artifact. Smoke-test via `act` or a sacrificial branch. End-to-end: PR opens → Action runs `codemap audit --base ${{ github.base_ref }} --ci` → artifact uploaded.
 3. **Slice 3: PR-comment writer (Q4 (b) summary only).** New `src/cli/cmd-pr-comment.ts`: takes SARIF or audit JSON, emits markdown summary. Action's optional final step calls it + posts via `gh pr comment`. Toggle via `pr-comment: true` Action input (default **`false`** for v1.0 — opt-in to avoid duplicating Code Scanning surfaces for users who already have GHAS). Default may flip in v1.x if usage shows the comment is universally expected.
 4. **Slice 4: dogfood on this repo.** Wire the published Action (or a local-path action ref during dev) into `.github/workflows/ci.yml`. The PR adding the Action's first release runs it on itself — eat-our-own-dogfood verifies the wrapper end-to-end before any external consumer sees it.
-5. **Slice 5: publish + Marketplace listing.** Tag `v1.0.0`, push fast-forward `@v1`, fill listing metadata (icon, description, tags). Verify discoverability. Update `README.md § CI` to lead with the Action. Update agent rule + skill (per [Rule 10](../README.md)) so agents recommending codemap CI integration cite the Action first.
+5. **Slice 5: publish + Marketplace listing.** Tag `v1.0.0`, push fast-forward `@v1`, fill listing metadata (icon, description, tags). Verify discoverability. Update `README.md § CI` to lead with the Action. Update agent rule + skill (per [Rule 10](../README.md)) so agents recommending codemap CI integration cite the Action first. Detailed runbook below.
+
+### Slice 5 runbook (post-merge — anyone can pick up)
+
+Slices 1-4 land in PR #74; Slice 5 is a sequenced manual runbook that requires a merged commit + access to the Marketplace publishing UI.
+
+**Pre-condition: CLI / Action version stream decoupling (per Q7).** The Action's `@v1` and the CLI's npm version live in separate namespaces — Action publishes at `v1.0.0` independent of CLI version. The Action's default invocation does `<pm> dlx codemap@latest`, so the CLI just needs the new `--format sarif` (audit) + `--ci` flags landed on npm. Earliest CLI version with both is `0.5.0` (changesets bumps from `0.4.0` for the new minor when PR #74 merges). **CLI v1.0.0 is not required** for Action v1.0.0.
+
+**Steps:**
+
+1. Merge PR #74.
+2. Changesets release workflow on `main` runs automatically → publishes CLI `0.5.0` (or whatever the bump resolves to) to npm.
+3. From the merge commit, tag git `v1.0.0`:
+   ```bash
+   git tag -a v1.0.0 -m "GitHub Marketplace Action v1"
+   git push origin v1.0.0
+   ```
+4. Force-push the floating `v1` tag to the same commit:
+   ```bash
+   git tag -f v1 v1.0.0
+   git push --force origin v1
+   ```
+5. **One-time Marketplace listing setup** (per Q10 checklist):
+   - Pick icon (reuse codemap brand asset if exists; else pick during this step).
+   - Brand colour: GitHub Marketplace palette.
+   - Tags: `code-quality`, `static-analysis`, `code-search`, `code-intelligence`. **Avoid `linter`** (Moat-A "no opinionated rule engine").
+   - Description (≤150 chars per Marketplace constraint): "SQL-queryable structural index of your codebase. Run any predicate as a recipe; CI gating via SARIF → Code Scanning."
+   - README: point Marketplace at `MARKETPLACE.md` (action-focused) rather than the codemap-CLI root README. Author `MARKETPLACE.md` in this step if it doesn't exist.
+   - Discipline: listing copy respects [`plan-pr-inspiration-discipline`](../../.agents/rules/plan-pr-inspiration-discipline.md) (no peer-tool comparisons in the listing) + aligns with [`docs/why-codemap.md`](../why-codemap.md).
+6. Smoke-test on a sacrificial public repo: `- uses: stainless-code/codemap@v1` in `.github/workflows/`; trigger a PR; verify SARIF surfaces in Code Scanning.
+7. Follow-up PR (post-publish):
+   - Update `README.md § CI` to lead with the Action.
+   - Flip `action-smoke` CI job from `continue-on-error: true` to a hard gate (Action now publishes a v1 with the right CLI flags, so the smoke meaningfully validates them).
+   - Per [`docs/README.md` Rule 3](../README.md), **delete `docs/plans/github-marketplace-action.md`**. Durable design decisions already live in:
+     - `docs/architecture.md` § "PR-comment wiring" + § "Audit wiring" + § "Output formatters" (CLI + engine seams)
+     - `docs/glossary.md` (`--ci` + `pr-comment` entries)
+     - `.agents/rules/codemap.md` + `templates/agents/rules/codemap.md` (agent surface)
+     - `MARKETPLACE.md` (consumer-facing)
+   - Remove the GitHub Marketplace Action backlog entry from `roadmap.md` per Rule 2.
+
+**Subsequent releases:** changesets-driven (existing pipeline). On every merge to `main` that bumps `package.json`:
+
+- Tag `v<major>.<minor>.<patch>` at the merge commit.
+- Force-push `v<major>` floating tag to the same commit (`git tag -f v<major> <sha> && git push --force origin v<major>`).
+- npm publish runs automatically.
+- Marketplace auto-syncs from the same git tag — no separate publish step.
+
+**Major bump (`v1.x.y → v2.0.0`):** create a new `v2` floating tag at the breaking-change commit; `v1` stops moving. Backports to `v1.x.y` are not promised (single-major-supported policy per Q7).
 
 ---
 
