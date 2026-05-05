@@ -33,7 +33,7 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors c9-plugin-
 - **Q1 — Repo structure (flat vs monorepo).** Add `lsp/` + `editors/vscode/` to current flat layout (no workspaces; Option 1)? Convert to monorepo first (`packages/codemap` + `packages/codemap-lsp` + `packages/codemap-vscode`; Option 2)? Combine convert + (d) impl in one PR (Option 3)? Trade-offs in [§ Repo-structure tradeoffs](#repo-structure-tradeoffs) below.
 - **Q2 — LSP server framework.** `vscode-languageserver` (Microsoft official, well-documented)? `vscode-jsonrpc` (lower-level, more control)? Custom over stdio? Bias toward `vscode-languageserver` for compatibility.
 - **Q3 — Extension-to-server transport.** Stdio (mirrors fallow + LSP convention)? Or skip LSP entirely and have extension call codemap MCP/HTTP directly? **L.1 already locks LSP shape**, so this is "stdio vs IPC" not "LSP yes/no" — bias toward stdio.
-- **Q4 — Which recipes become diagnostics in v1.** Candidate list: `untested-and-dead`, `unimported-exports`, `components-touching-deprecated`, `boundary-violations` (assuming § 1.5 ships first), `high-complexity-untested`, `deprecated-symbols` callers (need the call-site row, not the symbol row). Ship all 6 in v1 or start narrow?
+- **Q4 — Which recipes become diagnostics in v1.** Candidate list: `untested-and-dead`, `unimported-exports`, `components-touching-deprecated`, `boundary-violations` (shipped PR #72), `high-complexity-untested`, `deprecated-symbols` callers (need the call-site row from `calls`, not the symbol row from `symbols`). Ship all 6 in v1 or start narrow?
 - **Q5 — Diagnostic severity mapping.** `Error` for `boundary-violations`? `Warning` for `untested-and-dead` / `unimported-exports`? `Information` for `high-complexity-untested` / `deprecated-symbols` callers? Per-recipe configurable via `initializationOptions`?
 - **Q6 — Hover provider scope.** Hover on every indexed symbol with `signature` + `doc_comment` + `complexity` + caller-count? Or only on symbols that have at least one of those (avoid noise on plain locals)? Coverage % when available?
 - **Q7 — Code lens scope.** Fan-in count above functions? Complexity? Coverage? All three? Lens ON/OFF per kind via settings?
@@ -169,12 +169,13 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) — ship one verti
 
 ### Why this question surfaces now
 
-Two upcoming surfaces would each ship a **second binary or second publishable artifact**:
+Three upcoming surfaces would each ship a **second binary or second publishable artifact**:
 
 1. **(d) LSP diagnostic-push server + paired VSCode extension** — `codemap-lsp` Bun/Node binary + `codemap-vscode` extension package (published to VSCode Marketplace + Open VSX, NOT npm).
 2. **(b) C.9 community plugins** — per [c9-plugin-layer Q5/Q8](./c9-plugin-layer.md#open-decisions-iterate-as-the-plan-converges), the plugin contract may want plugins as separate npm packages (e.g. `codemap-plugin-nextjs`) so framework-specific knowledge lives outside core.
+3. **Docs site (Fumadocs / similar)** — a React-based docs site rendering existing `docs/*.md` content, deployed to Vercel or similar. Fumadocs is multi-framework (Next.js / Astro / Vite-based: Tanstack Start / Waku / React Router); the canonical adapter for "read existing markdown without MDX rewrite" is **`@fumadocs/local-md`** (mirrors `fuma-nama/fumadocs/examples/next-local-md`). Fumapress (`fumapress` CLI + `@fumapress/core`) is the May-2026 zero-config Waku-based variant — preview-oriented per its tagline, not yet the production path. Adds a second `package.json` (deployable web artifact) but **does NOT itself force monorepo conversion**: the site lives as a flat `website/` dir with its own `package.json`, reading markdown from `../docs/`. Conversion only triggers if the site needs to import codemap's TS engines (live recipe runner, interactive schema explorer, WASM CLI demo).
 
-Either alone can ship in the current flat layout. Both together start to strain it.
+Any one alone can ship in the current flat layout. Combinations start to strain it (especially (1) + (2), or (3) with engine-import requirements).
 
 ### The three options
 
@@ -199,11 +200,12 @@ Either alone can ship in the current flat layout. Both together start to strain 
 
 For codemap, the artifact count grows from **1** (today: CLI) to:
 
-- **2** after (d) ships (CLI + VSCode extension; extension already published separately regardless of layout)
-- **3+** if (d) extracts `codemap-core` for the LSP server to import cleanly
+- **2** after Fumadocs site deploys (CLI + docs site as deployable web artifact) **OR** after (d) ships (CLI + VSCode extension)
+- **3** after both Fumadocs + (d) ship (CLI + docs site + VSCode extension)
+- **4+** if (d) extracts `codemap-core` for the LSP server to import cleanly OR if the docs site needs engine imports
 - **5+** if C.9 community plugins ship as packages
 
-Inflection point is roughly between (d) and C.9 community plugins.
+Inflection point is roughly between **3 and 4 artifacts** — Fumadocs by itself doesn't tip the scale, but Fumadocs + (d) does.
 
 ### When to revisit (triggers, not preferences)
 
@@ -213,13 +215,14 @@ Convert (Option 2 or 3) when **any** of these triggers fire — not preemptively
 2. **A user asks "I want to consume the engines as a library."** Triggers extraction of `codemap-core`. If the ask comes after (d) ships, extracting alongside `codemap-lsp` justifies the conversion.
 3. **A second consumer-facing distro ships** (e.g. `codemap-server` long-running daemon decoupled from CLI). Workspaces let it iterate independently.
 4. **Locked versioning across packages becomes painful** with the hand-script approach in Option 1 (e.g. CLI bumps without LSP server changes still need a changeset entry for the LSP package — annoying enough times that the workspace tooling pays for itself).
+5. **Docs site needs to import codemap source.** Markdown-only Fumadocs site (using `@fumadocs/local-md` to read `../docs/*.md`) ships as a flat `website/` dir — NOT a trigger by itself. Trigger fires only when the site adds a live recipe runner, an interactive schema explorer, a WASM CLI demo, or anything else that imports from codemap's TS source. Then workspace tooling becomes the cleanest path: extract `@stainless-code/codemap-core`, import from the website package.
 
 Mirrors the doc's other "wait for two consumers / two asks" disciplines (research note § 6 Q5 history table, B.5 verdict thresholds).
 
 ### Default bias (revisit during plan iteration)
 
-- **Option 1** if (d) ships before any of the four triggers above. (d) alone doesn't justify conversion — the VSCode extension is separately published anyway, and the LSP binary can be a second `bin` entry in the existing `package.json`. **This is the recommended starting position.**
-- **Option 2** (separate refactor PR before (d) impl) if a community-plugin contributor is in flight when (d) starts, or if `codemap-core` extraction is asked for explicitly.
+- **Option 1** if (d) ships before any of the five triggers above. (d) alone doesn't justify conversion — the VSCode extension is separately published anyway, and the LSP binary can be a second `bin` entry in the existing `package.json`. Markdown-only Fumadocs site (flat `website/` dir) also doesn't trigger conversion. **This is the recommended starting position.**
+- **Option 2** (separate refactor PR before (d) impl) if a community-plugin contributor is in flight when (d) starts, or if `codemap-core` extraction is asked for explicitly (e.g. docs site needs live runners).
 - **Option 3** (convert as part of (d) impl) if Option 2's "refactor with no user-visible value" PR shape is unacceptable to reviewers.
 
 ### What stays out of scope here
@@ -227,6 +230,7 @@ Mirrors the doc's other "wait for two consumers / two asks" disciplines (researc
 - **User-repo monorepo awareness** (separate concept — discovering `pnpm-workspace.yaml` in indexed projects). Tracked in [`docs/roadmap.md` Backlog](../roadmap.md#backlog) "Monorepo / workspace awareness."
 - **Splitting `templates/agents/` into a separate package.** Templates ship in the main codemap package via `files: ["templates"]`; no consumer signal for a separate package today.
 - **VSCode-extension repo split** (knip's pattern — separate repo). Out of scope; codemap's extension lives alongside core.
+- **Docs site dir-name choice (`website/` vs `apps/docs/` vs `docs-site/`).** Bias to `website/` until conversion fires — `apps/*` implies workspaces (cohort norm signal); `website/` doesn't. Rename to `apps/docs/` only when actually converting.
 
 ---
 
