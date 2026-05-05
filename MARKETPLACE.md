@@ -64,6 +64,8 @@ The Action wraps that posture for CI: PR-scoped audit by default, recipe-driven 
 
 Agents discover code the slow way: glob, read, grep, read more, re-grep. Every discovery question burns context window, wastes tokens, slows response time, and produces false positives. Codemap collapses that loop into one SQL round-trip against a structured index.
 
+Beyond the audit + recipe surface, agents reach for the discovery verbs: `codemap show <name>` (file:line + signature lookup), `codemap snippet <name>` (source text with stale-detection), `codemap impact <target>` (blast-radius walker — callers, callees, dependents, with cycle detection), and `codemap context` (project metadata + recipe catalog + intent classification). All sub-100ms cold-start, all exposed as MCP tools.
+
 We supply the structure. The agent (human or otherwise) supplies the meaning. Two different jobs.
 
 The agent-host integration is first-class. `codemap mcp` exposes every CLI verb as a JSON-RPC tool over stdio for Claude Code, Cursor, Codex, Windsurf. `codemap agents init` writes `AGENTS.md` / `CLAUDE.md` / `.cursor/rules/codemap.mdc` / `.cursor/skills/codemap/SKILL.md` with a version-matched skill teaching agents the schema, recipes, and SQL idioms. Drop-in for any agent host that reads these conventions.
@@ -112,6 +114,7 @@ Indexed at parse time via [oxc](https://oxc.rs) (JS/TS) + [lightningcss](https:/
 - **CSS substrate** — `css_variables` / `css_classes` / `css_keyframes` queryable alongside JS/TS, so design-token JOINs are one SQL away.
 - **`markers`** — TODO / FIXME / HACK / NOTE with file:line, JOINable to symbols for "TODOs inside `@deprecated` functions"-shaped questions.
 - **`source_fts`** (opt-in) — full-text body search JOINable to every other table when you flip on `fts5: true`.
+- **`query_baselines`** — save any query result as a named snapshot inside the index, then `--baseline <name>` later to diff "what changed" — survives `--full` rebuilds.
 
 Full schema reference: [`docs/architecture.md`](https://github.com/stainless-code/codemap/blob/main/docs/architecture.md#schema). All tables `STRICT` mode; schema versioned.
 
@@ -250,7 +253,7 @@ All inputs are optional.
 | `changed-since`     | _empty_                                      | Filter to files changed since the given git ref.                       |
 | `group-by`          | _empty_                                      | Bucket by `owner` (CODEOWNERS) / `directory` / `package`.              |
 | `command`           | _empty_                                      | Raw CLI args (escape hatch).                                           |
-| `format`            | `sarif`                                      | `sarif` / `json` / `annotations` / `mermaid` / `diff`.                 |
+| `format`            | `sarif`                                      | `sarif` / `json` / `annotations` / `mermaid` / `diff` / `diff-json`.   |
 | `output-path`       | `codemap.sarif`                              | Where to write the output.                                             |
 | `upload-sarif`      | `true`                                       | Upload to Code Scanning. Set `false` if Code Scanning isn't available. |
 | `pr-comment`        | `false`                                      | Post a markdown summary comment on the PR.                             |
