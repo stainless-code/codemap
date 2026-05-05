@@ -360,18 +360,30 @@ export interface BoundaryRuleRow {
  * Replace `boundary_rules` with `rules` — config is the single source of
  * truth, this table is a denormalised lookup. Idempotent; cheap (one row
  * per declared boundary).
+ *
+ * Atomic via SAVEPOINT: a duplicate `name` (PRIMARY KEY collision — Zod
+ * doesn't dedupe) would otherwise wipe the previous good state and leave
+ * the table half-populated. SAVEPOINT works inside or outside an open
+ * transaction, so callers don't need to coordinate.
  */
 export function reconcileBoundaryRules(
   db: CodemapDatabase,
   rules: ReadonlyArray<BoundaryRuleRow>,
 ) {
-  db.run("DELETE FROM boundary_rules");
-  if (rules.length === 0) return;
-  for (const rule of rules) {
-    db.run(
-      "INSERT INTO boundary_rules (name, from_glob, to_glob, action) VALUES (?, ?, ?, ?)",
-      [rule.name, rule.from_glob, rule.to_glob, rule.action],
-    );
+  db.run("SAVEPOINT reconcile_boundary_rules");
+  try {
+    db.run("DELETE FROM boundary_rules");
+    for (const rule of rules) {
+      db.run(
+        "INSERT INTO boundary_rules (name, from_glob, to_glob, action) VALUES (?, ?, ?, ?)",
+        [rule.name, rule.from_glob, rule.to_glob, rule.action],
+      );
+    }
+    db.run("RELEASE SAVEPOINT reconcile_boundary_rules");
+  } catch (error) {
+    db.run("ROLLBACK TO SAVEPOINT reconcile_boundary_rules");
+    db.run("RELEASE SAVEPOINT reconcile_boundary_rules");
+    throw error;
   }
 }
 

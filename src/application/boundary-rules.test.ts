@@ -89,6 +89,29 @@ describe("boundary_rules — schema + reconciler", () => {
     }
   });
 
+  it("rolls back on duplicate name — preserves prior good state (atomic)", () => {
+    const db = openDb();
+    try {
+      reconcileBoundaryRules(db, [
+        { name: "good", from_glob: "a", to_glob: "b", action: "deny" },
+      ]);
+      expect(() =>
+        reconcileBoundaryRules(db, [
+          { name: "dup", from_glob: "a", to_glob: "b", action: "deny" },
+          { name: "dup", from_glob: "c", to_glob: "d", action: "deny" },
+        ]),
+      ).toThrow();
+      const rows = db
+        .query<{ name: string }>(
+          "SELECT name FROM boundary_rules ORDER BY name",
+        )
+        .all();
+      expect(rows).toEqual([{ name: "good" }]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("rejects unknown actions via CHECK constraint", () => {
     const db = openDb();
     try {
