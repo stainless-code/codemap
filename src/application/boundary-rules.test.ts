@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb, reconcileBoundaryRules } from "../db";
 import { initCodemap } from "../runtime";
+import { runCodemapIndex } from "./run-index";
 
 let projectRoot: string;
 
@@ -95,6 +97,35 @@ describe("boundary_rules — schema + reconciler", () => {
           "INSERT INTO boundary_rules (name, from_glob, to_glob, action) VALUES ('bad', 'a', 'b', 'maybe')",
         ),
       ).toThrow();
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("survives a full rebuild (reconciler runs after dropAll)", async () => {
+    initCodemap(
+      resolveCodemapConfig(projectRoot, {
+        boundaries: [
+          {
+            name: "ui-cant-touch-server",
+            from_glob: "src/ui/*",
+            to_glob: "src/server/*",
+          },
+        ],
+      }),
+    );
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(join(projectRoot, "src", "a.ts"), "export const A = 1;\n");
+
+    const db = openDb();
+    try {
+      await runCodemapIndex(db, { mode: "full", quiet: true });
+      const rows = db
+        .query<{ name: string; action: string }>(
+          "SELECT name, action FROM boundary_rules",
+        )
+        .all();
+      expect(rows).toEqual([{ name: "ui-cant-touch-server", action: "deny" }]);
     } finally {
       closeDb(db);
     }

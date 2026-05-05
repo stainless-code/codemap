@@ -42,7 +42,7 @@ SARIF / annotations consume the `file_path` location column (the `from_path` of 
 ## What v1 covers
 
 - Resolved import edges in the `dependencies` table.
-- SQLite `GLOB` matching — `*` / `?` / `[abc]` (no `**` recursion in GLOB; use `*/` segments per glob depth, or rely on the trailing-`*` wildcard, e.g. `src/ui/*` matches one level only).
+- SQLite `GLOB` matching — `*`, `?`, `[abc]`. **Important:** SQLite's `*` is not filesystem-aware — it matches any sequence of characters **including `/`**, so `src/ui/*` matches everything under `src/ui/` at any depth (`src/ui/Button.tsx`, `src/ui/forms/Input.tsx`, `src/ui/forms/internal/util.ts`, …). To restrict a rule to a single path segment, use a character class that excludes `/` — e.g. `src/ui/[^/]*` or `src/ui/[^/]*.tsx`. There is no `**` glob in SQLite; depth is controlled with explicit segment patterns.
 
 ## What v1 does not cover
 

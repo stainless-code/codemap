@@ -31,7 +31,7 @@ export type { CodemapDatabase } from "./db";
  * Options for {@link createCodemap}.
  *
  * @property root - Project root. When omitted: `CODEMAP_ROOT` or `CODEMAP_TEST_BENCH`, then `process.cwd()`.
- * @property configFile - Explicit path to `.codemap/config.ts` or `.codemap/config.json` (same as CLI `--config`).
+ * @property configFile - Explicit path to `.codemap/config.{ts,js,json}` (same as CLI `--config`).
  * @property config - Inline overrides merged on top of the file-based config from the project root.
  */
 export interface CodemapInitOptions {

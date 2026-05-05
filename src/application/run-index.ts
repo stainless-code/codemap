@@ -114,79 +114,91 @@ export async function runCodemapIndex(
     mode = "full";
     setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
   }
-  // Boundary rules are config-derived; reconcile once per pass regardless
-  // of mode so `boundary_rules` always tracks the resolved config exactly.
-  reconcileBoundaryRules(db, getBoundaryRules());
 
-  if (mode === "full") {
-    if (!quiet) console.log("  Full rebuild requested...");
-    const collectStart = performance.now();
-    const files = collectFiles();
-    const collectMs = performance.now() - collectStart;
-    const run = await indexFiles(db, files, true, undefined, {
-      quiet,
-      performance: wantPerformance,
-      collectMs,
-    });
-    return {
-      mode: "full",
-      indexed: run.indexed,
-      skipped: run.skipped,
-      elapsedMs: run.elapsedMs,
-      stats: run.stats,
-    };
-  }
-
-  if (mode === "files") {
-    const targetFiles = options.files ?? [];
-    if (targetFiles.length === 0) {
-      return {
-        mode: "files",
-        indexed: 0,
-        skipped: 0,
-        elapsedMs: 0,
-        stats: emptyStats(),
-        idle: true,
-      };
-    }
-    const run = await targetedReindex(db, targetFiles, quiet);
-    return {
-      mode: "files",
-      indexed: run.indexed,
-      skipped: run.skipped,
-      elapsedMs: run.elapsedMs,
-      stats: run.stats,
-    };
-  }
-
-  // Incremental path reads `meta` via getChangedFiles — schema must exist first
-  // (indexFiles / targetedReindex call createSchema later; fresh DB had none).
-  createSchema(db);
-  const diff = getChangedFiles(db);
-  if (diff) {
-    if (!quiet) {
-      console.log(
-        `  Incremental: ${diff.changed.length} changed, ${diff.deleted.length} deleted`,
-      );
-    }
-    deleteFilesFromIndex(db, diff.deleted, quiet);
-    if (diff.changed.length > 0) {
-      const indexedPaths = diff.existingPaths;
-      for (const f of diff.changed) indexedPaths.add(f);
-      const run = await indexFiles(db, diff.changed, false, indexedPaths, {
+  // Boundary rules track the resolved config exactly. The reconciler runs in
+  // `finally` because full rebuild calls `dropAll` inside `indexFiles` which
+  // wipes `boundary_rules` (config-derived); reconciling AFTER the index
+  // pipeline returns survives that drop on every code path.
+  try {
+    if (mode === "full") {
+      if (!quiet) console.log("  Full rebuild requested...");
+      const collectStart = performance.now();
+      const files = collectFiles();
+      const collectMs = performance.now() - collectStart;
+      const run = await indexFiles(db, files, true, undefined, {
         quiet,
+        performance: wantPerformance,
+        collectMs,
       });
       return {
-        mode: "incremental",
+        mode: "full",
         indexed: run.indexed,
         skipped: run.skipped,
         elapsedMs: run.elapsedMs,
         stats: run.stats,
       };
     }
-    if (diff.deleted.length > 0) {
-      setMeta(db, "last_indexed_commit", getCurrentCommit());
-      if (!quiet) console.log("  Index updated (deletions only)");
+
+    if (mode === "files") {
+      const targetFiles = options.files ?? [];
+      if (targetFiles.length === 0) {
+        return {
+          mode: "files",
+          indexed: 0,
+          skipped: 0,
+          elapsedMs: 0,
+          stats: emptyStats(),
+          idle: true,
+        };
+      }
+      const run = await targetedReindex(db, targetFiles, quiet);
+      return {
+        mode: "files",
+        indexed: run.indexed,
+        skipped: run.skipped,
+        elapsedMs: run.elapsedMs,
+        stats: run.stats,
+      };
+    }
+
+    // Incremental path reads `meta` via getChangedFiles — schema must exist first
+    // (indexFiles / targetedReindex call createSchema later; fresh DB had none).
+    createSchema(db);
+    const diff = getChangedFiles(db);
+    if (diff) {
+      if (!quiet) {
+        console.log(
+          `  Incremental: ${diff.changed.length} changed, ${diff.deleted.length} deleted`,
+        );
+      }
+      deleteFilesFromIndex(db, diff.deleted, quiet);
+      if (diff.changed.length > 0) {
+        const indexedPaths = diff.existingPaths;
+        for (const f of diff.changed) indexedPaths.add(f);
+        const run = await indexFiles(db, diff.changed, false, indexedPaths, {
+          quiet,
+        });
+        return {
+          mode: "incremental",
+          indexed: run.indexed,
+          skipped: run.skipped,
+          elapsedMs: run.elapsedMs,
+          stats: run.stats,
+        };
+      }
+      if (diff.deleted.length > 0) {
+        setMeta(db, "last_indexed_commit", getCurrentCommit());
+        if (!quiet) console.log("  Index updated (deletions only)");
+        return {
+          mode: "incremental",
+          indexed: 0,
+          skipped: 0,
+          elapsedMs: 0,
+          stats: fetchTableStats(db),
+          idle: true,
+        };
+      }
+      if (!quiet) console.log("  Index is up to date");
       return {
         mode: "incremental",
         indexed: 0,
@@ -196,35 +208,28 @@ export async function runCodemapIndex(
         idle: true,
       };
     }
-    if (!quiet) console.log("  Index is up to date");
-    return {
-      mode: "incremental",
-      indexed: 0,
-      skipped: 0,
-      elapsedMs: 0,
-      stats: fetchTableStats(db),
-      idle: true,
-    };
-  }
 
-  if (!quiet) {
-    console.log(
-      "  No previous index or incompatible history, doing full rebuild...",
-    );
+    if (!quiet) {
+      console.log(
+        "  No previous index or incompatible history, doing full rebuild...",
+      );
+    }
+    const fallbackCollectStart = performance.now();
+    const files = collectFiles();
+    const fallbackCollectMs = performance.now() - fallbackCollectStart;
+    const run = await indexFiles(db, files, true, undefined, {
+      quiet,
+      performance: wantPerformance,
+      collectMs: fallbackCollectMs,
+    });
+    return {
+      mode: "full",
+      indexed: run.indexed,
+      skipped: run.skipped,
+      elapsedMs: run.elapsedMs,
+      stats: run.stats,
+    };
+  } finally {
+    reconcileBoundaryRules(db, getBoundaryRules());
   }
-  const fallbackCollectStart = performance.now();
-  const files = collectFiles();
-  const fallbackCollectMs = performance.now() - fallbackCollectStart;
-  const run = await indexFiles(db, files, true, undefined, {
-    quiet,
-    performance: wantPerformance,
-    collectMs: fallbackCollectMs,
-  });
-  return {
-    mode: "full",
-    indexed: run.indexed,
-    skipped: run.skipped,
-    elapsedMs: run.elapsedMs,
-    stats: run.stats,
-  };
 }
