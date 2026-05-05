@@ -409,6 +409,53 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     });
   });
 
+  it("parses comma-separated --params for a recipe", () => {
+    const r = parseQueryRest([
+      "query",
+      "--recipe",
+      "find-symbol-by-kind",
+      "--params",
+      "kind=function,name_pattern=%Query%",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.recipeId).toBe("find-symbol-by-kind");
+    expect(r.recipeParams).toEqual({
+      kind: "function",
+      name_pattern: "%Query%",
+    });
+  });
+
+  it("parses repeated --params with last-write semantics", () => {
+    const r = parseQueryRest([
+      "query",
+      "--recipe",
+      "find-symbol-by-kind",
+      "--params",
+      "kind=const",
+      "--params",
+      "kind=function",
+      "--params=name_pattern=a=b",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.recipeParams).toEqual({
+      kind: "function",
+      name_pattern: "a=b",
+    });
+  });
+
+  it("rejects --params without --recipe", () => {
+    const r = parseQueryRest([
+      "query",
+      "--params",
+      "kind=function",
+      "SELECT",
+      "1",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error")
+      expect(r.message).toContain("only be used with --recipe");
+  });
+
   it("parses --json --recipe fan-out-sample", () => {
     const r = parseQueryRest(["query", "--json", "--recipe", "fan-out-sample"]);
     const sql = getQueryRecipeSql("fan-out-sample");

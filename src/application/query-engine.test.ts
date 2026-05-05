@@ -52,6 +52,15 @@ describe("executeQuery", () => {
     expect(r).toEqual({ count: 3 });
   });
 
+  it("binds recipe params positionally", () => {
+    const r = executeQuery({
+      sql: "SELECT path FROM files WHERE language = ? AND path LIKE ? ORDER BY path",
+      bindValues: ["typescript", "src/%"],
+      root: benchDir,
+    });
+    expect(r).toEqual([{ path: "src/a.ts" }, { path: "src/b.ts" }]);
+  });
+
   it("returns {group_by, groups} under group_by", () => {
     const r = executeQuery({
       sql: "SELECT path FROM files",

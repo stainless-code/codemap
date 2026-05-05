@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../src/api";
 import { ingestIstanbul, ingestLcov } from "../src/application/coverage-engine";
-import { getQueryRecipeSql } from "../src/application/query-recipes";
+import { queryRows } from "../src/application/index-engine";
+import {
+  getQueryRecipeParams,
+  getQueryRecipeSql,
+} from "../src/application/query-recipes";
+import { resolveRecipeParams } from "../src/application/recipe-params";
+import type { RecipeParamValue } from "../src/application/recipe-params";
 import { closeDb, openDb } from "../src/db";
 import { parseScenariosJson } from "./query-golden/schema";
 import type {
@@ -82,14 +88,32 @@ function stableStringify(value: unknown): string {
   return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`).join(",")}}`;
 }
 
-function resolveSql(s: GoldenScenario): string {
-  if (s.sql !== undefined) return s.sql;
+function resolveQuery(s: GoldenScenario): {
+  sql: string;
+  bindValues: RecipeParamValue[];
+} {
+  if (s.sql !== undefined) {
+    if (s.params !== undefined) {
+      throw new Error(
+        `Scenario "${s.id}": params are only supported with recipe-based scenarios; raw SQL scenarios must not declare params.`,
+      );
+    }
+    return { sql: s.sql, bindValues: [] };
+  }
   if (s.recipe !== undefined) {
     const sql = getQueryRecipeSql(s.recipe);
     if (sql === undefined) {
       throw new Error(`Scenario "${s.id}": unknown recipe "${s.recipe}"`);
     }
-    return sql;
+    const resolved = resolveRecipeParams({
+      recipeId: s.recipe,
+      declared: getQueryRecipeParams(s.recipe),
+      provided: s.params,
+    });
+    if (!resolved.ok) {
+      throw new Error(`Scenario "${s.id}": ${resolved.error}`);
+    }
+    return { sql, bindValues: resolved.values };
   }
   throw new Error(`Scenario "${s.id}": missing sql or recipe`);
 }
@@ -227,9 +251,9 @@ async function main(): Promise<void> {
   let budgetFailures = 0;
 
   for (const s of scenarios) {
-    const sql = resolveSql(s);
+    const { sql, bindValues } = resolveQuery(s);
     const t0 = performance.now();
-    const rows = cm.query(sql) as unknown[];
+    const rows = queryRows(sql, bindValues) as unknown[];
     const durationMs = performance.now() - t0;
     const match = defaultMatch(s);
 

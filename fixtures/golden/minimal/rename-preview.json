@@ -1,0 +1,29 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 1,
+    "line_end": 1,
+    "before_pattern": "usePermissions",
+    "after_pattern": "useAccess",
+    "location_kind": "import_specifier",
+    "chain_depth": 0
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 1,
+    "line_end": 1,
+    "before_pattern": "usePermissions",
+    "after_pattern": "useAccess",
+    "location_kind": "import_specifier",
+    "chain_depth": 0
+  },
+  {
+    "file_path": "src/usePermissions.ts",
+    "line_start": 1,
+    "line_end": 3,
+    "before_pattern": "usePermissions",
+    "after_pattern": "useAccess",
+    "location_kind": "definition",
+    "chain_depth": 0
+  }
+]

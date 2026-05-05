@@ -77,6 +77,9 @@ codemap query "SELECT name, file_path FROM symbols LIMIT 10"
 # Bundled SQL (same as skill examples): fan-out rankings
 codemap query --json --recipe fan-out
 codemap query --json --recipe fan-out-sample
+# Parametrised recipes validate params from <id>.md frontmatter before SQL binding.
+codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%
+codemap query --recipe rename-preview --params old=usePermissions,new=useAccess,kind=function --format diff
 # Counts only (skip the rows) — pairs well with --recipe for dashboards / agent context windows
 codemap query --json --summary -r deprecated-symbols
 # PR-scoped: filter result rows to those touching files changed since <ref>
@@ -111,9 +114,10 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # non-git projects get a clean `--base requires a git repository` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
-# --format <text|json|sarif|annotations|mermaid> — pipe results into GitHub Code Scanning
+# --format <text|json|sarif|annotations|mermaid|diff|diff-json> — pipe results into GitHub Code Scanning
 # (SARIF 2.1.0), surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg), or
-# render edge-shaped recipes as Mermaid `flowchart LR`. All four require a flat row list
+# render edge-shaped recipes as Mermaid `flowchart LR`, or preview edits as unified diffs. All
+# formatted outputs require a flat row list
 # (no --summary / --group-by / baseline). SARIF / annotations auto-detect file_path /
 # path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc). Mermaid
 # requires {from, to, label?, kind?} rows and rejects unbounded inputs (>50 edges) with a
@@ -121,6 +125,8 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
 codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'
+codemap query --format diff 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern'
+codemap query --format diff-json 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern' | jq '.summary'
 # --with-fts — opt-in FTS5 virtual table populated at index time. Default OFF (preserves
 # .codemap/index.db size); CLI flag wins over codemap.config.ts `fts5` field. Toggle change
 # auto-detects and forces a full rebuild so `source_fts` stays consistent.

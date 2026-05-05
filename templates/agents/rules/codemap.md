@@ -24,6 +24,8 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | Query (JSON — default for agents) | `codemap query --json "<SQL>"`                                                                                                                                                                                                 |
 | Query (ASCII table — optional)    | `codemap query "<SQL>"`                                                                                                                                                                                                        |
 | Query (recipe)                    | `codemap query --json --recipe fan-out` (see **`codemap query --help`**)                                                                                                                                                       |
+| Parametrised recipe               | `codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%` — params declared in recipe `.md` frontmatter and validated before SQL binding.                                                |
+| Rename preview                    | `codemap query --recipe rename-preview --params old=usePermissions,new=useAccess,kind=function --format diff` — read-only unified diff; codemap never writes files.                                                            |
 | Recipe catalog (JSON)             | `codemap query --recipes-json`                                                                                                                                                                                                 |
 | Print one recipe’s SQL            | `codemap query --print-sql fan-out`                                                                                                                                                                                            |
 | Counts only                       | `codemap query --json --summary -r deprecated-symbols`                                                                                                                                                                         |
@@ -40,16 +42,22 @@ Install **[@stainless-code/codemap](https://www.npmjs.com/package/@stainless-cod
 | Coverage ingest                   | `codemap ingest-coverage <path> [--json]` — Istanbul (`coverage-final.json`) or LCOV (`lcov.info`); format auto-detected. Joinable to `symbols` for "untested AND dead" queries.                                               |
 | SARIF / GH annotations            | `codemap query --recipe deprecated-symbols --format sarif` · `… --format annotations`                                                                                                                                          |
 | Mermaid graph (≤50 edges)         | `codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM dependencies LIMIT 50'` — recipes / SQL must alias columns to `{from, to, label?, kind?}`; rejects unbounded inputs.                         |
+| Diff preview                      | `codemap query --format diff '<SQL returning file_path, line_start, before_pattern, after_pattern>'` — read-only unified diff; `--format diff-json` returns structured hunks for agents.                                       |
 | FTS5 full-text (opt-in)           | `codemap --with-fts --full` enables `source_fts` virtual table; `query --recipe text-in-deprecated-functions` demos JOINs.                                                                                                     |
 | HTTP server (for non-MCP)         | `codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>] [--no-watch] [--debounce <ms>]` — same tool taxonomy over POST /tool/{name}. Watcher default-ON since 2026-05.                                              |
 | Watch mode (live reindex)         | `codemap watch [--debounce 250] [--quiet]` — standalone long-running process; debounced reindex on file changes. `mcp` / `serve` boot the watcher in-process by default — pass `--no-watch` (or `CODEMAP_WATCH=0`) to opt out. |
 
-**Recipe `actions`:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Inspect via **`--recipes-json`**. Ad-hoc SQL never carries actions.
+**Recipe metadata:** with **`--json`**, recipes that define an `actions` template append it to every row (kebab-case verb + description — e.g. `fan-out` → `review-coupling`). Under `--baseline`, actions attach to the **`added`** rows only. Parametrised recipes declare `params` in `.md` frontmatter; pass values with `--params key=value[,key=value]` (repeatable; last value wins). Inspect both via **`--recipes-json`**. Ad-hoc SQL never carries actions or params.
 
 **Project-local recipes:** drop `<id>.sql` (and optional `<id>.md` for description + actions) into **`<projectRoot>/.codemap/recipes/`** — auto-discovered, runs via `codemap query --recipe <id>` like bundled. Project recipes win on id collision; check `codemap query --recipes-json` for **`shadows: true`** entries to know when a project recipe overrides the documented bundled version. `<id>.md` supports YAML frontmatter for the per-row action template — block-list shape only (the loader's hand-rolled parser doesn't accept inline-flow `[{...}]`):
 
 ```markdown
 ---
+params:
+  - name: kind
+    type: string
+    required: true
+    description: "Symbol kind to match."
 actions:
   - type: review-coupling
     auto_fixable: false

@@ -388,7 +388,9 @@ function writeToolResult(
     "Content-Type",
     result.format === "sarif"
       ? "application/sarif+json"
-      : "text/plain; charset=utf-8",
+      : result.format === "diff-json"
+        ? "application/json; charset=utf-8"
+        : "text/plain; charset=utf-8",
   );
   res.setHeader("X-Codemap-Version", version);
   res.end(result.payload);

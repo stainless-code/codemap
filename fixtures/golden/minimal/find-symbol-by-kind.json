@@ -1,0 +1,9 @@
+[
+  {
+    "name": "usePermissions",
+    "kind": "function",
+    "file_path": "src/usePermissions.ts",
+    "line_start": 1,
+    "signature": "usePermissions()"
+  }
+]

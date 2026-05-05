@@ -47,6 +47,7 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
+import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
   IndexRunStats,
@@ -582,6 +583,7 @@ export function printQueryResult(
     summary?: boolean;
     changedFiles?: Set<string> | undefined;
     recipeActions?: ReadonlyArray<unknown> | undefined;
+    bindValues?: QueryBindValue[] | undefined;
   },
 ): number {
   const json = opts?.json === true;
@@ -591,7 +593,7 @@ export function printQueryResult(
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
-    let rows = db.query(sql).all();
+    let rows = db.query(sql).all(...(opts?.bindValues ?? []));
     if (changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, changedFiles);
     }
@@ -659,10 +661,13 @@ function enrichQueryError(message: string): string {
  * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
  * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
-export function queryRows(sql: string): unknown[] {
+export function queryRows(
+  sql: string,
+  bindValues?: QueryBindValue[] | undefined,
+): unknown[] {
   const db = openDb();
   try {
-    return db.query(sql).all();
+    return db.query(sql).all(...(bindValues ?? []));
   } finally {
     closeDb(db, { readonly: true });
   }

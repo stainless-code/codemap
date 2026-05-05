@@ -10,6 +10,14 @@ import {
 import type { Bucketizer, GroupByMode } from "../group-by";
 
 /**
+ * SQLite bind value — the union accepted by `db.query(sql).all(...values)`.
+ * Kept here at the DB boundary so `executeQuery` doesn't depend on any
+ * recipe-layer type. Recipe coercion lives in `application/recipe-params.ts`
+ * and produces values assignable to this union.
+ */
+export type QueryBindValue = string | number | bigint | boolean | null;
+
+/**
  * Pure, transport-agnostic query execution. Mirrors the layering of
  * `audit-engine.ts` / `index-engine.ts` — CLI shells (`cmd-query.ts`)
  * and the MCP server (`mcp-server.ts`) both call into this engine
@@ -34,6 +42,7 @@ export interface ExecuteQueryOpts {
   changedFiles?: Set<string> | undefined;
   groupBy?: GroupByMode | undefined;
   recipeActions?: ReadonlyArray<unknown> | undefined;
+  bindValues?: QueryBindValue[] | undefined;
   root: string;
 }
 
@@ -82,7 +91,7 @@ export function executeQuery(
     // proof boundary. Doesn't bleed across calls — `closeDb()` discards the
     // connection.
     db.run("PRAGMA query_only = 1");
-    let rows = db.query(opts.sql).all() as unknown[];
+    let rows = db.query(opts.sql).all(...(opts.bindValues ?? [])) as unknown[];
 
     if (opts.changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, opts.changedFiles);

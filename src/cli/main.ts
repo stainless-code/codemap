@@ -367,6 +367,7 @@ Copies bundled agent templates into .agents/ under the project root.
       groupBy: parsed.groupBy,
       saveBaseline: parsed.saveBaseline,
       baseline: parsed.baseline,
+      recipeParams: parsed.recipeParams,
     });
     return;
   }

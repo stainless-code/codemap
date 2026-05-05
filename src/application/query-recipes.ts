@@ -6,8 +6,8 @@ import { getProjectRoot } from "../runtime";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
 
-export type { RecipeAction } from "./recipes-loader";
-import type { RecipeAction } from "./recipes-loader";
+export type { RecipeAction, RecipeParam } from "./recipes-loader";
+import type { RecipeAction, RecipeParam } from "./recipes-loader";
 
 /**
  * Catalog entry surfaced to `--recipes-json`, the `codemap://recipes` MCP
@@ -22,6 +22,11 @@ import type { RecipeAction } from "./recipes-loader";
  *   of the same id (per plan §9 Q-E — agents read this at session start to
  *   know when a recipe behaves differently from the documented bundled
  *   version). Absent / `false` for non-shadowing entries.
+ * - **`params`** — declared recipe parameters in bind order, when the recipe
+ *   is parametrised. Each entry carries `name` / `type` / `required` /
+ *   `default` / `description`; the same shape `application/recipe-params.ts`
+ *   validates against before SQL binding. Omitted on recipes that take no
+ *   params.
  */
 export interface QueryRecipeCatalogEntry {
   id: string;
@@ -29,6 +34,7 @@ export interface QueryRecipeCatalogEntry {
   body?: string;
   sql: string;
   actions?: RecipeAction[];
+  params?: RecipeParam[];
   source: "bundled" | "project";
   shadows?: boolean;
 }
@@ -187,6 +193,7 @@ function buildCatalogEntry(r: LoadedRecipe): QueryRecipeCatalogEntry {
   };
   if (r.body !== undefined) entry.body = r.body;
   if (r.actions !== undefined) entry.actions = r.actions;
+  if (r.params !== undefined) entry.params = r.params;
   if (r.shadows) entry.shadows = true;
   return entry;
 }
@@ -205,4 +212,14 @@ export function getQueryRecipeSql(id: string): string | undefined {
  */
 export function getQueryRecipeActions(id: string): RecipeAction[] | undefined {
   return getRegistry().find((r) => r.id === id)?.actions;
+}
+
+/**
+ * Returns the declared parameter list for a recipe id (in bind order), or
+ * `undefined` if the recipe is unknown OR declares no params. Used by the
+ * CLI / MCP / HTTP layers to validate caller-supplied params via
+ * `application/recipe-params.ts` before SQL binding.
+ */
+export function getQueryRecipeParams(id: string): RecipeParam[] | undefined {
+  return getRegistry().find((r) => r.id === id)?.params;
 }
