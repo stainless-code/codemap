@@ -244,13 +244,22 @@ runs:
     - name: Post PR summary comment
       if: steps.gate.outputs.skip != 'true' && inputs.pr-comment == 'true' && github.event_name == 'pull_request' && always()
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         EXEC: ${{ steps.detect-pm.outputs.exec }}
-        OUTPUT_PATH: ${{ inputs.working-directory }}/${{ inputs.output-path }}
-        FORMAT: ${{ inputs.format }}
+        OUTPUT_PATH: ${{ inputs.output-path }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         GH_TOKEN: ${{ inputs.token }}
       run: |
-        # Slice 3 lands `codemap pr-comment` later; until then, just stub a
-        # short marker comment so downstream consumers can see the toggle works.
-        echo "::warning::codemap action: pr-comment writer (Slice 3) not yet implemented; toggle was set but no comment was posted."
+        # Render the markdown body via `codemap pr-comment`, then post via
+        # `gh pr comment`. The same binary that produced the SARIF / JSON
+        # output renders the comment — keeps the version stream coherent.
+        BODY=$($EXEC pr-comment "$OUTPUT_PATH" 2>/dev/null) || {
+          echo "::warning::codemap action: pr-comment renderer failed; skipping PR comment."
+          exit 0
+        }
+        if [ -z "$BODY" ]; then
+          echo "::notice::codemap action: pr-comment produced empty body; skipping."
+          exit 0
+        fi
+        echo "$BODY" | gh pr comment "$PR_NUMBER" -F -

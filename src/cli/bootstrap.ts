@@ -81,6 +81,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "snippet") return;
   if (rest[0] === "impact") return;
   if (rest[0] === "ingest-coverage") return;
+  if (rest[0] === "pr-comment") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;

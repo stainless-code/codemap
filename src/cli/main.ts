@@ -282,6 +282,29 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "pr-comment") {
+    const { parsePrCommentRest, printPrCommentCmdHelp, runPrCommentCmd } =
+      await import("./cmd-pr-comment.js");
+    const parsed = parsePrCommentRest(rest);
+    if (parsed.kind === "help") {
+      printPrCommentCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runPrCommentCmd({
+      root,
+      configFile,
+      stateDir,
+      inputPath: parsed.inputPath as string,
+      shape: parsed.shape,
+      json: parsed.json === true,
+    });
+    return;
+  }
+
   if (rest[0] === "ingest-coverage") {
     const {
       parseIngestCoverageRest,
