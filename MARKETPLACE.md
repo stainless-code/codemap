@@ -287,14 +287,7 @@ All inputs are optional.
 | `fail-on`           | `any`                                        | Exit-code policy: `any` / `never`.                                     |
 | `token`             | _`github.token`_                             | Token for SARIF upload + PR comment posting.                           |
 
-## Outputs
-
-| Output           | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `agent`          | Resolved package manager.                          |
-| `exec`           | Shell-ready command used to invoke codemap.        |
-| `install_method` | `project-installed` / `dlx-pinned` / `dlx-latest`. |
-| `output-file`    | Path to the written output file.                   |
+The Action also exposes a few step outputs (`exec`, `agent`, `install_method`, `output-file`) for workflows that chain additional codemap commands; see [`action.yml`](https://github.com/stainless-code/codemap/blob/main/action.yml) for the contract.
 
 ---
 
