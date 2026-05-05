@@ -2,7 +2,7 @@ import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -182,6 +182,18 @@ export function createTables(db: CodemapDatabase) {
       total_statements INTEGER NOT NULL,
       PRIMARY KEY (file_path, name, line_start)
     ) STRICT, WITHOUT ROWID;
+
+    -- Config-derived: reconcileBoundaryRules clears and re-fills from
+    -- .codemap/config boundaries on every index pass. Dropped on --full
+    -- like the other index tables (unlike query_baselines / coverage which
+    -- are user data and persist). Joined against dependencies by the
+    -- bundled boundary-violations recipe.
+    CREATE TABLE IF NOT EXISTS boundary_rules (
+      name      TEXT PRIMARY KEY,
+      from_glob TEXT NOT NULL,
+      to_glob   TEXT NOT NULL,
+      action    TEXT NOT NULL CHECK (action IN ('deny', 'allow'))
+    ) STRICT, WITHOUT ROWID;
   `);
 
   // Separate statement: FTS5 virtual-table CREATE doesn't accept STRICT and
@@ -316,6 +328,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS css_classes;
     DROP TABLE IF EXISTS css_keyframes;
     DROP TABLE IF EXISTS source_fts;
+    DROP TABLE IF EXISTS boundary_rules;
     DROP TABLE IF EXISTS files;
     DROP TABLE IF EXISTS meta;
   `);
@@ -333,6 +346,45 @@ export function setMeta(db: CodemapDatabase, key: string, value: string) {
     key,
     value,
   ]);
+}
+
+/** One row in `boundary_rules`. Shape mirrors the Zod `boundaries` field. */
+export interface BoundaryRuleRow {
+  name: string;
+  from_glob: string;
+  to_glob: string;
+  action: "deny" | "allow";
+}
+
+/**
+ * Replace `boundary_rules` with `rules` — config is the single source of
+ * truth, this table is a denormalised lookup. Idempotent; cheap (one row
+ * per declared boundary).
+ *
+ * Atomic via SAVEPOINT: a duplicate `name` (PRIMARY KEY collision — Zod
+ * doesn't dedupe) would otherwise wipe the previous good state and leave
+ * the table half-populated. SAVEPOINT works inside or outside an open
+ * transaction, so callers don't need to coordinate.
+ */
+export function reconcileBoundaryRules(
+  db: CodemapDatabase,
+  rules: ReadonlyArray<BoundaryRuleRow>,
+) {
+  db.run("SAVEPOINT reconcile_boundary_rules");
+  try {
+    db.run("DELETE FROM boundary_rules");
+    for (const rule of rules) {
+      db.run(
+        "INSERT INTO boundary_rules (name, from_glob, to_glob, action) VALUES (?, ?, ?, ?)",
+        [rule.name, rule.from_glob, rule.to_glob, rule.action],
+      );
+    }
+    db.run("RELEASE SAVEPOINT reconcile_boundary_rules");
+  } catch (error) {
+    db.run("ROLLBACK TO SAVEPOINT reconcile_boundary_rules");
+    db.run("RELEASE SAVEPOINT reconcile_boundary_rules");
+    throw error;
+  }
 }
 
 export function deleteFileData(db: CodemapDatabase, filePath: string) {

@@ -80,6 +80,10 @@ codemap query --json --recipe fan-out-sample
 # Parametrised recipes validate params from <id>.md frontmatter before SQL binding.
 codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%
 codemap query --recipe rename-preview --params old=usePermissions,new=useAccess,kind=function --format diff
+# Architecture-boundary rules (declare in .codemap/config.ts):
+#   boundaries: [{ name: "ui-cant-touch-server", from_glob: "src/ui/**", to_glob: "src/server/**" }]
+# Default action is "deny"; the table is reconciled from config on every index pass.
+codemap query --recipe boundary-violations --format sarif > boundary-findings.sarif
 # Counts only (skip the rows) — pairs well with --recipe for dashboards / agent context windows
 codemap query --json --summary -r deprecated-symbols
 # PR-scoped: filter result rows to those touching files changed since <ref>
@@ -128,7 +132,7 @@ codemap query --format mermaid 'SELECT from_path AS "from", to_path AS "to" FROM
 codemap query --format diff 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern'
 codemap query --format diff-json 'SELECT "README.md" AS file_path, 1 AS line_start, "# Codemap" AS before_pattern, "# Codemap Preview" AS after_pattern' | jq '.summary'
 # --with-fts — opt-in FTS5 virtual table populated at index time. Default OFF (preserves
-# .codemap/index.db size); CLI flag wins over codemap.config.ts `fts5` field. Toggle change
+# .codemap/index.db size); CLI flag wins over .codemap/config.ts `fts5` field. Toggle change
 # auto-detects and forces a full rebuild so `source_fts` stays consistent.
 codemap --with-fts --full
 codemap query --recipe text-in-deprecated-functions    # demonstrates FTS5 ⨯ symbols ⨯ coverage JOIN

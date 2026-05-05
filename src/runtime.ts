@@ -47,6 +47,10 @@ export function getFts5Enabled(): boolean {
   return getCodemapConfig().fts5;
 }
 
+export function getBoundaryRules(): ResolvedCodemapConfig["boundaries"] {
+  return getCodemapConfig().boundaries;
+}
+
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
   const set = getExcludeDirNames();

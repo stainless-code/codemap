@@ -51,7 +51,7 @@ export const DEFAULT_EXCLUDE_DIR_NAMES = [
 ] as const;
 
 /**
- * Zod schema for user config (`codemap.config.*`, `defineConfig`, API).
+ * Zod schema for user config (`<state-dir>/config.{ts,js,json}`, `defineConfig`, API).
  * Unknown keys are rejected (`.strict()`).
  */
 export const codemapUserConfigSchema = z
@@ -89,6 +89,41 @@ export const codemapUserConfigSchema = z
       .optional()
       .describe(
         "Enable FTS5 full-text indexing of file content into the `source_fts` virtual table. Default `false` — FTS5 grows `.codemap/index.db` ~30–50% on text-heavy projects. Override at the CLI with `--with-fts` (CLI wins; logs a stderr line on override).",
+      ),
+    boundaries: z
+      .array(
+        z
+          .object({
+            name: z
+              .string()
+              .min(1)
+              .describe(
+                "Stable identifier surfaced in `boundary-violations` rows + SARIF rule.id suffix.",
+              ),
+            from_glob: z
+              .string()
+              .min(1)
+              .describe(
+                "SQLite GLOB matched against `dependencies.from_path` (the file doing the import).",
+              ),
+            to_glob: z
+              .string()
+              .min(1)
+              .describe(
+                "SQLite GLOB matched against `dependencies.to_path` (the file being imported).",
+              ),
+            action: z
+              .enum(["deny", "allow"])
+              .optional()
+              .describe(
+                "`deny` rules surface as violations; `allow` rules reserve the slot for future whitelist semantics. Defaults to `deny` when omitted.",
+              ),
+          })
+          .strict(),
+      )
+      .optional()
+      .describe(
+        "Architecture-boundary rules. Each row is reconciled into the `boundary_rules` table at index time and joined against `dependencies` by the bundled `boundary-violations` recipe.",
       ),
   })
   .strict();
@@ -133,10 +168,21 @@ export interface ResolvedCodemapConfig {
   /**
    * FTS5 full-text indexing toggle. `true` populates the `source_fts`
    * virtual table at index time; `false` (default) leaves it empty.
-   * Resolved from `codemap.config.ts` `fts5` plus the `--with-fts` CLI
+   * Resolved from `.codemap/config.ts` `fts5` plus the `--with-fts` CLI
    * flag; CLI wins. See `docs/plans/fts5-mermaid.md`.
    */
   readonly fts5: boolean;
+  /**
+   * Reconciled into the `boundary_rules` table on every index pass. The
+   * bundled `boundary-violations` recipe joins this against `dependencies`
+   * via SQLite GLOB.
+   */
+  readonly boundaries: ReadonlyArray<{
+    readonly name: string;
+    readonly from_glob: string;
+    readonly to_glob: string;
+    readonly action: "deny" | "allow";
+  }>;
 }
 
 /**
@@ -155,7 +201,7 @@ export function parseCodemapUserConfig(config: unknown): CodemapUserConfig {
 }
 
 /**
- * Helper for `export default defineConfig({ ... })` in `codemap.config.ts`.
+ * Helper for `export default defineConfig({ ... })` in `.codemap/config.ts`.
  */
 export function defineConfig(config: CodemapUserConfig): CodemapUserConfig {
   return parseCodemapUserConfig(config);
@@ -171,7 +217,7 @@ export interface ResolveCodemapConfigOpts {
   stateDir?: string | undefined;
   /**
    * CLI override for `fts5` — when `true`, forces the toggle on
-   * regardless of `codemap.config.ts`. When `undefined` (default), the
+   * regardless of `.codemap/config.ts`. When `undefined` (default), the
    * config value (or false default) wins. Set by `--with-fts` argv
    * parsing in the bootstrap layer.
    */
@@ -218,7 +264,7 @@ export function resolveCodemapConfig(
   }
 
   // CLI > config (mirrors `--root` / `--state-dir`); explicit log on
-  // override so quiet-divergence from `codemap.config.ts` is visible.
+  // override so quiet-divergence from `.codemap/config.ts` is visible.
   let fts5: boolean;
   if (opts.fts5Cli === true) {
     fts5 = true;
@@ -229,6 +275,13 @@ export function resolveCodemapConfig(
     fts5 = parsed?.fts5 === true;
   }
 
+  const boundaries = (parsed?.boundaries ?? []).map((rule) => ({
+    name: rule.name,
+    from_glob: rule.from_glob,
+    to_glob: rule.to_glob,
+    action: rule.action ?? "deny",
+  }));
+
   return {
     root: absRoot,
     stateDir,
@@ -237,6 +290,7 @@ export function resolveCodemapConfig(
     excludeDirNames,
     tsconfigPath,
     fts5,
+    boundaries,
   };
 }
 

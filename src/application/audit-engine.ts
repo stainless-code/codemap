@@ -75,8 +75,8 @@ export interface AuditHead {
  * didn't request (no baseline → no entry) are absent from the map.
  *
  * v1 ships no `verdict` field; consumers compose `--json` + `jq` for CI exit
- * codes. v1.x adds `verdict: "pass" | "warn" | "fail"` driven by
- * `codemap.config.audit`.
+ * codes. v1.x adds `verdict: "pass" | "warn" | "fail"` driven by an
+ * `audit` field on the config object (`.codemap/config.{ts,js,json}`).
  */
 export interface AuditEnvelope {
   head: AuditHead;
