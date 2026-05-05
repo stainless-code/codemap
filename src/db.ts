@@ -142,8 +142,8 @@ export function createTables(db: CodemapDatabase) {
       is_readonly INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
-    -- Opt-in: recipes JOIN to honor; ad-hoc SQL unaffected.
-    -- line_number > 0 => next-line scope (suppressed line); = 0 => file scope.
+    -- Opt-in suppressions — recipes LEFT JOIN to honor, ad-hoc SQL unaffected.
+    -- line_number > 0 = next-line scope (suppressed line). 0 = file scope.
     -- Sourced from // codemap-ignore-{next-line,file} <recipe-id> directives (see markers.ts).
     CREATE TABLE IF NOT EXISTS suppressions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
