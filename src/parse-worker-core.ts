@@ -6,7 +6,7 @@ import type { ParseContext } from "./adapters/types";
 import { LANG_MAP } from "./constants";
 import type { FileRow } from "./db";
 import { hashContent } from "./hash";
-import { extractMarkers } from "./markers";
+import { extractMarkers, extractSuppressions } from "./markers";
 import type { ParsedFile } from "./parsed-types";
 
 export type { ParsedFile } from "./parsed-types";
@@ -25,10 +25,11 @@ export interface WorkerOutput {
 function parseAsTextFallback(
   source: string,
   relPath: string,
-): Pick<ParsedFile, "category" | "markers"> {
+): Pick<ParsedFile, "category" | "markers" | "suppressions"> {
   return {
     category: "text",
     markers: extractMarkers(source, relPath),
+    suppressions: extractSuppressions(source, relPath),
   };
 }
 

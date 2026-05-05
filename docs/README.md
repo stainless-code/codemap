@@ -22,7 +22,7 @@ Each topic has exactly one canonical file. Other files cross-reference by relati
 | [packaging.md](./packaging.md)                | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets; **`bun run version`** + oxfmt **`CHANGELOG.md`**).                                                                                                                                                                             |
 | [roadmap.md](./roadmap.md)                    | Forward-looking [**Backlog**](./roadmap.md#backlog) and [**Non-goals**](./roadmap.md#non-goals-v1) (not a `src/` inventory).                                                                                                                                                                                                                                                                        |
 | [plans/](./plans/)                            | One `<feature-name>.md` per in-flight plan. Created on demand — don't add the `-plan` suffix; the folder provides context. In flight: [`c9-plugin-layer.md`](./plans/c9-plugin-layer.md), [`lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md).                                                                                                                                               |
-| [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans). Each note links shipped items back to canonical homes — see [research/competitive-scan-2026-04.md](./research/competitive-scan-2026-04.md).                                                                                                                                                                                                   |
+| [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans, non-goals reassessments). Each note links shipped items back to canonical homes — see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md).                                                                                                                                                              |
 
 ---
 
@@ -37,7 +37,7 @@ These rules are normative — cite them by number in PR review. Ordered by how o
 5. **Cross-references use relative paths** — `[architecture.md § Section](./architecture.md#section)` or `[plans/foo.md](./plans/foo.md)`. Prefer section-deep links over file-only links.
 6. **No inventory counts in narrative** — don't hardcode counts of files, symbols, recipes, or other code-derived quantities. Use qualitative descriptors or a `codemap query --json` example. Decision values (cache TTLs, batch sizes, schema version) are fine — those are decisions, not inventory.
 7. **No line-number references** — line numbers (e.g. `parser.ts:241`) rot on every edit. Reference by function name, section heading, or symbol from `codemap query` instead. Methodology tables in [benchmark.md](./benchmark.md) are exempt.
-8. **Research notes get closed** — when a research scan's adopt items ship, slim the note to a "What shipped" appendix linking to canonical homes (see [research/competitive-scan-2026-04.md](./research/competitive-scan-2026-04.md) as the precedent). Rejected items keep a `Status: Rejected (date) — <one-line reason>` header.
+8. **Research notes get closed** — when a research scan's adopt items ship, slim the note to a "What shipped" appendix linking to canonical homes (see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md) as the precedent — its § 8 errata + § Closed-out items pattern). Rejected items keep a `Status: Rejected (date) — <one-line reason>` header.
 9. **New term ⇒ update [glossary.md](./glossary.md) in the same PR** — when a PR introduces a new domain noun / verb / acronym (table name, recipe id, parser name, schema column), add or update its entry. Disambiguations (e.g. `FileRow` TS shape vs `files` SQLite table) take priority over single defs.
 10. **Core surface change ⇒ update bundled agent rule + skill in the same PR** — when a PR adds / changes a CLI flag, recipe id, recipe `actions` template, schema column, or any other surface an agent would query, update **both** copies of the codemap rule + skill so installed agents and this clone stay in lockstep:
     - **`templates/agents/rules/codemap.md`** + **`templates/agents/skills/codemap/SKILL.md`** (ships to npm via `codemap agents init`).
@@ -99,7 +99,7 @@ If none → fold any salvageable content into roadmap / architecture / glossary,
 
 A research note's job is the evaluation. When it concludes:
 
-- **Adopted** → lift the decisions-of-record into the relevant reference doc; slim the note to a "What shipped" appendix linking to canonical homes (precedent: [research/competitive-scan-2026-04.md](./research/competitive-scan-2026-04.md)).
+- **Adopted** → lift the decisions-of-record into the relevant reference doc; slim the note to a "What shipped" appendix linking to canonical homes (precedent: [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md)).
 - **Rejected** → add `Status: Rejected (YYYY-MM-DD) — <one-line reason>` at the top. Keep the file. Don't delete; the rejection rationale saves the next agent from re-litigating.
 - **Open** → stays in `research/` with no status header (open is the default).
 
@@ -118,7 +118,7 @@ When in doubt, default to absorbing into the closest existing root-level file (u
 ## Naming Conventions
 
 - **`plans/` files**: `<feature-name>.md` — the folder provides "plan" context, don't add a `-plan` suffix.
-- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots (e.g. `competitive-scan-2026-04.md`); `<tool-name>.md` for ongoing tool evaluations.
+- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots (e.g. `non-goals-reassessment-2026-05.md`); `<tool-name>.md` for ongoing tool evaluations.
 - **Top-level files**: descriptive domain noun (`architecture.md`, `glossary.md`, `roadmap.md`) — no prefix or suffix.
 
 ---

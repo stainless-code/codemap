@@ -16,6 +16,13 @@ Query:
   codemap query [--json] "<SQL>"
   codemap query [--json] --recipe <id>
 
+Outcome aliases (thin wrappers around \`query --recipe <id>\`; pass-through flags):
+  codemap dead-code         # query --recipe untested-and-dead
+  codemap deprecated        # query --recipe deprecated-symbols
+  codemap boundaries        # query --recipe boundary-violations
+  codemap hotspots          # query --recipe fan-in
+  codemap coverage-gaps     # query --recipe worst-covered-exports
+
 Validate (compare on-disk SHA-256 to indexed hash):
   codemap validate [--json] [paths...]
 

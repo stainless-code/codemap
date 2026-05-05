@@ -22,6 +22,7 @@ import {
   insertComponents,
   insertDependencies,
   insertMarkers,
+  insertSuppressions,
   insertCssVariables,
   insertCssClasses,
   insertCssKeyframes,
@@ -36,7 +37,7 @@ import type { CodemapDatabase, FileRow } from "../db";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
-import { extractMarkers } from "../markers";
+import { extractMarkers, extractSuppressions } from "../markers";
 import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
@@ -247,6 +248,8 @@ function insertParsedResults(
           }
           if (parsed.calls?.length) insertCalls(db, parsed.calls);
         }
+        if (parsed.suppressions?.length)
+          insertSuppressions(db, parsed.suppressions);
       } catch (err) {
         console.error(
           `  Parse error in ${parsed.relPath}: ${err instanceof Error ? err.message : err}`,
@@ -419,6 +422,9 @@ export async function indexFiles(
               insertTypeMembers(db, data.typeMembers);
             if (data.calls.length) insertCalls(db, data.calls);
           }
+          // Category-agnostic: one regex pass over raw source, no AST needed.
+          const suppressions = extractSuppressions(source, relPath);
+          if (suppressions.length) insertSuppressions(db, suppressions);
         } catch (err) {
           console.error(
             `  Parse error in ${relPath}: ${err instanceof Error ? err.message : err}`,

@@ -16,7 +16,7 @@ describe("parseIngestCoverageRest", () => {
     });
   });
 
-  it("parses a single path with default --json=false", () => {
+  it("parses a single path with default --json=false and --runtime=false", () => {
     expect(
       parseIngestCoverageRest([
         "ingest-coverage",
@@ -26,13 +26,31 @@ describe("parseIngestCoverageRest", () => {
       kind: "run",
       path: "coverage/coverage-final.json",
       json: false,
+      runtime: false,
     });
   });
 
   it("parses --json", () => {
     expect(
       parseIngestCoverageRest(["ingest-coverage", "coverage", "--json"]),
-    ).toEqual({ kind: "run", path: "coverage", json: true });
+    ).toEqual({ kind: "run", path: "coverage", json: true, runtime: false });
+  });
+
+  it("parses --runtime (V8 protocol directory mode)", () => {
+    expect(
+      parseIngestCoverageRest(["ingest-coverage", ".cov", "--runtime"]),
+    ).toEqual({ kind: "run", path: ".cov", json: false, runtime: true });
+  });
+
+  it("parses --runtime + --json composed", () => {
+    expect(
+      parseIngestCoverageRest([
+        "ingest-coverage",
+        ".cov",
+        "--runtime",
+        "--json",
+      ]),
+    ).toEqual({ kind: "run", path: ".cov", json: true, runtime: true });
   });
 
   it("rejects missing path", () => {

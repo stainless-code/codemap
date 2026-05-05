@@ -10,7 +10,7 @@ Mid-flight or post-merge structural review of a PR against the repo's own archit
 This skill exists because:
 
 - Lightweight STOP signals (new top-level src/ folder, new shared util with 3+ consumers, folder past ~15 files without `index.ts`, files moved across module boundaries) miss **content-driven** smells (twin wrappers, incomplete lifts, dead leftovers from a move) that show up only after the PR has been opened.
-- The audit recipe (codemap reindex → boundary queries → fallow audit → cross-check rules → write findings) is reusable but lived nowhere before this skill — every audit was rebuilding it from scratch.
+- The audit recipe (codemap reindex → boundary queries → dead-code / complexity recipes → cross-check rules → write findings) is reusable but lived nowhere before this skill — every audit was rebuilding it from scratch.
 
 ## When to fire
 
@@ -88,26 +88,28 @@ Read [`docs/architecture.md` § Layering](../../../docs/architecture.md#layering
 
 For a re-runnable kit, find the most recent open or recently-closed audit under `docs/audits/` and copy its § Boundary verification block. **Don't cite a specific audit file by name from this skill** — audits are mortal under [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md), and naming one couples this skill's durability to its lifecycle.
 
-### 3. Run the fallow PR-audit
+### 3. Run codemap's structural-smell recipes
 
-Codemap is a TS project — fallow's PR-audit applies cleanly:
+Use codemap's own queries — same substrate for boundary checks, dead code, complexity, and unimported-export bloat:
 
 ```bash
-bunx fallow audit --base origin/main
+bun src/index.ts audit --base origin/main --json   # delta vs base ref
+bun src/index.ts query --json --recipe untested-and-dead
+bun src/index.ts query --json --recipe unimported-exports
+bun src/index.ts query --json --recipe high-complexity-untested
 ```
 
-Apply the duplication / complexity thresholds (translated from fallow's own audit-on-PR shape):
+Apply these verdicts to results:
 
-| Signal                                                                 | Verdict                                                  |
-| ---------------------------------------------------------------------- | -------------------------------------------------------- |
-| Clone group ≥40 LoC between sibling files of the same module / adapter | **Incomplete lift** — the orchestrator wasn't shared.    |
-| Clone family ≥3 groups across sibling files                            | **Structurally incomplete lift** — revisit the boundary. |
-| Function size ≥60 LoC in a wrapper / orchestrator                      | **Wrapper doing orchestration**, not adapter wiring.     |
-| Unused file (esp. file with the same name as one moved during the PR)  | **Dead leftover from the move** — delete.                |
-| Unused export of a type / fn referenced only inside the same folder    | **Public-surface bloat** — drop the `export`.            |
-| Unused dependency in `package.json`                                    | Out of scope for this audit unless the PR added it.      |
+| Signal                                                                                   | Verdict                                                  |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Function size ≥60 LoC (`line_end - line_start` on `symbols`) in a wrapper / orchestrator | **Wrapper doing orchestration**, not adapter wiring.     |
+| `unimported-exports` row added by the PR                                                 | **Public-surface bloat** — drop the `export`.            |
+| `untested-and-dead` row co-located with files moved during the PR                        | **Dead leftover from the move** — delete.                |
+| `high-complexity-untested` row added by the PR                                           | **Untested orchestration** — split or test before merge. |
+| Unused dependency in `package.json`                                                      | Out of scope for this audit unless the PR added it.      |
 
-The thresholds (≥40 / ≥3) are **seed values** from fallow's own calibration. Re-tune as more codemap-shaped lifts land if the seed proves too tight or too loose.
+Duplication / structural-clone detection (AST-hash) is a [roadmap item](../../../docs/roadmap.md#backlog) and not yet a substrate column — for now, eyeball clones in the diff or use ad-hoc text grep.
 
 ### 4. Cross-check structural STOP signals
 
@@ -144,7 +146,7 @@ Doc shape — mirror the most recent audit under `docs/audits/` (or — if this 
 
 **Status:** Open — pending PR #N follow-ups (or: Closed, all N findings shipped on the same branch).
 **Scope:** <one paragraph: what diff, what HEAD, what subtree(s)>.
-**Method:** <codemap query + fallow audit + cross-check; cite which queries>.
+**Method:** <codemap audit + structural-smell recipes + cross-check; cite which queries>.
 
 This audit follows [docs/README.md Rule 6](../README.md) (no inventory counts in evergreen prose) and [docs/README.md Rule 7](../README.md) (no line-number references). All numbers below are flagged "at audit time."
 
@@ -187,7 +189,7 @@ This audit follows [docs/README.md Rule 6](../README.md) (no inventory counts in
 
 ## Verification recipe
 
-<re-runnable bash block: codemap reindex + boundary queries + fallow audit + typecheck/lint/test>.
+<re-runnable bash block: codemap reindex + boundary queries + structural-smell recipes + typecheck/lint/test>.
 ```
 
 ## Closing this audit
@@ -213,4 +215,3 @@ Once findings are shipped (or deferred to `roadmap.md`):
 - [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md) — operationalises docs-governance lifecycle on demand.
 - [`codemap`](../codemap/SKILL.md) — query patterns; the boundary-leak kit lives in § 2 here.
 - [`docs/architecture.md`](../../../docs/architecture.md) — the canonical source of codemap's layering; every audit derives its boundary kit from this file.
-- [fallow](https://github.com/fallow-rs/fallow) — `bunx fallow audit --base origin/main` thresholds.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { extractMarkers } from "./markers";
+import { extractMarkers, extractSuppressions } from "./markers";
 
 describe("extractMarkers", () => {
   it("finds TODO with line number and content", () => {
@@ -42,5 +42,94 @@ describe("extractMarkers", () => {
 
   it("returns empty when no markers", () => {
     expect(extractMarkers("const x = 1;", "f.ts")).toEqual([]);
+  });
+});
+
+describe("extractSuppressions", () => {
+  it("recognizes // codemap-ignore-next-line and points at the next line", () => {
+    const src = [
+      "const a = 1;", // line 1
+      "// codemap-ignore-next-line untested-and-dead", // line 2
+      "export function legacy() {}", // line 3 — suppressed
+    ].join("\n");
+    const s = extractSuppressions(src, "f.ts");
+    expect(s).toEqual([
+      { file_path: "f.ts", line_number: 3, recipe_id: "untested-and-dead" },
+    ]);
+  });
+
+  it("recognizes // codemap-ignore-file and encodes scope as line_number = 0", () => {
+    const src =
+      "// codemap-ignore-file boundary-violations\nimport x from './y';\n";
+    const s = extractSuppressions(src, "f.ts");
+    expect(s).toEqual([
+      { file_path: "f.ts", line_number: 0, recipe_id: "boundary-violations" },
+    ]);
+  });
+
+  it("supports multiple suppressions across one file", () => {
+    const src = [
+      "// codemap-ignore-file deprecated-symbols",
+      "// line 2",
+      "// codemap-ignore-next-line unimported-exports",
+      "export const x = 1;",
+    ].join("\n");
+    const s = extractSuppressions(src, "f.ts");
+    expect(s).toHaveLength(2);
+    expect(s[0]).toEqual({
+      file_path: "f.ts",
+      line_number: 0,
+      recipe_id: "deprecated-symbols",
+    });
+    expect(s[1]).toEqual({
+      file_path: "f.ts",
+      line_number: 4,
+      recipe_id: "unimported-exports",
+    });
+  });
+
+  it("recognises hash, dash, and HTML/block comment leaders (markdown / yaml / sql)", () => {
+    expect(
+      extractSuppressions(
+        "# codemap-ignore-file deprecated-symbols\n",
+        "a.yml",
+      ),
+    ).toEqual([
+      { file_path: "a.yml", line_number: 0, recipe_id: "deprecated-symbols" },
+    ]);
+    expect(
+      extractSuppressions("-- codemap-ignore-file boundaries\n", "schema.sql"),
+    ).toEqual([
+      { file_path: "schema.sql", line_number: 0, recipe_id: "boundaries" },
+    ]);
+    expect(
+      extractSuppressions(
+        "<!-- codemap-ignore-file unused-type-members -->\n",
+        "doc.md",
+      ),
+    ).toEqual([
+      { file_path: "doc.md", line_number: 0, recipe_id: "unused-type-members" },
+    ]);
+    expect(
+      extractSuppressions("/* codemap-ignore-file fan-in */\n", "f.css"),
+    ).toEqual([{ file_path: "f.css", line_number: 0, recipe_id: "fan-in" }]);
+  });
+
+  it("returns empty when no suppression markers", () => {
+    expect(
+      extractSuppressions("const x = 1;\n// regular TODO: y\n", "f.ts"),
+    ).toEqual([]);
+  });
+
+  it("ignores prose mentions inside multi-line doc comments (no false positives)", () => {
+    // ` * ` continuation lines aren't leaders, so directive in prose is ignored.
+    const src = [
+      "/**",
+      " * Document mentions codemap-ignore-file boundaries in prose;",
+      " * NOT a real suppression because the line leader is `* `, not `//`.",
+      " */",
+      "export const x = 1;",
+    ].join("\n");
+    expect(extractSuppressions(src, "f.ts")).toEqual([]);
   });
 });

@@ -1,4 +1,9 @@
 import {
+  isOutcomeAlias,
+  printOutcomeAliasHelp,
+  resolveOutcomeAlias,
+} from "./aliases.js";
+import {
   parseBootstrapArgs,
   printCliUsage,
   printVersion,
@@ -23,6 +28,17 @@ export async function main(): Promise<void> {
   if (rest[0] === "--version" || rest[0] === "-V" || rest[0] === "version") {
     printVersion();
     return;
+  }
+
+  // Outcome aliases — rewrite `<alias>` to `query --recipe <id>` so the
+  // existing query dispatch handles every flag pass-through. See ./aliases.ts.
+  if (rest[0] && isOutcomeAlias(rest[0])) {
+    if (rest.includes("--help") || rest.includes("-h")) {
+      printOutcomeAliasHelp(rest[0]);
+      return;
+    }
+    const rewritten = resolveOutcomeAlias(rest);
+    if (rewritten) rest.splice(0, rest.length, ...rewritten);
   }
 
   if (rest[0] === "agents" && rest[1] === "init") {
@@ -326,6 +342,7 @@ Copies bundled agent templates into .agents/ under the project root.
       stateDir,
       path: parsed.path,
       json: parsed.json,
+      runtime: parsed.runtime,
     });
     return;
   }
