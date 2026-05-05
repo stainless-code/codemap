@@ -81,11 +81,13 @@ These are the design questions the plan-PR resolves before impl starts. Each get
   ```javascript
   import { detect } from "package-manager-detector/detect";
   import { resolveCommand } from "package-manager-detector/commands";
+  import { appendFileSync } from "node:fs";
 
   const pm = await detect();
   const agent = pm?.agent ?? "npm";
   // resolveCommand handles `npm exec` vs `pnpm exec` vs `bun x` vs `yarn dlx` — Q3 lookup-table for free
-  console.log(`::set-output name=agent::${agent}`);
+  // Write to GITHUB_OUTPUT env file (`::set-output` deprecated since 2022-10).
+  appendFileSync(process.env.GITHUB_OUTPUT, `agent=${agent}\n`);
   ```
 
   Precedence: `package-manager:` input still wins when set (overrides detection). When unset, the library's default strategy order applies. Multiple-lockfile case is handled by the library; we surface its result + log a warning if ambiguous.
@@ -98,7 +100,7 @@ These are the design questions the plan-PR resolves before impl starts. Each get
 
   **Resolution: project-installed first, download-and-execute fallback.** Maps directly onto `package-manager-detector`'s two `resolveCommand` intents — `'execute-local'` (already installed) vs `'execute'` (download and run). No hand-rolled per-agent branching; the library resolves `npx` / `bunx` / `pnpm dlx` / `yarn dlx` itself.
 
-  ```
+  ```text
   if version-input is set:
     intent = 'execute'                  # forced download with pinned version
     cli = resolveCommand(agent, 'execute',       ['codemap@<version>'])
