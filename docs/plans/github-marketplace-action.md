@@ -284,6 +284,42 @@ Slices 1-4 land in PR #74; Slice 5 is a sequenced manual runbook that requires a
 
 ---
 
+## Feature-completeness tiers (Slice 5 → v1.x cadence)
+
+After PR #74 landed Slices 1-4, the Action is functionally complete (PR-scoped audit → SARIF + opt-in PR comment + dogfood). This section ranks the post-merge polish picks that would lift "feels feature-complete" — separating real publish prerequisites from minor-release follow-ups.
+
+### Tier 1 — publish prerequisites (block Slice 5)
+
+| #   | What                              | Source / why                                                                                                                                                                                                                            |
+| --- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | **`MARKETPLACE.md`** at repo root | Per Q10: listing must point at an action-focused README, not the codemap-CLI root README (too implementation-heavy for a Marketplace landing page). ≤150-char description, tags, icon, quick-start, inputs/outputs reference live here. |
+
+Tier 1 is the only set that genuinely blocks publishing. Everything else can ship as non-breaking minors under the floating `@v1` tag — consumers auto-receive them.
+
+### Tier 2 — high-impact pre-publish polish (ship as v1.1 / v1.2 minors post-publish)
+
+| #   | What                                                          | Effort | Source / pulled from                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B   | **Unlock `mode: aggregate`** (Q6 deferral)                    | M      | Q6: "promote to a `mode: aggregate` input in v1.x once consumers signal demand." Verify multi-recipe SARIF rule.id de-dup composes in Code Scanning, then flip the `aggregate` validation reject to actually run a curated recipe set (`untested-and-dead`, `boundary-violations`, `deprecated-symbols`, `high-complexity-untested`) alongside audit. **Single biggest insight-density jump.**                                      |
+| C   | **Surface recipe `actions:` template in `pr-comment` output** | S      | [`fallow.md § 0`](../research/fallow.md): "Per-row `actions` hints save the agent a derivation step." We already ship the `actions:` template (PR #26); the renderer ignores it. One-line lift in `pr-comment-engine.ts`: pull `getQueryRecipeActions(ruleId)` and render under each rule. Closes the "what do I do about this?" reviewer gap.                                                                                      |
+| D   | **Per-recipe SARIF severity overrides**                       | S      | Already a deferral in `.changeset/sarif-formatter.md` ("per-recipe `sarifLevel` / `sarifMessage` / `sarifRuleId` overrides via frontmatter on `<id>.md` deferred to v1.x"). Currently every audit finding is `warning`, every recipe finding is `note`. Per-recipe override = better Code Scanning triage at zero runtime cost (e.g. `boundary-violations: error`, `untested-and-dead: warning`, `high-complexity-untested: note`). |
+
+### Tier 3 — defer to v1.x post-publish, demand-driven
+
+| #   | What                                                                                          | Defer reason                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| E   | **Auto-ingest coverage** — detect `coverage/coverage-final.json` or `lcov.info` pre-audit     | Zero-config, but only triggers for repos that already run coverage. Real demand surfaces post-publish.                                    |
+| F   | **CODEOWNERS-grouped PR comments by default** when `.github/CODEOWNERS` exists                | Already a flag (`--group-by owner`); making it a default is opinionated. Wait for monorepo-consumer ask.                                  |
+| G   | **`deprecated-symbols-callers` recipe** — surface CALL SITES of newly-`@deprecated` symbols   | New recipe; needs design (does it fit the audit envelope? new delta key?). v1.x candidate.                                                |
+| H   | **Per-rule URL in SARIF doc** — link `rule.id` → `.md` description                            | Pure formatting polish; Code Scanning UI already shows `shortDescription`. Minor.                                                         |
+| I   | **Auto-baseline on push to main** — Action saves a baseline for follow-up PRs to diff against | `audit --base <ref>` already covers PR-scoped diff (the headline). Auto-baselining is a different shape (cross-PR trends) better as v1.x. |
+
+### Default cadence
+
+**Ship Tier 1 alongside Slice 5; promote Tier 2 picks to v1.1 / v1.2 / v1.3 minors based on real consumer signal post-publish.** Tier 3 stays demand-gated. Same trigger discipline as the audit-verdict + history-table backlog items in [`roadmap.md`](../roadmap.md).
+
+---
+
 ## Test approach
 
 - **Unit:** `--ci` flag handling + PR-comment renderer — `*.test.ts` per touched file.
