@@ -1,16 +1,32 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   buildMessageText,
   detectLocationColumn,
   escapeAnnotationData,
   escapeAnnotationProperty,
+  formatDiff,
+  formatDiffJson,
   formatAnnotations,
   formatMermaid,
   formatSarif,
   hasLocatableRows,
   MERMAID_MAX_EDGES,
 } from "./output-formatters";
+
+let workDir: string;
+
+beforeEach(() => {
+  workDir = mkdtempSync(join(tmpdir(), "output-formatters-"));
+  mkdirSync(join(workDir, "src"), { recursive: true });
+});
+
+afterEach(() => {
+  rmSync(workDir, { recursive: true, force: true });
+});
 
 describe("detectLocationColumn", () => {
   it("prefers file_path over path/to_path/from_path", () => {
@@ -419,6 +435,88 @@ describe("formatMermaid", () => {
     // Only one edge should be rendered.
     const edgeLines = out.split("\n").filter((l) => l.includes("-->"));
     expect(edgeLines).toHaveLength(1);
+  });
+});
+
+describe("formatDiff / formatDiffJson", () => {
+  it("emits a unified diff for one replacement", () => {
+    writeFileSync(join(workDir, "src/a.ts"), "const oldName = 1;\n");
+    const out = formatDiff({
+      projectRoot: workDir,
+      rows: [
+        {
+          file_path: "src/a.ts",
+          line_start: 1,
+          before_pattern: "oldName",
+          after_pattern: "newName",
+        },
+      ],
+    });
+    expect(out).toContain("--- a/src/a.ts");
+    expect(out).toContain("+++ b/src/a.ts");
+    expect(out).toContain("@@ -1,1 +1,1 @@");
+    expect(out).toContain("-const oldName = 1;");
+    expect(out).toContain("+const newName = 1;");
+  });
+
+  it("groups multiple hunks under one file header", () => {
+    writeFileSync(join(workDir, "src/a.ts"), "oldName();\noldName(1);\n");
+    const out = formatDiff({
+      projectRoot: workDir,
+      rows: [
+        {
+          file_path: "src/a.ts",
+          line_start: 1,
+          before_pattern: "oldName",
+          after_pattern: "newName",
+        },
+        {
+          file_path: "src/a.ts",
+          line_start: 2,
+          before_pattern: "oldName",
+          after_pattern: "newName",
+        },
+      ],
+    });
+    expect(out.match(/^--- a\/src\/a\.ts/gm)).toHaveLength(1);
+    expect(out.match(/^@@/gm)).toHaveLength(2);
+  });
+
+  it("marks stale rows when before_pattern no longer matches the indexed line", () => {
+    writeFileSync(join(workDir, "src/a.ts"), "const currentName = 1;\n");
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/a.ts",
+            line_start: 1,
+            before_pattern: "oldName",
+            after_pattern: "newName",
+          },
+        ],
+      }),
+    );
+    expect(payload.files[0].stale).toBe(true);
+    expect(payload.summary.skipped).toBe(1);
+  });
+
+  it("marks missing rows when source file is gone", () => {
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/missing.ts",
+            line_start: 1,
+            before_pattern: "oldName",
+            after_pattern: "newName",
+          },
+        ],
+      }),
+    );
+    expect(payload.files[0].missing).toBe(true);
+    expect(payload.summary.skipped).toBe(1);
   });
 });
 

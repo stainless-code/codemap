@@ -5,6 +5,8 @@ import {
 } from "../application/index-engine";
 import {
   formatAnnotations,
+  formatDiff,
+  formatDiffJson,
   formatMermaid,
   formatSarif,
   hasLocatableRows,
@@ -68,6 +70,8 @@ export const OUTPUT_FORMATS = [
   "sarif",
   "annotations",
   "mermaid",
+  "diff",
+  "diff-json",
 ] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
@@ -549,7 +553,13 @@ function formatIncompatibility(
     baseline: string | true | undefined;
   },
 ): string | undefined {
-  if (fmt !== "sarif" && fmt !== "annotations" && fmt !== "mermaid")
+  if (
+    fmt !== "sarif" &&
+    fmt !== "annotations" &&
+    fmt !== "mermaid" &&
+    fmt !== "diff" &&
+    fmt !== "diff-json"
+  )
     return undefined;
   const offenders: string[] = [];
   if (opts.summary) offenders.push("--summary");
@@ -557,7 +567,7 @@ function formatIncompatibility(
   if (opts.saveBaseline !== undefined) offenders.push("--save-baseline");
   if (opts.baseline !== undefined) offenders.push("--baseline");
   if (offenders.length === 0) return undefined;
-  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations/mermaid only support flat row lists).`;
+  return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — formatted outputs only support flat row lists).`;
 }
 
 /** Print the bundled recipe catalog as JSON to stdout (no DB access). */
@@ -612,7 +622,11 @@ Flags:
                                          (or codemap.adhoc for ad-hoc SQL); auto-detects file_path / path /
                                          to_path / from_path; aggregate recipes (no location) emit results: [].
                             annotations  GitHub Actions ::notice file=…,line=…::msg per row (PR-inline findings).
-                          sarif/annotations require a flat row list — incompatible with --summary,
+                            mermaid      Mermaid flowchart from rows shaped as {from, to, label?, kind?}.
+                            diff         Unified diff from rows shaped as {file_path, line_start,
+                                         before_pattern, after_pattern}.
+                            diff-json    Structured diff envelope for agents.
+                          Formatted outputs require a flat row list — incompatible with --summary,
                           --group-by, --save-baseline, --baseline (parser rejects at parse time).
   --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
                           With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
@@ -795,11 +809,7 @@ export async function runQueryCmd(opts: {
       return;
     }
 
-    if (
-      effectiveFormat === "sarif" ||
-      effectiveFormat === "annotations" ||
-      effectiveFormat === "mermaid"
-    ) {
+    if (effectiveFormat !== "text" && effectiveFormat !== "json") {
       const code = printFormattedQuery(opts.sql, {
         format: effectiveFormat,
         recipeId: opts.recipeId,
@@ -919,7 +929,7 @@ export async function runDropBaselineCmd(opts: {
 function printFormattedQuery(
   sql: string,
   opts: {
-    format: "sarif" | "annotations" | "mermaid";
+    format: Exclude<OutputFormat, "text" | "json">;
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
     bindValues: RecipeParamValue[] | undefined;
@@ -973,6 +983,16 @@ function printFormattedQuery(
         recipeId: opts.recipeId,
       });
       console.log(out);
+      return 0;
+    }
+
+    if (opts.format === "diff") {
+      console.log(formatDiff({ rows, projectRoot: getProjectRoot() }));
+      return 0;
+    }
+
+    if (opts.format === "diff-json") {
+      console.log(formatDiffJson({ rows, projectRoot: getProjectRoot() }));
       return 0;
     }
 

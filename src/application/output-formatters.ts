@@ -15,6 +15,9 @@
  * and the MCP `query` / `query_recipe` tools.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { CODEMAP_VERSION } from "../version";
 
 /** Priority-ordered column names that name a file path (D1). */
@@ -215,6 +218,44 @@ export interface MermaidOpts {
   recipeId: string | undefined;
 }
 
+export interface DiffOpts {
+  rows: Record<string, unknown>[];
+  projectRoot: string;
+}
+
+export interface DiffLine {
+  type: "remove" | "add";
+  text: string;
+}
+
+export interface DiffHunk {
+  old_start: number;
+  old_count: number;
+  new_start: number;
+  new_count: number;
+  lines: DiffLine[];
+}
+
+export interface DiffFile {
+  file_path: string;
+  hunks: DiffHunk[];
+  stale?: boolean;
+  missing?: boolean;
+  warning?: string;
+}
+
+export interface DiffJsonPayload {
+  files: DiffFile[];
+  warnings: string[];
+  summary: {
+    files: number;
+    hunks: number;
+    insertions: number;
+    deletions: number;
+    skipped: number;
+  };
+}
+
 /**
  * Render a `{from, to, label?, kind?}` row-set as a Mermaid `flowchart LR`
  * diagram (`docs/plans/fts5-mermaid.md` Q5). Rejects with a scope-suggestion
@@ -270,6 +311,145 @@ export function formatMermaid(opts: MermaidOpts): string {
     lines.push(`  ${fromId} --> ${label} ${toId}`.replace(/\s+$/, ""));
   }
   return lines.join("\n");
+}
+
+export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
+  const files = new Map<string, DiffFile>();
+  const warnings: string[] = [];
+
+  for (const row of opts.rows) {
+    const filePath = readString(row, "file_path");
+    const lineStart = readPositiveInt(row, "line_start");
+    const before = readString(row, "before_pattern");
+    const after = readString(row, "after_pattern");
+    if (
+      filePath === undefined ||
+      lineStart === undefined ||
+      before === undefined ||
+      after === undefined
+    ) {
+      continue;
+    }
+
+    const file = ensureDiffFile(files, filePath);
+    let source: string;
+    try {
+      source = readFileSync(join(opts.projectRoot, filePath), "utf8");
+    } catch {
+      markSkipped(file, warnings, `${filePath}: missing or unreadable`);
+      continue;
+    }
+    const lines = source.split(/\r?\n/);
+    const actual = lines[lineStart - 1];
+    if (actual === undefined || !actual.includes(before)) {
+      markSkipped(file, warnings, `${filePath}:${lineStart}: stale line range`);
+      continue;
+    }
+
+    const updated = actual.replace(before, after);
+    file.hunks.push({
+      old_start: lineStart,
+      old_count: 1,
+      new_start: lineStart,
+      new_count: 1,
+      lines: [
+        { type: "remove", text: actual },
+        { type: "add", text: updated },
+      ],
+    });
+  }
+
+  const fileList = [...files.values()];
+  let hunks = 0;
+  let insertions = 0;
+  let deletions = 0;
+  let skipped = 0;
+  for (const file of fileList) {
+    hunks += file.hunks.length;
+    for (const hunk of file.hunks) {
+      insertions += hunk.lines.filter((l) => l.type === "add").length;
+      deletions += hunk.lines.filter((l) => l.type === "remove").length;
+    }
+    if (file.stale === true || file.missing === true) skipped++;
+  }
+
+  return {
+    files: fileList,
+    warnings,
+    summary: {
+      files: fileList.filter((f) => f.hunks.length > 0).length,
+      hunks,
+      insertions,
+      deletions,
+      skipped,
+    },
+  };
+}
+
+export function formatDiff(opts: DiffOpts): string {
+  const payload = buildDiffJson(opts);
+  const lines: string[] = [];
+  for (const warning of payload.warnings) {
+    lines.push(`# WARNING: ${warning}`);
+  }
+  for (const file of payload.files) {
+    if (file.hunks.length === 0) continue;
+    lines.push(`--- a/${file.file_path}`);
+    lines.push(`+++ b/${file.file_path}`);
+    for (const hunk of file.hunks) {
+      lines.push(
+        `@@ -${hunk.old_start},${hunk.old_count} +${hunk.new_start},${hunk.new_count} @@`,
+      );
+      for (const line of hunk.lines) {
+        lines.push(`${line.type === "remove" ? "-" : "+"}${line.text}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
+export function formatDiffJson(opts: DiffOpts): string {
+  return JSON.stringify(buildDiffJson(opts), null, 2);
+}
+
+function ensureDiffFile(
+  files: Map<string, DiffFile>,
+  filePath: string,
+): DiffFile {
+  const existing = files.get(filePath);
+  if (existing !== undefined) return existing;
+  const next: DiffFile = { file_path: filePath, hunks: [] };
+  files.set(filePath, next);
+  return next;
+}
+
+function markSkipped(
+  file: DiffFile,
+  warnings: string[],
+  warning: string,
+): void {
+  if (warning.includes("stale")) file.stale = true;
+  else file.missing = true;
+  file.warning = warning;
+  warnings.push(warning);
+}
+
+function readString(
+  row: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = row[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readPositiveInt(
+  row: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = row[key];
+  return Number.isInteger(value) && typeof value === "number" && value > 0
+    ? value
+    : undefined;
 }
 
 function readMermaidEndpoint(

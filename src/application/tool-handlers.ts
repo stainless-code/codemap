@@ -41,6 +41,8 @@ import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
 import {
   formatAnnotations,
+  formatDiff,
+  formatDiffJson,
   formatMermaid,
   formatSarif,
 } from "./output-formatters";
@@ -80,6 +82,8 @@ export type ToolResult =
   | { ok: true; format: "sarif"; payload: string }
   | { ok: true; format: "annotations"; payload: string }
   | { ok: true; format: "mermaid"; payload: string }
+  | { ok: true; format: "diff"; payload: string }
+  | { ok: true; format: "diff-json"; payload: string }
   | { ok: false; error: string; status?: 400 | 404 | 500 };
 
 const ok = (payload: unknown): ToolResult => ({
@@ -146,7 +150,14 @@ export const groupByEnum = z.enum(
   GROUP_BY_MODES as unknown as readonly [GroupByMode, ...GroupByMode[]],
 );
 
-export const formatEnum = z.enum(["json", "sarif", "annotations", "mermaid"]);
+export const formatEnum = z.enum([
+  "json",
+  "sarif",
+  "annotations",
+  "mermaid",
+  "diff",
+  "diff-json",
+]);
 
 export const batchItemSchema = z.union([
   z.string().min(1, "sql must be a non-empty string"),
@@ -173,7 +184,7 @@ export interface QueryArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations" | "mermaid";
+  format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
 }
 
 export function handleQuery(args: QueryArgs, root: string): ToolResult {
@@ -186,7 +197,9 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
     if (
       args.format === "sarif" ||
       args.format === "annotations" ||
-      args.format === "mermaid"
+      args.format === "mermaid" ||
+      args.format === "diff" ||
+      args.format === "diff-json"
     ) {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
@@ -231,7 +244,7 @@ export interface QueryRecipeArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations" | "mermaid";
+  format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
   params?: RecipeParamValues;
 }
 
@@ -262,7 +275,9 @@ export function handleQueryRecipe(
     if (
       args.format === "sarif" ||
       args.format === "annotations" ||
-      args.format === "mermaid"
+      args.format === "mermaid" ||
+      args.format === "diff" ||
+      args.format === "diff-json"
     ) {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
@@ -755,22 +770,22 @@ export function handleImpact(args: ImpactArgs): ToolResult {
   }
 }
 
-// === shared format helpers (sarif / annotations) ============================
+// === shared format helpers ===================================================
 
 /**
- * Reject `format: "sarif" | "annotations" | "mermaid"` combinations that
+ * Reject formatted-output combinations that
  * change the output shape away from a flat row list. Mirrors the CLI
  * parser's `formatIncompatibility` for the tool wrapper layer.
  */
 function formatToolIncompatibility(
-  fmt: "sarif" | "annotations" | "mermaid",
+  fmt: "sarif" | "annotations" | "mermaid" | "diff" | "diff-json",
   args: { summary?: boolean; group_by?: GroupByMode },
 ): string | undefined {
   const offenders: string[] = [];
   if (args.summary === true) offenders.push("summary");
   if (args.group_by !== undefined) offenders.push("group_by");
   if (offenders.length === 0) return undefined;
-  return `codemap: format=${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — sarif/annotations/mermaid only support flat row lists).`;
+  return `codemap: format=${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — formatted outputs only support flat row lists).`;
 }
 
 function runFormattedQuery(args: {
@@ -779,7 +794,7 @@ function runFormattedQuery(args: {
   recipeActions: ReadonlyArray<unknown> | undefined;
   changedFiles: Set<string> | undefined;
   bindValues?: RecipeParamValue[] | undefined;
-  format: "sarif" | "annotations" | "mermaid";
+  format: "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
   root: string;
 }): ToolResult {
   const payload = executeQuery({
@@ -814,6 +829,14 @@ function runFormattedQuery(args: {
     } catch (e) {
       return err(e instanceof Error ? e.message : String(e));
     }
+  }
+  if (args.format === "diff") {
+    const text = formatDiff({ rows, projectRoot: args.root });
+    return { ok: true, format: "diff", payload: text };
+  }
+  if (args.format === "diff-json") {
+    const text = formatDiffJson({ rows, projectRoot: args.root });
+    return { ok: true, format: "diff-json", payload: text };
   }
   const text = formatAnnotations({
     rows,

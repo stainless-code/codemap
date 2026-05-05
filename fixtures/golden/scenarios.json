@@ -20,6 +20,16 @@
       "params": { "kind": "function", "name_pattern": "%usePermissions%" }
     },
     {
+      "id": "rename-preview",
+      "prompt": "Parametrised recipe: rename usePermissions to useAccess.",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "usePermissions",
+        "new": "useAccess",
+        "kind": "function"
+      }
+    },
+    {
       "id": "index-summary",
       "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
       "recipe": "index-summary"
