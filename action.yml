@@ -42,7 +42,7 @@ inputs:
     required: false
     default: ""
   audit-base:
-    description: "Git ref to audit against (when mode=audit). Default: ${{ github.base_ref }} on pull_request events."
+    description: "Git ref to audit against (when mode=audit). Empty (default) → falls back to `github.base_ref` on `pull_request` events; on other events the action no-ops unless an explicit `command:` is set."
     required: false
     default: ""
   changed-since:
@@ -80,9 +80,9 @@ inputs:
     required: false
     default: "any"
   token:
-    description: "GitHub token for SARIF upload + PR comment posting. Default: ${{ github.token }}."
+    description: "GitHub token for SARIF upload + PR comment posting. Empty (default) → falls back to `github.token` automatically. Pass an explicit fine-grained PAT only if you need elevated permissions."
     required: false
-    default: ${{ github.token }}
+    default: ""
 
 outputs:
   agent:
@@ -238,7 +238,7 @@ runs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{ inputs.working-directory }}/${{ inputs.output-path }}
-        token: ${{ inputs.token }}
+        token: ${{ inputs.token != '' && inputs.token || github.token }}
 
     - name: Post PR summary comment
       if: steps.gate.outputs.skip != 'true' && inputs.pr-comment == 'true' && github.event_name == 'pull_request' && always()
@@ -248,7 +248,7 @@ runs:
         EXEC: ${{ steps.detect-pm.outputs.exec }}
         OUTPUT_PATH: ${{ inputs.output-path }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
-        GH_TOKEN: ${{ inputs.token }}
+        GH_TOKEN: ${{ inputs.token != '' && inputs.token || github.token }}
       run: |
         # Render the markdown body via `codemap pr-comment`, then post via
         # `gh pr comment`. The same binary that produced the SARIF / JSON
