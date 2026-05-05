@@ -1,9 +1,10 @@
 # Codemap
 
-> **Codebase intelligence for TypeScript, JavaScript, and CSS** — with TODO / FIXME / HACK / NOTE marker tracking across Markdown, MDX, YAML, JSON, and shell scripts.
-> SQL-queryable structural index for unused code, deprecated symbols, architecture drift, hotspot ranking, coverage gaps, and React component shape.
-> **Built for AI-assisted development. No AI inside. No telemetry. No verdicts.**
-> **SQLite-native. Sub-millisecond queries. Sub-second incremental reindex.**
+> **SQL is the API for your codebase.**
+> A SQLite-backed structural index of TypeScript, JavaScript, and CSS — symbols, imports, exports, React components, calls, type members, dependency graphs, CSS tokens, coverage, and TODO/FIXME markers across docs, configs, and scripts.
+> Write any predicate. Compose any JOIN. Run it as a recipe in CI, as an MCP tool from your agent host, or over HTTP from anything.
+> **Predicate-as-API. No LLM, no embeddings, no telemetry, no verdicts.**
+> **Sub-millisecond queries. Sub-second incremental reindex. Sub-100ms cold-start.**
 
 ```text
 $ codemap query --recipe index-summary
@@ -35,40 +36,37 @@ That's the full setup. On every PR, the Action audits structural drift against t
 
 ## Why this exists
 
-Linters check files. TypeScript checks types. **Codemap checks the codebase.**
+Most static-analysis tools answer their own questions and hand you a verdict. Codemap inverts that posture: it ships the **substrate**, you write the question.
 
-It builds an AST-backed SQLite index of structural facts — symbols, imports, exports, components, calls, dependencies, CSS tokens, markers, coverage — that you query in **one SQL round-trip** instead of scanning the tree. The result is a deterministic, queryable substrate for the questions reviewers actually ask.
+The substrate is a SQLite database with 14 tables — `symbols`, `imports`, `exports`, `dependencies`, `calls`, `components`, `type_members`, `markers`, `css_variables`, `css_classes`, `css_keyframes`, `coverage`, `boundary_rules`, `query_baselines`. The questions are SQL: 20+ bundled recipes you can read with `--print-sql`, modify, fork, or replace. JOINs across tables let you ask things no verdict-shaped tool can pre-bake:
 
-| Question                                       | Linter | TypeScript | Codemap |
-| ---------------------------------------------- | ------ | ---------- | ------- |
-| Unused variable inside a function              | ✅     |            |         |
-| Type-level errors                              |        | ✅         |         |
-| Unused export that nothing imports             |        |            | ✅      |
-| File that nothing imports anywhere             |        |            | ✅      |
-| New dependency edges crossing a layer boundary |        |            | ✅      |
-| Symbol callers (who calls X?)                  |        |            | ✅      |
-| Coverage gaps × structural-dead code           |        |            | ✅      |
-| New `@deprecated` symbols + their callers      |        |            | ✅      |
-| Components touching a deprecated API           |        |            | ✅      |
-| React components by hook usage                 |        |            | ✅      |
-| CSS variables / classes / keyframes inventory  |        |            | ✅      |
+```sql
+-- "TODO comments inside @deprecated functions in files with <50% coverage"
+SELECT m.file_path, m.line_number, m.content
+FROM   markers m
+JOIN   symbols s ON s.file_path = m.file_path
+                 AND m.line_number BETWEEN s.line_start AND s.line_end
+LEFT JOIN coverage c ON c.file_path = s.file_path
+                     AND c.name      = s.name
+                     AND c.line_start = s.line_start
+WHERE  s.doc_comment LIKE '%@deprecated%'
+   AND COALESCE(c.coverage_pct, 0) < 50
+   AND m.kind = 'TODO';
+```
+
+That JOIN composes three indexed substrates — markers × symbols × coverage — in one round-trip. There's no command-line flag for that question. There never will be. **You write it. Codemap runs it.**
+
+The Action wraps that posture for CI: PR-scoped audit by default, recipe-driven gates when you want more, and the same substrate exposed over MCP / HTTP for agent hosts that want richer queries.
 
 ---
 
-## Why teams using AI need this
+## Built for agents
 
-AI accelerates code creation. It does not eliminate review, cleanup, or architecture drift.
+Agents discover code the slow way: glob, read, grep, read more, re-grep. Every discovery question burns context window, wastes tokens, slows response time, and produces false positives. Codemap collapses that loop into one SQL round-trip against a structured index.
 
-When Claude Code, Cursor, Copilot, Codex, or other tools generate changes, your reviewers (human or agent) still need to know:
+We supply the structure. The agent (human or otherwise) supplies the meaning. Two different jobs.
 
-- Did this introduce **dead code** or unused exports?
-- Did it cross an **architecture boundary** it shouldn't?
-- Did **complexity get worse** in code that's still untested?
-- Did a new dependency edge land that should have been reviewed?
-- Did a `@deprecated` symbol just sprout new callers?
-- Are these the **riskiest refactor targets** to read closely first?
-
-Codemap answers those questions deterministically, with structured output, so both humans and agents act on facts instead of guesses.
+The agent-host integration is first-class. `codemap mcp` exposes every CLI verb as a JSON-RPC tool over stdio for Claude Code, Cursor, Codex, Windsurf. `codemap agents init` writes `AGENTS.md` / `CLAUDE.md` / `.cursor/rules/codemap.mdc` / `.cursor/skills/codemap/SKILL.md` with a version-matched skill teaching agents the schema, recipes, and SQL idioms. Drop-in for any agent host that reads these conventions.
 
 ---
 
@@ -300,17 +298,17 @@ All inputs are optional.
 
 ---
 
-## Editor + AI support
+## Four transports, one engine
 
-Codemap is **not** an AI assistant. It's the codebase truth layer your assistant can call.
+The same engines back every surface; switch transports without re-learning anything.
 
-- **CLI** — `npx @stainless-code/codemap …`. 12+ verbs (`query`, `audit`, `show`, `snippet`, `impact`, `context`, `validate`, `watch`, `ingest-coverage`, `pr-comment`, `agents init`, `mcp`, `serve`).
-- **MCP server** — `codemap mcp` exposes every CLI verb as a JSON-RPC tool over stdio for Claude Code, Cursor, Codex, Windsurf, and other agent hosts. Plus 6 lazy-cached resources (`codemap://recipes`, `codemap://schema`, `codemap://files/{path}`, `codemap://symbols/{name}`, `codemap://skill`).
-- **HTTP server** — `codemap serve` exposes the same tool set over `POST /tool/{name}` for non-MCP consumers (curl, IDE plugins, CI scripts that don't speak MCP). Loopback default with optional `--token` Bearer auth.
-- **Watch mode** — `codemap watch` (standalone) or `codemap mcp --watch` / `codemap serve --watch` (default ON). Live reindex via chokidar; agents always read against fresh state.
-- **Bundled agent guidance** — `codemap agents init` writes `AGENTS.md` / `CLAUDE.md` / `.cursor/rules/codemap.mdc` / `.cursor/skills/codemap/SKILL.md` with a version-matched skill teaching agents the schema, recipes, and SQL idioms. Drop-in for any agent host that reads these conventions.
+- **CLI** — `npx @stainless-code/codemap …`. 12+ verbs: `query`, `audit`, `show`, `snippet`, `impact`, `context`, `validate`, `watch`, `ingest-coverage`, `pr-comment`, `agents init`, `mcp`, `serve`.
+- **MCP server** — `codemap mcp` over stdio. Every CLI verb maps to a JSON-RPC tool; six lazy-cached resources (`codemap://recipes`, `codemap://recipes/{id}`, `codemap://schema`, `codemap://files/{path}`, `codemap://symbols/{name}`, `codemap://skill`).
+- **HTTP server** — `codemap serve` exposes the same tool set over `POST /tool/{name}` for non-MCP consumers (curl, IDE plugins, CI scripts that don't speak MCP). Loopback default; optional `--token` Bearer auth.
+- **GitHub Action** — this listing. Wraps the CLI for CI; emits SARIF → Code Scanning + optional PR comment.
+- **Watch mode** (standalone or layered into `mcp` / `serve`, default ON) — chokidar-backed live reindex; consumers always read fresh state.
 
-LSP support (recipes-as-squigglies in VS Code + Open VSX) is on the roadmap.
+LSP support (recipes-as-squigglies in VS Code + Open VSX) is tracked on the roadmap.
 
 ## Performance
 
