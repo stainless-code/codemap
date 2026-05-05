@@ -1,6 +1,6 @@
 # Codemap
 
-> **Codebase intelligence for TypeScript, JavaScript, and CSS.**
+> **Codebase intelligence for TypeScript, JavaScript, and CSS** — with TODO / FIXME / HACK / NOTE marker tracking across Markdown, MDX, YAML, JSON, and shell scripts.
 > SQL-queryable structural index for unused code, deprecated symbols, architecture drift, hotspot ranking, coverage gaps, and React component shape.
 > **Built for AI-assisted development. No AI inside. No telemetry. No verdicts.**
 > **SQLite-native. Sub-millisecond queries. Sub-second incremental reindex.**
@@ -126,6 +126,16 @@ Indexed at parse time via [oxc](https://oxc.rs) (JS/TS) + [lightningcss](https:/
 | `query_baselines`     | Saved `query --save-baseline` snapshots; survive `--full` rebuilds                                                           |
 
 All `STRICT` mode tables. Schema versioned; reindex is idempotent + sub-second on incremental changes.
+
+## Supported file types
+
+| Depth                       | Formats                                                               | What you get                                                                                 |
+| --------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Deep AST (oxc)**          | `.ts` · `.tsx` · `.mts` · `.cts` · `.js` · `.jsx` · `.mjs` · `.cjs`   | `symbols` · `imports` · `exports` · `components` · `calls` · `type_members` · `dependencies` |
+| **Deep CSS (lightningcss)** | `.css`                                                                | `css_variables` · `css_classes` · `css_keyframes`                                            |
+| **Markers (regex)**         | `.md` · `.mdx` · `.mdc` · `.yml` · `.yaml` · `.json` · `.sh` · `.txt` | `markers` (TODO / FIXME / HACK / NOTE with file:line + content)                              |
+
+Sass / Less / SCSS / Vue / Svelte / Astro / Python and other deep-parsers are tracked as community language adapters in the roadmap. See [`roadmap.md`](https://github.com/stainless-code/codemap/blob/main/docs/roadmap.md).
 
 ## Architecture boundaries
 
@@ -334,7 +344,7 @@ Action publishes at `v1.0.0`, independent of the codemap CLI's npm version. The 
 - SARIF → Code Scanning requires Advanced Security on private repos. Set `upload-sarif: false` and rely on `pr-comment: true` for visibility.
 - `mode: aggregate` (run audit + curated recipes in one invocation) reserved for v1.x.
 - Static analysis only — no LLM, no embeddings, no runtime tracing. Coverage is ingested statically from Istanbul/LCOV files.
-- TypeScript / JavaScript / CSS first — community language adapters are on the roadmap.
+- Deep AST extraction is JavaScript / TypeScript / CSS first; Sass / Less / SCSS / Vue / Svelte / Astro / Python adapters are tracked as roadmap items. Marker extraction (TODO / FIXME / HACK / NOTE) is broader: Markdown, MDX, YAML, JSON, and shell scripts.
 
 ## Source + license
 
