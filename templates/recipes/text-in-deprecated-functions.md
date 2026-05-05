@@ -11,7 +11,7 @@ actions:
 
 **Returns empty when FTS5 is disabled** (`source_fts` virtual table is empty). Enable via either of:
 
-- `codemap.config.ts` → `export default defineConfig({ fts5: true })` then run `codemap --full`.
+- `.codemap/config.ts` → `export default defineConfig({ fts5: true })` then run `codemap --full`.
 - `codemap --with-fts --full` at the CLI (overrides config; logs a stderr line on override).
 
 The toggle-change auto-detect upgrades incremental → full when flipping `fts5: false → true`, so a fresh `--full` is automatic.

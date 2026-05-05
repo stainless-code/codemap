@@ -1,4 +1,11 @@
 {
   "include": ["src/**/*.{ts,tsx,js,jsx}", "src/**/*.css", "**/*.{md,json}"],
-  "excludeDirNames": ["node_modules", ".git", "dist", "build", ".output"]
+  "excludeDirNames": ["node_modules", ".git", "dist", "build", ".output"],
+  "boundaries": [
+    {
+      "name": "ui-cant-touch-server",
+      "from_glob": "src/ui/*",
+      "to_glob": "src/server/*"
+    }
+  ]
 }

@@ -1,6 +1,12 @@
-import { createSchema, getMeta, META_FTS5_ENABLED_KEY, setMeta } from "../db";
+import {
+  createSchema,
+  getMeta,
+  META_FTS5_ENABLED_KEY,
+  reconcileBoundaryRules,
+  setMeta,
+} from "../db";
 import type { CodemapDatabase } from "../db";
-import { getFts5Enabled } from "../runtime";
+import { getBoundaryRules, getFts5Enabled } from "../runtime";
 import {
   collectFiles,
   deleteFilesFromIndex,
@@ -108,6 +114,9 @@ export async function runCodemapIndex(
     mode = "full";
     setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
   }
+  // Boundary rules are config-derived; reconcile once per pass regardless
+  // of mode so `boundary_rules` always tracks the resolved config exactly.
+  reconcileBoundaryRules(db, getBoundaryRules());
 
   if (mode === "full") {
     if (!quiet) console.log("  Full rebuild requested...");

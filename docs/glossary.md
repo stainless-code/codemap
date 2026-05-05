@@ -51,6 +51,10 @@ In Codemap usage: a file with a high number of `exports` rows — typically a pu
 
 The shared `batchInsert<T>()` helper in `src/db.ts`. Splits inserts into multi-row `INSERT … VALUES (…),(…)` statements of `BATCH_SIZE` (500) rows each, with pre-computed placeholder strings. Used by every `insertX` function.
 
+### `boundaries` (config) / `boundary_rules` (table) / `boundary-violations` (recipe)
+
+Architecture-boundary substrate. Users declare `boundaries: [{name, from_glob, to_glob, action?}]` in `.codemap/config.ts`; the resolver fills `action` to `"deny"` when omitted. Every index pass calls `reconcileBoundaryRules` (in `src/db.ts`) which clears `boundary_rules` and re-inserts from the resolved config — config is the single source of truth, the table is a denormalised lookup. Bundled `boundary-violations` recipe joins `dependencies` × `boundary_rules` via SQLite `GLOB` and surfaces forbidden import edges; `--format sarif` lights up automatically because the recipe row aliases `dependencies.from_path` to `file_path`. CHECK constraint pins `action ∈ {'deny','allow'}`. v1 only honours `'deny'`; `'allow'` reserves the slot for future whitelist semantics. See [architecture.md § `boundary_rules`](./architecture.md#boundary_rules--architecture-boundary-rules-config-derived-strict-without-rowid).
+
 ### `bun:sqlite`
 
 Bun's native SQLite binding. Codemap uses it on Bun; falls back to `better-sqlite3` on Node. Both are wrapped by `src/sqlite-db.ts` so call sites are runtime-agnostic.
@@ -105,7 +109,7 @@ Per-function decision-point count (REAL column on `symbols`). Computed by the pa
 
 ### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
 
-Opt-in FTS5 virtual table over file content (`tokenize='porter unicode61'`). Always created (near-zero space when empty); populated only when the resolved config has FTS5 enabled (`codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; CLI wins, logs stderr override). Demonstrates the FTS5 ⨯ `symbols` ⨯ `coverage` JOIN composability that ripgrep can't match — bundled recipe `text-in-deprecated-functions` exemplifies the JOIN. Toggle change auto-detects via `meta.fts5_enabled` and forces a full rebuild so `source_fts` is consistently populated. Stderr telemetry `[fts5] source_fts populated: <N> files / <X> KB` on first populate. Distinct from arbitrary full-text storage — the table is structurally identical to `coverage` (both `WITHOUT ROWID`-class virtual tables in the substrate). Default OFF preserves `.codemap/index.db` size for non-users (~30–50% growth on text-heavy projects).
+Opt-in FTS5 virtual table over file content (`tokenize='porter unicode61'`). Always created (near-zero space when empty); populated only when the resolved config has FTS5 enabled (`.codemap/config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; CLI wins, logs stderr override). Demonstrates the FTS5 ⨯ `symbols` ⨯ `coverage` JOIN composability that ripgrep can't match — bundled recipe `text-in-deprecated-functions` exemplifies the JOIN. Toggle change auto-detects via `meta.fts5_enabled` and forces a full rebuild so `source_fts` is consistently populated. Stderr telemetry `[fts5] source_fts populated: <N> files / <X> KB` on first populate. Distinct from arbitrary full-text storage — the table is structurally identical to `coverage` (both `WITHOUT ROWID`-class virtual tables in the substrate). Default OFF preserves `.codemap/index.db` size for non-users (~30–50% growth on text-heavy projects).
 
 ### `--format mermaid` / `formatMermaid` / `MERMAID_MAX_EDGES`
 

@@ -22,7 +22,7 @@ export interface BootstrapCodemapOpts {
   root: string;
   configFile: string | undefined;
   stateDir?: string | undefined;
-  /** CLI `--with-fts`; `undefined` defers to `codemap.config.ts` `fts5`. */
+  /** CLI `--with-fts`; `undefined` defers to `.codemap/config.ts` `fts5`. */
   fts5Cli?: boolean | undefined;
 }
 

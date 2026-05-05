@@ -3,7 +3,7 @@
 -- AND have measured coverage <50% — high-priority cleanup candidates that
 -- are also untidy enough to warrant attention.
 -- Empty when FTS5 is disabled (`source_fts` empty); enable via
--- `codemap.config.ts` `fts5: true` or `--with-fts` and run `--full`.
+-- `.codemap/config.ts` `fts5: true` or `--with-fts` and run `--full`.
 SELECT DISTINCT
   s.name AS symbol,
   s.kind,

@@ -104,6 +104,46 @@ describe("resolveCodemapConfig", () => {
     expect(r2.excludeDirNames.has("custom")).toBe(true);
     expect(r2.excludeDirNames.has("node_modules")).toBe(false);
   });
+
+  it("defaults boundaries to []", () => {
+    const r = resolveCodemapConfig(dir, undefined);
+    expect(r.boundaries).toEqual([]);
+  });
+
+  it("passes through declared boundaries with default action='deny'", () => {
+    const r = resolveCodemapConfig(dir, {
+      boundaries: [
+        {
+          name: "ui-cant-touch-server",
+          from_glob: "src/ui/**",
+          to_glob: "src/server/**",
+        },
+      ],
+    });
+    expect(r.boundaries).toEqual([
+      {
+        name: "ui-cant-touch-server",
+        from_glob: "src/ui/**",
+        to_glob: "src/server/**",
+        action: "deny",
+      },
+    ]);
+  });
+
+  it("rejects unknown action values", () => {
+    expect(() =>
+      resolveCodemapConfig(dir, {
+        boundaries: [
+          {
+            name: "x",
+            from_glob: "a",
+            to_glob: "b",
+            action: "warn" as unknown as "deny",
+          },
+        ],
+      }),
+    ).toThrow(/action/);
+  });
 });
 
 describe("loadUserConfig", () => {

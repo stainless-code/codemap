@@ -135,7 +135,8 @@ Flags:
 
 Global flags (parsed by bootstrap, forwarded to the server):
   --root <dir>      Project root (defaults to cwd; respects CODEMAP_ROOT).
-  --config <file>   Config file path (defaults to codemap.config.{ts,js,json}).
+  --config <file>   Config file path (defaults to <state-dir>/config.{ts,js,json},
+                    i.e. .codemap/config.{ts,js,json} unless --state-dir overrides).
 
 The server stays running until stdin closes (the agent host disconnects).
 With --watch, the file watcher is drained before the server exits.
