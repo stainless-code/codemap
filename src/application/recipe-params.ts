@@ -1,18 +1,33 @@
 import type { RecipeParam } from "./recipes-loader";
 
+/**
+ * One bound parameter value. `null` is internal-only — callers may not pass
+ * `null` directly; the resolver assigns it for declared optional params that
+ * the caller omitted, so positional `?` placeholders stay aligned with the
+ * declaration order in the recipe.
+ */
 export type RecipeParamValue = string | number | boolean | null;
+
+/** Loose `key: value` map of params provided to a recipe by the caller. */
 export type RecipeParamValues = Record<string, RecipeParamValue>;
 
+/** Successful resolution; `values` are positional in declaration order. */
 export interface ResolveRecipeParamsOk {
   ok: true;
   values: RecipeParamValue[];
 }
 
+/** Resolution failure; `error` carries a single human-readable message. */
 export interface ResolveRecipeParamsError {
   ok: false;
   error: string;
 }
 
+/**
+ * Parse the CLI `--params <k=v[,k=v]>` value into a {@link RecipeParamValues}
+ * map. Splits on the first `=` so values may contain `=`; values may be
+ * empty strings; comma-only fragments are skipped.
+ */
 export function parseParamsCli(value: string): RecipeParamValues {
   const out: RecipeParamValues = {};
   for (const part of value.split(",")) {
@@ -25,6 +40,10 @@ export function parseParamsCli(value: string): RecipeParamValues {
   return out;
 }
 
+/**
+ * Merge two parameter maps with last-write-wins semantics on duplicate keys.
+ * Used by the CLI parser to honour repeated `--params` flags.
+ */
 export function mergeParams(
   base: RecipeParamValues | undefined,
   next: RecipeParamValues,
@@ -32,6 +51,12 @@ export function mergeParams(
   return { ...(base ?? {}), ...next };
 }
 
+/**
+ * Validate `provided` against `declared` and produce positional bind values
+ * in declaration order. Strict on missing required, unknown keys, and type
+ * mismatches; coerces `string | number` into the declared `number` /
+ * `boolean` types where the value is unambiguous.
+ */
 export function resolveRecipeParams(opts: {
   recipeId: string;
   declared: RecipeParam[] | undefined;
@@ -109,8 +134,15 @@ function coerceParamValue(
     return { ok: true, value: n };
   }
   if (typeof raw === "boolean") return { ok: true, value: raw };
-  if (raw === "true" || raw === "1") return { ok: true, value: true };
-  if (raw === "false" || raw === "0") return { ok: true, value: false };
+  // Accept numeric `1`/`0` as well as their string forms — MCP / HTTP callers
+  // hit this path because `query_recipe.params` accepts `z.number()` and the
+  // CLI / HTTP layers don't pre-coerce numeric booleans.
+  if (raw === "true" || raw === "1" || raw === 1) {
+    return { ok: true, value: true };
+  }
+  if (raw === "false" || raw === "0" || raw === 0) {
+    return { ok: true, value: false };
+  }
   return {
     ok: false,
     error: `${prefix(recipeId)} --params ${param.name}="${String(raw)}" is not a boolean (use true/false or 1/0).`,

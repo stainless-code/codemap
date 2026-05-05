@@ -92,7 +92,14 @@ function resolveQuery(s: GoldenScenario): {
   sql: string;
   bindValues: RecipeParamValue[];
 } {
-  if (s.sql !== undefined) return { sql: s.sql, bindValues: [] };
+  if (s.sql !== undefined) {
+    if (s.params !== undefined) {
+      throw new Error(
+        `Scenario "${s.id}": params are only supported with recipe-based scenarios; raw SQL scenarios must not declare params.`,
+      );
+    }
+    return { sql: s.sql, bindValues: [] };
+  }
   if (s.recipe !== undefined) {
     const sql = getQueryRecipeSql(s.recipe);
     if (sql === undefined) {

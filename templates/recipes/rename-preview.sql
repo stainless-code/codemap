@@ -1,12 +1,15 @@
 WITH params(old_name, new_name, kind_filter, in_file, include_tests, include_re_exports) AS (
   SELECT ?, ?, ?, ?, ?, ?
 ),
+-- target_symbols intentionally does NOT filter by `in_file`. `in_file` narrows
+-- the OUTPUT rows (definition / import call sites whose own `file_path` is
+-- under the prefix), so when a symbol is defined outside the scope but
+-- imported inside it the import rows still surface for review.
 target_symbols AS (
   SELECT s.*
   FROM symbols s, params p
   WHERE s.name = p.old_name
     AND (p.kind_filter IS NULL OR s.kind = p.kind_filter)
-    AND (p.in_file IS NULL OR s.file_path LIKE p.in_file || '%')
     AND (
       p.include_tests
       OR (s.file_path NOT LIKE '%test.%' AND s.file_path NOT LIKE '%spec.%')
@@ -22,6 +25,7 @@ definition_rows AS (
     'definition' AS location_kind,
     0 AS chain_depth
   FROM target_symbols s, params p
+  WHERE p.in_file IS NULL OR s.file_path LIKE p.in_file || '%'
 ),
 import_rows AS (
   SELECT DISTINCT

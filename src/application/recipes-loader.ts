@@ -16,8 +16,18 @@ export interface RecipeAction {
   description?: string;
 }
 
+/**
+ * Declared type of a recipe parameter as it appears in `<id>.md` frontmatter.
+ * Validated and coerced by `application/recipe-params.ts` before SQL binding.
+ */
 export type RecipeParamType = "string" | "number" | "boolean";
 
+/**
+ * One entry in a recipe's `params:` block-list frontmatter. `default` is
+ * applied when the caller omits the param; `required: true` rejects missing
+ * values. The hand-rolled YAML loader below recognises only this shape — no
+ * inline-flow lists / nested objects.
+ */
 export interface RecipeParam {
   name: string;
   type: RecipeParamType;
@@ -246,14 +256,16 @@ function firstNonEmptyLine(text: string): string | undefined {
 
 /**
  * Hand-rolled YAML frontmatter parser scoped to codemap's recipe needs.
- * Reads one optional `actions` list of RecipeAction-shaped items between
- * `---` delimiters at the top of the file. Per plan §9 Q-D: recipe-specific
- * shallow shape only; reject anything weirder so authors get clear errors
- * instead of half-parsed YAML edge cases.
+ * Reads optional `actions` and `params` block-lists between `---` delimiters
+ * at the top of the file. Per plan §9 Q-D: recipe-specific shallow shape
+ * only; reject anything weirder so authors get clear errors instead of
+ * half-parsed YAML edge cases.
  *
- * Returns the parsed actions (or undefined when the file has no
- * frontmatter / no actions key) plus the body — file content with the
- * frontmatter block stripped, used as the description body downstream.
+ * Returns the parsed `actions` (per-row hint templates), `params` (recipe
+ * parameter declarations validated by `application/recipe-params.ts`), and
+ * the `body` — file content with the frontmatter block stripped, used as the
+ * description body downstream. Any field is `undefined` when the recipe's
+ * `.md` has no frontmatter or omits that key.
  */
 export function extractFrontmatterAndBody(md: string): {
   actions: RecipeAction[] | undefined;

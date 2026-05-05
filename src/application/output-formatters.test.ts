@@ -501,6 +501,69 @@ describe("formatDiff / formatDiffJson", () => {
     expect(payload.summary.skipped).toBe(1);
   });
 
+  it("treats `$` in after_pattern as a literal (no replacement-pattern leak)", () => {
+    writeFileSync(
+      join(workDir, "src/a.ts"),
+      "const oldName = inject(token);\n",
+    );
+    const out = formatDiff({
+      projectRoot: workDir,
+      rows: [
+        {
+          file_path: "src/a.ts",
+          line_start: 1,
+          before_pattern: "oldName",
+          after_pattern: "$inject",
+        },
+      ],
+    });
+    expect(out).toContain("+const $inject = inject(token);");
+    expect(out).not.toContain("$&");
+  });
+
+  it("classifies missing files even when path contains the word 'stale'", () => {
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/stale-module.ts",
+            line_start: 1,
+            before_pattern: "oldName",
+            after_pattern: "newName",
+          },
+        ],
+      }),
+    );
+    expect(payload.files[0].missing).toBe(true);
+    expect(payload.files[0].stale).toBeUndefined();
+  });
+
+  it("preserves every per-file warning across multiple stale rows", () => {
+    writeFileSync(join(workDir, "src/a.ts"), "alpha\nbeta\n");
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/a.ts",
+            line_start: 1,
+            before_pattern: "oldName",
+            after_pattern: "newName",
+          },
+          {
+            file_path: "src/a.ts",
+            line_start: 2,
+            before_pattern: "oldName",
+            after_pattern: "newName",
+          },
+        ],
+      }),
+    );
+    expect(payload.files[0].warnings).toHaveLength(2);
+    expect(payload.summary.skipped).toBe(1);
+  });
+
   it("marks missing rows when source file is gone", () => {
     const payload = JSON.parse(
       formatDiffJson({

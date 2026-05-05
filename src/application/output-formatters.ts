@@ -218,16 +218,28 @@ export interface MermaidOpts {
   recipeId: string | undefined;
 }
 
+/**
+ * Input contract for {@link formatDiff} / {@link formatDiffJson} /
+ * {@link buildDiffJson}. Rows must shape as
+ * `{file_path, line_start, before_pattern, after_pattern}`. The formatter
+ * reads source files at format time from `projectRoot` to validate that the
+ * indexed line still contains `before_pattern` (per `docs/plans/...`
+ * Q6 — diff is a preview-only output mode, codemap never writes files).
+ */
 export interface DiffOpts {
+  /** Recipe / SQL row set; rows missing required keys are silently skipped. */
   rows: Record<string, unknown>[];
+  /** Absolute or process-cwd-relative root used when reading `file_path` from disk. */
   projectRoot: string;
 }
 
+/** A single textual line in a unified-diff hunk. */
 export interface DiffLine {
   type: "remove" | "add";
   text: string;
 }
 
+/** A unified-diff hunk; `old_*` / `new_*` follow `git diff` 1-based indexing. */
 export interface DiffHunk {
   old_start: number;
   old_count: number;
@@ -236,14 +248,26 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
+/**
+ * One file's diff payload. `stale` and `missing` are mutually exclusive flags
+ * set when the row's source line could not be matched against disk; `warnings`
+ * carries every reason a row was skipped (the array preserves all entries
+ * across multiple skips for the same file).
+ */
 export interface DiffFile {
   file_path: string;
   hunks: DiffHunk[];
   stale?: boolean;
   missing?: boolean;
-  warning?: string;
+  warnings?: string[];
 }
 
+/**
+ * Structured `--format diff-json` payload. `files` carries every file that
+ * had at least one row (including skipped ones — read `stale` / `missing` to
+ * filter); `warnings` mirrors per-file warnings at the top level for quick
+ * `jq` access; `summary` counts only files whose hunks were emitted.
+ */
 export interface DiffJsonPayload {
   files: DiffFile[];
   warnings: string[];
@@ -313,6 +337,13 @@ export function formatMermaid(opts: MermaidOpts): string {
   return lines.join("\n");
 }
 
+/**
+ * Build the structured {@link DiffJsonPayload} from a row set. Reads every
+ * `file_path` from disk under `projectRoot` and verifies that the indexed
+ * line still contains `before_pattern`; rows where the file is gone or the
+ * line drifted are kept in `files` with a `stale` / `missing` flag so callers
+ * can decide what to do. Performs no writes.
+ */
 export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
   const files = new Map<string, DiffFile>();
   const warnings: string[] = [];
@@ -336,17 +367,31 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
     try {
       source = readFileSync(join(opts.projectRoot, filePath), "utf8");
     } catch {
-      markSkipped(file, warnings, `${filePath}: missing or unreadable`);
+      markSkipped(
+        file,
+        warnings,
+        "missing",
+        `${filePath}: missing or unreadable`,
+      );
       continue;
     }
     const lines = source.split(/\r?\n/);
     const actual = lines[lineStart - 1];
     if (actual === undefined || !actual.includes(before)) {
-      markSkipped(file, warnings, `${filePath}:${lineStart}: stale line range`);
+      markSkipped(
+        file,
+        warnings,
+        "stale",
+        `${filePath}:${lineStart}: stale line range`,
+      );
       continue;
     }
 
-    const updated = actual.replace(before, after);
+    // `String.prototype.replace(string, string)` interprets `$&` / `$`/`$1`...
+    // in the replacement argument per ECMAScript GetSubstitution. Identifiers
+    // legitimately containing `$` (`$inject`, `$$factory`) would otherwise be
+    // silently mangled. Pre-escape so the replacement is literal.
+    const updated = actual.replace(before, after.replace(/\$/g, "$$$$"));
     file.hunks.push({
       old_start: lineStart,
       old_count: 1,
@@ -386,6 +431,13 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
   };
 }
 
+/**
+ * Render the row set as plain unified-diff text. Stale / missing rows are
+ * surfaced as `# WARNING: ...` comments at the top of the output (legal in
+ * unified diff and tolerated by `git apply`). Pipe the result into
+ * `git apply --check` to validate before applying — codemap never writes
+ * files.
+ */
 export function formatDiff(opts: DiffOpts): string {
   const payload = buildDiffJson(opts);
   const lines: string[] = [];
@@ -408,6 +460,11 @@ export function formatDiff(opts: DiffOpts): string {
   return lines.join("\n");
 }
 
+/**
+ * Render the row set as a structured {@link DiffJsonPayload} JSON string —
+ * for agents that want hunks they can filter / partially apply rather than
+ * raw text.
+ */
 export function formatDiffJson(opts: DiffOpts): string {
   return JSON.stringify(buildDiffJson(opts), null, 2);
 }
@@ -426,11 +483,13 @@ function ensureDiffFile(
 function markSkipped(
   file: DiffFile,
   warnings: string[],
+  kind: "stale" | "missing",
   warning: string,
 ): void {
-  if (warning.includes("stale")) file.stale = true;
+  if (kind === "stale") file.stale = true;
   else file.missing = true;
-  file.warning = warning;
+  if (file.warnings === undefined) file.warnings = [];
+  file.warnings.push(warning);
   warnings.push(warning);
 }
 

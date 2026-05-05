@@ -91,6 +91,22 @@ describe("resolveRecipeParams", () => {
     if (!r.ok) expect(r.error).toContain('unknown param "typo"');
   });
 
+  it("accepts numeric 1/0 for boolean params (MCP/HTTP path)", () => {
+    const truthy = resolveRecipeParams({
+      recipeId: "example",
+      declared,
+      provided: { kind: "function", include_tests: 1 },
+    });
+    expect(truthy).toEqual({ ok: true, values: ["function", 80, true] });
+
+    const falsy = resolveRecipeParams({
+      recipeId: "example",
+      declared,
+      provided: { kind: "function", include_tests: 0 },
+    });
+    expect(falsy).toEqual({ ok: true, values: ["function", 80, false] });
+  });
+
   it("rejects malformed numbers and booleans", () => {
     const badNumber = resolveRecipeParams({
       recipeId: "example",

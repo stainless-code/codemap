@@ -15,7 +15,7 @@ params:
   - name: in_file
     type: string
     required: false
-    description: Optional file_path prefix to narrow scope.
+    description: Optional file_path prefix that narrows OUTPUT rows. Definition rows are kept when the defining file is under the prefix; import rows are kept when the importing file is under the prefix. The target symbol may live outside the prefix.
   - name: include_tests
     type: boolean
     required: false
