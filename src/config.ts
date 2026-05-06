@@ -90,6 +90,12 @@ export const codemapUserConfigSchema = z
       .describe(
         "Enable FTS5 full-text indexing of file content into the `source_fts` virtual table. Default `false` — FTS5 grows `.codemap/index.db` ~30–50% on text-heavy projects. Override at the CLI with `--with-fts` (CLI wins; logs a stderr line on override).",
       ),
+    recipeRecency: z
+      .boolean()
+      .optional()
+      .describe(
+        "Track per-recipe `last_run_at` + `run_count` in the `recipe_recency` table; surfaces inline on `--recipes-json` for agent-host ranking. Default `true` (opt-out). Set `false` to short-circuit every write — no rows ever land. Local-only — no upload primitive. See `docs/architecture.md` § `recipe_recency`.",
+      ),
     boundaries: z
       .array(
         z
@@ -172,6 +178,14 @@ export interface ResolvedCodemapConfig {
    * flag; CLI wins. See `docs/plans/fts5-mermaid.md`.
    */
   readonly fts5: boolean;
+  /**
+   * Recipe-recency tracking toggle. `true` (default) populates the
+   * `recipe_recency` table on every successful recipe run and inlines
+   * `last_run_at` / `run_count` on `--recipes-json` reads. `false`
+   * short-circuits every write — no rows ever land. Local-only — no
+   * upload primitive. See `docs/architecture.md` § `recipe_recency`.
+   */
+  readonly recipeRecency: boolean;
   /**
    * Reconciled into the `boundary_rules` table on every index pass. The
    * bundled `boundary-violations` recipe joins this against `dependencies`
@@ -282,6 +296,9 @@ export function resolveCodemapConfig(
     action: rule.action ?? "deny",
   }));
 
+  // Default ON (opt-out, not opt-in). Only `false` disables.
+  const recipeRecency = parsed?.recipeRecency !== false;
+
   return {
     root: absRoot,
     stateDir,
@@ -291,6 +308,7 @@ export function resolveCodemapConfig(
     tsconfigPath,
     fts5,
     boundaries,
+    recipeRecency,
   };
 }
 

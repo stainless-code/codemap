@@ -388,6 +388,22 @@ Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record fresh
 
 Bundled recipes consuming the table — `untested-and-dead`, `files-by-coverage`, `worst-covered-exports`. Each ships a frontmatter `actions` block (per PR #26) so agents see per-row follow-up hints in `--json` output.
 
+### `recipe_recency` — Per-recipe last-run + run-count (user data) (`STRICT, WITHOUT ROWID`)
+
+Tracks `last_run_at` (epoch ms) + `run_count` per recipe id so agent hosts can rank live recipes ahead of historic ones. Surfaces inline on `--recipes-json` and the matching `codemap://recipes` / `codemap://recipes/{id}` MCP resources (live read every call — the resource cache was dropped to avoid freezing recency at first-read for the server-process lifetime). Same lifecycle posture as `query_baselines` / `coverage`: **intentionally absent from `dropAll()`** so `--full` and `SCHEMA_VERSION` rebuilds preserve user-activity history. Local-only — no upload primitive ever ships (resists telemetry-creep PRs by construction).
+
+Two write sites both call `tryRecordRecipeRun` (the failure-isolated wrapper around `recordRecipeRun`) from `application/recipe-recency.ts`: `handleQueryRecipe` in `application/tool-handlers.ts` (covers MCP + HTTP — both flow through it) and `runQueryCmd` in `cli/cmd-query.ts` (CLI — finally-block keys off a local `recipeQuerySucceeded` flag, NOT `process.exitCode`, so `--ci`'s deliberate exit-1-on-findings is recognised as success). Counts only successful runs; recency-write failures are swallowed with a stderr `[recency] write failed: <reason>` warning so they NEVER block the recipe response. The 90-day rolling window is enforced eagerly on the write path (single indexed `DELETE` inside `recordRecipeRun` before the upsert); reads filter at SELECT time (`WHERE last_run_at >= cutoff`) and never mutate the DB so the catalog stays side-effect free for `--recipes-json` and the MCP `codemap://recipes` resources.
+
+Default ON; opt-out via `.codemap/config` `recipeRecency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row, since only one version is ever reachable per id).
+
+| Column      | Type    | Description                                                                              |
+| ----------- | ------- | ---------------------------------------------------------------------------------------- |
+| recipe_id   | TEXT PK | Recipe id (matches `QUERY_RECIPES` keys + project-recipe ids in `<state-dir>/recipes/`). |
+| last_run_at | INTEGER | Epoch ms of the last successful run.                                                     |
+| run_count   | INTEGER | Cumulative successful runs (incremented per call). `INTEGER` wraparound is theoretical.  |
+
+`idx_recipe_recency_last_run` on `last_run_at` keeps both the eager-on-write prune (`DELETE WHERE last_run_at < cutoffMs` inside `recordRecipeRun`) and the read-time filter (`WHERE last_run_at >= cutoffMs` inside `loadRecipeRecency`) indexed scans as project-recipe counts grow. **Boundary discipline (write-path)**: only `application/tool-handlers.ts` + `cli/cmd-query.ts` (+ the test file) may import `tryRecordRecipeRun` / `recordRecipeRun` — re-runnable forbidden-edge query at [§ Boundary verification — `recipe_recency` write path](#boundary-verification--recipe_recency-write-path). **Read-path** (`enrichWithRecency` / `loadRecipeRecency`) is unrestricted — any catalog renderer can import it (today: `cmd-query.ts` for `--recipes-json`, `application/resource-handlers.ts` for `codemap://recipes` + `codemap://recipes/{id}`).
+
 ### `boundary_rules` — Architecture-boundary rules (config-derived) (`STRICT, WITHOUT ROWID`)
 
 Reconciled from `.codemap/config.ts` `boundaries: [...]` on every index pass via `reconcileBoundaryRules` in `db.ts`; the wiring lives in `application/run-index.ts` right after `createSchema`. Empty when the user declares no boundaries. Bundled `boundary-violations` recipe joins this table against `dependencies` via SQLite `GLOB` to surface forbidden imports; `--format sarif` lights up automatically because the recipe row aliases `dependencies.from_path` to `file_path` (the existing location-column priority list catches it).
@@ -563,12 +579,29 @@ During full rebuild the tables are empty (just created), so the per-file `delete
 
 The `meta` table stores `schema_version`. The canonical version is `SCHEMA_VERSION` in `db.ts` (exported). Both `createSchema()` and the full-rebuild path in `index.ts` persist `String(SCHEMA_VERSION)` after building tables and indexes.
 
-When `SCHEMA_VERSION` is bumped (after the first release, when DDL changes require it):
-
-- `createSchema()` detects the mismatch automatically and calls `dropAll()` before recreating
-- No manual intervention needed — run the indexer and it auto-rebuilds on version change
+**When to bump.** Only when a DDL change FORCES a rebuild — i.e. an existing `.codemap/index.db` from the previous version would be incorrect or incompatible with the new code (column drop, type change, breaking constraint shift, table rename). Purely additive tables / columns / indexes that land via `CREATE … IF NOT EXISTS` on next boot DON'T need a bump — that's the `query_baselines` / `coverage` / `recipe_recency` precedent (each landed without a bump and existing DBs picked them up automatically). Bumping triggers `dropAll()` and a full reindex; doing it for additive changes burns ~85ms (per `benchmark.md`) for zero migration benefit. See also [`.agents/lessons.md`](../.agents/lessons.md) "changesets bump policy (pre-v1)" — a `SCHEMA_VERSION` bump always rides with a `minor` changeset; additive tables ride patch.
 
 When `SCHEMA_VERSION` changes, the indexer auto-detects the mismatch and triggers a full rebuild — no manual intervention needed.
+
+### Boundary verification — `recipe_recency` write path
+
+Re-runnable kit, lifted from the engine module so the docstring stays slim. Only `application/tool-handlers.ts` + `cli/cmd-query.ts` (+ the test file) may import the write-path symbols (`tryRecordRecipeRun` / `recordRecipeRun`):
+
+```bash
+bun src/index.ts query --json "
+  SELECT DISTINCT file_path FROM imports
+  WHERE source LIKE '%application/recipe-recency%'
+    -- Quoted-name match (specifiers is JSON) — explicit so a future
+    -- symbol like 'recordRecipeRunner' wouldn't false-positive.
+    AND (specifiers LIKE '%\"recordRecipeRun\"%'
+         OR specifiers LIKE '%\"tryRecordRecipeRun\"%')
+    AND file_path NOT IN ('src/application/tool-handlers.ts',
+                          'src/cli/cmd-query.ts',
+                          'src/application/recipe-recency.test.ts')
+"
+```
+
+Expected: `[]`. Non-empty = a new write site appeared without a docs update — escalate per [`audit-pr-architecture` skill](../.agents/skills/audit-pr-architecture/SKILL.md). Read-path imports (`enrichWithRecency` / `loadRecipeRecency`) are unrestricted by design.
 
 ## SQLite Performance Configuration
 

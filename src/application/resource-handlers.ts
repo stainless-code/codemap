@@ -17,6 +17,7 @@ import {
   getQueryRecipeCatalogEntry,
   listQueryRecipeCatalog,
 } from "./query-recipes";
+import { enrichWithRecency } from "./recipe-recency";
 import { buildShowResult, findSymbolsByName } from "./show-engine";
 
 export interface ResourcePayload {
@@ -24,20 +25,21 @@ export interface ResourcePayload {
   text: string;
 }
 
-let recipesCache: ResourcePayload | undefined;
+// Recipes / one-recipe deliberately NOT cached — inline recency fields
+// (last_run_at / run_count) need to reflect mutations during the
+// `codemap mcp` / `codemap serve` lifetime; a cached snapshot would
+// freeze them at first-read. Schema / skill stay cached — neither
+// changes mid-session.
 let schemaCache: ResourcePayload | undefined;
 let skillCache: ResourcePayload | undefined;
-const oneRecipeCache = new Map<string, ResourcePayload>();
 
 /**
  * Test-only escape hatch — drops every cached payload so a temp-DB test
  * can re-read with fresh state. Production code never calls this.
  */
 export function _resetResourceCachesForTests(): void {
-  recipesCache = undefined;
   schemaCache = undefined;
   skillCache = undefined;
-  oneRecipeCache.clear();
 }
 
 /**
@@ -110,25 +112,20 @@ export function listResources(): { uri: string; description: string }[] {
 }
 
 function readRecipesCatalog(): ResourcePayload {
-  if (recipesCache !== undefined) return recipesCache;
-  recipesCache = {
+  return {
     mimeType: "application/json",
-    text: JSON.stringify(listQueryRecipeCatalog()),
+    text: JSON.stringify(enrichWithRecency(listQueryRecipeCatalog())),
   };
-  return recipesCache;
 }
 
 function readOneRecipe(id: string): ResourcePayload | undefined {
-  const cached = oneRecipeCache.get(id);
-  if (cached !== undefined) return cached;
   const entry = getQueryRecipeCatalogEntry(id);
   if (entry === undefined) return undefined;
-  const payload: ResourcePayload = {
+  const [enriched] = enrichWithRecency([entry]);
+  return {
     mimeType: "application/json",
-    text: JSON.stringify(entry),
+    text: JSON.stringify(enriched),
   };
-  oneRecipeCache.set(id, payload);
-  return payload;
 }
 
 function readSchema(): ResourcePayload {

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import {
   getCurrentCommit,
   printQueryResult,
@@ -30,6 +32,11 @@ import type {
   RecipeParamValues,
 } from "../application/recipe-params";
 import {
+  enrichWithRecency,
+  resolveRecencyDbPath,
+  tryRecordRecipeRun,
+} from "../application/recipe-recency";
+import {
   closeDb,
   deleteQueryBaseline,
   getQueryBaseline,
@@ -50,6 +57,7 @@ import {
   makePackageBucketizer,
 } from "../group-by";
 import { getProjectRoot } from "../runtime";
+import { openCodemapDatabase } from "../sqlite-db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
 /**
@@ -601,9 +609,37 @@ function formatIncompatibility(
   return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — formatted outputs only support flat row lists).`;
 }
 
-/** Print the bundled recipe catalog as JSON to stdout (no DB access). */
-export function printRecipesCatalogJson(): void {
-  console.log(JSON.stringify(listQueryRecipeCatalog(), null, 2));
+/**
+ * Print the bundled recipe catalog as JSON to stdout. Each entry carries
+ * `last_run_at` + `run_count` recency fields when an indexed DB exists,
+ * else null/0 fallbacks. The verb runs before `bootstrapCodemap()` (the
+ * catalog has historically been "no DB required") — keep it side-effect
+ * free by using a path-based opener instead of `initCodemap()`.
+ */
+export function printRecipesCatalogJson(opts?: {
+  root?: string;
+  stateDir?: string | undefined;
+}): void {
+  const root = opts?.root;
+  const dbFactory =
+    root === undefined
+      ? undefined
+      : () => {
+          const dbPath = resolveRecencyDbPath({
+            root,
+            stateDir: opts?.stateDir,
+          });
+          // Throw on never-indexed; enrichWithRecency catches and falls
+          // back to null/0 entries (no .codemap dir gets created).
+          if (!existsSync(dbPath)) {
+            throw new Error(`recipe-recency: no DB at ${dbPath}`);
+          }
+          return openCodemapDatabase(dbPath);
+        };
+  const enriched = enrichWithRecency(listQueryRecipeCatalog(), {
+    openDb: dbFactory,
+  });
+  console.log(JSON.stringify(enriched, null, 2));
 }
 
 /** Print one recipe's SQL to stdout, or false if the id is unknown (caller should exit 1). */
@@ -779,6 +815,10 @@ export async function runQueryCmd(opts: {
   // emit plain stderr for `--format diff-json` / `sarif` / etc., breaking
   // pipelines that key off the JSON envelope.
   const structuredErrors = effectiveFormat !== "text";
+  // Recency tracker reads this in finally. Don't use process.exitCode:
+  // --ci sets it to 1 on findings (success, not failure); exitCode also
+  // poisons across calls when this helper runs multiple times per process.
+  let recipeQuerySucceeded = false;
   try {
     await bootstrapCodemap(opts);
 
@@ -807,6 +847,7 @@ export async function runQueryCmd(opts: {
     // the diff semantics are about row identity, not bucketing. (--summary still
     // composes: collapses the diff to {added: N, removed: N}.)
     if (opts.saveBaseline !== undefined) {
+      const before = process.exitCode;
       runSaveBaseline({
         sql: opts.sql,
         json: isJson,
@@ -818,9 +859,11 @@ export async function runQueryCmd(opts: {
         changedFiles,
         bindValues: bindValues.values,
       });
+      if (process.exitCode !== 1 || before === 1) recipeQuerySucceeded = true;
       return;
     }
     if (opts.baseline !== undefined) {
+      const before = process.exitCode;
       runBaselineDiff({
         sql: opts.sql,
         json: isJson,
@@ -831,10 +874,12 @@ export async function runQueryCmd(opts: {
         recipeActions,
         bindValues: bindValues.values,
       });
+      if (process.exitCode !== 1 || before === 1) recipeQuerySucceeded = true;
       return;
     }
 
     if (opts.groupBy !== undefined) {
+      const before = process.exitCode;
       runGroupedQuery({
         sql: opts.sql,
         json: isJson,
@@ -845,18 +890,25 @@ export async function runQueryCmd(opts: {
         bindValues: bindValues.values,
         root: getProjectRoot(),
       });
+      if (process.exitCode !== 1 || before === 1) recipeQuerySucceeded = true;
       return;
     }
 
     if (effectiveFormat !== "text" && effectiveFormat !== "json") {
-      const code = printFormattedQuery(opts.sql, {
+      const result = printFormattedQuery(opts.sql, {
         format: effectiveFormat,
         recipeId: opts.recipeId,
         changedFiles,
         bindValues: bindValues.values,
         ci: opts.ci === true,
       });
-      if (code !== 0) process.exitCode = code;
+      if (result.ok) {
+        // exitCode=1 here is the --ci gating signal, not a failure.
+        recipeQuerySucceeded = true;
+        if (result.exitCode !== 0) process.exitCode = result.exitCode;
+      } else {
+        process.exitCode = 1;
+      }
       return;
     }
 
@@ -867,10 +919,15 @@ export async function runQueryCmd(opts: {
       recipeActions,
       bindValues: bindValues.values,
     });
+    if (code === 0) recipeQuerySucceeded = true;
     if (code !== 0) process.exitCode = code;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, structuredErrors);
+  } finally {
+    if (opts.recipeId !== undefined && recipeQuerySucceeded) {
+      tryRecordRecipeRun(opts.recipeId);
+    }
   }
 }
 
@@ -966,6 +1023,13 @@ export async function runDropBaselineCmd(opts: {
  * findings shape; annotations emit nothing + the same warning. See
  * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  */
+/**
+ * Disambiguates a CI-gating exit (recipe SUCCEEDED, `--ci` wants exit 1
+ * to flag findings) from a real failure (SQL error, formatter rejection).
+ * Callers (recency tracker, etc.) need this distinction.
+ */
+type FormattedQueryResult = { ok: true; exitCode: 0 | 1 } | { ok: false };
+
 function printFormattedQuery(
   sql: string,
   opts: {
@@ -973,10 +1037,10 @@ function printFormattedQuery(
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
     bindValues: RecipeParamValue[] | undefined;
-    /** `--ci`: suppress no-locatable-rows warning + return 1 on `rows.length > 0`. */
+    /** `--ci`: suppress no-locatable-rows warning + exit 1 on `rows.length > 0`. */
     ci?: boolean;
   },
-): number {
+): FormattedQueryResult {
   let db: Awaited<ReturnType<typeof openDb>> | undefined;
   try {
     db = openDb();
@@ -1018,38 +1082,34 @@ function printFormattedQuery(
       });
       console.log(out);
       // `--ci` gates the runner step on findings (non-zero exit).
-      return opts.ci === true && rows.length > 0 ? 1 : 0;
+      return {
+        ok: true,
+        exitCode: opts.ci === true && rows.length > 0 ? 1 : 0,
+      };
     }
 
     if (opts.format === "mermaid") {
-      const out = formatMermaid({
-        rows,
-        recipeId: opts.recipeId,
-      });
-      console.log(out);
-      return 0;
+      console.log(formatMermaid({ rows, recipeId: opts.recipeId }));
+      return { ok: true, exitCode: 0 };
     }
 
     if (opts.format === "diff") {
       console.log(formatDiff({ rows, projectRoot: getProjectRoot() }));
-      return 0;
+      return { ok: true, exitCode: 0 };
     }
 
     if (opts.format === "diff-json") {
       console.log(formatDiffJson({ rows, projectRoot: getProjectRoot() }));
-      return 0;
+      return { ok: true, exitCode: 0 };
     }
 
-    const annotations = formatAnnotations({
-      rows,
-      recipeId: opts.recipeId,
-    });
+    const annotations = formatAnnotations({ rows, recipeId: opts.recipeId });
     if (annotations.length > 0) console.log(annotations);
-    return 0;
+    return { ok: true, exitCode: 0 };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.log(JSON.stringify({ error: msg }));
-    return 1;
+    return { ok: false };
   } finally {
     if (db !== undefined) closeDb(db, { readonly: true });
   }

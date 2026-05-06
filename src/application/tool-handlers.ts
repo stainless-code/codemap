@@ -55,6 +55,7 @@ import {
 } from "./query-recipes";
 import { resolveRecipeParams } from "./recipe-params";
 import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
+import { tryRecordRecipeRun } from "./recipe-recency";
 import { runCodemapIndex } from "./run-index";
 import {
   buildShowResult,
@@ -281,7 +282,7 @@ export function handleQueryRecipe(
     ) {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
-      return runFormattedQuery({
+      const result = runFormattedQuery({
         sql,
         recipeId: args.recipe,
         recipeActions,
@@ -290,6 +291,9 @@ export function handleQueryRecipe(
         format: args.format,
         root,
       });
+      // Successful runs only; failure-isolated inside the helper.
+      if (result.ok) tryRecordRecipeRun(args.recipe);
+      return result;
     }
     const payload = executeQuery({
       sql,
@@ -301,6 +305,7 @@ export function handleQueryRecipe(
       root,
     });
     if (isEnginePayloadError(payload)) return err(payload.error);
+    tryRecordRecipeRun(args.recipe);
     return ok(payload);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
