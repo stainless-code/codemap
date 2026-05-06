@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 
 import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
+import { getRecipeRecencyEnabled } from "../runtime";
 import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
@@ -65,6 +66,13 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
  * Caller responsibility: only call AFTER the recipe execution returns
  * successfully (Q9 — count successful runs only).
  *
+ * Slice 4 short-circuit: when `.codemap/config` `recipe_recency: false`,
+ * skip the openDb/upsert entirely so no rows ever land. Cleanest opt-out
+ * — not "ignore the data after writing it." `getRecipeRecencyEnabled()`
+ * itself throws when codemap isn't initialised (e.g. CLI smoke paths
+ * before `bootstrapCodemap()`); the outer try/catch swallows that the
+ * same way as a real DB failure, so the L.8 contract holds either way.
+ *
  * `_openDb` is a test seam — production callers omit it; the failure-mode
  * test injects a thrower to confirm the swallow / warn path.
  */
@@ -72,6 +80,16 @@ export function tryRecordRecipeRun(
   recipeId: string,
   opts?: { quiet?: boolean; _openDb?: () => CodemapDatabase },
 ): void {
+  // Short-circuit before any DB interaction when disabled. Wrapped in
+  // try/catch because getRecipeRecencyEnabled() throws when the runtime
+  // singleton isn't initialised (the wrapper still catches it below;
+  // we just want to bail BEFORE openDb when we can read the toggle).
+  try {
+    if (!getRecipeRecencyEnabled()) return;
+  } catch {
+    // Runtime not initialised — fall through to the openDb path; if
+    // openDb also fails, the outer try/catch swallows.
+  }
   let db: CodemapDatabase | undefined;
   try {
     db = (opts?._openDb ?? openDb)();

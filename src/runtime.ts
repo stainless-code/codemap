@@ -47,6 +47,10 @@ export function getFts5Enabled(): boolean {
   return getCodemapConfig().fts5;
 }
 
+export function getRecipeRecencyEnabled(): boolean {
+  return getCodemapConfig().recipeRecency;
+}
+
 export function getBoundaryRules(): ResolvedCodemapConfig["boundaries"] {
   return getCodemapConfig().boundaries;
 }
