@@ -2,19 +2,27 @@
  * Pure transport-agnostic engine for `codemap apply <recipe-id>` — substrate-
  * shaped fix executor. Consumes the same `{file_path, line_start,
  * before_pattern, after_pattern}` row contract `buildDiffJson` emits and
- * either previews (dry-run) or applies (Slice 2) the edits to disk.
+ * either previews (dry-run) or applies the edits to disk.
  *
- * Slice 1 ships phase-1 validation + dry-run output only; the write branch
- * (phase 2) lands in Slice 2 with atomic temp-rename. See
+ * Phase 1 validates every row against current disk state; phase 2 (gated on
+ * `!dryRun && conflicts.length === 0`) writes each modified file via temp +
+ * rename for crash-safe per-file atomicity. See
  * [`docs/plans/codemap-apply.md`](../../docs/plans/codemap-apply.md) for the
  * full design (Q1–Q10 locked).
  *
- * TOCTOU note: phase-1 reads disk, phase-2 writes disk. The window between
- * is a deliberate v1 simplification (Q2) — apply isn't an adversarial verb,
- * so we don't add lock-file machinery.
+ * TOCTOU note: phase-1 caches the source it validated; phase-2 transforms
+ * the cached source and writes the result. The window between read and
+ * write is a deliberate v1 simplification (Q2) — apply isn't an adversarial
+ * verb, so we don't add lock-file machinery.
+ *
+ * EOL note: phase-2 splits source on raw `"\n"` (NOT `/\r?\n/`) so CRLF
+ * lines retain their trailing `\r` and round-trip when joined back with
+ * `"\n"`. Patterns that include a literal `\r` are out of scope for v1;
+ * recipe authors should target identifier-shaped patterns.
  */
 
-import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** Required input columns on every recipe row. */
@@ -30,14 +38,14 @@ export interface ApplyDiffPayloadOpts {
   rows: Record<string, unknown>[];
   /** Absolute or process-cwd-relative root used when reading `file_path` from disk. */
   projectRoot: string;
-  /** `true` previews; `false` writes (Slice 2). */
+  /** `true` previews; `false` writes (gated on a clean phase 1). */
   dryRun: boolean;
 }
 
 /**
- * Per-file roll-up. `rows_applied` is `0` in dry-run (Slice 1) and `0` in
- * apply mode when phase 1 collected any conflicts (Q2 (c) — all-or-nothing
- * per recipe-run aborts before any writes).
+ * Per-file roll-up. `rows_applied` is `0` in dry-run mode and `0` in apply
+ * mode when phase 1 collected any conflicts (Q2 (c) — all-or-nothing per
+ * recipe-run aborts before any writes).
  */
 export interface ApplyFile {
   file_path: string;
@@ -92,14 +100,15 @@ interface PendingEdit {
 
 /**
  * Run the apply pipeline. Always runs phase 1 (validation); phase 2 (write)
- * is gated on `!dryRun && conflicts.length === 0` and lands in Slice 2.
+ * is gated on `!dryRun && conflicts.length === 0`.
  */
 export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   const { rows, projectRoot, dryRun } = opts;
 
-  // Phase 1: validate every row against current disk state.
   const conflicts: ConflictRow[] = [];
   const pending = new Map<string, PendingEdit[]>();
+  // Phase-1 reads each file at most once; phase 2 reuses the cached source.
+  const sourceCache = new Map<string, string>();
   let validRows = 0;
 
   for (const row of rows) {
@@ -117,19 +126,25 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
     validRows++;
 
-    let source: string;
-    try {
-      source = readFileSync(join(projectRoot, filePath), "utf8");
-    } catch {
-      conflicts.push({
-        file_path: filePath,
-        line_start: lineStart,
-        before_pattern: before,
-        actual_at_line: "",
-        reason: "file missing",
-      });
-      continue;
+    let source = sourceCache.get(filePath);
+    if (source === undefined) {
+      try {
+        source = readFileSync(join(projectRoot, filePath), "utf8");
+      } catch {
+        conflicts.push({
+          file_path: filePath,
+          line_start: lineStart,
+          before_pattern: before,
+          actual_at_line: "",
+          reason: "file missing",
+        });
+        continue;
+      }
+      sourceCache.set(filePath, source);
     }
+    // Phase-1 splits on `/\r?\n/` so the `actual_at_line` reported in
+    // conflicts doesn't carry a stray `\r`. Phase-2 re-splits on raw `\n`
+    // for round-trip-safe writes (see EOL note in module docstring).
     const lines = source.split(/\r?\n/);
     const actual = lines[lineStart - 1];
     if (actual === undefined) {
@@ -167,24 +182,6 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
   }
 
-  // Phase 2 (write) lands in Slice 2. Every code path below is dry-run-shaped.
-  if (!dryRun && conflicts.length === 0 && pending.size > 0) {
-    throw new Error(
-      "apply-engine: write path lands in Slice 2 — pass dryRun: true for now.",
-    );
-  }
-
-  // Q2 (c) — any conflict aborts the whole run; `files[]` shows nothing
-  // applied. Dry-run mirrors that shape so the envelope is the same across
-  // modes.
-  const files: ApplyFile[] =
-    conflicts.length === 0
-      ? [...pending.keys()].sort().map((file_path) => ({
-          file_path,
-          rows_applied: 0,
-        }))
-      : [];
-
   const filesWithConflicts = new Set(conflicts.map((c) => c.file_path)).size;
   const distinctInputFiles = new Set<string>();
   for (const row of rows) {
@@ -192,18 +189,90 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     if (filePath !== undefined) distinctInputFiles.add(filePath);
   }
 
+  // Q2 (c) — any conflict aborts the whole run; dry-run never writes either.
+  // Both branches return the same envelope shape (Q5).
+  if (dryRun || conflicts.length > 0) {
+    const files: ApplyFile[] =
+      conflicts.length === 0
+        ? [...pending.keys()].sort().map((file_path) => ({
+            file_path,
+            rows_applied: 0,
+          }))
+        : [];
+    return {
+      mode: dryRun ? "dry-run" : "apply",
+      applied: false,
+      files,
+      conflicts,
+      summary: {
+        files: distinctInputFiles.size,
+        files_modified: 0,
+        rows: validRows,
+        rows_applied: 0,
+        conflicts: conflicts.length,
+        files_with_conflicts: filesWithConflicts,
+      },
+    };
+  }
+
+  // Phase 2 — apply edits per-file via temp + rename.
+  const writtenFiles: ApplyFile[] = [];
+  let appliedRows = 0;
+  for (const filePath of [...pending.keys()].sort()) {
+    const edits = pending.get(filePath)!;
+    const cachedSource = sourceCache.get(filePath)!;
+    // Re-split the cached source on raw `"\n"` (not `/\r?\n/`) so CRLF
+    // lines retain their trailing `\r` and rejoin losslessly.
+    const fileLines = cachedSource.split("\n");
+    // Apply edits in descending line order — defensive default for when
+    // multi-line transforms land (today every row is a single-line
+    // replacement so order doesn't actually matter).
+    edits.sort((a, b) => b.line_start - a.line_start);
+    for (const edit of edits) {
+      const idx = edit.line_start - 1;
+      const actual = fileLines[idx];
+      // The cached source was validated in phase 1; re-checking here guards
+      // against future regressions where the cache and validation drift.
+      if (actual === undefined || !actual.includes(edit.before_pattern)) {
+        throw new Error(
+          `apply-engine: phase-2 invariant violated at ${filePath}:${edit.line_start} — phase-1 cache out of sync.`,
+        );
+      }
+      // Pre-escape `$` per `String.prototype.replace` GetSubstitution rule
+      // so identifiers like `$inject` round-trip safely (mirrors
+      // `buildDiffJson`).
+      fileLines[idx] = actual.replace(
+        edit.before_pattern,
+        edit.after_pattern.replace(/\$/g, "$$$$"),
+      );
+    }
+
+    const newContent = fileLines.join("\n");
+    const absPath = join(projectRoot, filePath);
+    // Sibling temp + `rename`: POSIX-atomic when source and destination
+    // share a filesystem (always true for siblings). A concurrent reader
+    // sees either the pre-rename or post-rename content — never a torn
+    // write.
+    const tempPath = `${absPath}.codemap-apply-${randomBytes(6).toString("hex")}.tmp`;
+    writeFileSync(tempPath, newContent, "utf8");
+    renameSync(tempPath, absPath);
+
+    writtenFiles.push({ file_path: filePath, rows_applied: edits.length });
+    appliedRows += edits.length;
+  }
+
   return {
-    mode: dryRun ? "dry-run" : "apply",
-    applied: false,
-    files,
-    conflicts,
+    mode: "apply",
+    applied: writtenFiles.length > 0,
+    files: writtenFiles,
+    conflicts: [],
     summary: {
       files: distinctInputFiles.size,
-      files_modified: 0,
+      files_modified: writtenFiles.length,
       rows: validRows,
-      rows_applied: 0,
-      conflicts: conflicts.length,
-      files_with_conflicts: filesWithConflicts,
+      rows_applied: appliedRows,
+      conflicts: 0,
+      files_with_conflicts: 0,
     },
   };
 }

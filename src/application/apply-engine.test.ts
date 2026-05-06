@@ -1,7 +1,14 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { applyDiffPayload } from "./apply-engine";
 import type { ApplyJsonPayload } from "./apply-engine";
@@ -11,10 +18,16 @@ function tmpProject(): string {
 }
 
 function writeSource(root: string, relPath: string, content: string): void {
-  writeFileSync(join(root, relPath), content, "utf8");
+  const absPath = join(root, relPath);
+  mkdirSync(dirname(absPath), { recursive: true });
+  writeFileSync(absPath, content, "utf8");
 }
 
-describe("applyDiffPayload — phase 1 + dry-run (Slice 1)", () => {
+function readSource(root: string, relPath: string): string {
+  return readFileSync(join(root, relPath), "utf8");
+}
+
+describe("applyDiffPayload", () => {
   describe("happy paths", () => {
     it("returns a clean dry-run envelope for a single-row valid input", () => {
       const root = tmpProject();
@@ -324,28 +337,8 @@ describe("applyDiffPayload — phase 1 + dry-run (Slice 1)", () => {
     });
   });
 
-  describe("apply-mode (Slice 1 — guard until Slice 2 lands)", () => {
-    it("throws a clear NotImplemented error when dryRun=false has clean phase 1", () => {
-      const root = tmpProject();
-      writeSource(root, "a.ts", "const foo = 1;\n");
-
-      expect(() =>
-        applyDiffPayload({
-          rows: [
-            {
-              file_path: "a.ts",
-              line_start: 1,
-              before_pattern: "foo",
-              after_pattern: "bar",
-            },
-          ],
-          projectRoot: root,
-          dryRun: false,
-        }),
-      ).toThrow(/Slice 2/);
-    });
-
-    it("does NOT throw on dryRun=false when conflicts abort phase 2", () => {
+  describe("apply-mode (phase-2 writes)", () => {
+    it("writes the transformed content to disk and reports applied=true", () => {
       const root = tmpProject();
       writeSource(root, "a.ts", "const foo = 1;\n");
 
@@ -354,8 +347,131 @@ describe("applyDiffPayload — phase 1 + dry-run (Slice 1)", () => {
           {
             file_path: "a.ts",
             line_start: 1,
-            before_pattern: "MISSING",
-            after_pattern: "X",
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.mode).toBe("apply");
+      expect(result.applied).toBe(true);
+      expect(result.files).toEqual([{ file_path: "a.ts", rows_applied: 1 }]);
+      expect(result.summary).toEqual({
+        files: 1,
+        files_modified: 1,
+        rows: 1,
+        rows_applied: 1,
+        conflicts: 0,
+        files_with_conflicts: 0,
+      });
+      expect(readSource(root, "a.ts")).toBe("const bar = 1;\n");
+    });
+
+    it("applies multiple rows to the same file in descending line order", () => {
+      const root = tmpProject();
+      writeSource(
+        root,
+        "a.ts",
+        "const foo = 1;\nconst bar = 2;\nconst baz = 3;\n",
+      );
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "ONE",
+          },
+          {
+            file_path: "a.ts",
+            line_start: 2,
+            before_pattern: "bar",
+            after_pattern: "TWO",
+          },
+          {
+            file_path: "a.ts",
+            line_start: 3,
+            before_pattern: "baz",
+            after_pattern: "THREE",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(true);
+      expect(result.files[0]?.rows_applied).toBe(3);
+      expect(readSource(root, "a.ts")).toBe(
+        "const ONE = 1;\nconst TWO = 2;\nconst THREE = 3;\n",
+      );
+    });
+
+    it("preserves CRLF line endings via raw `\\n` split + join", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\r\nconst bar = 2;\r\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "FOO",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(true);
+      expect(readSource(root, "a.ts")).toBe(
+        "const FOO = 1;\r\nconst bar = 2;\r\n",
+      );
+    });
+
+    it("escapes `$` in after_pattern per GetSubstitution (mirrors buildDiffJson)", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const inject = 1;\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "inject",
+            after_pattern: "$inject",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(true);
+      expect(readSource(root, "a.ts")).toBe("const $inject = 1;\n");
+    });
+
+    it("does NOT write any file when conflicts abort phase 2 (Q2 (c))", () => {
+      const root = tmpProject();
+      writeSource(root, "good.ts", "const foo = 1;\n");
+      // bad.ts intentionally missing.
+      const goodBefore = readSource(root, "good.ts");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "good.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+          {
+            file_path: "bad.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
           },
         ],
         projectRoot: root,
@@ -365,9 +481,11 @@ describe("applyDiffPayload — phase 1 + dry-run (Slice 1)", () => {
       expect(result.mode).toBe("apply");
       expect(result.applied).toBe(false);
       expect(result.conflicts).toHaveLength(1);
+      // good.ts must be untouched even though its row would have validated.
+      expect(readSource(root, "good.ts")).toBe(goodBefore);
     });
 
-    it("does NOT throw on dryRun=false when no rows are applicable", () => {
+    it("returns applied=false / mode=apply when no rows are applicable", () => {
       const root = tmpProject();
 
       const result = applyDiffPayload({
@@ -377,7 +495,83 @@ describe("applyDiffPayload — phase 1 + dry-run (Slice 1)", () => {
       });
 
       expect(result.mode).toBe("apply");
-      expect(result.summary.rows).toBe(0);
+      expect(result.applied).toBe(false);
+      expect(result.files).toEqual([]);
+      expect(result.summary.rows_applied).toBe(0);
+    });
+
+    it("does NOT leave behind any `*.codemap-apply-*.tmp` siblings", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+
+      applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      const siblings = readdirSync(root);
+      expect(siblings.some((s) => s.includes("codemap-apply-"))).toBe(false);
+    });
+  });
+
+  describe("failure modes", () => {
+    it("propagates the writeFileSync error when the file is read-only (chmod 0o444)", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+      // Chmod the directory to read-only so the temp-file write fails.
+      // (The file itself can still be `rename`d to, but writeFileSync of
+      // the temp sibling needs write permission on the parent dir.)
+      chmodSync(root, 0o555);
+
+      try {
+        expect(() =>
+          applyDiffPayload({
+            rows: [
+              {
+                file_path: "a.ts",
+                line_start: 1,
+                before_pattern: "foo",
+                after_pattern: "bar",
+              },
+            ],
+            projectRoot: root,
+            dryRun: false,
+          }),
+        ).toThrow();
+      } finally {
+        chmodSync(root, 0o755);
+      }
+    });
+
+    it("is a no-op on disk when dry-run is requested even with valid rows", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+      const before = readSource(root, "a.ts");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+        projectRoot: root,
+        dryRun: true,
+      });
+
+      expect(result.mode).toBe("dry-run");
+      expect(result.files).toEqual([{ file_path: "a.ts", rows_applied: 0 }]);
+      expect(readSource(root, "a.ts")).toBe(before);
     });
   });
 });
