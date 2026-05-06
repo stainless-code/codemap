@@ -1,0 +1,225 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { resolveCodemapConfig } from "../config";
+import { closeDb, createTables, openDb } from "../db";
+import { initCodemap } from "../runtime";
+import {
+  loadRecipeRecency,
+  pruneRecipeRecency,
+  RECENCY_WINDOW_MS,
+  recordRecipeRun,
+} from "./recipe-recency";
+
+let projectRoot: string;
+
+beforeEach(() => {
+  projectRoot = mkdtempSync(join(tmpdir(), "recipe-recency-"));
+  initCodemap(resolveCodemapConfig(projectRoot, undefined));
+  const db = openDb();
+  try {
+    createTables(db);
+  } finally {
+    closeDb(db);
+  }
+});
+
+afterEach(() => {
+  rmSync(projectRoot, { recursive: true, force: true });
+});
+
+describe("recipe_recency — schema", () => {
+  it("starts empty after createTables", () => {
+    const db = openDb();
+    try {
+      const rows = db
+        .query<{ n: number }>("SELECT COUNT(*) AS n FROM recipe_recency")
+        .all();
+      expect(rows[0]?.n).toBe(0);
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  });
+
+  it("RECENCY_WINDOW_MS equals 90 days", () => {
+    expect(RECENCY_WINDOW_MS).toBe(90 * 24 * 60 * 60 * 1000);
+  });
+});
+
+describe("recordRecipeRun", () => {
+  it("creates a row with run_count=1 on first call", () => {
+    const db = openDb();
+    try {
+      recordRecipeRun({ db, recipeId: "fan-out", now: 1_000_000 });
+      const row = db
+        .query<{
+          recipe_id: string;
+          last_run_at: number;
+          run_count: number;
+        }>("SELECT recipe_id, last_run_at, run_count FROM recipe_recency")
+        .get();
+      expect(row).toEqual({
+        recipe_id: "fan-out",
+        last_run_at: 1_000_000,
+        run_count: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("increments run_count and updates last_run_at on subsequent calls", () => {
+    const db = openDb();
+    try {
+      recordRecipeRun({ db, recipeId: "fan-out", now: 1_000_000 });
+      recordRecipeRun({ db, recipeId: "fan-out", now: 2_000_000 });
+      recordRecipeRun({ db, recipeId: "fan-out", now: 3_000_000 });
+      const row = db
+        .query<{ last_run_at: number; run_count: number }>(
+          "SELECT last_run_at, run_count FROM recipe_recency WHERE recipe_id = 'fan-out'",
+        )
+        .get();
+      expect(row).toEqual({ last_run_at: 3_000_000, run_count: 3 });
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("tracks distinct recipes in separate rows", () => {
+    const db = openDb();
+    try {
+      recordRecipeRun({ db, recipeId: "fan-out", now: 1_000_000 });
+      recordRecipeRun({ db, recipeId: "fan-in", now: 1_500_000 });
+      recordRecipeRun({ db, recipeId: "fan-out", now: 2_000_000 });
+      const rows = db
+        .query<{
+          recipe_id: string;
+          last_run_at: number;
+          run_count: number;
+        }>(
+          "SELECT recipe_id, last_run_at, run_count FROM recipe_recency ORDER BY recipe_id",
+        )
+        .all();
+      expect(rows).toEqual([
+        { recipe_id: "fan-in", last_run_at: 1_500_000, run_count: 1 },
+        { recipe_id: "fan-out", last_run_at: 2_000_000, run_count: 2 },
+      ]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("defaults `now` to Date.now() when omitted", () => {
+    const db = openDb();
+    try {
+      const before = Date.now();
+      recordRecipeRun({ db, recipeId: "fan-out" });
+      const after = Date.now();
+      const row = db
+        .query<{ last_run_at: number }>(
+          "SELECT last_run_at FROM recipe_recency WHERE recipe_id = 'fan-out'",
+        )
+        .get();
+      expect(row?.last_run_at).toBeGreaterThanOrEqual(before);
+      expect(row?.last_run_at).toBeLessThanOrEqual(after);
+    } finally {
+      closeDb(db);
+    }
+  });
+});
+
+describe("pruneRecipeRecency", () => {
+  it("deletes rows whose last_run_at < cutoffMs", () => {
+    const db = openDb();
+    try {
+      recordRecipeRun({ db, recipeId: "old-recipe", now: 1_000 });
+      recordRecipeRun({ db, recipeId: "new-recipe", now: 9_999 });
+      pruneRecipeRecency({ db, cutoffMs: 5_000 });
+      const rows = db
+        .query<{ recipe_id: string }>(
+          "SELECT recipe_id FROM recipe_recency ORDER BY recipe_id",
+        )
+        .all();
+      expect(rows).toEqual([{ recipe_id: "new-recipe" }]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("keeps rows where last_run_at == cutoffMs (strict <)", () => {
+    const db = openDb();
+    try {
+      recordRecipeRun({ db, recipeId: "exactly-cutoff", now: 5_000 });
+      pruneRecipeRecency({ db, cutoffMs: 5_000 });
+      const rows = db
+        .query<{ recipe_id: string }>("SELECT recipe_id FROM recipe_recency")
+        .all();
+      expect(rows).toEqual([{ recipe_id: "exactly-cutoff" }]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("is a no-op on an empty table", () => {
+    const db = openDb();
+    try {
+      pruneRecipeRecency({ db, cutoffMs: Date.now() });
+      const rows = db
+        .query<{ n: number }>("SELECT COUNT(*) AS n FROM recipe_recency")
+        .all();
+      expect(rows[0]?.n).toBe(0);
+    } finally {
+      closeDb(db);
+    }
+  });
+});
+
+describe("loadRecipeRecency", () => {
+  it("returns an empty Map when no recipes have run", () => {
+    const db = openDb();
+    try {
+      const map = loadRecipeRecency({ db });
+      expect(map.size).toBe(0);
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  });
+
+  it("returns rows keyed by recipe_id", () => {
+    const db = openDb();
+    try {
+      const now = Date.now();
+      recordRecipeRun({ db, recipeId: "fan-out", now });
+      recordRecipeRun({ db, recipeId: "fan-out", now });
+      recordRecipeRun({ db, recipeId: "fan-in", now });
+      const map = loadRecipeRecency({ db, now });
+      expect(map.size).toBe(2);
+      expect(map.get("fan-out")).toEqual({ last_run_at: now, run_count: 2 });
+      expect(map.get("fan-in")).toEqual({ last_run_at: now, run_count: 1 });
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("prunes rows older than 90 days before returning (lazy prune per Q3)", () => {
+    const db = openDb();
+    try {
+      const now = 100 * 24 * 60 * 60 * 1000;
+      const tooOld = now - RECENCY_WINDOW_MS - 1;
+      const justInside = now - RECENCY_WINDOW_MS + 1;
+      recordRecipeRun({ db, recipeId: "ancient", now: tooOld });
+      recordRecipeRun({ db, recipeId: "still-fresh", now: justInside });
+      const map = loadRecipeRecency({ db, now });
+      expect(map.has("ancient")).toBe(false);
+      expect(map.has("still-fresh")).toBe(true);
+      const rows = db
+        .query<{ recipe_id: string }>("SELECT recipe_id FROM recipe_recency")
+        .all();
+      expect(rows.map((r) => r.recipe_id)).toEqual(["still-fresh"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+});

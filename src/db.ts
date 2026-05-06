@@ -193,6 +193,21 @@ export function createTables(db: CodemapDatabase) {
       PRIMARY KEY (file_path, name, line_start)
     ) STRICT, WITHOUT ROWID;
 
+    -- User-data table: per-recipe last-run timestamp + run count for
+    -- agent-host ranking ("which recipes does this project actually use?").
+    -- Joins inline into --recipes-json / codemap://recipes via loadRecipeRecency.
+    -- Like query_baselines / coverage, intentionally absent from dropAll() so
+    -- --full and SCHEMA_VERSION rebuilds preserve user-activity history. The
+    -- 90-day rolling window is enforced lazily by pruneRecipeRecency on read,
+    -- not on write — keeps the recipe-execution hot path a pure upsert. recipe_id
+    -- is loose (matches bundled or project recipe ids; no FK to a recipes table
+    -- because there isn't one). Plan: docs/plans/recipe-recency.md.
+    CREATE TABLE IF NOT EXISTS recipe_recency (
+      recipe_id   TEXT PRIMARY KEY,
+      last_run_at INTEGER NOT NULL,
+      run_count   INTEGER NOT NULL DEFAULT 1
+    ) STRICT, WITHOUT ROWID;
+
     -- Config-derived: reconcileBoundaryRules clears and re-fills from
     -- .codemap/config boundaries on every index pass. Dropped on --full
     -- like the other index tables (unlike query_baselines / coverage which
@@ -302,6 +317,11 @@ export function createIndexes(db: CodemapDatabase) {
     -- The (file_path, name) prefix also covers GROUP BY file_path scans
     -- used by the bundled files-by-coverage recipe (D2 + D13).
     CREATE INDEX IF NOT EXISTS idx_coverage_file_name ON coverage(file_path, name);
+
+    -- Powers the lazy 90-day prune (DELETE WHERE last_run_at < cutoff) inside
+    -- loadRecipeRecency. Tiny table (one row per known recipe id) — index keeps
+    -- the prune predictable as project-recipe counts grow.
+    CREATE INDEX IF NOT EXISTS idx_recipe_recency_last_run ON recipe_recency(last_run_at);
   `);
 }
 
