@@ -1,5 +1,8 @@
+import { isAbsolute, resolve } from "node:path";
+
 import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
+import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
  * One row of the `recipe_recency` table. The shape is intentionally minimal —
@@ -137,4 +140,83 @@ export function loadRecipeRecency(
     });
   }
   return map;
+}
+
+/**
+ * Inline-join shape for `--recipes-json` and the matching MCP resources
+ * (Q5 Resolution: per-entry inline fields, not a separate top-level
+ * `recency:` map). `last_run_at: null` / `run_count: 0` for recipes
+ * never executed; consumers filter with `select(.last_run_at != null)`
+ * or treat null as fresh.
+ */
+export interface RecipeRecencyFields {
+  last_run_at: number | null;
+  run_count: number;
+}
+
+/**
+ * Resolve the absolute path to `<state-dir>/index.db` from the same
+ * inputs the CLI's `bootstrap-codemap` would use, WITHOUT mutating the
+ * global runtime singleton. Slice 3's `--recipes-json` flow runs before
+ * `initCodemap()` (the catalog has historically been "no DB required"),
+ * so the path-resolver lets us read recency without taking on the
+ * config / state-dir reconciliation side effects.
+ *
+ * Mirrors `application/state-dir.ts` `resolveStateDir` precedence:
+ * `cliFlag > env > default`.
+ */
+export function resolveRecencyDbPath(opts: {
+  root: string;
+  stateDir: string | undefined;
+}): string {
+  const raw =
+    opts.stateDir ?? process.env.CODEMAP_STATE_DIR ?? STATE_DIR_DEFAULT;
+  const dir = isAbsolute(raw) ? raw : resolve(opts.root, raw);
+  return resolve(dir, "index.db");
+}
+
+/**
+ * Slice 3 read-side enricher. Opens its own DB to read recency live —
+ * NEVER cached on the MCP/HTTP transports because the catalog resource
+ * runs inside long-lived `codemap mcp` / `codemap serve` sessions; a
+ * cached snapshot would freeze recency at first-read forever per server
+ * lifetime.
+ *
+ * Failure-isolated like {@link tryRecordRecipeRun} — a DB-open failure
+ * returns the input entries enriched with `null` / `0` fallbacks, never
+ * throws. The optional `openDb` factory lets callers without an
+ * `initCodemap()` runtime (e.g. CLI `--recipes-json` before bootstrap)
+ * supply a path-based opener; the test seam reuses the same hook.
+ */
+export function enrichWithRecency<T extends { id: string }>(
+  entries: ReadonlyArray<T>,
+  opts?: { openDb?: () => CodemapDatabase },
+): Array<T & RecipeRecencyFields> {
+  let map: Map<string, { last_run_at: number; run_count: number }> | undefined;
+  let db: CodemapDatabase | undefined;
+  try {
+    db = (opts?.openDb ?? openDb)();
+    map = loadRecipeRecency({ db });
+  } catch {
+    // Same posture as tryRecordRecipeRun (L.8) — recency errors NEVER
+    // block the catalog response. Caller gets entries with null/0
+    // fallbacks; the `--recipes-json` shape stays stable.
+    map = undefined;
+  } finally {
+    if (db !== undefined) {
+      try {
+        closeDb(db, { readonly: true });
+      } catch {
+        // Already in error path; nothing useful to do.
+      }
+    }
+  }
+  return entries.map((entry) => {
+    const hit = map?.get(entry.id);
+    return {
+      ...entry,
+      last_run_at: hit?.last_run_at ?? null,
+      run_count: hit?.run_count ?? 0,
+    };
+  });
 }

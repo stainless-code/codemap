@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import {
   getCurrentCommit,
   printQueryResult,
@@ -29,7 +31,11 @@ import type {
   RecipeParamValue,
   RecipeParamValues,
 } from "../application/recipe-params";
-import { tryRecordRecipeRun } from "../application/recipe-recency";
+import {
+  enrichWithRecency,
+  resolveRecencyDbPath,
+  tryRecordRecipeRun,
+} from "../application/recipe-recency";
 import {
   closeDb,
   deleteQueryBaseline,
@@ -51,6 +57,7 @@ import {
   makePackageBucketizer,
 } from "../group-by";
 import { getProjectRoot } from "../runtime";
+import { openCodemapDatabase } from "../sqlite-db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
 /**
@@ -602,9 +609,46 @@ function formatIncompatibility(
   return `codemap: --format ${fmt} cannot be combined with ${offenders.join(", ")} (different output shapes — formatted outputs only support flat row lists).`;
 }
 
-/** Print the bundled recipe catalog as JSON to stdout (no DB access). */
-export function printRecipesCatalogJson(): void {
-  console.log(JSON.stringify(listQueryRecipeCatalog(), null, 2));
+/**
+ * Print the bundled recipe catalog as JSON to stdout.
+ *
+ * Each entry gains `last_run_at: number | null` and `run_count: number`
+ * (Slice 3, Q5 Resolution — inline per-entry fields, not a separate
+ * `recency:` map). Live read every call (CLI is one-shot).
+ *
+ * **No bootstrap, no side effects.** This verb runs before
+ * `bootstrapCodemap()` in `cli/main.ts` (the catalog has historically been
+ * "no DB required" so agents can discover recipes pre-index). To preserve
+ * that posture while still surfacing recency when an indexed DB exists,
+ * the path-based `openCodemapDatabase(<path>)` factory is used directly —
+ * `initCodemap()` is NOT called. If the resolved DB path doesn't exist
+ * (never-indexed project), enrichment falls through to `null` / `0`
+ * fallbacks; if it exists, real recency lands inline.
+ */
+export function printRecipesCatalogJson(opts?: {
+  root?: string;
+  stateDir?: string | undefined;
+}): void {
+  const root = opts?.root;
+  const dbFactory =
+    root === undefined
+      ? undefined
+      : () => {
+          const dbPath = resolveRecencyDbPath({
+            root,
+            stateDir: opts?.stateDir,
+          });
+          if (!existsSync(dbPath)) {
+            // Never-indexed project — let enrichWithRecency catch the
+            // throw and fall back to null/0 entries.
+            throw new Error(`recipe-recency: no DB at ${dbPath}`);
+          }
+          return openCodemapDatabase(dbPath);
+        };
+  const enriched = enrichWithRecency(listQueryRecipeCatalog(), {
+    openDb: dbFactory,
+  });
+  console.log(JSON.stringify(enriched, null, 2));
 }
 
 /** Print one recipe's SQL to stdout, or false if the id is unknown (caller should exit 1). */

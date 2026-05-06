@@ -17,6 +17,7 @@ import {
   getQueryRecipeCatalogEntry,
   listQueryRecipeCatalog,
 } from "./query-recipes";
+import { enrichWithRecency } from "./recipe-recency";
 import { buildShowResult, findSymbolsByName } from "./show-engine";
 
 export interface ResourcePayload {
@@ -24,20 +25,25 @@ export interface ResourcePayload {
   text: string;
 }
 
-let recipesCache: ResourcePayload | undefined;
+// Slice 3 (recipe-recency): the recipes catalog used to lazy-cache its
+// JSON.stringify result for the server-process lifetime. With recency
+// fields injected inline (Q5 Resolution), a cached snapshot would freeze
+// `last_run_at` / `run_count` at first-read forever per `codemap mcp` /
+// `codemap serve` lifetime. The recipes / one-recipe caches were dropped
+// — the underlying `listQueryRecipeCatalog()` / `getQueryRecipeCatalogEntry()`
+// are themselves module-cached upstream (in `query-recipes.ts`), so the
+// extra cost is one DB-read + one JSON.stringify per call. Schema / skill
+// stay cached — neither changes mid-session.
 let schemaCache: ResourcePayload | undefined;
 let skillCache: ResourcePayload | undefined;
-const oneRecipeCache = new Map<string, ResourcePayload>();
 
 /**
  * Test-only escape hatch — drops every cached payload so a temp-DB test
  * can re-read with fresh state. Production code never calls this.
  */
 export function _resetResourceCachesForTests(): void {
-  recipesCache = undefined;
   schemaCache = undefined;
   skillCache = undefined;
-  oneRecipeCache.clear();
 }
 
 /**
@@ -110,25 +116,24 @@ export function listResources(): { uri: string; description: string }[] {
 }
 
 function readRecipesCatalog(): ResourcePayload {
-  if (recipesCache !== undefined) return recipesCache;
-  recipesCache = {
+  // Live read every call (no cache) so recency reflects the current
+  // session — see the cache-removal comment near the cache declarations.
+  return {
     mimeType: "application/json",
-    text: JSON.stringify(listQueryRecipeCatalog()),
+    text: JSON.stringify(enrichWithRecency(listQueryRecipeCatalog())),
   };
-  return recipesCache;
 }
 
 function readOneRecipe(id: string): ResourcePayload | undefined {
-  const cached = oneRecipeCache.get(id);
-  if (cached !== undefined) return cached;
   const entry = getQueryRecipeCatalogEntry(id);
   if (entry === undefined) return undefined;
-  const payload: ResourcePayload = {
+  // `enrichWithRecency` operates on a list; wrap the single entry,
+  // pull its enriched form back out.
+  const [enriched] = enrichWithRecency([entry]);
+  return {
     mimeType: "application/json",
-    text: JSON.stringify(entry),
+    text: JSON.stringify(enriched),
   };
-  oneRecipeCache.set(id, payload);
-  return payload;
 }
 
 function readSchema(): ResourcePayload {

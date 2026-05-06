@@ -367,7 +367,7 @@ Copies bundled agent templates into .agents/ under the project root.
       process.exit(1);
     }
     if (parsed.kind === "recipesCatalog") {
-      printRecipesCatalogJson();
+      printRecipesCatalogJson({ root, stateDir });
       return;
     }
     if (parsed.kind === "printRecipeSql") {
