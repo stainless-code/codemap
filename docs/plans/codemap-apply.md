@@ -224,40 +224,40 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors the recipe
   - **Promotion path is additive.** If real users complain about reindex-then-retry friction, ship (b) as additional phase-1 metadata: `summary.already_applied: N` + per-file `rows_already_applied`. No shape break for existing consumers; existing fields remain accurate.
 
 - **Q8 — `before_pattern` matching semantics.**
-  - **(a) Exact match** — including whitespace; `disk[line_start..line_start + N] === before_pattern.split('\n')`.
+  - **(a) Substring match (single line)** — `disk[line_start - 1].includes(before_pattern)` and replace via `disk[line_start - 1].replace(before_pattern, after_pattern)` (first occurrence). Matches the existing `buildDiffJson` formatter contract.
   - **(b) Whitespace-tolerant** — collapse runs of whitespace before comparing.
-  - **(c) Multi-line `before_pattern` support** — folded into (a)'s phase-1 implementation; not a separate option.
+  - **(c) Whole-line exact match** — `disk[line_start - 1] === before_pattern`.
 
   ### Q8 Resolution
 
-  **Locked: (a) Exact match.** Multi-line support is (a)'s implementation detail, not a separate option.
+  **Locked: (a) Substring match (single line) — verbatim with the existing `buildDiffJson` formatter contract.**
 
   **Phase-1 algorithm:**
-  1. Load file at `file_path` (1-indexed line array).
-  2. Split `before_pattern` on `\n` → N lines.
-  3. Compare `disk[line_start..line_start + N - 1]` line-by-line to those N lines, byte-exact.
-  4. Match → row passes validation.
-  5. Mismatch → conflict; `actual_at_line` is `disk[line_start..line_start + N - 1].join('\n')`.
+  1. Load file at `file_path`; split into 1-indexed lines via `source.split(/\r?\n/)`.
+  2. `actual = lines[line_start - 1]`.
+  3. If file unreadable → conflict (`reason: "file missing"`).
+  4. If `actual === undefined` (line past EOF) → conflict (`reason: "line out of range"`).
+  5. If `!actual.includes(before_pattern)` → conflict (`reason: "line content drifted"`); `actual_at_line = actual`.
+  6. Otherwise → row passes; phase-2 transformation is `actual.replace(before_pattern, after_pattern)` (first occurrence). Pre-escape `$` in `after_pattern` per `String.prototype.replace`'s `GetSubstitution` rule (`replace(/\$/g, "$$$$")` — mirrors `buildDiffJson` line 475).
 
   Reasoning:
-  - **Moat-A clean.** `before_pattern === disk` is observation; "close enough" is interpretation. Codemap does the former.
-  - **Predictable for agents.** A whitespace-tolerant comparator opens the door to "match if you can"; agents can't reason about the false-positive surface.
-  - **Recipe-author control.** Recipes already produce the rows — if normalization is wanted, the recipe SQL does it (e.g. `before_pattern` derived from `replace(source, char(9), ' ')`).
-  - **(c) folds into (a).** `before_pattern` is `TEXT` and accepts `\n` today; phase-1 just splits on `\n` and reads the corresponding N consecutive lines. No schema delta. Documented as a recipe-author idiom.
-  - **Reject (b).** Tolerance grows over time (collapse runs → trim → ignore EOL → ignore blank lines → …); each addition is more interpretation. Promotion path is recipe-side: a future recipe-frontmatter flag (`apply.whitespace_tolerant: true`) keeps the verdict where it belongs.
+  - **Matches the formatter contract verbatim.** `application/output-formatters.ts` `buildDiffJson` uses `actual.includes(before)` + `actual.replace(before, after)` with the `$` pre-escape. The exemplar `templates/recipes/rename-preview.sql` emits `before_pattern = old_name` (the bare identifier, e.g. `"foo"`), NOT the full line. Whole-line exact match would conflict every time on `const foo = 1;`.
+  - **Single line per row.** Hunks today are 1-line removals + 1-line additions (`old_count: 1, new_count: 1` in `buildDiffJson`). Multi-line transforms are out of scope for v1; promote with a schema-aware extension if real recipes need it.
+  - **Reject (b) whitespace-tolerant.** Tolerance grows over time (collapse runs → trim → ignore EOL → …); each addition is more interpretation. Recipe-side normalization is the right substrate (recipe SQL controls what `before_pattern` contains).
+  - **Reject (c) whole-line exact.** Contradicts the formatter precedent and breaks every shipped recipe row.
 
   **Edge cases handled by (a):**
 
-  | Disk state                         | `before_pattern`             | Outcome                                                                   |
-  | ---------------------------------- | ---------------------------- | ------------------------------------------------------------------------- |
-  | File missing                       | any                          | conflict; `reason: "file missing"`                                        |
-  | `line_start` past EOF              | any                          | conflict; `reason: "line out of range"`                                   |
-  | Trailing whitespace differs        | exact recipe text            | conflict (correctly — file did drift)                                     |
-  | EOL differs (`\r\n` vs `\n`)       | recipe authored on `\n` host | conflict; user normalizes EOL or recipe accepts both via parameterisation |
-  | `before_pattern` has trailing `\n` | —                            | counted as N+1 lines; phase-1 reads N+1 lines (last is empty)             |
+  | Disk state                             | `before_pattern` | Outcome                                                                                                                         |
+  | -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+  | File missing                           | any              | conflict; `reason: "file missing"`                                                                                              |
+  | `line_start` past EOF                  | any              | conflict; `reason: "line out of range"`                                                                                         |
+  | `before_pattern` not in line           | any              | conflict; `reason: "line content drifted"`; `actual_at_line` shows what's there                                                 |
+  | `before_pattern` appears twice in line | any              | only the first occurrence replaces (matches formatter); recipe author should split into two rows or use a more specific pattern |
+  | `after_pattern` contains `$` / `$1`    | any              | escaped before `replace()` so identifiers like `$inject` round-trip safely                                                      |
 
 - **Q9 — Test approach.**
-  - **Unit:** `apply-engine.ts` — `applyDiffPayload({rows, projectRoot, dryRun})` + helpers. Temp-dir scenarios for happy path / conflict / dry-run / file-missing / out-of-range / multi-line `before_pattern`.
+  - **Unit:** `apply-engine.ts` — `applyDiffPayload({rows, projectRoot, dryRun})` + helpers. Temp-dir scenarios for happy path / conflict / dry-run / file-missing / out-of-range / `$`-pattern escape / row-shape validation.
   - **Integration:** subprocess CLI tests against a fixture project (mirrors `cmd-query-recency.test.ts`) — full pipeline from `codemap apply rename-preview --params … --yes` through to disk-state assertions. TTY-prompt path tested via `--yes` flag (skipping prompt); non-TTY-no-`--yes` rejection tested explicitly.
   - **Golden:** add a recipe-execution scenario to `fixtures/golden/scenarios.json` covering the dry-run output shape (deterministic; doesn't write to disk).
 
