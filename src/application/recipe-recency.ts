@@ -6,10 +6,10 @@ import { getRecipeRecencyEnabled } from "../runtime";
 import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
- * One row of the `recipe_recency` table. The shape is intentionally minimal —
- * `first_run_at` / `source` / `errored_run_count` were rejected for v1 per the
- * Q1 resolution in `docs/plans/recipe-recency.md` (locked schema; additive
- * promotion path if a real consumer asks).
+ * One row of the `recipe_recency` table. The shape is intentionally minimal
+ * — `first_run_at` / `source` / `errored_run_count` were rejected for v1
+ * (additive promotion path if a real consumer asks). See
+ * [`docs/architecture.md` § `recipe_recency`](../../docs/architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid).
  */
 export interface RecipeRecencyRow {
   recipe_id: string;
@@ -18,9 +18,9 @@ export interface RecipeRecencyRow {
 }
 
 /**
- * 90-day rolling retention window. Plan L.3. Exposed for tests; production
- * call sites should use the `cutoffMs` argument on `pruneRecipeRecency` so
- * the boundary is testable without freezing time.
+ * 90-day rolling retention window. Exposed for tests; production call sites
+ * should use the `cutoffMs` argument on `pruneRecipeRecency` so the boundary
+ * is testable without freezing time.
  */
 export const RECENCY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 

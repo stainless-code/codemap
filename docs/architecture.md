@@ -388,6 +388,22 @@ Three meta keys (`coverage_last_ingested_at` / `_path` / `_format`) record fresh
 
 Bundled recipes consuming the table — `untested-and-dead`, `files-by-coverage`, `worst-covered-exports`. Each ships a frontmatter `actions` block (per PR #26) so agents see per-row follow-up hints in `--json` output.
 
+### `recipe_recency` — Per-recipe last-run + run-count (user data) (`STRICT, WITHOUT ROWID`)
+
+Tracks `last_run_at` (epoch ms) + `run_count` per recipe id so agent hosts can rank live recipes ahead of historic ones. Surfaces inline on `--recipes-json` and the matching `codemap://recipes` / `codemap://recipes/{id}` MCP resources (live read every call — the resource cache was dropped to avoid freezing recency at first-read for the server-process lifetime). Same lifecycle posture as `query_baselines` / `coverage`: **intentionally absent from `dropAll()`** so `--full` and `SCHEMA_VERSION` rebuilds preserve user-activity history. Local-only — no upload primitive ever ships (resists telemetry-creep PRs by construction).
+
+Two write sites both call `recordRecipeRun` from `application/recipe-recency.ts`: `handleQueryRecipe` in `application/tool-handlers.ts` (covers MCP + HTTP — both flow through it) and `runQueryCmd` in `cli/cmd-query.ts` (CLI — finally-block observes `process.exitCode` as the unified success signal). Counts only successful runs; recency-write failures are swallowed with a stderr `[recency] write failed: <reason>` warning so they NEVER block the recipe response. The 90-day rolling window is enforced lazily on `--recipes-json` reads (no DELETE on the write path).
+
+Default ON; opt-out via `.codemap/config` `recipe_recency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row per Q4 of the recipe-recency plan).
+
+| Column      | Type    | Description                                                                              |
+| ----------- | ------- | ---------------------------------------------------------------------------------------- |
+| recipe_id   | TEXT PK | Recipe id (matches `QUERY_RECIPES` keys + project-recipe ids in `<state-dir>/recipes/`). |
+| last_run_at | INTEGER | Epoch ms of the last successful run.                                                     |
+| run_count   | INTEGER | Cumulative successful runs (incremented per call). `INTEGER` wraparound is theoretical.  |
+
+`idx_recipe_recency_last_run` on `last_run_at` keeps the lazy 90-day prune (`DELETE WHERE last_run_at < cutoffMs`) an indexed scan as project-recipe counts grow. Boundary discipline: only `application/tool-handlers.ts` + `cli/cmd-query.ts` (+ the test file) may import `recordRecipeRun` — verifiable via the forbidden-edge query in the engine module's docstring.
+
 ### `boundary_rules` — Architecture-boundary rules (config-derived) (`STRICT, WITHOUT ROWID`)
 
 Reconciled from `.codemap/config.ts` `boundaries: [...]` on every index pass via `reconcileBoundaryRules` in `db.ts`; the wiring lives in `application/run-index.ts` right after `createSchema`. Empty when the user declares no boundaries. Bundled `boundary-violations` recipe joins this table against `dependencies` via SQLite `GLOB` to surface forbidden imports; `--format sarif` lights up automatically because the recipe row aliases `dependencies.from_path` to `file_path` (the existing location-column priority list catches it).

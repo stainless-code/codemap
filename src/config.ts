@@ -94,7 +94,7 @@ export const codemapUserConfigSchema = z
       .boolean()
       .optional()
       .describe(
-        "Track per-recipe `last_run_at` + `run_count` in the `recipe_recency` table; surfaces inline on `--recipes-json` for agent-host ranking. Default `true` (opt-out). Set `false` to short-circuit every write — no rows ever land. Local-only — no upload primitive. Plan: docs/plans/recipe-recency.md (Q5 + L.4).",
+        "Track per-recipe `last_run_at` + `run_count` in the `recipe_recency` table; surfaces inline on `--recipes-json` for agent-host ranking. Default `true` (opt-out). Set `false` to short-circuit every write — no rows ever land. Local-only — no upload primitive. See `docs/architecture.md` § `recipe_recency`.",
       ),
     boundaries: z
       .array(
@@ -183,7 +183,7 @@ export interface ResolvedCodemapConfig {
    * `recipe_recency` table on every successful recipe run and inlines
    * `last_run_at` / `run_count` on `--recipes-json` reads. `false`
    * short-circuits every write — no rows ever land. Local-only — no
-   * upload primitive. See `docs/plans/recipe-recency.md` (L.4).
+   * upload primitive. See `docs/architecture.md` § `recipe_recency`.
    */
   readonly recipeRecency: boolean;
   /**

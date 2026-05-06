@@ -408,6 +408,10 @@ Run via `codemap query --recipe <id>` (alias `-r`). Project recipes win on id co
 
 Boolean flag on a project-local recipe entry that has the same `id` as a bundled recipe — `shadows: true` means "this project recipe overrides what the bundled version would have done." Surfaces in `--recipes-json`, `codemap://recipes`, and `codemap://recipes/{id}` so agents can see overrides without parsing per-execution responses (per-execution shape stays unchanged for plan § 4 uniformity). Silent at runtime — the agent-facing skill prompt is the channel that tells agents to check the flag at session start.
 
+### `recipe_recency` (table) / recipe recency / `recipe_recency: false`
+
+Per-recipe `last_run_at` (epoch ms) + `run_count` for agent-host ranking — surfaces inline on every `--recipes-json` entry and the matching `codemap://recipes` / `codemap://recipes/{id}` MCP resources (live read every call; the resource cache was dropped to avoid freezing recency at first-read for the server-process lifetime). Counts only successful recipe runs (`Q9` of the recipe-recency plan); failed runs / param-validation rejections / SQL errors don't write. Default ON; opt-out via `.codemap/config` `recipe_recency: false` (short-circuits before any DB write — no rows ever land). 90-day rolling window enforced lazily on read, not write. Local-only — no upload primitive (resists telemetry-creep PRs by construction). Two write sites — `handleQueryRecipe` in `application/tool-handlers.ts` (covers MCP + HTTP) and `runQueryCmd` in `cli/cmd-query.ts` (CLI) — both call the shared `recordRecipeRun` helper from `application/recipe-recency.ts`. Failure-isolated: a recency-write throw NEVER blocks the recipe response (warning to stderr unless `quiet`). Schema: see [architecture.md § `recipe_recency`](./architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid).
+
 ### research
 
 A snapshot-style note under `docs/research/` capturing a competitive scan or evaluation. Closed per [README § Closing research](./README.md#closing-research) — adopted items are slimmed to a "What shipped" appendix; rejected items keep a status header.
