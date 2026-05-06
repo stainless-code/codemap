@@ -27,13 +27,23 @@ interface RecordRunOpts {
 }
 
 /**
- * Pure upsert — pruning lives on the read path so the recipe-execution
- * hot path stays cheap. Caller is `tryRecordRecipeRun` (which guards the
- * "successful run only" contract).
+ * Eager prune + upsert. Pruning runs on the write path (not the read path)
+ * so catalog reads stay pure — Slice 5 audit caught that lazy-on-read
+ * violated the "No DB required" contract for `--recipes-json` and the
+ * MCP `codemap://recipes` resource. Single indexed DELETE on a tiny
+ * table (~recipe-id-cardinality rows) is cheap enough to justify
+ * write-side eagerness; reads now filter on `last_run_at >= cutoff`
+ * without writing.
+ *
+ * Caller is `tryRecordRecipeRun` (which guards the "successful run only"
+ * contract).
  */
 export function recordRecipeRun(opts: RecordRunOpts): void {
   const { db, recipeId } = opts;
   const now = opts.now ?? Date.now();
+  db.run("DELETE FROM recipe_recency WHERE last_run_at < ?", [
+    now - RECENCY_WINDOW_MS,
+  ]);
   db.run(
     `INSERT INTO recipe_recency (recipe_id, last_run_at, run_count)
      VALUES (?, ?, 1)
@@ -93,7 +103,11 @@ interface PruneOpts {
   cutoffMs: number;
 }
 
-/** Lazy prune — called from `loadRecipeRecency` so writes stay pure upserts. */
+/**
+ * Maintenance helper — exposed for tests / future ad-hoc CLI verbs. Production
+ * pruning lives inside `recordRecipeRun` (write-side eager); reads never call
+ * this so the catalog stays pure.
+ */
 export function pruneRecipeRecency(opts: PruneOpts): void {
   const { db, cutoffMs } = opts;
   db.run("DELETE FROM recipe_recency WHERE last_run_at < ?", [cutoffMs]);
@@ -106,21 +120,24 @@ interface LoadOpts {
 }
 
 /**
- * Read path for `--recipes-json` + `codemap://recipes` resources. Lazy-prunes
- * before the SELECT; returns a Map keyed by `recipe_id` so the catalog
- * renderer can `map.get(entry.id) ?? null` for never-run recipes.
+ * Pure read for `--recipes-json` + `codemap://recipes` resources. Filters
+ * to within the 90-day window via `WHERE last_run_at >= ?` — never DELETEs,
+ * so the catalog read site stays side-effect free. Stale rows are pruned
+ * on the next `recordRecipeRun` write (eager prune-then-upsert). Returns a
+ * Map keyed by `recipe_id` so the catalog renderer can
+ * `map.get(entry.id) ?? null` for never-run recipes.
  */
 export function loadRecipeRecency(
   opts: LoadOpts,
 ): Map<string, { last_run_at: number; run_count: number }> {
   const { db } = opts;
   const now = opts.now ?? Date.now();
-  pruneRecipeRecency({ db, cutoffMs: now - RECENCY_WINDOW_MS });
+  const cutoff = now - RECENCY_WINDOW_MS;
   const rows = db
     .query<RecipeRecencyRow>(
-      "SELECT recipe_id, last_run_at, run_count FROM recipe_recency",
+      "SELECT recipe_id, last_run_at, run_count FROM recipe_recency WHERE last_run_at >= ?",
     )
-    .all();
+    .all(cutoff);
   const map = new Map<string, { last_run_at: number; run_count: number }>();
   for (const row of rows) {
     map.set(row.recipe_id, {

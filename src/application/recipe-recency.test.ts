@@ -204,21 +204,55 @@ describe("loadRecipeRecency", () => {
     }
   });
 
-  it("prunes rows older than 90 days before returning (lazy prune)", () => {
+  it("filters out rows older than 90 days WITHOUT mutating the table (read purity)", () => {
     const db = openDb();
     try {
       const now = 100 * 24 * 60 * 60 * 1000;
       const tooOld = now - RECENCY_WINDOW_MS - 1;
       const justInside = now - RECENCY_WINDOW_MS + 1;
-      recordRecipeRun({ db, recipeId: "ancient", now: tooOld });
-      recordRecipeRun({ db, recipeId: "still-fresh", now: justInside });
+      // Seed via raw INSERT to avoid the eager prune inside recordRecipeRun.
+      db.run(
+        "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, 1)",
+        ["ancient", tooOld],
+      );
+      db.run(
+        "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, 1)",
+        ["still-fresh", justInside],
+      );
       const map = loadRecipeRecency({ db, now });
       expect(map.has("ancient")).toBe(false);
       expect(map.has("still-fresh")).toBe(true);
+      // Read MUST NOT delete — the ancient row still physically exists.
       const rows = db
-        .query<{ recipe_id: string }>("SELECT recipe_id FROM recipe_recency")
+        .query<{ recipe_id: string }>(
+          "SELECT recipe_id FROM recipe_recency ORDER BY recipe_id",
+        )
         .all();
-      expect(rows.map((r) => r.recipe_id)).toEqual(["still-fresh"]);
+      expect(rows.map((r) => r.recipe_id)).toEqual(["ancient", "still-fresh"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+});
+
+describe("recordRecipeRun — eager prune (write-side)", () => {
+  it("deletes ancient rows alongside its upsert", () => {
+    const db = openDb();
+    try {
+      const now = 100 * 24 * 60 * 60 * 1000;
+      const tooOld = now - RECENCY_WINDOW_MS - 1;
+      // Seed an ancient row, then write a fresh one through recordRecipeRun.
+      db.run(
+        "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, 1)",
+        ["ancient", tooOld],
+      );
+      recordRecipeRun({ db, recipeId: "fresh", now });
+      const rows = db
+        .query<{ recipe_id: string }>(
+          "SELECT recipe_id FROM recipe_recency ORDER BY recipe_id",
+        )
+        .all();
+      expect(rows.map((r) => r.recipe_id)).toEqual(["fresh"]);
     } finally {
       closeDb(db);
     }
