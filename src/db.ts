@@ -194,15 +194,13 @@ export function createTables(db: CodemapDatabase) {
       PRIMARY KEY (file_path, name, line_start)
     ) STRICT, WITHOUT ROWID;
 
-    -- User-data table: per-recipe last-run timestamp + run count for
-    -- agent-host ranking ("which recipes does this project actually use?").
-    -- Joins inline into --recipes-json / codemap://recipes via loadRecipeRecency.
-    -- Like query_baselines / coverage, intentionally absent from dropAll() so
-    -- --full and SCHEMA_VERSION rebuilds preserve user-activity history. The
-    -- 90-day rolling window is enforced lazily by pruneRecipeRecency on read,
-    -- not on write — keeps the recipe-execution hot path a pure upsert. recipe_id
-    -- is loose (matches bundled or project recipe ids — no FK to a recipes table
-    -- because there isn't one). See docs/architecture.md recipe_recency.
+    -- User-data table: per-recipe last_run_at + run_count for agent-host
+    -- ranking. Joined inline into --recipes-json / codemap://recipes via
+    -- loadRecipeRecency. Like query_baselines / coverage, intentionally absent
+    -- from dropAll() so --full and SCHEMA_VERSION rebuilds preserve activity
+    -- history. 90-day window is eager-on-write (recordRecipeRun DELETEs stale
+    -- rows before its upsert); reads stay pure. recipe_id is loose (no FK; can
+    -- match bundled or project recipe ids). See docs/architecture.md recipe_recency.
     CREATE TABLE IF NOT EXISTS recipe_recency (
       recipe_id   TEXT PRIMARY KEY,
       last_run_at INTEGER NOT NULL,
