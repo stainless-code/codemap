@@ -48,7 +48,7 @@ export function mergeParams(
   base: RecipeParamValues | undefined,
   next: RecipeParamValues,
 ): RecipeParamValues {
-  return { ...(base ?? {}), ...next };
+  return { ...base, ...next };
 }
 
 /**

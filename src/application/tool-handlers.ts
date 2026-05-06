@@ -29,6 +29,7 @@ import { getFilesChangedSince } from "../git-changed";
 import type { GroupByMode } from "../group-by";
 import { GROUP_BY_MODES } from "../group-by";
 import { getProjectRoot } from "../runtime";
+import { applyDiffPayload } from "./apply-engine";
 import {
   makeWorktreeReindex,
   resolveAuditBaselines,
@@ -38,7 +39,7 @@ import {
 import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
-import { getCurrentCommit } from "./index-engine";
+import { getCurrentCommit, queryRows } from "./index-engine";
 import {
   formatAnnotations,
   formatDiff,
@@ -770,6 +771,81 @@ export function handleImpact(args: ImpactArgs): ToolResult {
     } finally {
       closeDb(db, { readonly: true });
     }
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === apply ==================================================================
+
+export const applyArgsSchema = {
+  recipe: z.string().min(1, "recipe must be a non-empty string"),
+  params: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .optional(),
+  dry_run: z.boolean().optional(),
+  /** Q6 (a) — required for the write path; non-TTY transports have no prompt to fall back on. */
+  yes: z.boolean().optional(),
+};
+
+export interface ApplyArgs {
+  recipe: string;
+  params?: RecipeParamValues;
+  dry_run?: boolean;
+  yes?: boolean;
+}
+
+/**
+ * Substrate-shaped fix executor — reuses {@link applyDiffPayload} so the
+ * envelope is identical across CLI / MCP / HTTP (Q5). Non-`dry_run`
+ * invocations require `yes: true`; this is the agent-shaped equivalent
+ * of the CLI's non-TTY rejection.
+ */
+export function handleApply(args: ApplyArgs, root: string): ToolResult {
+  try {
+    const sql = getQueryRecipeSql(args.recipe);
+    if (sql === undefined) {
+      return err(
+        `codemap: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
+        404,
+      );
+    }
+
+    const dryRun = args.dry_run === true;
+    if (!dryRun && args.yes !== true) {
+      return err(
+        `codemap apply: this tool writes files. Pass {yes: true} for non-interactive runs, or {dry_run: true} for preview.`,
+      );
+    }
+    if (dryRun && args.yes === true) {
+      return err(
+        `codemap apply: dry_run and yes are mutually exclusive (dry_run never writes).`,
+      );
+    }
+
+    const resolvedParams = resolveRecipeParams({
+      recipeId: args.recipe,
+      declared: getQueryRecipeParams(args.recipe),
+      provided: args.params,
+    });
+    if (!resolvedParams.ok) return err(resolvedParams.error);
+
+    let rows: unknown[];
+    try {
+      rows = queryRows(sql, resolvedParams.values);
+    } catch (e) {
+      return err(
+        `codemap apply: recipe SQL execution failed — ${e instanceof Error ? e.message : String(e)}`,
+        500,
+      );
+    }
+
+    const payload = applyDiffPayload({
+      rows: rows as Record<string, unknown>[],
+      projectRoot: root,
+      dryRun,
+    });
+    return ok(payload);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
   }
