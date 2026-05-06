@@ -24,12 +24,15 @@ import { join } from "node:path";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const indexTs = join(repoRoot, "src", "index.ts");
-const bunBin = Bun.which("bun")!;
+let bunBin: string | null = null;
 
 async function runCli(
   args: string[],
   envOverride: Record<string, string> = {},
 ): Promise<{ exitCode: number; out: string; err: string }> {
+  if (bunBin === null) {
+    throw new Error("cmd-query-recency: bunBin not initialised by beforeAll.");
+  }
   const proc = Bun.spawn([bunBin, indexTs, ...args], {
     cwd: repoRoot,
     stdout: "pipe",
@@ -60,8 +63,7 @@ const helperSource = `export function helper(): number {
 `;
 
 beforeAll(() => {
-  // Sanity check: skip the suite if the global `bun` binary or src
-  // entry isn't reachable from this test's perspective.
+  bunBin = Bun.which("bun");
   if (!bunBin || !existsSync(indexTs)) {
     throw new Error(
       `cmd-query-recency: cannot locate Bun (${bunBin}) or src entry (${indexTs}).`,
@@ -132,27 +134,21 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
     expect(await loadRunCount("deprecated-symbols")).toBe(before + 1);
   });
 
-  it("does NOT record recency on SQL parse errors (real failure)", async () => {
-    // Force a recipe-side failure via a param value the recipe rejects.
-    const before = await loadRunCount("find-symbol-by-kind");
+  it("does NOT record recency on a recipe failure (deterministic — unknown recipe id)", async () => {
+    // Unknown recipe id is the most stable forced-failure trigger
+    // (param-validation rules can evolve; the "unknown recipe" error
+    // is fundamental to the catalog lookup).
     const r = await runCli(
-      [
-        "query",
-        "--recipe",
-        "find-symbol-by-kind",
-        "--params",
-        "kind=invalid_kind_value,name_pattern=%foo%",
-        "--json",
-      ],
+      ["query", "--recipe", "recipe-does-not-exist", "--json"],
       { CODEMAP_ROOT: projectRoot },
     );
-    // Param-value semantics may evolve — assert "exit-mirrors-recency"
-    // either way (clean run → record; rejection → no record).
-    if (r.exitCode === 0) {
-      expect(await loadRunCount("find-symbol-by-kind")).toBe(before + 1);
-    } else {
-      expect(await loadRunCount("find-symbol-by-kind")).toBe(before);
-    }
+    expect(r.exitCode).toBe(1);
+    const total = await runCli(
+      ["query", "--json", "SELECT COUNT(*) AS n FROM recipe_recency"],
+      { CODEMAP_ROOT: projectRoot },
+    );
+    const n = (JSON.parse(total.out) as Array<{ n: number }>)[0]?.n;
+    expect(n).toBe(0);
   });
 
   it("does NOT record recency on ad-hoc SQL (recipeId undefined)", async () => {
@@ -171,11 +167,11 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
     expect(totalRows).toBeDefined();
   });
 
-  it("does NOT record recency when recipe_recency: false in user config", async () => {
+  it("does NOT record recency when recipeRecency: false in user config", async () => {
     mkdirSync(join(projectRoot, ".codemap"), { recursive: true });
     writeFileSync(
       join(projectRoot, ".codemap", "config.json"),
-      JSON.stringify({ recipe_recency: false }, null, 2),
+      JSON.stringify({ recipeRecency: false }, null, 2),
       "utf8",
     );
     const r = await runCli(["query", "--recipe", "fan-out", "--json"], {

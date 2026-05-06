@@ -90,7 +90,7 @@ export const codemapUserConfigSchema = z
       .describe(
         "Enable FTS5 full-text indexing of file content into the `source_fts` virtual table. Default `false` — FTS5 grows `.codemap/index.db` ~30–50% on text-heavy projects. Override at the CLI with `--with-fts` (CLI wins; logs a stderr line on override).",
       ),
-    recipe_recency: z
+    recipeRecency: z
       .boolean()
       .optional()
       .describe(
@@ -296,8 +296,8 @@ export function resolveCodemapConfig(
     action: rule.action ?? "deny",
   }));
 
-  // Default ON per L.4 (opt-out, not opt-in). Only `false` disables.
-  const recipeRecency = parsed?.recipe_recency !== false;
+  // Default ON (opt-out, not opt-in). Only `false` disables.
+  const recipeRecency = parsed?.recipeRecency !== false;
 
   return {
     root: absRoot,

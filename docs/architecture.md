@@ -394,7 +394,7 @@ Tracks `last_run_at` (epoch ms) + `run_count` per recipe id so agent hosts can r
 
 Two write sites both call `tryRecordRecipeRun` (the failure-isolated wrapper around `recordRecipeRun`) from `application/recipe-recency.ts`: `handleQueryRecipe` in `application/tool-handlers.ts` (covers MCP + HTTP — both flow through it) and `runQueryCmd` in `cli/cmd-query.ts` (CLI — finally-block keys off a local `recipeQuerySucceeded` flag, NOT `process.exitCode`, so `--ci`'s deliberate exit-1-on-findings is recognised as success). Counts only successful runs; recency-write failures are swallowed with a stderr `[recency] write failed: <reason>` warning so they NEVER block the recipe response. The 90-day rolling window is enforced eagerly on the write path (single indexed `DELETE` inside `recordRecipeRun` before the upsert); reads filter at SELECT time (`WHERE last_run_at >= cutoff`) and never mutate the DB so the catalog stays side-effect free for `--recipes-json` and the MCP `codemap://recipes` resources.
 
-Default ON; opt-out via `.codemap/config` `recipe_recency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row, since only one version is ever reachable per id).
+Default ON; opt-out via `.codemap/config` `recipeRecency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row, since only one version is ever reachable per id).
 
 | Column      | Type    | Description                                                                              |
 | ----------- | ------- | ---------------------------------------------------------------------------------------- |
@@ -591,7 +591,10 @@ Re-runnable kit, lifted from the engine module so the docstring stays slim. Only
 bun src/index.ts query --json "
   SELECT DISTINCT file_path FROM imports
   WHERE source LIKE '%application/recipe-recency%'
-    AND specifiers LIKE '%recordRecipeRun%'
+    -- Quoted-name match (specifiers is JSON) — explicit so a future
+    -- symbol like 'recordRecipeRunner' wouldn't false-positive.
+    AND (specifiers LIKE '%\"recordRecipeRun\"%'
+         OR specifiers LIKE '%\"tryRecordRecipeRun\"%')
     AND file_path NOT IN ('src/application/tool-handlers.ts',
                           'src/cli/cmd-query.ts',
                           'src/application/recipe-recency.test.ts')

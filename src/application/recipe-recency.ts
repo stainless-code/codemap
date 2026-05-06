@@ -31,24 +31,27 @@ interface RecordRunOpts {
 }
 
 /**
- * Eager prune + upsert. Prune lives on the write path so catalog reads
- * (`--recipes-json`, `codemap://recipes`) stay side-effect free. Caller
- * is `tryRecordRecipeRun`, which guards the "successful run only" contract.
+ * Eager prune + upsert in a single transaction (one fsync, atomic).
+ * Prune lives on the write path so catalog reads stay side-effect free.
+ * Caller is `tryRecordRecipeRun`, which guards "successful run only".
  */
 export function recordRecipeRun(opts: RecordRunOpts): void {
   const { db, recipeId } = opts;
   const now = opts.now ?? Date.now();
-  db.run("DELETE FROM recipe_recency WHERE last_run_at < ?", [
-    now - RECENCY_WINDOW_MS,
-  ]);
-  db.run(
-    `INSERT INTO recipe_recency (recipe_id, last_run_at, run_count)
-     VALUES (?, ?, 1)
-     ON CONFLICT(recipe_id) DO UPDATE SET
-       last_run_at = excluded.last_run_at,
-       run_count   = recipe_recency.run_count + 1`,
-    [recipeId, now],
-  );
+  const tx = db.transaction(() => {
+    db.run("DELETE FROM recipe_recency WHERE last_run_at < ?", [
+      now - RECENCY_WINDOW_MS,
+    ]);
+    db.run(
+      `INSERT INTO recipe_recency (recipe_id, last_run_at, run_count)
+       VALUES (?, ?, 1)
+       ON CONFLICT(recipe_id) DO UPDATE SET
+         last_run_at = excluded.last_run_at,
+         run_count   = recipe_recency.run_count + 1`,
+      [recipeId, now],
+    );
+  });
+  tx();
 }
 
 /**
@@ -65,14 +68,14 @@ export function tryRecordRecipeRun(
   recipeId: string,
   opts?: { quiet?: boolean; _openDb?: () => CodemapDatabase },
 ): void {
-  // Bail before openDb when opt-out config is set. The toggle-getter
-  // throws when the runtime isn't initialised (CLI smoke paths before
-  // bootstrap); the outer try/catch swallows that, so behaviour stays
-  // identical to a real DB failure.
+  // Bail before openDb when opt-out config is set. If the runtime
+  // singleton isn't initialised, the toggle-getter throws — bail too,
+  // since openDb (which depends on the same runtime) would fail
+  // anyway and emit a confusing `[recency] write failed` warning.
   try {
     if (!getRecipeRecencyEnabled()) return;
   } catch {
-    // Runtime not initialised — let the openDb path try.
+    return;
   }
   let db: CodemapDatabase | undefined;
   try {

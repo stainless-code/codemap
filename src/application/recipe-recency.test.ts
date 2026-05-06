@@ -318,9 +318,9 @@ describe("tryRecordRecipeRun — failure isolation", () => {
   });
 });
 
-describe("tryRecordRecipeRun — opt-out (recipe_recency: false)", () => {
-  it("short-circuits the upsert when recipe_recency: false", () => {
-    initCodemap(resolveCodemapConfig(projectRoot, { recipe_recency: false }));
+describe("tryRecordRecipeRun — opt-out (recipeRecency: false)", () => {
+  it("short-circuits the upsert when recipeRecency: false", () => {
+    initCodemap(resolveCodemapConfig(projectRoot, { recipeRecency: false }));
 
     // Thrower factory — fires only if the short-circuit fails.
     let openDbCalled = false;
@@ -345,8 +345,8 @@ describe("tryRecordRecipeRun — opt-out (recipe_recency: false)", () => {
     }
   });
 
-  it("writes normally when recipe_recency: true (default)", () => {
-    initCodemap(resolveCodemapConfig(projectRoot, { recipe_recency: true }));
+  it("writes normally when recipeRecency: true (default)", () => {
+    initCodemap(resolveCodemapConfig(projectRoot, { recipeRecency: true }));
     tryRecordRecipeRun("explicit-on-recipe");
     initCodemap(resolveCodemapConfig(projectRoot, undefined));
 
