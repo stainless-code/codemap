@@ -199,7 +199,7 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors the recipe
 
   **Prompt content** (printed before the y/N):
 
-  ```
+  ```text
   apply rename-preview: 3 files, 5 rows
     - src/foo.ts (2 rows)
     - src/bar.ts (1 row)
@@ -317,7 +317,7 @@ Three new pieces; engine reuses existing diff-formatter primitives.
 
 2. **CLI shell (`src/cli/cmd-apply.ts`, new)** — argv parsing + bootstrap + dispatch. Mirrors `cmd-impact.ts` shape (positional target + flags + JSON envelope). Resolves `--recipe` → SQL → executes via `executeQuery` → passes rows to `apply-engine`.
 
-3. **MCP/HTTP transport** — `application/tool-handlers.ts` gets a new `apply` tool. Same args envelope shape as `query_recipe` (recipe id + params + format) plus `--apply` / `--dry-run` flags. Resource handlers untouched (apply is a tool, not a resource).
+3. **MCP/HTTP transport** — `application/tool-handlers.ts` gets a new `apply` tool. Same args envelope shape as `query_recipe` (recipe id + params + format) plus `dry_run` (preview, per Q1) and `yes` (non-interactive write gate, per Q6) keys. Apply-by-default mirrors the CLI; non-TTY transports always require `yes: true` because they have no prompt to fall back on. Resource handlers untouched (apply is a tool, not a resource).
 
 No schema delta. No new SQL primitives. The engine consumes the existing `query-engine.ts` `executeQuery` output.
 
