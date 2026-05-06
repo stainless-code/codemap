@@ -9,12 +9,18 @@
  * (Q1–Q10 locks, semantics, exit codes) at
  * [`docs/architecture.md`](../../docs/architecture.md) § Apply wiring.
  *
- * Three behaviours called out here because the code alone won't betray them:
+ * Four behaviours called out here because the code alone won't betray them:
  *
  * - **Same-line ambiguity.** `actual.replace(before, after)` is first-
  *   occurrence — mirrors `buildDiffJson` verbatim. `const foo = foo();`
  *   with `before = "foo"` rewrites only the leftmost; recipe authors
  *   normalise their SQL or accept the formatter-parity behaviour.
+ * - **Phase-2 I/O failures are NOT transactional across files.** Q2 (c)
+ *   guarantees no partial state when phase 1 collects a conflict — phase 2
+ *   doesn't run. But once phase 2 starts, a `writeFileSync` / `renameSync`
+ *   crash on file N leaves files `1..N-1` already renamed with no rollback.
+ *   Per-file atomicity (temp + rename) is preserved; cross-file rollback
+ *   would require pre-write backups + a restore loop and is deferred.
  * - **TOCTOU.** Phase-1 caches the source it validated; phase-2 transforms
  *   the cache and writes. The read→rename window is a v1 simplification
  *   (apply isn't adversarial; no lock files).
@@ -126,7 +132,10 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     const filePath = readString(row, "file_path");
     const lineStart = readPositiveInt(row, "line_start");
     const before = readString(row, "before_pattern");
-    const after = readString(row, "after_pattern");
+    // `after_pattern: ""` is the deletion case — `actual.replace(before, "")`
+    // strips the leftmost match. Empty `before_pattern` stays disallowed
+    // (would match anywhere on the line, including the start).
+    const after = readStringAllowEmpty(row, "after_pattern");
     if (
       filePath === undefined ||
       lineStart === undefined ||
@@ -150,13 +159,19 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
       continue;
     }
 
-    let source = sourceCache.get(filePath);
+    // Canonicalise to a single key so `a.ts`, `./a.ts`, and `src/../a.ts`
+    // all dedup into the same cache + pending entry. Without this, two
+    // rows naming the same disk file via different spellings would race in
+    // phase 2 — second writeFileSync clobbers the first edit.
+    const canonicalPath = canonicalizeFilePath(resolvedRoot, filePath);
+
+    let source = sourceCache.get(canonicalPath);
     if (source === undefined) {
       try {
-        source = readFileSync(resolve(resolvedRoot, filePath), "utf8");
+        source = readFileSync(resolve(resolvedRoot, canonicalPath), "utf8");
       } catch {
         conflicts.push({
-          file_path: filePath,
+          file_path: canonicalPath,
           line_start: lineStart,
           before_pattern: before,
           actual_at_line: "",
@@ -164,7 +179,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
         });
         continue;
       }
-      sourceCache.set(filePath, source);
+      sourceCache.set(canonicalPath, source);
     }
     // Phase-1 splits on `/\r?\n/` so `actual_at_line` is `\r`-free; phase-2
     // re-splits on raw `\n` for round-trip-safe writes (module docstring § EOL).
@@ -172,7 +187,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     const actual = lines[lineStart - 1];
     if (actual === undefined) {
       conflicts.push({
-        file_path: filePath,
+        file_path: canonicalPath,
         line_start: lineStart,
         before_pattern: before,
         actual_at_line: "",
@@ -182,7 +197,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
     if (!actual.includes(before)) {
       conflicts.push({
-        file_path: filePath,
+        file_path: canonicalPath,
         line_start: lineStart,
         before_pattern: before,
         actual_at_line: actual,
@@ -193,10 +208,10 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
 
     // Reject the second-and-subsequent rows targeting one line — see
     // `seenLines` declaration for the Q2 (c) violation this guards.
-    const seen = seenLines.get(filePath);
+    const seen = seenLines.get(canonicalPath);
     if (seen !== undefined && seen.has(lineStart)) {
       conflicts.push({
-        file_path: filePath,
+        file_path: canonicalPath,
         line_start: lineStart,
         before_pattern: before,
         actual_at_line: actual,
@@ -205,14 +220,14 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
       continue;
     }
     if (seen === undefined) {
-      seenLines.set(filePath, new Set([lineStart]));
+      seenLines.set(canonicalPath, new Set([lineStart]));
     } else {
       seen.add(lineStart);
     }
 
-    const edits = pending.get(filePath);
+    const edits = pending.get(canonicalPath);
     if (edits === undefined) {
-      pending.set(filePath, [
+      pending.set(canonicalPath, [
         { line_start: lineStart, before_pattern: before, after_pattern: after },
       ]);
     } else {
@@ -228,7 +243,14 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   const distinctInputFiles = new Set<string>();
   for (const row of rows) {
     const filePath = readString(row, "file_path");
-    if (filePath !== undefined) distinctInputFiles.add(filePath);
+    if (filePath === undefined) continue;
+    // Count distinct disk targets, not distinct spellings — same as the
+    // dedup applied to the cache + pending keys.
+    if (isAbsolute(filePath) || !isWithinRoot(resolvedRoot, filePath)) {
+      distinctInputFiles.add(filePath);
+    } else {
+      distinctInputFiles.add(canonicalizeFilePath(resolvedRoot, filePath));
+    }
   }
 
   // Q2 (c) — any conflict aborts the run; dry-run never writes. Same Q5 envelope.
@@ -318,6 +340,15 @@ function readString(
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+/** Like {@link readString} but admits `""` — used for `after_pattern` (deletion). */
+function readStringAllowEmpty(
+  row: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = row[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 function readPositiveInt(
   row: Record<string, unknown>,
   key: string,
@@ -334,4 +365,17 @@ function isWithinRoot(resolvedRoot: string, candidate: string): boolean {
   if (resolved === resolvedRoot) return true;
   const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
   return resolved.startsWith(prefix);
+}
+
+/**
+ * Canonical project-relative form for the `pending` / `sourceCache` /
+ * `seenLines` keys. `a.ts`, `./a.ts`, `src/../a.ts` all collapse to `a.ts`.
+ * Caller has already verified `isWithinRoot(resolvedRoot, candidate)` so
+ * the result is guaranteed in-tree.
+ */
+function canonicalizeFilePath(resolvedRoot: string, candidate: string): string {
+  const absolute = resolve(resolvedRoot, candidate);
+  if (absolute === resolvedRoot) return "";
+  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
+  return absolute.slice(prefix.length);
 }

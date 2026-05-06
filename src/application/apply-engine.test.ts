@@ -644,6 +644,83 @@ describe("applyDiffPayload", () => {
       expect(readSource(root, "a.ts")).toBe(aBefore);
       expect(readSource(root, "b.ts")).toBe(bBefore);
     });
+
+    it("dedups `a.ts` and `./a.ts` to the same canonical key", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "X",
+          },
+          // Same disk file via a different spelling — pre-fix this evaded
+          // the overlap guard and racing writes clobbered each other.
+          {
+            file_path: "./a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "Y",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.conflicts[0]?.reason).toBe("duplicate edit on same line");
+      expect(readSource(root, "a.ts")).toBe("const foo = 1;\n");
+    });
+  });
+
+  describe("after_pattern allows empty string (deletion)", () => {
+    it("deletes the leftmost match of `before_pattern` when `after_pattern` is empty", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "// FIXME(team): this comment\nconst x = 1;\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "FIXME(team): ",
+            after_pattern: "",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(true);
+      expect(result.summary.rows_applied).toBe(1);
+      expect(readSource(root, "a.ts")).toBe("// this comment\nconst x = 1;\n");
+    });
+
+    it("still rejects a row with empty `before_pattern`", () => {
+      // Empty `before_pattern` would match anywhere on the line — a row
+      // with `before: ""` is malformed, not a deletion intent.
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "",
+            after_pattern: "anything",
+          },
+        ],
+        projectRoot: root,
+        dryRun: true,
+      });
+
+      expect(result.summary.rows).toBe(0); // row silently dropped
+      expect(result.files).toEqual([]);
+    });
   });
 
   describe("same-line ambiguity (F3 — documented limitation)", () => {

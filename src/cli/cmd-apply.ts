@@ -193,10 +193,14 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
     }
 
     const projectRoot = getProjectRoot();
-    const isTTY = process.stdout.isTTY === true;
+    // Gate on the streams the prompt actually uses (stdin for input,
+    // stderr for output) — `process.stdout` may be a pipe even in
+    // interactive sessions (`codemap apply foo | tee log.txt`).
+    const canPrompt =
+      process.stdin.isTTY === true && process.stderr.isTTY === true;
 
     // Q6 (a): non-TTY without --yes / --dry-run is rejected.
-    if (!isTTY && !opts.yes && !opts.dryRun) {
+    if (!canPrompt && !opts.yes && !opts.dryRun) {
       emitError(
         `codemap apply: this verb writes files. Pass --yes for non-interactive runs, or --dry-run for preview.`,
         opts.json,
@@ -230,8 +234,17 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
     printPromptSummary(preview, opts.recipeId, rows);
     const proceed = await promptYesNo();
     if (!proceed) {
-      console.error("apply: aborted by user.");
-      emitResult(preview, opts);
+      // Don't fall through to `emitResult` in terminal mode — the dry-run
+      // envelope's `applied: false` would render as "no rows applicable",
+      // which contradicts the user's explicit cancellation. JSON consumers
+      // still get the full preview envelope.
+      if (opts.json) {
+        emitResult(preview, opts);
+      } else {
+        console.log(
+          `apply ${opts.recipeId}: aborted by user; no files written.`,
+        );
+      }
       return;
     }
 
