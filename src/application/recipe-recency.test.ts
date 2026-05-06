@@ -204,7 +204,7 @@ describe("loadRecipeRecency", () => {
     }
   });
 
-  it("prunes rows older than 90 days before returning (lazy prune per Q3)", () => {
+  it("prunes rows older than 90 days before returning (lazy prune)", () => {
     const db = openDb();
     try {
       const now = 100 * 24 * 60 * 60 * 1000;
@@ -225,7 +225,7 @@ describe("loadRecipeRecency", () => {
   });
 });
 
-describe("tryRecordRecipeRun — failure isolation (L.8 / Q10)", () => {
+describe("tryRecordRecipeRun — failure isolation", () => {
   it("swallows openDb failures and emits a stderr warning", () => {
     const warnings: string[] = [];
     const origWarn = console.warn;
@@ -285,14 +285,11 @@ describe("tryRecordRecipeRun — failure isolation (L.8 / Q10)", () => {
   });
 });
 
-describe("tryRecordRecipeRun — Slice 4 opt-out (recipe_recency: false)", () => {
+describe("tryRecordRecipeRun — opt-out (recipe_recency: false)", () => {
   it("short-circuits the upsert when recipe_recency: false", () => {
-    // Re-init runtime with opt-out config — overrides the beforeEach
-    // default (recipeRecency: true) for this test only.
     initCodemap(resolveCodemapConfig(projectRoot, { recipe_recency: false }));
 
-    // Inject a thrower as openDb factory; if the short-circuit works,
-    // it should NEVER fire (we exit before openDb).
+    // Thrower factory — fires only if the short-circuit fails.
     let openDbCalled = false;
     tryRecordRecipeRun("opt-out-recipe", {
       _openDb: () => {
@@ -302,10 +299,8 @@ describe("tryRecordRecipeRun — Slice 4 opt-out (recipe_recency: false)", () =>
     });
     expect(openDbCalled).toBe(false);
 
-    // Re-init with default (true) so afterEach cleanup works.
     initCodemap(resolveCodemapConfig(projectRoot, undefined));
 
-    // Verify table is empty — no row was written.
     const db = openDb();
     try {
       const rows = db

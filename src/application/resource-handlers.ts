@@ -25,15 +25,11 @@ export interface ResourcePayload {
   text: string;
 }
 
-// Slice 3 (recipe-recency): the recipes catalog used to lazy-cache its
-// JSON.stringify result for the server-process lifetime. With recency
-// fields injected inline (Q5 Resolution), a cached snapshot would freeze
-// `last_run_at` / `run_count` at first-read forever per `codemap mcp` /
-// `codemap serve` lifetime. The recipes / one-recipe caches were dropped
-// — the underlying `listQueryRecipeCatalog()` / `getQueryRecipeCatalogEntry()`
-// are themselves module-cached upstream (in `query-recipes.ts`), so the
-// extra cost is one DB-read + one JSON.stringify per call. Schema / skill
-// stay cached — neither changes mid-session.
+// Recipes / one-recipe deliberately NOT cached — inline recency fields
+// (last_run_at / run_count) need to reflect mutations during the
+// `codemap mcp` / `codemap serve` lifetime; a cached snapshot would
+// freeze them at first-read. Schema / skill stay cached — neither
+// changes mid-session.
 let schemaCache: ResourcePayload | undefined;
 let skillCache: ResourcePayload | undefined;
 
@@ -116,8 +112,6 @@ export function listResources(): { uri: string; description: string }[] {
 }
 
 function readRecipesCatalog(): ResourcePayload {
-  // Live read every call (no cache) so recency reflects the current
-  // session — see the cache-removal comment near the cache declarations.
   return {
     mimeType: "application/json",
     text: JSON.stringify(enrichWithRecency(listQueryRecipeCatalog())),
@@ -127,8 +121,6 @@ function readRecipesCatalog(): ResourcePayload {
 function readOneRecipe(id: string): ResourcePayload | undefined {
   const entry = getQueryRecipeCatalogEntry(id);
   if (entry === undefined) return undefined;
-  // `enrichWithRecency` operates on a list; wrap the single entry,
-  // pull its enriched form back out.
   const [enriched] = enrichWithRecency([entry]);
   return {
     mimeType: "application/json",

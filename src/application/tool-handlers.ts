@@ -291,9 +291,7 @@ export function handleQueryRecipe(
         format: args.format,
         root,
       });
-      // Record recency only on successful execution (Q9). Failure-isolated
-      // by tryRecordRecipeRun (L.8 + Q10) — recency-write errors never
-      // block the response.
+      // Successful runs only; failure-isolated inside the helper.
       if (result.ok) tryRecordRecipeRun(args.recipe);
       return result;
     }

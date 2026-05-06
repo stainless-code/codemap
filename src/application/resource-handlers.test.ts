@@ -130,7 +130,7 @@ describe("listResources", () => {
   });
 });
 
-describe("readResource — codemap://recipes (Slice 3 recency inline)", () => {
+describe("readResource — codemap://recipes (recency inline)", () => {
   it("includes last_run_at + run_count fields on every entry", () => {
     const r = readResource("codemap://recipes");
     expect(r).toBeDefined();
@@ -149,10 +149,8 @@ describe("readResource — codemap://recipes (Slice 3 recency inline)", () => {
   });
 
   it("populates real recency for recipes that have been run", () => {
-    // Use a fresh timestamp — loadRecipeRecency lazily prunes anything
-    // older than 90 days (Q3 Resolution). Seed recipe_recency directly;
-    // bypasses the runtime singleton's bootstrap (already initialised
-    // by beforeEach).
+    // Fresh timestamp — `loadRecipeRecency` lazily prunes anything older
+    // than 90 days, so a fixed past `ts` would race-delete on slow runs.
     const ts = Date.now();
     const db = openDb();
     try {
@@ -206,7 +204,7 @@ describe("readResource — codemap://recipes (Slice 3 recency inline)", () => {
   });
 });
 
-describe("readResource — codemap://recipes/{id} (Slice 3 recency inline)", () => {
+describe("readResource — codemap://recipes/{id} (recency inline)", () => {
   it("returns entry with last_run_at + run_count fields", () => {
     const ts = Date.now();
     const db = openDb();

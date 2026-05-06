@@ -394,7 +394,7 @@ Tracks `last_run_at` (epoch ms) + `run_count` per recipe id so agent hosts can r
 
 Two write sites both call `recordRecipeRun` from `application/recipe-recency.ts`: `handleQueryRecipe` in `application/tool-handlers.ts` (covers MCP + HTTP — both flow through it) and `runQueryCmd` in `cli/cmd-query.ts` (CLI — finally-block observes `process.exitCode` as the unified success signal). Counts only successful runs; recency-write failures are swallowed with a stderr `[recency] write failed: <reason>` warning so they NEVER block the recipe response. The 90-day rolling window is enforced lazily on `--recipes-json` reads (no DELETE on the write path).
 
-Default ON; opt-out via `.codemap/config` `recipe_recency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row per Q4 of the recipe-recency plan).
+Default ON; opt-out via `.codemap/config` `recipe_recency: false` (short-circuits before any DB write — no rows ever land). `recipe_id` is loose — matches bundled or project-recipe ids (no `recipes` SQLite table to FK against; project-shadow rows share the bundled row, since only one version is ever reachable per id).
 
 | Column      | Type    | Description                                                                              |
 | ----------- | ------- | ---------------------------------------------------------------------------------------- |

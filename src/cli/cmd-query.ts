@@ -610,20 +610,11 @@ function formatIncompatibility(
 }
 
 /**
- * Print the bundled recipe catalog as JSON to stdout.
- *
- * Each entry gains `last_run_at: number | null` and `run_count: number`
- * (Slice 3, Q5 Resolution — inline per-entry fields, not a separate
- * `recency:` map). Live read every call (CLI is one-shot).
- *
- * **No bootstrap, no side effects.** This verb runs before
- * `bootstrapCodemap()` in `cli/main.ts` (the catalog has historically been
- * "no DB required" so agents can discover recipes pre-index). To preserve
- * that posture while still surfacing recency when an indexed DB exists,
- * the path-based `openCodemapDatabase(<path>)` factory is used directly —
- * `initCodemap()` is NOT called. If the resolved DB path doesn't exist
- * (never-indexed project), enrichment falls through to `null` / `0`
- * fallbacks; if it exists, real recency lands inline.
+ * Print the bundled recipe catalog as JSON to stdout. Each entry carries
+ * `last_run_at` + `run_count` recency fields when an indexed DB exists,
+ * else null/0 fallbacks. The verb runs before `bootstrapCodemap()` (the
+ * catalog has historically been "no DB required") — keep it side-effect
+ * free by using a path-based opener instead of `initCodemap()`.
  */
 export function printRecipesCatalogJson(opts?: {
   root?: string;
@@ -638,9 +629,9 @@ export function printRecipesCatalogJson(opts?: {
             root,
             stateDir: opts?.stateDir,
           });
+          // Throw on never-indexed; enrichWithRecency catches and falls
+          // back to null/0 entries (no .codemap dir gets created).
           if (!existsSync(dbPath)) {
-            // Never-indexed project — let enrichWithRecency catch the
-            // throw and fall back to null/0 entries.
             throw new Error(`recipe-recency: no DB at ${dbPath}`);
           }
           return openCodemapDatabase(dbPath);
@@ -917,12 +908,9 @@ export async function runQueryCmd(opts: {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, structuredErrors);
   } finally {
-    // Slice 2: record recipe recency on the CLI write site (Q2 / L.2).
-    // `process.exitCode` is the unified success signal — every failure path
-    // (`emitErrorMaybeJson`, `printQueryResult` non-zero, etc.) sets it to 1
-    // before its early `return`, so this finally observes the verdict
-    // regardless of which branch fired. Q9: success only. L.8 / Q10:
-    // failure-isolated inside `tryRecordRecipeRun`.
+    // CLI recency write site. `process.exitCode` is the unified success
+    // signal — every failure path sets it to 1 before its early return, so
+    // this finally observes the verdict regardless of which branch fired.
     if (opts.recipeId !== undefined && process.exitCode !== 1) {
       tryRecordRecipeRun(opts.recipeId);
     }

@@ -6,10 +6,9 @@ import { getRecipeRecencyEnabled } from "../runtime";
 import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
- * One row of the `recipe_recency` table. The shape is intentionally minimal
- * — `first_run_at` / `source` / `errored_run_count` were rejected for v1
- * (additive promotion path if a real consumer asks). See
- * [`docs/architecture.md` § `recipe_recency`](../../docs/architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid).
+ * One row of the `recipe_recency` table. See [`docs/architecture.md` §
+ * `recipe_recency`](../../docs/architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid)
+ * for the lifecycle and rejected-column rationale.
  */
 export interface RecipeRecencyRow {
   recipe_id: string;
@@ -17,11 +16,7 @@ export interface RecipeRecencyRow {
   run_count: number;
 }
 
-/**
- * 90-day rolling retention window. Exposed for tests; production call sites
- * should use the `cutoffMs` argument on `pruneRecipeRecency` so the boundary
- * is testable without freezing time.
- */
+/** 90-day rolling retention window. Tests inject `cutoffMs` directly. */
 export const RECENCY_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
 interface RecordRunOpts {
@@ -32,16 +27,9 @@ interface RecordRunOpts {
 }
 
 /**
- * Write site for both transports (plan Q2 / L.2): `handleQueryRecipe` in
- * `tool-handlers.ts` (covers MCP + HTTP) and `runQueryCmd` in `cmd-query.ts`
- * (covers CLI). Pure upsert — Q3 locks pruning to the read path so the
- * recipe-execution hot path stays cheap.
- *
- * Counts only successful runs (Q9): callers wrap this in a `try/catch`
- * AFTER the recipe execution returns successfully, so any throw exits before
- * we reach this site. The `try/catch` itself is for L.8 failure isolation —
- * a recency-write failure (DB locked, disk full, schema drift) must NEVER
- * block the recipe response.
+ * Pure upsert — pruning lives on the read path so the recipe-execution
+ * hot path stays cheap. Caller is `tryRecordRecipeRun` (which guards the
+ * "successful run only" contract).
  */
 export function recordRecipeRun(opts: RecordRunOpts): void {
   const { db, recipeId } = opts;
@@ -57,38 +45,27 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
 }
 
 /**
- * Slice 2 wrapper for the two write sites (`handleQueryRecipe` +
- * `runQueryCmd`). Opens its own DB connection because `executeQuery` runs
+ * The wrapper both write sites call (`handleQueryRecipe` for MCP/HTTP +
+ * `runQueryCmd` for CLI). Opens its own DB because `executeQuery` runs
  * with `PRAGMA query_only = 1` and can't double as the writer. Swallows
- * every error (L.8 + Q10) — recency-write failures NEVER block the recipe
- * response. Warning-on-stderr unless `quiet`.
+ * every error — recency-write failures NEVER block the recipe response.
  *
- * Caller responsibility: only call AFTER the recipe execution returns
- * successfully (Q9 — count successful runs only).
+ * Caller contract: only call AFTER recipe execution returns successfully.
  *
- * Slice 4 short-circuit: when `.codemap/config` `recipe_recency: false`,
- * skip the openDb/upsert entirely so no rows ever land. Cleanest opt-out
- * — not "ignore the data after writing it." `getRecipeRecencyEnabled()`
- * itself throws when codemap isn't initialised (e.g. CLI smoke paths
- * before `bootstrapCodemap()`); the outer try/catch swallows that the
- * same way as a real DB failure, so the L.8 contract holds either way.
- *
- * `_openDb` is a test seam — production callers omit it; the failure-mode
- * test injects a thrower to confirm the swallow / warn path.
+ * `_openDb` is a test seam — production omits it.
  */
 export function tryRecordRecipeRun(
   recipeId: string,
   opts?: { quiet?: boolean; _openDb?: () => CodemapDatabase },
 ): void {
-  // Short-circuit before any DB interaction when disabled. Wrapped in
-  // try/catch because getRecipeRecencyEnabled() throws when the runtime
-  // singleton isn't initialised (the wrapper still catches it below;
-  // we just want to bail BEFORE openDb when we can read the toggle).
+  // Bail before openDb when opt-out config is set. The toggle-getter
+  // throws when the runtime isn't initialised (CLI smoke paths before
+  // bootstrap); the outer try/catch swallows that, so behaviour stays
+  // identical to a real DB failure.
   try {
     if (!getRecipeRecencyEnabled()) return;
   } catch {
-    // Runtime not initialised — fall through to the openDb path; if
-    // openDb also fails, the outer try/catch swallows.
+    // Runtime not initialised — let the openDb path try.
   }
   let db: CodemapDatabase | undefined;
   try {
@@ -116,12 +93,7 @@ interface PruneOpts {
   cutoffMs: number;
 }
 
-/**
- * Lazy prune (Q3 resolution): called from `loadRecipeRecency` before its
- * SELECT, NOT from `recordRecipeRun`. Keeps the write path a pure upsert
- * and concentrates the staleness signal at read time, where consumers
- * actually observe it.
- */
+/** Lazy prune — called from `loadRecipeRecency` so writes stay pure upserts. */
 export function pruneRecipeRecency(opts: PruneOpts): void {
   const { db, cutoffMs } = opts;
   db.run("DELETE FROM recipe_recency WHERE last_run_at < ?", [cutoffMs]);
@@ -134,10 +106,9 @@ interface LoadOpts {
 }
 
 /**
- * Read path consumed by Slice 3 (`--recipes-json` inline join, MCP
- * `codemap://recipes` resource, HTTP mirror). Returns a Map keyed by
- * `recipe_id` so the catalog renderer can `map.get(entry.id) ?? null`
- * for never-run recipes. Runs the lazy prune before the SELECT (Q3).
+ * Read path for `--recipes-json` + `codemap://recipes` resources. Lazy-prunes
+ * before the SELECT; returns a Map keyed by `recipe_id` so the catalog
+ * renderer can `map.get(entry.id) ?? null` for never-run recipes.
  */
 export function loadRecipeRecency(
   opts: LoadOpts,
@@ -161,11 +132,8 @@ export function loadRecipeRecency(
 }
 
 /**
- * Inline-join shape for `--recipes-json` and the matching MCP resources
- * (Q5 Resolution: per-entry inline fields, not a separate top-level
- * `recency:` map). `last_run_at: null` / `run_count: 0` for recipes
- * never executed; consumers filter with `select(.last_run_at != null)`
- * or treat null as fresh.
+ * Per-entry shape inlined onto every `--recipes-json` row. `null` /
+ * `0` for recipes never executed.
  */
 export interface RecipeRecencyFields {
   last_run_at: number | null;
@@ -173,15 +141,10 @@ export interface RecipeRecencyFields {
 }
 
 /**
- * Resolve the absolute path to `<state-dir>/index.db` from the same
- * inputs the CLI's `bootstrap-codemap` would use, WITHOUT mutating the
- * global runtime singleton. Slice 3's `--recipes-json` flow runs before
- * `initCodemap()` (the catalog has historically been "no DB required"),
- * so the path-resolver lets us read recency without taking on the
- * config / state-dir reconciliation side effects.
- *
- * Mirrors `application/state-dir.ts` `resolveStateDir` precedence:
- * `cliFlag > env > default`.
+ * Resolve `<state-dir>/index.db` from CLI inputs without mutating the
+ * runtime singleton — `--recipes-json` runs before `initCodemap()` and
+ * must stay zero-side-effect. Mirrors `resolveStateDir` precedence
+ * (`cliFlag > env > default`).
  */
 export function resolveRecencyDbPath(opts: {
   root: string;
@@ -194,17 +157,14 @@ export function resolveRecencyDbPath(opts: {
 }
 
 /**
- * Slice 3 read-side enricher. Opens its own DB to read recency live —
- * NEVER cached on the MCP/HTTP transports because the catalog resource
- * runs inside long-lived `codemap mcp` / `codemap serve` sessions; a
- * cached snapshot would freeze recency at first-read forever per server
- * lifetime.
+ * Read-side enricher for `--recipes-json` + the matching MCP/HTTP catalog
+ * resources. Live every call — caching at this layer would freeze recency
+ * at first-read for the lifetime of `codemap mcp` / `codemap serve`.
  *
- * Failure-isolated like {@link tryRecordRecipeRun} — a DB-open failure
- * returns the input entries enriched with `null` / `0` fallbacks, never
- * throws. The optional `openDb` factory lets callers without an
- * `initCodemap()` runtime (e.g. CLI `--recipes-json` before bootstrap)
- * supply a path-based opener; the test seam reuses the same hook.
+ * Failure-isolated like {@link tryRecordRecipeRun}: any DB-open / read
+ * failure returns entries with `null` / `0` fallbacks. The optional
+ * `openDb` factory is for callers without an `initCodemap()` runtime
+ * (CLI `--recipes-json` before bootstrap supplies a path-based opener).
  */
 export function enrichWithRecency<T extends { id: string }>(
   entries: ReadonlyArray<T>,
@@ -216,9 +176,7 @@ export function enrichWithRecency<T extends { id: string }>(
     db = (opts?.openDb ?? openDb)();
     map = loadRecipeRecency({ db });
   } catch {
-    // Same posture as tryRecordRecipeRun (L.8) — recency errors NEVER
-    // block the catalog response. Caller gets entries with null/0
-    // fallbacks; the `--recipes-json` shape stays stable.
+    // Recency errors NEVER block the catalog — null/0 fallbacks below.
     map = undefined;
   } finally {
     if (db !== undefined) {
