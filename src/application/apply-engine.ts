@@ -6,9 +6,24 @@
  *
  * Phase 1 validates every row against current disk state; phase 2 (gated on
  * `!dryRun && conflicts.length === 0`) writes each modified file via temp +
- * rename for crash-safe per-file atomicity. See
- * [`docs/plans/codemap-apply.md`](../../docs/plans/codemap-apply.md) for the
- * full design (Q1–Q10 locked).
+ * rename for crash-safe per-file atomicity. Full design (Q1–Q10 locks)
+ * lives in [`docs/architecture.md`](../../docs/architecture.md) under the
+ * Apply wiring subsection.
+ *
+ * Path-containment guard: every `file_path` is resolved against
+ * `projectRoot` (no `realpath` — `resolve` normalises `..` segments) and
+ * rejected via a `"path escapes project root"` conflict if the result lands
+ * outside the root. Absolute `file_path` inputs are also rejected — the row
+ * contract is project-relative.
+ *
+ * Same-line ambiguity caveat: phase-2 uses
+ * `actual.replace(before_pattern, after_pattern)` — first-occurrence only.
+ * This mirrors `buildDiffJson`'s formatter contract verbatim. When a line
+ * contains the pattern more than once (e.g. `const foo = foo();` with
+ * `before = "foo"`) only the leftmost occurrence is rewritten; the call
+ * site is left intact and `applied: true` is reported. Recipe authors
+ * either accept this (the formatter preview shows the same shape) or
+ * normalise their SQL to emit a more specific pattern.
  *
  * TOCTOU note: phase-1 caches the source it validated; phase-2 transforms
  * the cached source and writes the result. The window between read and
@@ -23,7 +38,7 @@
 
 import { randomBytes } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, resolve, sep } from "node:path";
 
 /** Required input columns on every recipe row. */
 export interface ApplyInputRow extends Record<string, unknown> {
@@ -67,7 +82,9 @@ export interface ConflictRow {
 export type ConflictReason =
   | "file missing"
   | "line out of range"
-  | "line content drifted";
+  | "line content drifted"
+  | "path escapes project root"
+  | "duplicate edit on same line";
 
 /** Q5 envelope shape — single shape across `dry-run` and `apply` modes. */
 export interface ApplyJsonPayload {
@@ -109,6 +126,15 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   const pending = new Map<string, PendingEdit[]>();
   // Phase-1 reads each file at most once; phase 2 reuses the cached source.
   const sourceCache = new Map<string, string>();
+  // Resolve the project root once so the path-containment check uses
+  // a canonicalised prefix. `resolve` normalises trailing `/` and `.`
+  // segments without dereferencing symlinks (matching the candidate's
+  // resolution semantics — no false positives for symlinked roots).
+  const resolvedRoot = resolve(projectRoot);
+  // Per-file set of line_starts already seen in the row stream — used
+  // to fire the "duplicate edit on same line" conflict before phase 2
+  // could throw the cross-file partial-write that drops Q2 (c).
+  const seenLines = new Map<string, Set<number>>();
   let validRows = 0;
 
   for (const row of rows) {
@@ -126,10 +152,25 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
     validRows++;
 
+    // Path-containment guard: reject absolute paths and any candidate
+    // whose resolved form lands outside `resolvedRoot`. Without this the
+    // engine would happily honour `file_path: "../escape.ts"` and write
+    // sibling-of-root files (CLI + MCP + HTTP all share this engine).
+    if (isAbsolute(filePath) || !isWithinRoot(resolvedRoot, filePath)) {
+      conflicts.push({
+        file_path: filePath,
+        line_start: lineStart,
+        before_pattern: before,
+        actual_at_line: "",
+        reason: "path escapes project root",
+      });
+      continue;
+    }
+
     let source = sourceCache.get(filePath);
     if (source === undefined) {
       try {
-        source = readFileSync(join(projectRoot, filePath), "utf8");
+        source = readFileSync(resolve(resolvedRoot, filePath), "utf8");
       } catch {
         conflicts.push({
           file_path: filePath,
@@ -166,6 +207,30 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
         reason: "line content drifted",
       });
       continue;
+    }
+
+    // Overlap detection — one (file_path, line_start) tuple may have at
+    // most one row. Without this guard, two rows on the same line both
+    // pass phase-1's substring check (validated against original source);
+    // phase-2 then applies the first replace, the second's invariant
+    // assertion fails, the function throws AFTER earlier files in
+    // alphabetical order have already been renamed — partial cross-file
+    // state, no envelope returned.
+    const seen = seenLines.get(filePath);
+    if (seen !== undefined && seen.has(lineStart)) {
+      conflicts.push({
+        file_path: filePath,
+        line_start: lineStart,
+        before_pattern: before,
+        actual_at_line: actual,
+        reason: "duplicate edit on same line",
+      });
+      continue;
+    }
+    if (seen === undefined) {
+      seenLines.set(filePath, new Set([lineStart]));
+    } else {
+      seen.add(lineStart);
     }
 
     const edits = pending.get(filePath);
@@ -248,7 +313,10 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
 
     const newContent = fileLines.join("\n");
-    const absPath = join(projectRoot, filePath);
+    // `resolvedRoot` is captured from the closure — phase-1 already
+    // verified the candidate is inside it, so this `resolve` collapses
+    // back to the same in-root absolute path.
+    const absPath = resolve(resolvedRoot, filePath);
     // Sibling temp + `rename`: POSIX-atomic when source and destination
     // share a filesystem (always true for siblings). A concurrent reader
     // sees either the pre-rename or post-rename content — never a torn
@@ -293,4 +361,17 @@ function readPositiveInt(
   return Number.isInteger(value) && typeof value === "number" && value > 0
     ? value
     : undefined;
+}
+
+/**
+ * `true` iff the resolved candidate lands inside `resolvedRoot` (or is
+ * the root itself). Both sides go through the same `resolve` semantics —
+ * no `realpath` / symlink dereference — so a project root that lives
+ * behind a symlink doesn't false-positive on its own descendants.
+ */
+function isWithinRoot(resolvedRoot: string, candidate: string): boolean {
+  const resolved = resolve(resolvedRoot, candidate);
+  if (resolved === resolvedRoot) return true;
+  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
+  return resolved.startsWith(prefix);
 }

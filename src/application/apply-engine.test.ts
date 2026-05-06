@@ -522,6 +522,163 @@ describe("applyDiffPayload", () => {
     });
   });
 
+  describe("path-containment guard (F1 — triangulated review 2026-05-06)", () => {
+    it("rejects `..`-traversal and never writes outside the project root", () => {
+      const root = tmpProject();
+      writeSource(root, "in.ts", "const foo = 1;\n");
+      // Sibling-of-root file the malicious row would otherwise hit.
+      const outsidePath = join(root, "..", "outside.ts");
+      writeFileSync(outsidePath, "const foo = 1;\n", "utf8");
+      const before = readFileSync(outsidePath, "utf8");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "../outside.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "PWNED",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.conflicts).toEqual([
+        {
+          file_path: "../outside.ts",
+          line_start: 1,
+          before_pattern: "foo",
+          actual_at_line: "",
+          reason: "path escapes project root",
+        },
+      ]);
+      expect(readFileSync(outsidePath, "utf8")).toBe(before);
+    });
+
+    it("rejects absolute file_path inputs", () => {
+      const root = tmpProject();
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "/etc/passwd",
+            line_start: 1,
+            before_pattern: "root",
+            after_pattern: "X",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.conflicts[0]).toMatchObject({
+        reason: "path escapes project root",
+      });
+    });
+
+    it("rejects nested traversal that resolves outside the root", () => {
+      const root = tmpProject();
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "src/../../sibling.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "X",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.conflicts[0]?.reason).toBe("path escapes project root");
+    });
+  });
+
+  describe("overlap detection (F2 — triangulated review 2026-05-06)", () => {
+    it("emits a conflict on duplicate (file_path, line_start) and writes nothing", () => {
+      const root = tmpProject();
+      writeSource(root, "a.ts", "const foo = 1;\n");
+      writeSource(root, "b.ts", "const foo = 1;\n");
+      const aBefore = readSource(root, "a.ts");
+      const bBefore = readSource(root, "b.ts");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "a.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "AAA",
+          },
+          {
+            file_path: "b.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "BBB",
+          },
+          // Duplicate on b.ts:1 — pre-fix this triggered a phase-2 throw
+          // AFTER a.ts had already been renamed (Q2 (c) violation).
+          {
+            file_path: "b.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "CCC",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0]).toMatchObject({
+        file_path: "b.ts",
+        line_start: 1,
+        reason: "duplicate edit on same line",
+      });
+      // CRITICAL — neither file may have been touched; Q2 (c) holds.
+      expect(readSource(root, "a.ts")).toBe(aBefore);
+      expect(readSource(root, "b.ts")).toBe(bBefore);
+    });
+  });
+
+  describe("same-line ambiguity (F3 — documented limitation)", () => {
+    it("rewrites only the first occurrence on a line — matches buildDiffJson", () => {
+      // Recipe authors who hit this normalise their SQL to emit a more
+      // specific pattern. Documented in the engine docstring + architecture.md
+      // Apply wiring caveat. This test pins the current behaviour so a
+      // future engine-level fix lands as a deliberate breaking change
+      // rather than silent drift.
+      const root = tmpProject();
+      writeSource(root, "x.ts", "const foo = foo();\n");
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "x.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(true);
+      expect(result.summary.rows_applied).toBe(1);
+      // Variable renamed; recursive call site untouched. Recipe author
+      // accepts this (formatter preview shows the same shape) or splits
+      // their SQL into a more specific pattern.
+      expect(readSource(root, "x.ts")).toBe("const bar = foo();\n");
+    });
+  });
+
   describe("failure modes", () => {
     it("propagates the writeFileSync error when the file is read-only (chmod 0o444)", () => {
       const root = tmpProject();
