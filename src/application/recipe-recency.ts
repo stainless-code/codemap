@@ -68,10 +68,8 @@ export function tryRecordRecipeRun(
   recipeId: string,
   opts?: { quiet?: boolean; _openDb?: () => CodemapDatabase },
 ): void {
-  // Bail before openDb when opt-out config is set. If the runtime
-  // singleton isn't initialised, the toggle-getter throws — bail too,
-  // since openDb (which depends on the same runtime) would fail
-  // anyway and emit a confusing `[recency] write failed` warning.
+  // Bail on opt-out, OR on uninitialised-runtime (the toggle-getter
+  // throws) — openDb shares the same runtime and would fail anyway.
   try {
     if (!getRecipeRecencyEnabled()) return;
   } catch {

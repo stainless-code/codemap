@@ -21,13 +21,8 @@ import {
 import { openCodemapDatabase } from "./sqlite-db";
 
 describe("createTables() DDL — Node split-on-`;` invariant", () => {
-  // Node uses better-sqlite3 (one statement per `prepare()`), so `runSql()`
-  // splits the multi-statement DDL on `;`. A `;` inside a `--` line comment
-  // creates a comment-only fragment that `prepare()` rejects with
-  // `RangeError: The supplied SQL string contains no statements`. Bun tests
-  // miss this because `bun:sqlite` accepts multi-statement SQL natively;
-  // the failure surfaces only when CI runs `node dist/index.mjs --full`.
-  // See `.agents/lessons.md` "Semicolons inside `--` line comments".
+  // `bun test` masks this regression class; see `.agents/lessons.md`
+  // "Semicolons inside `--` line comments in `db.ts` DDL strings".
   it("contains no comment-only fragments after split-on-`;`", () => {
     const src = readFileSync(join(import.meta.dir, "db.ts"), "utf-8");
     const match = src.match(/createTables[^`]*`([\s\S]+?)`/);
