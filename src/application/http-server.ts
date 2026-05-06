@@ -14,9 +14,11 @@ import {
 } from "../runtime";
 import { listResources, readResource } from "./resource-handlers";
 import {
+  applyArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
+  handleApply,
   handleAudit,
   handleContext,
   handleDropBaseline,
@@ -88,6 +90,7 @@ const TOOL_NAMES = [
   "show",
   "snippet",
   "impact",
+  "apply",
   "save_baseline",
   "list_baselines",
   "drop_baseline",
@@ -472,6 +475,12 @@ async function dispatchTool(
       const r = validate(impactArgsSchema, args, "impact");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleImpact(r.value);
+      break;
+    }
+    case "apply": {
+      const r = validate(applyArgsSchema, args, "apply");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleApply(r.value, opts.root);
       break;
     }
     case "save_baseline": {
