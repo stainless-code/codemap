@@ -200,7 +200,7 @@ export function createTables(db: CodemapDatabase) {
     -- --full and SCHEMA_VERSION rebuilds preserve user-activity history. The
     -- 90-day rolling window is enforced lazily by pruneRecipeRecency on read,
     -- not on write — keeps the recipe-execution hot path a pure upsert. recipe_id
-    -- is loose (matches bundled or project recipe ids; no FK to a recipes table
+    -- is loose (matches bundled or project recipe ids — no FK to a recipes table
     -- because there isn't one). See docs/architecture.md recipe_recency.
     CREATE TABLE IF NOT EXISTS recipe_recency (
       recipe_id   TEXT PRIMARY KEY,
