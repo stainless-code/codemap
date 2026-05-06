@@ -1,39 +1,26 @@
 /**
  * Pure transport-agnostic engine for `codemap apply <recipe-id>` — substrate-
- * shaped fix executor. Consumes the same `{file_path, line_start,
- * before_pattern, after_pattern}` row contract `buildDiffJson` emits and
- * either previews (dry-run) or applies the edits to disk.
+ * shaped fix executor over the `{file_path, line_start, before_pattern,
+ * after_pattern}` row contract `buildDiffJson` emits.
  *
- * Phase 1 validates every row against current disk state; phase 2 (gated on
- * `!dryRun && conflicts.length === 0`) writes each modified file via temp +
- * rename for crash-safe per-file atomicity. Full design (Q1–Q10 locks)
- * lives in [`docs/architecture.md`](../../docs/architecture.md) under the
- * Apply wiring subsection.
+ * Phase 1 validates every row against current disk; phase 2 (gated on
+ * `!dryRun && conflicts.length === 0`) writes each modified file via
+ * sibling temp + `rename` for crash-safe per-file atomicity. Full design
+ * (Q1–Q10 locks, semantics, exit codes) at
+ * [`docs/architecture.md`](../../docs/architecture.md) § Apply wiring.
  *
- * Path-containment guard: every `file_path` is resolved against
- * `projectRoot` (no `realpath` — `resolve` normalises `..` segments) and
- * rejected via a `"path escapes project root"` conflict if the result lands
- * outside the root. Absolute `file_path` inputs are also rejected — the row
- * contract is project-relative.
+ * Three behaviours called out here because the code alone won't betray them:
  *
- * Same-line ambiguity caveat: phase-2 uses
- * `actual.replace(before_pattern, after_pattern)` — first-occurrence only.
- * This mirrors `buildDiffJson`'s formatter contract verbatim. When a line
- * contains the pattern more than once (e.g. `const foo = foo();` with
- * `before = "foo"`) only the leftmost occurrence is rewritten; the call
- * site is left intact and `applied: true` is reported. Recipe authors
- * either accept this (the formatter preview shows the same shape) or
- * normalise their SQL to emit a more specific pattern.
- *
- * TOCTOU note: phase-1 caches the source it validated; phase-2 transforms
- * the cached source and writes the result. The window between read and
- * write is a deliberate v1 simplification (Q2) — apply isn't an adversarial
- * verb, so we don't add lock-file machinery.
- *
- * EOL note: phase-2 splits source on raw `"\n"` (NOT `/\r?\n/`) so CRLF
- * lines retain their trailing `\r` and round-trip when joined back with
- * `"\n"`. Patterns that include a literal `\r` are out of scope for v1;
- * recipe authors should target identifier-shaped patterns.
+ * - **Same-line ambiguity.** `actual.replace(before, after)` is first-
+ *   occurrence — mirrors `buildDiffJson` verbatim. `const foo = foo();`
+ *   with `before = "foo"` rewrites only the leftmost; recipe authors
+ *   normalise their SQL or accept the formatter-parity behaviour.
+ * - **TOCTOU.** Phase-1 caches the source it validated; phase-2 transforms
+ *   the cache and writes. The read→rename window is a v1 simplification
+ *   (apply isn't adversarial; no lock files).
+ * - **EOL.** Phase-2 splits on raw `"\n"` (NOT `/\r?\n/`) so CRLF lines
+ *   keep their trailing `\r` and round-trip on rejoin. Patterns containing
+ *   `\r` are out of scope for v1.
  */
 
 import { randomBytes } from "node:crypto";
@@ -126,14 +113,12 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   const pending = new Map<string, PendingEdit[]>();
   // Phase-1 reads each file at most once; phase 2 reuses the cached source.
   const sourceCache = new Map<string, string>();
-  // Resolve the project root once so the path-containment check uses
-  // a canonicalised prefix. `resolve` normalises trailing `/` and `.`
-  // segments without dereferencing symlinks (matching the candidate's
-  // resolution semantics — no false positives for symlinked roots).
+  // No `realpath` — same `resolve` semantics on both sides keep symlinked
+  // roots from false-positiving on their own descendants.
   const resolvedRoot = resolve(projectRoot);
-  // Per-file set of line_starts already seen in the row stream — used
-  // to fire the "duplicate edit on same line" conflict before phase 2
-  // could throw the cross-file partial-write that drops Q2 (c).
+  // Tracks `(file_path, line_start)` tuples already collected so the
+  // duplicate-edit conflict fires in phase 1 — without it the second row
+  // would split phase 2 mid-loop and leak Q2 (c) all-or-nothing.
   const seenLines = new Map<string, Set<number>>();
   let validRows = 0;
 
@@ -152,10 +137,8 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
     validRows++;
 
-    // Path-containment guard: reject absolute paths and any candidate
-    // whose resolved form lands outside `resolvedRoot`. Without this the
-    // engine would happily honour `file_path: "../escape.ts"` and write
-    // sibling-of-root files (CLI + MCP + HTTP all share this engine).
+    // Path-containment guard — without it `file_path: "../escape.ts"` would
+    // write sibling-of-root files (CLI + MCP + HTTP all share this engine).
     if (isAbsolute(filePath) || !isWithinRoot(resolvedRoot, filePath)) {
       conflicts.push({
         file_path: filePath,
@@ -183,9 +166,8 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
       }
       sourceCache.set(filePath, source);
     }
-    // Phase-1 splits on `/\r?\n/` so the `actual_at_line` reported in
-    // conflicts doesn't carry a stray `\r`. Phase-2 re-splits on raw `\n`
-    // for round-trip-safe writes (see EOL note in module docstring).
+    // Phase-1 splits on `/\r?\n/` so `actual_at_line` is `\r`-free; phase-2
+    // re-splits on raw `\n` for round-trip-safe writes (module docstring § EOL).
     const lines = source.split(/\r?\n/);
     const actual = lines[lineStart - 1];
     if (actual === undefined) {
@@ -209,13 +191,8 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
       continue;
     }
 
-    // Overlap detection — one (file_path, line_start) tuple may have at
-    // most one row. Without this guard, two rows on the same line both
-    // pass phase-1's substring check (validated against original source);
-    // phase-2 then applies the first replace, the second's invariant
-    // assertion fails, the function throws AFTER earlier files in
-    // alphabetical order have already been renamed — partial cross-file
-    // state, no envelope returned.
+    // Reject the second-and-subsequent rows targeting one line — see
+    // `seenLines` declaration for the Q2 (c) violation this guards.
     const seen = seenLines.get(filePath);
     if (seen !== undefined && seen.has(lineStart)) {
       conflicts.push({
@@ -254,8 +231,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     if (filePath !== undefined) distinctInputFiles.add(filePath);
   }
 
-  // Q2 (c) — any conflict aborts the whole run; dry-run never writes either.
-  // Both branches return the same envelope shape (Q5).
+  // Q2 (c) — any conflict aborts the run; dry-run never writes. Same Q5 envelope.
   if (dryRun || conflicts.length > 0) {
     const files: ApplyFile[] =
       conflicts.length === 0
@@ -280,32 +256,26 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     };
   }
 
-  // Phase 2 — apply edits per-file via temp + rename.
+  // Phase 2 — write each modified file via sibling temp + `rename`.
   const writtenFiles: ApplyFile[] = [];
   let appliedRows = 0;
   for (const filePath of [...pending.keys()].sort()) {
     const edits = pending.get(filePath)!;
     const cachedSource = sourceCache.get(filePath)!;
-    // Re-split the cached source on raw `"\n"` (not `/\r?\n/`) so CRLF
-    // lines retain their trailing `\r` and rejoin losslessly.
     const fileLines = cachedSource.split("\n");
-    // Apply edits in descending line order — defensive default for when
-    // multi-line transforms land (today every row is a single-line
-    // replacement so order doesn't actually matter).
+    // Descending order is a defensive default — single-line replacements
+    // are index-stable today, but multi-line transforms aren't.
     edits.sort((a, b) => b.line_start - a.line_start);
     for (const edit of edits) {
       const idx = edit.line_start - 1;
       const actual = fileLines[idx];
-      // The cached source was validated in phase 1; re-checking here guards
-      // against future regressions where the cache and validation drift.
       if (actual === undefined || !actual.includes(edit.before_pattern)) {
         throw new Error(
           `apply-engine: phase-2 invariant violated at ${filePath}:${edit.line_start} — phase-1 cache out of sync.`,
         );
       }
-      // Pre-escape `$` per `String.prototype.replace` GetSubstitution rule
-      // so identifiers like `$inject` round-trip safely (mirrors
-      // `buildDiffJson`).
+      // Pre-escape `$` per `String.prototype.replace` GetSubstitution so
+      // identifiers like `$inject` round-trip safely (mirrors `buildDiffJson`).
       fileLines[idx] = actual.replace(
         edit.before_pattern,
         edit.after_pattern.replace(/\$/g, "$$$$"),
@@ -313,14 +283,9 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     }
 
     const newContent = fileLines.join("\n");
-    // `resolvedRoot` is captured from the closure — phase-1 already
-    // verified the candidate is inside it, so this `resolve` collapses
-    // back to the same in-root absolute path.
     const absPath = resolve(resolvedRoot, filePath);
-    // Sibling temp + `rename`: POSIX-atomic when source and destination
-    // share a filesystem (always true for siblings). A concurrent reader
-    // sees either the pre-rename or post-rename content — never a torn
-    // write.
+    // POSIX-atomic when src + dst share a filesystem (true for siblings) —
+    // concurrent readers see pre- or post-rename content, never a torn write.
     const tempPath = `${absPath}.codemap-apply-${randomBytes(6).toString("hex")}.tmp`;
     writeFileSync(tempPath, newContent, "utf8");
     renameSync(tempPath, absPath);
@@ -363,12 +328,7 @@ function readPositiveInt(
     : undefined;
 }
 
-/**
- * `true` iff the resolved candidate lands inside `resolvedRoot` (or is
- * the root itself). Both sides go through the same `resolve` semantics —
- * no `realpath` / symlink dereference — so a project root that lives
- * behind a symlink doesn't false-positive on its own descendants.
- */
+/** `true` iff `resolve(resolvedRoot, candidate)` lands inside `resolvedRoot`. */
 function isWithinRoot(resolvedRoot: string, candidate: string): boolean {
   const resolved = resolve(resolvedRoot, candidate);
   if (resolved === resolvedRoot) return true;

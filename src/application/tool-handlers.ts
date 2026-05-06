@@ -784,10 +784,7 @@ export const applyArgsSchema = {
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .optional(),
   dry_run: z.boolean().optional(),
-  /**
-   * Q6 (a) — non-TTY contexts (every MCP / HTTP transport) require an
-   * explicit `yes: true` to write. There's no prompt to fall back on.
-   */
+  /** Q6 (a) — required for the write path; non-TTY transports have no prompt to fall back on. */
   yes: z.boolean().optional(),
 };
 
@@ -799,12 +796,10 @@ export interface ApplyArgs {
 }
 
 /**
- * Substrate-shaped fix executor. Reuses {@link applyDiffPayload} so the
- * MCP / HTTP envelope is identical to the CLI's `--json` output (Q5).
- *
- * Q6 gating — over MCP / HTTP the only valid non-`dry_run` invocation
- * carries `yes: true`. There is no TTY prompt; rejecting non-`yes` here
- * is the agent-shaped equivalent of the CLI's non-TTY rejection.
+ * Substrate-shaped fix executor — reuses {@link applyDiffPayload} so the
+ * envelope is identical across CLI / MCP / HTTP (Q5). Non-`dry_run`
+ * invocations require `yes: true`; this is the agent-shaped equivalent
+ * of the CLI's non-TTY rejection.
  */
 export function handleApply(args: ApplyArgs, root: string): ToolResult {
   try {

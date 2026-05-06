@@ -165,10 +165,8 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
       expect(env.mode).toBe("apply");
       expect(env.applied).toBe(true);
       expect(env.summary.rows_applied).toBeGreaterThan(0);
-      // Definition site should have been renamed.
       expect(readFile("src/helper.ts")).toContain("function worker(");
       expect(readFile("src/helper.ts")).not.toContain("function helper(");
-      // Import specifier on the consumer should have been renamed too.
       expect(readFile("src/entry.ts")).toContain("import { worker }");
     });
 

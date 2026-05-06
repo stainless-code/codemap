@@ -195,7 +195,7 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
     const projectRoot = getProjectRoot();
     const isTTY = process.stdout.isTTY === true;
 
-    // Q6 gate (a): non-TTY without --yes / --dry-run is rejected.
+    // Q6 (a): non-TTY without --yes / --dry-run is rejected.
     if (!isTTY && !opts.yes && !opts.dryRun) {
       emitError(
         `codemap apply: this verb writes files. Pass --yes for non-interactive runs, or --dry-run for preview.`,
@@ -204,7 +204,6 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
       return;
     }
 
-    // Direct paths (no prompt): --dry-run or --yes.
     if (opts.dryRun || opts.yes) {
       const result = applyDiffPayload({
         rows: rows as Record<string, unknown>[],
@@ -215,22 +214,15 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
       return;
     }
 
-    // Interactive path: phase-1 dry-run preview → prompt → phase-2 apply.
-    // Phase-1 runs twice in the proceed case (once for the preview, once
-    // when applyDiffPayload re-runs phase-1 before phase-2). Cost is two
-    // file reads per pending file; acceptable for v1 since apply isn't a
-    // hot path.
+    // Interactive path: dry-run preview → prompt → apply. Phase-1 runs
+    // twice on accept (preview + the apply call's own pass) — two FS reads
+    // per pending file; fine for a non-hot CLI path.
     const preview = applyDiffPayload({
       rows: rows as Record<string, unknown>[],
       projectRoot,
       dryRun: true,
     });
-    if (preview.conflicts.length > 0) {
-      emitResult(preview, opts);
-      return;
-    }
-    if (preview.files.length === 0) {
-      // Nothing to apply — emit the dry-run envelope and exit 0.
+    if (preview.conflicts.length > 0 || preview.files.length === 0) {
       emitResult(preview, opts);
       return;
     }
@@ -238,8 +230,6 @@ export async function runApplyCmd(opts: ApplyOpts): Promise<void> {
     printPromptSummary(preview, opts.recipeId, rows);
     const proceed = await promptYesNo();
     if (!proceed) {
-      // User aborted; treat as a clean dry-run + stderr note. Exit 0 (the
-      // user explicitly chose not to apply; that's not an error).
       console.error("apply: aborted by user.");
       emitResult(preview, opts);
       return;
@@ -303,9 +293,7 @@ function printPromptSummary(
   recipeId: string,
   rows: unknown[],
 ): void {
-  // Count input rows per file_path so the prompt shows per-file scope.
-  // The engine's `files[].rows_applied` is 0 in dry-run mode (per Q5);
-  // re-deriving from the input row set is the cheapest correct path.
+  // `files[].rows_applied` is 0 in dry-run (Q5); recount from input rows.
   const perFile = new Map<string, number>();
   for (const row of rows) {
     if (typeof row !== "object" || row === null) continue;

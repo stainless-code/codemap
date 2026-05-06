@@ -621,8 +621,7 @@ describe("applyDiffPayload", () => {
             before_pattern: "foo",
             after_pattern: "BBB",
           },
-          // Duplicate on b.ts:1 — pre-fix this triggered a phase-2 throw
-          // AFTER a.ts had already been renamed (Q2 (c) violation).
+          // Duplicate on b.ts:1 — pre-fix triggered a phase-2 throw after a.ts had already renamed.
           {
             file_path: "b.ts",
             line_start: 1,
@@ -649,11 +648,8 @@ describe("applyDiffPayload", () => {
 
   describe("same-line ambiguity (F3 — documented limitation)", () => {
     it("rewrites only the first occurrence on a line — matches buildDiffJson", () => {
-      // Recipe authors who hit this normalise their SQL to emit a more
-      // specific pattern. Documented in the engine docstring + architecture.md
-      // Apply wiring caveat. This test pins the current behaviour so a
-      // future engine-level fix lands as a deliberate breaking change
-      // rather than silent drift.
+      // Pins current behaviour so a future engine change lands as a deliberate
+      // breaking change. See module docstring § Same-line ambiguity.
       const root = tmpProject();
       writeSource(root, "x.ts", "const foo = foo();\n");
 
@@ -672,9 +668,7 @@ describe("applyDiffPayload", () => {
 
       expect(result.applied).toBe(true);
       expect(result.summary.rows_applied).toBe(1);
-      // Variable renamed; recursive call site untouched. Recipe author
-      // accepts this (formatter preview shows the same shape) or splits
-      // their SQL into a more specific pattern.
+      // Declaration renamed; recursive call site untouched.
       expect(readSource(root, "x.ts")).toBe("const bar = foo();\n");
     });
   });
