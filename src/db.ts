@@ -1,7 +1,8 @@
 import { openCodemapDatabase } from "./sqlite-db";
 import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
-/** Bump on any DDL change; `createSchema()` auto-rebuilds on mismatch. */
+/** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
+ *  See `docs/architecture.md` § Schema Versioning. */
 export const SCHEMA_VERSION = 10;
 
 /**

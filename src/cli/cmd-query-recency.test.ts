@@ -1,13 +1,7 @@
 /**
- * CLI write-site coverage for recipe-recency tracking — exercises
- * `runQueryCmd` end-to-end via subprocess, including the success-flag
- * disambiguation that PR #76's audit caught (the `--ci` recipe path
- * exits 1 as a CI gate, but the recipe SUCCEEDED — recency must record).
- *
- * Uses a per-test temp project so each case starts with a clean
- * `recipe_recency` table; copies a minimal source file into the temp
- * dir and full-indexes it via `bun src/index.ts --full` first so
- * `--recipe` calls return real rows.
+ * End-to-end CLI coverage for recipe-recency, including the `--ci` path
+ * (recipe succeeds, exit=1 is the gating signal — recency must still record).
+ * Per-test temp project + full-index so `--recipe` calls return real rows.
  */
 
 import {
@@ -115,11 +109,9 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
   });
 
   it("records recency on --ci + --format sarif WITH findings (CI gate exits 1, recipe succeeded)", async () => {
-    // Regression test for PR #76 audit Finding 1 — `process.exitCode`
-    // was the success oracle, so --ci's deliberate exit=1 made the
-    // recency tracker treat a successful run as a failure.
-    // `unimported-exports` reliably returns rows on this minimal fixture
-    // (entry.ts re-exports nothing; unused exports surface).
+    // Regression: don't undercount when --ci's gate-exit (1) collides
+    // with the success-detection logic. `unimported-exports` reliably
+    // returns rows on this fixture so the gate fires.
     const before = await loadRunCount("unimported-exports");
     const r = await runCli(
       ["query", "--recipe", "unimported-exports", "--format", "sarif", "--ci"],
@@ -130,8 +122,7 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
   });
 
   it("records recency on --ci with NO findings (recipe ran cleanly, no gate fired)", async () => {
-    // `deprecated-symbols` returns 0 rows on a fixture with no `@deprecated`
-    // JSDocs; --ci with 0 rows → exit 0 → recency increments.
+    // `deprecated-symbols` returns 0 rows on a fixture with no `@deprecated`.
     const before = await loadRunCount("deprecated-symbols");
     const r = await runCli(
       ["query", "--recipe", "deprecated-symbols", "--format", "sarif", "--ci"],
@@ -142,10 +133,7 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
   });
 
   it("does NOT record recency on SQL parse errors (real failure)", async () => {
-    // recipe id resolves but SQL underneath fails. Easier path: ad-hoc
-    // SQL that errors — should never record (recipeId undefined). To
-    // exercise the recipe failure branch, pass --params for a recipe
-    // that requires a different kind so binding rejects.
+    // Force a recipe-side failure via a param value the recipe rejects.
     const before = await loadRunCount("find-symbol-by-kind");
     const r = await runCli(
       [
@@ -158,14 +146,11 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
       ],
       { CODEMAP_ROOT: projectRoot },
     );
-    // Recipe might either reject the param or return 0 rows depending
-    // on validation rules — the important assertion is that the table
-    // has the run_count we'd expect, not a poisoned over-increment.
+    // Param-value semantics may evolve — assert "exit-mirrors-recency"
+    // either way (clean run → record; rejection → no record).
     if (r.exitCode === 0) {
-      // Param accepted; recipe ran cleanly → counts as success.
       expect(await loadRunCount("find-symbol-by-kind")).toBe(before + 1);
     } else {
-      // Param rejected; recipe FAILED → must NOT record.
       expect(await loadRunCount("find-symbol-by-kind")).toBe(before);
     }
   });
@@ -177,19 +162,16 @@ describe("runQueryCmd — recipe-recency CLI write site", () => {
       { CODEMAP_ROOT: projectRoot },
     );
     expect(r.exitCode).toBe(0);
-    // No recipe id was passed, so recency must not record under any name.
     const all = await runCli(
       ["query", "--json", "SELECT COUNT(*) AS n FROM recipe_recency"],
       { CODEMAP_ROOT: projectRoot },
     );
     const totalRows = (JSON.parse(all.out) as Array<{ n: number }>)[0]?.n;
-    // The ad-hoc SQL didn't touch fan-out either way.
     expect(await loadRunCount("fan-out")).toBe(before);
     expect(totalRows).toBeDefined();
   });
 
   it("does NOT record recency when recipe_recency: false in user config", async () => {
-    // Write the opt-out config and re-index so the toggle is observed.
     mkdirSync(join(projectRoot, ".codemap"), { recursive: true });
     writeFileSync(
       join(projectRoot, ".codemap", "config.json"),

@@ -815,12 +815,9 @@ export async function runQueryCmd(opts: {
   // emit plain stderr for `--format diff-json` / `sarif` / etc., breaking
   // pipelines that key off the JSON envelope.
   const structuredErrors = effectiveFormat !== "text";
-  // Local success flag — used by the recency-tracking finally below.
-  // `process.exitCode` is unsafe as the success oracle because `--ci`
-  // deliberately sets exit=1 on findings (the gating signal) even though
-  // the recipe ran cleanly, AND because exitCode survives across calls
-  // when this function is invoked multiple times in one process (tests,
-  // future programmatic use).
+  // Recency tracker reads this in finally. Don't use process.exitCode:
+  // --ci sets it to 1 on findings (success, not failure); exitCode also
+  // poisons across calls when this helper runs multiple times per process.
   let recipeQuerySucceeded = false;
   try {
     await bootstrapCodemap(opts);
@@ -906,9 +903,7 @@ export async function runQueryCmd(opts: {
         ci: opts.ci === true,
       });
       if (result.ok) {
-        // Recipe ran cleanly. `result.exitCode === 1` here means --ci
-        // wants the runner to gate on findings — that is success, not
-        // failure, so recency records the run.
+        // exitCode=1 here is the --ci gating signal, not a failure.
         recipeQuerySucceeded = true;
         if (result.exitCode !== 0) process.exitCode = result.exitCode;
       } else {
@@ -1029,10 +1024,9 @@ export async function runDropBaselineCmd(opts: {
  * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  */
 /**
- * Two-axis result so the caller can distinguish a CI-gating exit (recipe
- * SUCCEEDED, but `--ci` wants exit 1 to flag findings) from a real failure
- * (recipe FAILED — SQL error, formatter rejection, etc.). Without this the
- * recency tracker can't tell whether to record the run — see PR #76 audit.
+ * Disambiguates a CI-gating exit (recipe SUCCEEDED, `--ci` wants exit 1
+ * to flag findings) from a real failure (SQL error, formatter rejection).
+ * Callers (recency tracker, etc.) need this distinction.
  */
 type FormattedQueryResult = { ok: true; exitCode: 0 | 1 } | { ok: false };
 

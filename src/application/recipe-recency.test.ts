@@ -210,7 +210,7 @@ describe("loadRecipeRecency", () => {
       const now = 100 * 24 * 60 * 60 * 1000;
       const tooOld = now - RECENCY_WINDOW_MS - 1;
       const justInside = now - RECENCY_WINDOW_MS + 1;
-      // Seed via raw INSERT to avoid the eager prune inside recordRecipeRun.
+      // Raw INSERT — `recordRecipeRun` would eager-prune the ancient row.
       db.run(
         "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, 1)",
         ["ancient", tooOld],
@@ -222,7 +222,7 @@ describe("loadRecipeRecency", () => {
       const map = loadRecipeRecency({ db, now });
       expect(map.has("ancient")).toBe(false);
       expect(map.has("still-fresh")).toBe(true);
-      // Read MUST NOT delete — the ancient row still physically exists.
+      // Read MUST NOT delete — ancient row still on disk.
       const rows = db
         .query<{ recipe_id: string }>(
           "SELECT recipe_id FROM recipe_recency ORDER BY recipe_id",
@@ -241,7 +241,6 @@ describe("recordRecipeRun — eager prune (write-side)", () => {
     try {
       const now = 100 * 24 * 60 * 60 * 1000;
       const tooOld = now - RECENCY_WINDOW_MS - 1;
-      // Seed an ancient row, then write a fresh one through recordRecipeRun.
       db.run(
         "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, 1)",
         ["ancient", tooOld],

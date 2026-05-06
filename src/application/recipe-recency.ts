@@ -6,9 +6,13 @@ import { getRecipeRecencyEnabled } from "../runtime";
 import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
- * One row of the `recipe_recency` table. See [`docs/architecture.md` §
- * `recipe_recency`](../../docs/architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid)
- * for the lifecycle and rejected-column rationale.
+ * Write-path imports (`tryRecordRecipeRun` / `recordRecipeRun`) are restricted
+ * to `tool-handlers.ts` + `cmd-query.ts` (+ the test file). Re-runnable
+ * forbidden-edge query lives at [`docs/architecture.md` § Boundary verification —
+ * `recipe_recency` write path](../../docs/architecture.md#boundary-verification--recipe_recency-write-path).
+ * Read-path imports (`enrichWithRecency` / `loadRecipeRecency`) are unrestricted.
+ *
+ * Schema + lifecycle: [`docs/architecture.md` § `recipe_recency`](../../docs/architecture.md#recipe_recency--per-recipe-last-run--run-count-user-data-strict-without-rowid).
  */
 export interface RecipeRecencyRow {
   recipe_id: string;
@@ -27,16 +31,9 @@ interface RecordRunOpts {
 }
 
 /**
- * Eager prune + upsert. Pruning runs on the write path (not the read path)
- * so catalog reads stay pure — Slice 5 audit caught that lazy-on-read
- * violated the "No DB required" contract for `--recipes-json` and the
- * MCP `codemap://recipes` resource. Single indexed DELETE on a tiny
- * table (~recipe-id-cardinality rows) is cheap enough to justify
- * write-side eagerness; reads now filter on `last_run_at >= cutoff`
- * without writing.
- *
- * Caller is `tryRecordRecipeRun` (which guards the "successful run only"
- * contract).
+ * Eager prune + upsert. Prune lives on the write path so catalog reads
+ * (`--recipes-json`, `codemap://recipes`) stay side-effect free. Caller
+ * is `tryRecordRecipeRun`, which guards the "successful run only" contract.
  */
 export function recordRecipeRun(opts: RecordRunOpts): void {
   const { db, recipeId } = opts;
@@ -104,9 +101,8 @@ interface PruneOpts {
 }
 
 /**
- * Maintenance helper — exposed for tests / future ad-hoc CLI verbs. Production
- * pruning lives inside `recordRecipeRun` (write-side eager); reads never call
- * this so the catalog stays pure.
+ * Maintenance helper for tests / ad-hoc CLI use; production pruning lives
+ * inside `recordRecipeRun`. Reads never call this — catalog stays pure.
  */
 export function pruneRecipeRecency(opts: PruneOpts): void {
   const { db, cutoffMs } = opts;
@@ -120,12 +116,9 @@ interface LoadOpts {
 }
 
 /**
- * Pure read for `--recipes-json` + `codemap://recipes` resources. Filters
- * to within the 90-day window via `WHERE last_run_at >= ?` — never DELETEs,
- * so the catalog read site stays side-effect free. Stale rows are pruned
- * on the next `recordRecipeRun` write (eager prune-then-upsert). Returns a
- * Map keyed by `recipe_id` so the catalog renderer can
- * `map.get(entry.id) ?? null` for never-run recipes.
+ * Pure read for the catalog renderers — filters to the 90-day window with
+ * `WHERE last_run_at >= ?`; never DELETEs. Returns a Map keyed by
+ * `recipe_id` so callers can `map.get(entry.id) ?? null` for never-run.
  */
 export function loadRecipeRecency(
   opts: LoadOpts,
