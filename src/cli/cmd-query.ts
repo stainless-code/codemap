@@ -29,6 +29,7 @@ import type {
   RecipeParamValue,
   RecipeParamValues,
 } from "../application/recipe-params";
+import { tryRecordRecipeRun } from "../application/recipe-recency";
 import {
   closeDb,
   deleteQueryBaseline,
@@ -871,6 +872,16 @@ export async function runQueryCmd(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, structuredErrors);
+  } finally {
+    // Slice 2: record recipe recency on the CLI write site (Q2 / L.2).
+    // `process.exitCode` is the unified success signal — every failure path
+    // (`emitErrorMaybeJson`, `printQueryResult` non-zero, etc.) sets it to 1
+    // before its early `return`, so this finally observes the verdict
+    // regardless of which branch fired. Q9: success only. L.8 / Q10:
+    // failure-isolated inside `tryRecordRecipeRun`.
+    if (opts.recipeId !== undefined && process.exitCode !== 1) {
+      tryRecordRecipeRun(opts.recipeId);
+    }
   }
 }
 

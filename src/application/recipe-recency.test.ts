@@ -11,6 +11,7 @@ import {
   pruneRecipeRecency,
   RECENCY_WINDOW_MS,
   recordRecipeRun,
+  tryRecordRecipeRun,
 } from "./recipe-recency";
 
 let projectRoot: string;
@@ -220,6 +221,66 @@ describe("loadRecipeRecency", () => {
       expect(rows.map((r) => r.recipe_id)).toEqual(["still-fresh"]);
     } finally {
       closeDb(db);
+    }
+  });
+});
+
+describe("tryRecordRecipeRun — failure isolation (L.8 / Q10)", () => {
+  it("swallows openDb failures and emits a stderr warning", () => {
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) =>
+      warnings.push(args.map((a) => String(a)).join(" "));
+    try {
+      expect(() =>
+        tryRecordRecipeRun("any-recipe", {
+          _openDb: () => {
+            throw new Error("simulated openDb failure");
+          },
+        }),
+      ).not.toThrow();
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(
+      warnings.some(
+        (w) =>
+          w.includes("[recency] write failed") &&
+          w.includes("simulated openDb failure"),
+      ),
+    ).toBe(true);
+  });
+
+  it("respects quiet flag — no stderr warning emitted", () => {
+    const warnings: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) =>
+      warnings.push(args.map((a) => String(a)).join(" "));
+    try {
+      tryRecordRecipeRun("any-recipe", {
+        quiet: true,
+        _openDb: () => {
+          throw new Error("simulated failure");
+        },
+      });
+    } finally {
+      console.warn = origWarn;
+    }
+    expect(warnings).toEqual([]);
+  });
+
+  it("writes successfully when openDb succeeds (smoke for the production path)", () => {
+    tryRecordRecipeRun("smoke-recipe");
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ recipe_id: string; run_count: number }>(
+          "SELECT recipe_id, run_count FROM recipe_recency WHERE recipe_id = 'smoke-recipe'",
+        )
+        .get();
+      expect(row).toEqual({ recipe_id: "smoke-recipe", run_count: 1 });
+    } finally {
+      closeDb(db, { readonly: true });
     }
   });
 });

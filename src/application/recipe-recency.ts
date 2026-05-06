@@ -1,3 +1,4 @@
+import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
 
 /**
@@ -49,6 +50,43 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
        run_count   = recipe_recency.run_count + 1`,
     [recipeId, now],
   );
+}
+
+/**
+ * Slice 2 wrapper for the two write sites (`handleQueryRecipe` +
+ * `runQueryCmd`). Opens its own DB connection because `executeQuery` runs
+ * with `PRAGMA query_only = 1` and can't double as the writer. Swallows
+ * every error (L.8 + Q10) — recency-write failures NEVER block the recipe
+ * response. Warning-on-stderr unless `quiet`.
+ *
+ * Caller responsibility: only call AFTER the recipe execution returns
+ * successfully (Q9 — count successful runs only).
+ *
+ * `_openDb` is a test seam — production callers omit it; the failure-mode
+ * test injects a thrower to confirm the swallow / warn path.
+ */
+export function tryRecordRecipeRun(
+  recipeId: string,
+  opts?: { quiet?: boolean; _openDb?: () => CodemapDatabase },
+): void {
+  let db: CodemapDatabase | undefined;
+  try {
+    db = (opts?._openDb ?? openDb)();
+    recordRecipeRun({ db, recipeId });
+  } catch (err) {
+    if (!opts?.quiet) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[recency] write failed: ${msg}`);
+    }
+  } finally {
+    if (db !== undefined) {
+      try {
+        closeDb(db);
+      } catch {
+        // Already in error path; nothing useful to do.
+      }
+    }
+  }
 }
 
 interface PruneOpts {
