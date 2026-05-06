@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   closeDb,
@@ -17,6 +19,35 @@ import {
   upsertQueryBaseline,
 } from "./db";
 import { openCodemapDatabase } from "./sqlite-db";
+
+describe("createTables() DDL — Node split-on-`;` invariant", () => {
+  // Node uses better-sqlite3 (one statement per `prepare()`), so `runSql()`
+  // splits the multi-statement DDL on `;`. A `;` inside a `--` line comment
+  // creates a comment-only fragment that `prepare()` rejects with
+  // `RangeError: The supplied SQL string contains no statements`. Bun tests
+  // miss this because `bun:sqlite` accepts multi-statement SQL natively;
+  // the failure surfaces only when CI runs `node dist/index.mjs --full`.
+  // See `.agents/lessons.md` "Semicolons inside `--` line comments".
+  it("contains no comment-only fragments after split-on-`;`", () => {
+    const src = readFileSync(join(import.meta.dir, "db.ts"), "utf-8");
+    const match = src.match(/createTables[^`]*`([\s\S]+?)`/);
+    expect(match).not.toBeNull();
+    const sql = match![1]!;
+    const fragments = sql
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const offenders = fragments.filter((f) => {
+      const stripped = f
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("--"))
+        .join(" ");
+      return stripped === "";
+    });
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("SQLite layer (in-memory)", () => {
   it("creates schema and round-trips meta", () => {

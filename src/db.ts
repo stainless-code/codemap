@@ -199,8 +199,8 @@ export function createTables(db: CodemapDatabase) {
     -- loadRecipeRecency. Like query_baselines / coverage, intentionally absent
     -- from dropAll() so --full and SCHEMA_VERSION rebuilds preserve activity
     -- history. 90-day window is eager-on-write (recordRecipeRun DELETEs stale
-    -- rows before its upsert); reads stay pure. recipe_id is loose (no FK; can
-    -- match bundled or project recipe ids). See docs/architecture.md recipe_recency.
+    -- rows before its upsert) — reads stay pure. recipe_id is loose (no FK,
+    -- can match bundled or project recipe ids). See docs/architecture.md.
     CREATE TABLE IF NOT EXISTS recipe_recency (
       recipe_id   TEXT PRIMARY KEY,
       last_run_at INTEGER NOT NULL,
