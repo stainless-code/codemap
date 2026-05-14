@@ -26,6 +26,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     suppressions: extractSuppressions(ctx.source, ctx.relPath),
     typeMembers: data.typeMembers,
     calls: data.calls,
+    importSpecifiers: data.importSpecifiers,
   };
 }
 

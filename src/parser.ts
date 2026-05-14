@@ -6,25 +6,42 @@ import type {
   StaticExportEntry,
   ExportExportNameKind,
   ImportNameKind,
+  VisitorObject,
 } from "oxc-parser";
 
 import type {
   SymbolRow,
   ImportRow,
+  ImportSpecifierRow,
   ExportRow,
   ComponentRow,
   MarkerRow,
   TypeMemberRow,
   CallRow,
 } from "./db";
-import { extractMarkers } from "./markers";
+import { callsExtractor } from "./extractors/calls";
+import {
+  complexityExtractor,
+  createComplexityTracker,
+} from "./extractors/complexity";
+import {
+  componentsExtractor,
+  createComponentDetector,
+} from "./extractors/components";
+import { extractVisibility } from "./extractors/jsdoc";
+import { markersExtractor } from "./extractors/markers";
+import { buildLineMap, offsetToLine } from "./extractors/offsets";
+import { createScopeTracker, scopesExtractor } from "./extractors/scopes";
+import { symbolsExtractor } from "./extractors/symbols";
+import type { ExtractContext, TierExtractor } from "./extractors/types";
 
-const RE_COMPONENT = /^[A-Z]/;
-const RE_HOOK = /^use[A-Z]/;
+// Re-export for parser.test.ts compatibility — implementation in extractors/jsdoc.ts.
+export { extractVisibility };
 
 interface ExtractedData {
   symbols: SymbolRow[];
   imports: ImportRow[];
+  importSpecifiers: ImportSpecifierRow[];
   exports: ExportRow[];
   components: ComponentRow[];
   markers: MarkerRow[];
@@ -33,29 +50,47 @@ interface ExtractedData {
 }
 
 /**
- * Compute line number from byte offset.
- * Build a line-start-offsets array once, then binary search.
+ * Merge N extractors' visitor handlers into one VisitorObject.
+ * Multiple extractors on the same node type chain in registration order.
+ * Per [R.17](../docs/plans/substrate-extraction.md).
  */
-function buildLineMap(source: string): number[] {
-  const offsets = [0];
-  for (let i = 0; i < source.length; i++) {
-    if (source.charCodeAt(i) === 10) {
-      offsets.push(i + 1);
+export function buildMultiplexedVisitor(
+  extractors: readonly TierExtractor[],
+  ctx: ExtractContext,
+): VisitorObject {
+  const merged: Record<string, Array<(node: any) => void>> = {};
+  for (const extractor of extractors) {
+    const scratch: VisitorObject = {};
+    extractor.register(scratch, ctx);
+    for (const [key, fn] of Object.entries(scratch)) {
+      if (typeof fn !== "function") continue;
+      (merged[key] ??= []).push(fn as (node: any) => void);
     }
   }
-  return offsets;
+
+  const out: VisitorObject = {};
+  for (const [key, fns] of Object.entries(merged)) {
+    if (fns.length === 1) {
+      (out as Record<string, (node: any) => void>)[key] = fns[0]!;
+      continue;
+    }
+    (out as Record<string, (node: any) => void>)[key] = (node: any) => {
+      for (const fn of fns) fn(node);
+    };
+  }
+  return out;
 }
 
-function offsetToLine(lineMap: number[], offset: number): number {
-  let lo = 0;
-  let hi = lineMap.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (lineMap[mid] <= offset) lo = mid;
-    else hi = mid - 1;
-  }
-  return lo + 1; // 1-based
-}
+// Order = registration order = chained-handler order on shared nodes.
+// `symbolsExtractor` first so its pushes + tracker setup precede everything else.
+const EXTRACTORS: readonly TierExtractor[] = [
+  symbolsExtractor,
+  scopesExtractor,
+  complexityExtractor,
+  callsExtractor,
+  componentsExtractor,
+  markersExtractor,
+];
 
 export function extractFileData(
   filePath: string,
@@ -63,7 +98,7 @@ export function extractFileData(
   relPath: string,
 ): ExtractedData {
   const ext = extname(filePath).toLowerCase();
-  const lang =
+  const lang: "ts" | "tsx" | "js" | "jsx" =
     ext === ".tsx"
       ? "tsx"
       : ext === ".jsx"
@@ -78,20 +113,21 @@ export function extractFileData(
   const lineMap = buildLineMap(source);
   const mod = result.module;
 
-  const jsDocComments = buildJsDocIndex(result.comments);
-
   const symbols: SymbolRow[] = [];
   const imports: ImportRow[] = [];
+  const importSpecifiers: ImportSpecifierRow[] = [];
   const exports: ExportRow[] = [];
   const components: ComponentRow[] = [];
   const markers: MarkerRow[] = [];
   const typeMembers: TypeMemberRow[] = [];
   const calls: CallRow[] = [];
-  const seenCalls = new Set<string>();
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
 
+  // Pre-passes: `exportedNames` / `defaultExportedNames` feed `is_exported`
+  // on every downstream symbol push. Imports surface on `mod.staticImports`
+  // so the visitor never walks them.
   for (const exp of mod.staticExports) {
     for (const entry of exp.entries) {
       const exportName = entry.exportName;
@@ -106,467 +142,60 @@ export function extractFileData(
         exportedNames.add(exportName.name);
       }
 
-      exports.push(exportEntryToRow(relPath, entry));
+      exports.push(exportEntryToRow(relPath, entry, lineMap));
     }
   }
 
   for (const imp of mod.staticImports) {
     imports.push(staticImportToRow(relPath, imp, lineMap));
+    importSpecifiers.push(...staticImportSpecifierRows(relPath, imp, lineMap));
   }
 
-  const hookCalls = new Map<string, Set<string>>(); // function scope name -> hook names
-  const jsxScopes = new Set<string>(); // function scopes that contain JSX
-  let currentFunctionScope: string | null = null;
-  const scopeStack: string[] = [];
-  let _scopeStr = "";
-  const currentParent = () =>
-    scopeStack.length ? scopeStack[scopeStack.length - 1] : null;
-  const currentScope = () => _scopeStr;
-  const scopePush = (name: string) => {
-    scopeStack.push(name);
-    _scopeStr = _scopeStr ? `${_scopeStr}.${name}` : name;
-  };
-  const scopePop = () => {
-    scopeStack.pop();
-    _scopeStr = scopeStack.join(".");
-  };
-
-  // `symbolIndex = -1` marks anonymous functions (callbacks, IIFEs) — counted
-  // but never persisted, so their branches don't bleed into outer scopes.
-  // `arrowFnSymbolIndex` maps each named-arrow init node back to its symbol
-  // row index — must push from the function-shaped visitors (not the
-  // VariableDeclaration loop) so multi-declarator `const a = () => …,
-  // b = () => …` shapes attribute branches per-function, not per-statement.
-  const complexityStack: { symbolIndex: number; count: number }[] = [];
-  const arrowFnSymbolIndex = new WeakMap<object, number>();
-  const pushComplexityFor = (symbolIndex: number) => {
-    complexityStack.push({ symbolIndex, count: 1 });
-  };
-  const popComplexityTop = () => {
-    const top = complexityStack.pop();
-    if (!top) return;
-    if (top.symbolIndex >= 0) {
-      symbols[top.symbolIndex].complexity = top.count;
-    }
-  };
-  const incrementComplexity = () => {
-    const top = complexityStack[complexityStack.length - 1];
-    if (top) top.count++;
+  const ctx: ExtractContext = {
+    filePath,
+    relPath,
+    source,
+    lang,
+    isTsx,
+    lineMap,
+    comments: result.comments,
+    exportedNames,
+    defaultExportedNames,
+    symbols,
+    imports,
+    exports,
+    components,
+    markers,
+    typeMembers,
+    calls,
+    scopes: createScopeTracker(),
+    complexity: createComplexityTracker(symbols),
+    componentDetector: createComponentDetector(),
   };
 
-  const visitor = new Visitor({
-    FunctionDeclaration(node: any) {
-      const name = node.id?.name;
-      if (!name) return;
-      const lineStart = offsetToLine(lineMap, node.start);
-      const lineEnd = offsetToLine(lineMap, node.end);
-      const isExported =
-        exportedNames.has(name) || defaultExportedNames.has(name);
-      const isDefault = defaultExportedNames.has(name);
+  const multiplexedVisitor = new Visitor(
+    buildMultiplexedVisitor(EXTRACTORS, ctx),
+  );
+  multiplexedVisitor.visit(result.program);
 
-      const symbolIndex = symbols.length;
-      symbols.push({
-        file_path: relPath,
-        name,
-        kind: "function",
-        line_start: lineStart,
-        line_end: lineEnd,
-        signature: buildFunctionSignature(name, node),
-        is_exported: isExported ? 1 : 0,
-        is_default_export: isDefault ? 1 : 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, node.start, source),
-        value: null,
-        parent_name: currentParent(),
-        visibility: null,
-      });
-      pushComplexityFor(symbolIndex);
-
-      scopePush(name);
-      if (isTsx && RE_COMPONENT.test(name)) {
-        currentFunctionScope = name;
-        hookCalls.set(name, new Set());
-      }
-    },
-    "FunctionDeclaration:exit"(node: any) {
-      const name = node.id?.name;
-      if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopePop();
-      }
-      popComplexityTop();
-      if (name && currentFunctionScope === name) {
-        maybeAddComponent(name, node, false);
-        currentFunctionScope = null;
-      }
-    },
-
-    VariableDeclaration(node: any) {
-      for (const decl of node.declarations) {
-        const name = decl.id?.name;
-        if (!name) continue;
-        const init = decl.init;
-        const lineStart = offsetToLine(lineMap, node.start);
-        const lineEnd = offsetToLine(lineMap, node.end);
-        const isExported =
-          exportedNames.has(name) || defaultExportedNames.has(name);
-        const isDefault = defaultExportedNames.has(name);
-
-        const isArrowOrFn =
-          init?.type === "ArrowFunctionExpression" ||
-          init?.type === "FunctionExpression";
-
-        const symbolIndex = symbols.length;
-        symbols.push({
-          file_path: relPath,
-          name,
-          kind: isArrowOrFn ? "function" : "const",
-          line_start: lineStart,
-          line_end: lineEnd,
-          signature: isArrowOrFn
-            ? buildFunctionSignature(name, init)
-            : `const ${name}`,
-          is_exported: isExported ? 1 : 0,
-          is_default_export: isDefault ? 1 : 0,
-          members: null,
-          doc_comment: findJsDoc(jsDocComments, node.start, source),
-          value: isArrowOrFn ? null : extractLiteralValue(init),
-          parent_name: currentParent(),
-          visibility: null,
-        });
-
-        if (isArrowOrFn) {
-          scopePush(name);
-          if (init) arrowFnSymbolIndex.set(init, symbolIndex);
-        }
-        if (isTsx && RE_COMPONENT.test(name) && isArrowOrFn) {
-          currentFunctionScope = name;
-          hookCalls.set(name, new Set());
-        }
-      }
-    },
-    "VariableDeclaration:exit"(node: any) {
-      const decls = node.declarations;
-      for (let i = decls.length - 1; i >= 0; i--) {
-        const decl = decls[i];
-        const name = decl.id?.name;
-        if (!name) continue;
-        const init = decl.init;
-        const isArrowOrFn =
-          init?.type === "ArrowFunctionExpression" ||
-          init?.type === "FunctionExpression";
-        if (isArrowOrFn && scopeStack[scopeStack.length - 1] === name) {
-          scopePop();
-        }
-        if (name && currentFunctionScope === name) {
-          maybeAddComponent(name, init, true);
-          currentFunctionScope = null;
-        }
-      }
-    },
-
-    ArrowFunctionExpression(node: any) {
-      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
-    },
-    "ArrowFunctionExpression:exit"() {
-      popComplexityTop();
-    },
-    FunctionExpression(node: any) {
-      pushComplexityFor(arrowFnSymbolIndex.get(node) ?? -1);
-    },
-    "FunctionExpression:exit"() {
-      popComplexityTop();
-    },
-
-    TSTypeAliasDeclaration(node: any) {
-      const name = node.id?.name;
-      if (!name) return;
-      const isExported = exportedNames.has(name);
-      const tp = stringifyTypeParams(node.typeParameters);
-      symbols.push({
-        file_path: relPath,
-        name,
-        kind: "type",
-        line_start: offsetToLine(lineMap, node.start),
-        line_end: offsetToLine(lineMap, node.end),
-        signature: `type ${name}${tp}`,
-        is_exported: isExported ? 1 : 0,
-        is_default_export: 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, node.start, source),
-        value: null,
-        parent_name: currentParent(),
-        visibility: null,
-      });
-      if (node.typeAnnotation?.type === "TSTypeLiteral") {
-        extractObjectMembers(
-          node.typeAnnotation.members,
-          relPath,
-          name,
-          typeMembers,
-        );
-      }
-    },
-
-    TSInterfaceDeclaration(node: any) {
-      const name = node.id?.name;
-      if (!name) return;
-      const isExported = exportedNames.has(name);
-      const tp = stringifyTypeParams(node.typeParameters);
-      let sig = `interface ${name}${tp}`;
-      if (node.extends?.length) {
-        const bases = node.extends
-          .map((e: any) => {
-            const base = e.expression?.name ?? e.typeName?.name ?? "";
-            if (!base) return null;
-            const ta = e.typeArguments ?? e.typeParameters;
-            if (ta?.params?.length) {
-              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
-              if (args.length) return `${base}<${args.join(", ")}>`;
-            }
-            return base;
-          })
-          .filter(Boolean);
-        if (bases.length) sig += ` extends ${bases.join(", ")}`;
-      }
-      symbols.push({
-        file_path: relPath,
-        name,
-        kind: "interface",
-        line_start: offsetToLine(lineMap, node.start),
-        line_end: offsetToLine(lineMap, node.end),
-        signature: sig,
-        is_exported: isExported ? 1 : 0,
-        is_default_export: 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, node.start, source),
-        value: null,
-        parent_name: currentParent(),
-        visibility: null,
-      });
-      extractObjectMembers(node.body?.body, relPath, name, typeMembers);
-    },
-
-    TSEnumDeclaration(node: any) {
-      const name = node.id?.name;
-      if (!name) return;
-      const isExported = exportedNames.has(name);
-      const enumMembers = node.body?.members;
-      let members: string | null = null;
-      if (enumMembers?.length) {
-        const extracted = enumMembers.map((m: any) => {
-          const mName = m.id?.name ?? m.id?.value;
-          if (!mName) return null;
-          const init = m.initializer;
-          let mValue: string | number | null = null;
-          if (init?.type === "Literal" || init?.type === "StringLiteral")
-            mValue = init.value;
-          else if (init?.type === "NumericLiteral") mValue = init.value;
-          return mValue !== null && mValue !== undefined
-            ? { name: mName, value: mValue }
-            : { name: mName };
-        });
-        members = JSON.stringify(extracted.filter(Boolean));
-      }
-      symbols.push({
-        file_path: relPath,
-        name,
-        kind: "enum",
-        line_start: offsetToLine(lineMap, node.start),
-        line_end: offsetToLine(lineMap, node.end),
-        signature: `enum ${name}`,
-        is_exported: isExported ? 1 : 0,
-        is_default_export: 0,
-        members,
-        doc_comment: findJsDoc(jsDocComments, node.start, source),
-        value: null,
-        parent_name: currentParent(),
-        visibility: null,
-      });
-    },
-
-    ClassDeclaration(node: any) {
-      const name = node.id?.name;
-      if (!name) return;
-      const isExported =
-        exportedNames.has(name) || defaultExportedNames.has(name);
-      const tp = stringifyTypeParams(node.typeParameters);
-      let sig = `class ${name}${tp}`;
-      if (node.superClass?.name) {
-        sig += ` extends ${node.superClass.name}`;
-        const sta = node.superTypeArguments ?? node.superTypeParameters;
-        if (sta?.params?.length) {
-          const args = sta.params.map(stringifyTypeNode).filter(Boolean);
-          if (args.length) sig += `<${args.join(", ")}>`;
-        }
-      }
-      if (node.implements?.length) {
-        const impls = node.implements
-          .map((i: any) => {
-            const n = i.expression?.name ?? "";
-            if (!n) return null;
-            const ta = i.typeArguments ?? i.typeParameters;
-            if (ta?.params?.length) {
-              const args = ta.params.map(stringifyTypeNode).filter(Boolean);
-              if (args.length) return `${n}<${args.join(", ")}>`;
-            }
-            return n;
-          })
-          .filter(Boolean);
-        if (impls.length) sig += ` implements ${impls.join(", ")}`;
-      }
-      symbols.push({
-        file_path: relPath,
-        name,
-        kind: "class",
-        line_start: offsetToLine(lineMap, node.start),
-        line_end: offsetToLine(lineMap, node.end),
-        signature: sig,
-        is_exported: isExported ? 1 : 0,
-        is_default_export: defaultExportedNames.has(name) ? 1 : 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, node.start, source),
-        value: null,
-        parent_name: currentParent(),
-        visibility: null,
-      });
-      scopePush(name);
-      extractClassMembers(
-        node.body?.body,
-        relPath,
-        name,
-        lineMap,
-        symbols,
-        jsDocComments,
-        source,
-      );
-    },
-    "ClassDeclaration:exit"(node: any) {
-      const name = node.id?.name;
-      if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopePop();
-      }
-    },
-
-    MethodDefinition(node: any) {
-      const name = node.key?.name;
-      if (name) scopePush(name);
-    },
-    "MethodDefinition:exit"(node: any) {
-      const name = node.key?.name;
-      if (name && scopeStack[scopeStack.length - 1] === name) {
-        scopePop();
-      }
-    },
-
-    CallExpression(node: any) {
-      if (currentFunctionScope) {
-        const callee = node.callee;
-        if (callee?.type === "Identifier" && RE_HOOK.test(callee.name)) {
-          hookCalls.get(currentFunctionScope)?.add(callee.name);
-        }
-      }
-      const caller = currentParent();
-      if (!caller) return;
-      const callee = node.callee;
-      let calleeName: string | null = null;
-      if (callee?.type === "Identifier") {
-        calleeName = callee.name;
-      } else if (callee?.type === "MemberExpression" && callee.property?.name) {
-        if (callee.object?.type === "Identifier") {
-          calleeName = `${callee.object.name}.${callee.property.name}`;
-        } else if (callee.object?.type === "ThisExpression") {
-          calleeName = `this.${callee.property.name}`;
-        }
-      }
-      if (calleeName) {
-        const scope = currentScope();
-        const key = `${scope}>>${calleeName}`;
-        if (!seenCalls.has(key)) {
-          seenCalls.add(key);
-          calls.push({
-            file_path: relPath,
-            caller_name: caller,
-            caller_scope: scope,
-            callee_name: calleeName,
-          });
-        }
-      }
-    },
-
-    JSXElement() {
-      if (currentFunctionScope) jsxScopes.add(currentFunctionScope);
-    },
-    JSXFragment() {
-      if (currentFunctionScope) jsxScopes.add(currentFunctionScope);
-    },
-
-    // Cyclomatic-complexity branching nodes — each adds 1 to the
-    // currently-walked function's count. Standard McCabe formula:
-    // CC = 1 + (#decision points). Tracks if/loops/case/catch/&&/||/??/?:.
-    IfStatement: incrementComplexity,
-    WhileStatement: incrementComplexity,
-    DoWhileStatement: incrementComplexity,
-    ForStatement: incrementComplexity,
-    ForInStatement: incrementComplexity,
-    ForOfStatement: incrementComplexity,
-    ConditionalExpression: incrementComplexity, // `a ? b : c`
-    CatchClause: incrementComplexity,
-    SwitchCase(node: any) {
-      // `default:` is the fall-through arm, not a decision point — only
-      // count `case X:` arms.
-      if (node.test !== null && node.test !== undefined) incrementComplexity();
-    },
-    LogicalExpression(node: any) {
-      // `&&`, `||`, `??` introduce branching paths; `&` / `|` are bitwise
-      // (not decision points; AST shapes them as BinaryExpression).
-      if (
-        node.operator === "&&" ||
-        node.operator === "||" ||
-        node.operator === "??"
-      ) {
-        incrementComplexity();
-      }
-    },
-  });
-
-  visitor.visit(result.program);
-
-  markers.push(...extractMarkers(source, relPath));
-
-  function maybeAddComponent(name: string, node: any, _isArrow: boolean) {
-    if (!isTsx || !RE_COMPONENT.test(name)) return;
-    const hooks = hookCalls.get(name);
-    const hasJsx = jsxScopes.has(name);
-    if (!hasJsx && !(hooks && hooks.size > 0)) return;
-    const isDefault = defaultExportedNames.has(name);
-
-    let propsType: string | null = null;
-    const params = node?.params;
-    if (params?.length > 0) {
-      const firstParam = params[0];
-      if (firstParam.typeAnnotation?.typeAnnotation) {
-        const ta = firstParam.typeAnnotation.typeAnnotation;
-        if (ta.type === "TSTypeReference" && ta.typeName?.name) {
-          propsType = ta.typeName.name;
-        }
-      }
-    }
-
-    components.push({
-      file_path: relPath,
-      name,
-      props_type: propsType,
-      hooks_used: JSON.stringify(hooks ? [...hooks] : []),
-      is_default_export: isDefault ? 1 : 0,
-    });
+  for (const extractor of EXTRACTORS) {
+    extractor.finalize?.(ctx);
   }
 
-  // Single post-processing pass keeps the per-push code in this file
-  // free of doc/visibility derivation — every symbol's `visibility` is a
-  // pure function of its already-extracted `doc_comment`.
+  // `visibility` is a pure function of `doc_comment` — derived in one pass
+  // rather than at every push site.
   for (const s of symbols) s.visibility = extractVisibility(s.doc_comment);
 
-  return { symbols, imports, exports, components, markers, typeMembers, calls };
+  return {
+    symbols,
+    imports,
+    importSpecifiers,
+    exports,
+    components,
+    markers,
+    typeMembers,
+    calls,
+  };
 }
 
 function staticImportToRow(
@@ -607,9 +236,58 @@ function staticImportToRow(
   };
 }
 
+function staticImportSpecifierRows(
+  filePath: string,
+  imp: StaticImport,
+  lineMap: number[],
+): ImportSpecifierRow[] {
+  // Side-effect imports (`import "mod"`) have zero entries — produce no rows.
+  if (imp.entries.length === 0) return [];
+  const rows: ImportSpecifierRow[] = [];
+  for (const entry of imp.entries) {
+    const importKind = entry.importName.kind;
+    let kind: "named" | "default" | "namespace";
+    let importedName: string;
+    if (importKind === ("Default" as ImportNameKind)) {
+      kind = "default";
+      importedName = "default";
+    } else if (importKind === ("NamespaceObject" as ImportNameKind)) {
+      kind = "namespace";
+      importedName = "*";
+    } else {
+      // `Name` kind — `import { foo as bar }` puts `foo` on importName.name,
+      // `bar` on localName.value.
+      kind = "named";
+      importedName = entry.importName.name ?? entry.localName.value;
+    }
+    const localName = entry.localName.value;
+    // Position records the local-binding token (`bar` in `foo as bar`) —
+    // the rewrite-relevant token per R.6. The original `foo` token's
+    // position is not exposed by oxc's StaticImportEntry; recipes that
+    // need it walk imports.specifiers JSON or query the raw AST.
+    const tokenStart = entry.localName.start;
+    const tokenEnd = entry.localName.end;
+    const line = offsetToLine(lineMap, tokenStart);
+    const lineStartOffset = lineMap[line - 1] ?? 0;
+    rows.push({
+      file_path: filePath,
+      source: imp.moduleRequest.value,
+      line,
+      column_start: tokenStart - lineStartOffset,
+      column_end: tokenEnd - lineStartOffset,
+      imported_name: importedName,
+      local_name: localName,
+      kind,
+      is_type_only: entry.isType ? 1 : 0,
+    });
+  }
+  return rows;
+}
+
 function exportEntryToRow(
   filePath: string,
   entry: StaticExportEntry,
+  lineMap: number[],
 ): ExportRow {
   const exportName = entry.exportName;
   const isDefault = exportName.kind === ("Default" as ExportExportNameKind);
@@ -621,351 +299,23 @@ function exportEntryToRow(
   if (entry.isType) kind = "type";
   if (entry.moduleRequest) kind = "re-export";
 
+  // Position records the exported name token where available (per R.6);
+  // falls back to the entry start for default exports of anonymous values
+  // (`export default function() {}`) where `exportName.start` is null.
+  const nameStart = exportName.start ?? entry.start;
+  const nameEnd = exportName.end ?? entry.start + name.length;
+  const lineStart = offsetToLine(lineMap, nameStart);
+  const lineStartOffset = lineMap[lineStart - 1]!;
   return {
     file_path: filePath,
     name,
     kind,
     is_default: isDefault ? 1 : 0,
     re_export_source: entry.moduleRequest?.value ?? null,
+    line_start: lineStart,
+    line_end: offsetToLine(lineMap, entry.end),
+    column_start: nameStart - lineStartOffset,
+    column_end: nameEnd - lineStartOffset,
+    is_re_export: entry.moduleRequest ? 1 : 0,
   };
-}
-
-function stringifyTypeNode(node: any): string | null {
-  if (!node) return null;
-  switch (node.type) {
-    case "TSTypeReference": {
-      let name: string | null = null;
-      const tn = node.typeName;
-      if (tn?.type === "Identifier") name = tn.name;
-      else if (typeof tn?.name === "string") name = tn.name;
-      else if (tn?.type === "TSQualifiedName")
-        name = `${tn.left?.name ?? ""}.${tn.right?.name ?? ""}`;
-      if (!name) return null;
-      const ta = node.typeArguments ?? node.typeParameters;
-      if (ta?.params?.length) {
-        const args = ta.params.map(stringifyTypeNode).filter(Boolean);
-        if (args.length) return `${name}<${args.join(", ")}>`;
-      }
-      return name;
-    }
-    case "TSStringKeyword": {
-      return "string";
-    }
-    case "TSNumberKeyword": {
-      return "number";
-    }
-    case "TSBooleanKeyword": {
-      return "boolean";
-    }
-    case "TSVoidKeyword": {
-      return "void";
-    }
-    case "TSNullKeyword": {
-      return "null";
-    }
-    case "TSUndefinedKeyword": {
-      return "undefined";
-    }
-    case "TSAnyKeyword": {
-      return "any";
-    }
-    case "TSNeverKeyword": {
-      return "never";
-    }
-    case "TSUnknownKeyword": {
-      return "unknown";
-    }
-    case "TSObjectKeyword": {
-      return "object";
-    }
-    case "TSBigIntKeyword": {
-      return "bigint";
-    }
-    case "TSSymbolKeyword": {
-      return "symbol";
-    }
-    case "TSArrayType": {
-      const elem = stringifyTypeNode(node.elementType);
-      return elem ? `${elem}[]` : null;
-    }
-    case "TSUnionType": {
-      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
-      return types?.length ? types.join(" | ") : null;
-    }
-    case "TSIntersectionType": {
-      const types = node.types?.map(stringifyTypeNode).filter(Boolean);
-      return types?.length ? types.join(" & ") : null;
-    }
-    case "TSTupleType": {
-      const elems = node.elementTypes?.map(stringifyTypeNode).filter(Boolean);
-      return `[${elems?.join(", ") ?? ""}]`;
-    }
-    case "TSLiteralType": {
-      const lit = node.literal;
-      if (lit?.type === "StringLiteral") return `"${lit.value}"`;
-      if (lit?.type === "NumericLiteral") return String(lit.value);
-      if (lit?.type === "BooleanLiteral") return String(lit.value);
-      return null;
-    }
-    case "TSTypeQuery": {
-      const exprName = node.exprName;
-      const n =
-        typeof exprName?.name === "string" ? exprName.name : exprName?.name;
-      return n ? `typeof ${n}` : null;
-    }
-    case "TSTypeOperator": {
-      const inner = stringifyTypeNode(node.typeAnnotation);
-      return inner ? `${node.operator} ${inner}` : null;
-    }
-    case "TSThisType": {
-      return "this";
-    }
-    default: {
-      return null;
-    }
-  }
-}
-
-function stringifyTypeParams(typeParameters: any): string {
-  const params = typeParameters?.params;
-  if (!params?.length) return "";
-  const parts = params.map((p: any) => {
-    const name = typeof p.name === "string" ? p.name : (p.name?.name ?? "?");
-    let s = name;
-    if (p.constraint) {
-      const c = stringifyTypeNode(p.constraint);
-      if (c) s += ` extends ${c}`;
-    }
-    if (p.default) {
-      const d = stringifyTypeNode(p.default);
-      if (d) s += ` = ${d}`;
-    }
-    return s;
-  });
-  return `<${parts.join(", ")}>`;
-}
-
-function buildFunctionSignature(name: string, node: any): string {
-  const typeParams = stringifyTypeParams(node?.typeParameters);
-  const params = node?.params;
-  let paramStr = "";
-  if (params?.length) {
-    paramStr = params
-      .map((p: any) => p.name ?? p.left?.name ?? p.argument?.name ?? "...")
-      .join(", ");
-  }
-  let sig = `${name}${typeParams}(${paramStr})`;
-  const returnType = node?.returnType?.typeAnnotation;
-  if (returnType) {
-    const rt = stringifyTypeNode(returnType);
-    if (rt) sig += `: ${rt}`;
-  }
-  return sig;
-}
-
-interface JsDocEntry {
-  end: number;
-  text: string;
-}
-
-function buildJsDocIndex(comments: any[]): JsDocEntry[] {
-  if (!comments?.length) return [];
-  const docs: JsDocEntry[] = [];
-  for (const c of comments) {
-    if (c.type !== "Block" || !c.value.startsWith("*")) continue;
-    docs.push({ end: c.end, text: cleanJsDoc(c.value) });
-  }
-  return docs;
-}
-
-function cleanJsDoc(raw: string): string {
-  return raw
-    .split("\n")
-    .map((line) => line.replace(/^\s*\*\s?/, ""))
-    .join("\n")
-    .trim();
-}
-
-// Tag must start its own line (after the `*` prefix that cleanJsDoc strips).
-// Anchoring on line-start avoids matching backticked references inside prose
-// like "Extract @public / @private from ..." which describe tags rather than
-// declare them. Trailing word-boundary keeps `@betaTwo` from matching `@beta`.
-const VISIBILITY_TAG_RE =
-  /(?:^|\n)\s*@(public|private|internal|alpha|beta)(?![A-Za-z0-9_])/;
-
-/**
- * Extract a JSDoc visibility tag from a doc comment. First match in document
- * order wins when multiple line-leading tags are present.
- *
- * Returned values match the JSDoc keywords minus the `@` prefix:
- * `"public" | "private" | "internal" | "alpha" | "beta"`. Returns `null` when
- * no tag is present or the doc is empty/null. Tags inside prose (e.g.
- * backticked references that don't start a line) intentionally don't match —
- * those are descriptions of tags, not declarations of one.
- */
-export function extractVisibility(doc: string | null): string | null {
-  if (doc === null || doc === "") return null;
-  const m = VISIBILITY_TAG_RE.exec(doc);
-  return m?.[1] ?? null;
-}
-
-function findJsDoc(
-  docs: JsDocEntry[],
-  nodeStart: number,
-  source: string,
-): string | null {
-  if (!docs.length) return null;
-  let lo = 0;
-  let hi = docs.length - 1;
-  let best = -1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (docs[mid].end <= nodeStart) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  if (best < 0) return null;
-  const doc = docs[best];
-  for (let i = doc.end; i < nodeStart; i++) {
-    const ch = source.charCodeAt(i);
-    if (ch === 59 || ch === 123 || ch === 125) return null; // ; { }
-  }
-  return doc.text || null;
-}
-
-function extractClassMembers(
-  members: any[] | undefined,
-  filePath: string,
-  className: string,
-  lineMap: number[],
-  out: SymbolRow[],
-  jsDocComments: JsDocEntry[],
-  source: string,
-) {
-  if (!members?.length) return;
-  for (const m of members) {
-    const name = m.key?.name;
-    if (!name) continue;
-
-    if (m.type === "MethodDefinition") {
-      const fn = m.value;
-      const kind =
-        m.kind === "get" ? "getter" : m.kind === "set" ? "setter" : "method";
-      let prefix = "";
-      if (m.accessibility && m.accessibility !== "public") {
-        prefix += `${m.accessibility} `;
-      }
-      if (m.static) prefix += "static ";
-      if (fn?.async) prefix += "async ";
-      const sig = `${prefix}${buildFunctionSignature(name, fn)}`;
-      out.push({
-        file_path: filePath,
-        name,
-        kind,
-        line_start: offsetToLine(lineMap, m.start),
-        line_end: offsetToLine(lineMap, m.end),
-        signature: sig,
-        is_exported: 0,
-        is_default_export: 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, m.start, source),
-        value: null,
-        parent_name: className,
-        visibility: null,
-      });
-    } else if (m.type === "PropertyDefinition") {
-      let prefix = "";
-      if (m.accessibility && m.accessibility !== "public") {
-        prefix += `${m.accessibility} `;
-      }
-      if (m.static) prefix += "static ";
-      if (m.readonly) prefix += "readonly ";
-      const ta = m.typeAnnotation?.typeAnnotation;
-      const typeStr = ta ? stringifyTypeNode(ta) : null;
-      const sig = typeStr ? `${prefix}${name}: ${typeStr}` : `${prefix}${name}`;
-      out.push({
-        file_path: filePath,
-        name,
-        kind: "property",
-        line_start: offsetToLine(lineMap, m.start),
-        line_end: offsetToLine(lineMap, m.end),
-        signature: sig,
-        is_exported: 0,
-        is_default_export: 0,
-        members: null,
-        doc_comment: findJsDoc(jsDocComments, m.start, source),
-        value: extractLiteralValue(m.value),
-        parent_name: className,
-        visibility: null,
-      });
-    }
-  }
-}
-
-function extractLiteralValue(init: any): string | null {
-  if (!init) return null;
-  let node = init;
-  if (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression") {
-    node = node.expression;
-  }
-  if (node.type === "Literal") {
-    return node.value === null ? "null" : String(node.value);
-  }
-  if (
-    node.type === "UnaryExpression" &&
-    node.prefix &&
-    node.operator === "-" &&
-    node.argument?.type === "Literal" &&
-    typeof node.argument.value === "number"
-  ) {
-    return String(-node.argument.value);
-  }
-  if (
-    node.type === "TemplateLiteral" &&
-    node.expressions?.length === 0 &&
-    node.quasis?.length === 1
-  ) {
-    return node.quasis[0].value?.cooked ?? null;
-  }
-  return null;
-}
-
-function extractObjectMembers(
-  members: any[] | undefined,
-  filePath: string,
-  symbolName: string,
-  out: TypeMemberRow[],
-) {
-  if (!members?.length) return;
-  for (const m of members) {
-    const name = m.key?.name ?? m.key?.value;
-    if (!name) continue;
-    let type: string | null = null;
-    if (m.type === "TSMethodSignature") {
-      const rt = m.returnType?.typeAnnotation;
-      const rtStr = rt ? stringifyTypeNode(rt) : null;
-      const params = m.params;
-      let paramStr = "";
-      if (params?.length) {
-        paramStr = params
-          .map((p: any) => p.name ?? p.left?.name ?? "...")
-          .join(", ");
-      }
-      type = `(${paramStr})${rtStr ? ` => ${rtStr}` : ""}`;
-    } else {
-      const ta = m.typeAnnotation?.typeAnnotation;
-      if (ta) type = stringifyTypeNode(ta);
-    }
-    out.push({
-      file_path: filePath,
-      symbol_name: symbolName,
-      name,
-      type,
-      is_optional: m.optional ? 1 : 0,
-      is_readonly: m.readonly ? 1 : 0,
-    });
-  }
 }

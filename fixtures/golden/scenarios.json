@@ -95,6 +95,30 @@
       "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
     },
     {
+      "id": "find-call-sites",
+      "prompt": "Parametrised recipe: where is createClient called from? (column-precise per R.6)",
+      "recipe": "find-call-sites",
+      "params": { "callee": "createClient" }
+    },
+    {
+      "id": "find-export-sites",
+      "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
+      "recipe": "find-export-sites",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-symbol-definitions",
+      "prompt": "Parametrised recipe: where is ProductCard defined? (name-token-precise)",
+      "recipe": "find-symbol-definitions",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-import-sites",
+      "prompt": "Parametrised recipe: where is ProductCard imported (specifier-precise)?",
+      "recipe": "find-import-sites",
+      "params": { "imported_name": "ProductCard" }
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

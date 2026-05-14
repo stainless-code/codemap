@@ -42,8 +42,8 @@ beforeEach(() => {
        VALUES ('src/foo.ts', './bar', 'src/bar.ts', '["bar"]', 0, 1)`,
     );
     db.run(
-      `INSERT INTO exports (file_path, name, kind, is_default)
-       VALUES ('src/foo.ts', 'foo', 'value', 0)`,
+      `INSERT INTO exports (file_path, name, kind, is_default, line_start, line_end, column_start, column_end, is_re_export)
+       VALUES ('src/foo.ts', 'foo', 'value', 0, 1, 1, 0, 3, 0)`,
     );
   } finally {
     closeDb(db);

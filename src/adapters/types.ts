@@ -30,6 +30,7 @@ export type ParsedFilePayload = Pick<
   | "suppressions"
   | "typeMembers"
   | "calls"
+  | "importSpecifiers"
   | "cssVariables"
   | "cssClasses"
   | "cssKeyframes"

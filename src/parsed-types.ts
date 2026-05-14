@@ -2,6 +2,7 @@ import type {
   FileRow,
   SymbolRow,
   ImportRow,
+  ImportSpecifierRow,
   ExportRow,
   ComponentRow,
   MarkerRow,
@@ -31,6 +32,7 @@ export interface ParsedFile {
   parseMs?: number;
   symbols?: SymbolRow[];
   imports?: ImportRow[];
+  importSpecifiers?: ImportSpecifierRow[];
   exports?: ExportRow[];
   components?: ComponentRow[];
   markers?: MarkerRow[];

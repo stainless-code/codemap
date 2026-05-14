@@ -995,8 +995,8 @@ describe("MCP server — impact tool", () => {
            ('src/b.ts', 'b', 'function', 1, 1, 'function b()', 0, 0)`,
       );
       db.run(
-        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name)
-         VALUES ('src/a.ts', 'a', 'function', 'b')`,
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ('src/a.ts', 'a', 'function', 'b', 1, 0, 1)`,
       );
       db.run(
         `INSERT INTO dependencies (from_path, to_path)

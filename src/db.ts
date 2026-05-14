@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 14;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -56,7 +56,9 @@ export function createTables(db: CodemapDatabase) {
       value TEXT,
       parent_name TEXT,
       visibility TEXT,
-      complexity REAL
+      complexity REAL,
+      name_column_start INTEGER NOT NULL DEFAULT 0,
+      name_column_end INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -75,7 +77,12 @@ export function createTables(db: CodemapDatabase) {
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
       is_default INTEGER NOT NULL DEFAULT 0,
-      re_export_source TEXT
+      re_export_source TEXT,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      is_re_export INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS components (
@@ -98,7 +105,9 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       line_number INTEGER NOT NULL,
       kind TEXT NOT NULL,
-      content TEXT NOT NULL
+      content TEXT NOT NULL,
+      column_start INTEGER NOT NULL DEFAULT 0,
+      column_end INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_variables (
@@ -130,7 +139,10 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       caller_name TEXT NOT NULL,
       caller_scope TEXT NOT NULL,
-      callee_name TEXT NOT NULL
+      callee_name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS type_members (
@@ -141,6 +153,23 @@ export function createTables(db: CodemapDatabase) {
       type TEXT,
       is_optional INTEGER NOT NULL DEFAULT 0,
       is_readonly INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
+    -- want specifier-precise rewrites (rename specifier, dedupe, type-only
+    -- migrate) JOIN this table. The original imports.specifiers JSON stays
+    -- in place as a v1 convenience surface.
+    CREATE TABLE IF NOT EXISTS import_specifiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      source TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      imported_name TEXT NOT NULL,
+      local_name TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace')),
+      is_type_only INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     -- Opt-in suppressions — recipes LEFT JOIN to honor, ad-hoc SQL unaffected.
@@ -284,6 +313,8 @@ export function createIndexes(db: CodemapDatabase) {
 
     CREATE INDEX IF NOT EXISTS idx_exports_name ON exports(name, file_path, kind, is_default);
     CREATE INDEX IF NOT EXISTS idx_exports_file ON exports(file_path);
+    CREATE INDEX IF NOT EXISTS idx_exports_position ON exports(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_exports_re_export ON exports(is_re_export, file_path);
 
     CREATE INDEX IF NOT EXISTS idx_components_name ON components(name, file_path, props_type, hooks_used);
     CREATE INDEX IF NOT EXISTS idx_components_file ON components(file_path, name);
@@ -307,10 +338,16 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_type_members_symbol ON type_members(symbol_name, file_path, name, type, is_optional, is_readonly);
     CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
 
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_source ON import_specifiers(source, file_path);
+
     CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_position ON calls(file_path, line_start);
 
     -- Mirrors the typical join shape symbols.(file_path, name, line_start).
     -- The (file_path, name) prefix also covers GROUP BY file_path scans
@@ -351,6 +388,7 @@ export function dropAll(db: CodemapDatabase) {
   db.run(`
     DROP TABLE IF EXISTS calls;
     DROP TABLE IF EXISTS suppressions;
+    DROP TABLE IF EXISTS import_specifiers;
     DROP TABLE IF EXISTS type_members;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
@@ -489,6 +527,10 @@ export interface SymbolRow {
    * column existed; absence binds as `null`.
    */
   complexity?: number | null;
+  /** 0-based byte column of the symbol-name token start on `line_start` (per [R.6]). Optional for back-compat; defaults to 0. */
+  name_column_start?: number;
+  /** 0-based byte column one past the symbol-name token end. Optional for back-compat; defaults to 0. */
+  name_column_end?: number;
 }
 
 const BATCH_SIZE = 500;
@@ -521,8 +563,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -539,6 +581,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.parent_name,
         s.visibility,
         s.complexity ?? null,
+        s.name_column_start ?? 0,
+        s.name_column_end ?? 0,
       ),
   );
 }
@@ -585,16 +629,37 @@ export interface ExportRow {
   kind: string;
   is_default: number;
   re_export_source: string | null;
+  /** 1-based line of the exported name token (per [R.6]). */
+  line_start: number;
+  /** 1-based line of the export statement end (for multi-line exports). */
+  line_end: number;
+  /** 0-based byte column of the exported name token start. */
+  column_start: number;
+  /** 0-based byte column one past the exported name token end. */
+  column_end: number;
+  /** 1 when the export is `export … from 'mod'` (has `re_export_source`). */
+  is_re_export: number;
 }
 
 export function insertExports(db: CodemapDatabase, exports: ExportRow[]) {
   batchInsert(
     db,
     exports,
-    "INSERT INTO exports (file_path, name, kind, is_default, re_export_source)",
-    "(?,?,?,?,?)",
+    "INSERT INTO exports (file_path, name, kind, is_default, re_export_source, line_start, line_end, column_start, column_end, is_re_export)",
+    "(?,?,?,?,?,?,?,?,?,?)",
     (e, v) =>
-      v.push(e.file_path, e.name, e.kind, e.is_default, e.re_export_source),
+      v.push(
+        e.file_path,
+        e.name,
+        e.kind,
+        e.is_default,
+        e.re_export_source,
+        e.line_start,
+        e.line_end,
+        e.column_start,
+        e.column_end,
+        e.is_re_export,
+      ),
   );
 }
 
@@ -659,15 +724,27 @@ export interface MarkerRow {
   line_number: number;
   kind: string;
   content: string;
+  /** 0-based byte column where the marker tag (e.g. `TODO`) starts. Optional for back-compat. */
+  column_start?: number;
+  /** 0-based byte column one past the marker tag end. Optional for back-compat. */
+  column_end?: number;
 }
 
 export function insertMarkers(db: CodemapDatabase, markers: MarkerRow[]) {
   batchInsert(
     db,
     markers,
-    "INSERT INTO markers (file_path, line_number, kind, content)",
-    "(?,?,?,?)",
-    (m, v) => v.push(m.file_path, m.line_number, m.kind, m.content),
+    "INSERT INTO markers (file_path, line_number, kind, content, column_start, column_end)",
+    "(?,?,?,?,?,?)",
+    (m, v) =>
+      v.push(
+        m.file_path,
+        m.line_number,
+        m.kind,
+        m.content,
+        m.column_start ?? 0,
+        m.column_end ?? 0,
+      ),
   );
 }
 
@@ -769,15 +846,75 @@ export interface CallRow {
   caller_name: string;
   caller_scope: string;
   callee_name: string;
+  /** 1-based line of the callee identifier token (per [R.6]). */
+  line_start: number;
+  /** 0-based byte column of the callee identifier start. */
+  column_start: number;
+  /** 0-based byte column one past the callee identifier end. */
+  column_end: number;
 }
 
 export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name)",
-    "(?,?,?,?)",
-    (c, v) => v.push(c.file_path, c.caller_name, c.caller_scope, c.callee_name),
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)",
+    "(?,?,?,?,?,?,?)",
+    (c, v) =>
+      v.push(
+        c.file_path,
+        c.caller_name,
+        c.caller_scope,
+        c.callee_name,
+        c.line_start,
+        c.column_start,
+        c.column_end,
+      ),
+  );
+}
+
+/**
+ * Per-specifier row for `import { foo, bar as baz }` / `import foo from 'mod'`
+ * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) have
+ * no specifiers. JOIN to `imports` by (file_path, line, source) when the
+ * import statement's other fields are needed.
+ */
+export interface ImportSpecifierRow {
+  file_path: string;
+  source: string;
+  line: number;
+  /** 0-based byte column of the imported (or local) name token start (per [R.6]). */
+  column_start: number;
+  column_end: number;
+  /** Name as written in the source module (`foo` in `import { foo as bar }`); equals `local_name` when no alias. */
+  imported_name: string;
+  /** Name as bound locally (`bar` in `import { foo as bar }`); equals `imported_name` when no alias. For default + namespace imports, this is the binding name. */
+  local_name: string;
+  kind: "named" | "default" | "namespace";
+  is_type_only: number;
+}
+
+export function insertImportSpecifiers(
+  db: CodemapDatabase,
+  rows: ImportSpecifierRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO import_specifiers (file_path, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.source,
+        r.line,
+        r.column_start,
+        r.column_end,
+        r.imported_name,
+        r.local_name,
+        r.kind,
+        r.is_type_only,
+      ),
   );
 }
 

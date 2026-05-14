@@ -1,0 +1,13 @@
+[
+  {
+    "file_path": "src/consumer.ts",
+    "source": "~/components/shop",
+    "line": 2,
+    "column_start": 9,
+    "column_end": 20,
+    "imported_name": "ProductCard",
+    "local_name": "ProductCard",
+    "kind": "named",
+    "is_type_only": 0
+  }
+]

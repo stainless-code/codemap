@@ -18,6 +18,7 @@ import {
   insertFile,
   insertSymbols,
   insertImports,
+  insertImportSpecifiers,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -237,6 +238,9 @@ function insertParsedResults(
             insertImports(db, parsed.imports);
             if (deps.length) insertDependencies(db, deps);
           }
+          if (parsed.importSpecifiers?.length) {
+            insertImportSpecifiers(db, parsed.importSpecifiers);
+          }
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -414,6 +418,8 @@ export async function indexFiles(
             if (data.symbols.length) insertSymbols(db, data.symbols);
             const deps = resolveImports(absPath, data.imports, indexedPaths);
             if (data.imports.length) insertImports(db, data.imports);
+            if (data.importSpecifiers.length)
+              insertImportSpecifiers(db, data.importSpecifiers);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);

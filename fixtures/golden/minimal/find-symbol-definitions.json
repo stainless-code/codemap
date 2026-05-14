@@ -1,0 +1,13 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "name": "ProductCard",
+    "kind": "function",
+    "line_start": 11,
+    "line_end": 19,
+    "name_column_start": 16,
+    "name_column_end": 27,
+    "parent_name": null,
+    "signature": "ProductCard(props)"
+  }
+]

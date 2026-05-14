@@ -1,0 +1,119 @@
+import type { Comment, VisitorObject } from "oxc-parser";
+
+import type {
+  CallRow,
+  ComponentRow,
+  ExportRow,
+  ImportRow,
+  MarkerRow,
+  SymbolRow,
+  TypeMemberRow,
+} from "../db";
+
+/**
+ * Tier opt-out config key per [R.15](../../docs/plans/substrate-extraction.md).
+ * Typed as `string` (not a union) so tier PRs extend the set without
+ * coupling to a single literal type; the Zod schema in `config.ts` is the
+ * runtime validator.
+ */
+export type ExtractionTierId = string;
+
+/**
+ * `symbolsExtractor`'s enter handlers call `enter(name)` for PascalCase
+ * candidates; `componentsExtractor` owns JSX + hook recording and emits
+ * the `ComponentRow` at exit.
+ */
+export interface ComponentDetector {
+  enter(name: string): void;
+  current(): string | null;
+  exit(): void;
+  markJsx(): void;
+  recordHook(hookName: string): void;
+  hasJsxOrHooks(name: string): boolean;
+  /** Insertion-ordered hook names recorded for `name`. */
+  hooksFor(name: string): readonly string[];
+}
+
+/**
+ * Cyclomatic complexity (McCabe: CC = 1 + #decision points).
+ *
+ * `pushFor(symbolIndex)` on function-shape enter; `increment()` per
+ * branch; `popTop()` on exit writes back to `symbols[symbolIndex]`.
+ * `symbolIndex = -1` = anonymous (callbacks, IIFEs) — counted but
+ * never persisted so branches don't bleed into the outer scope.
+ *
+ * `markArrowSymbol(node, idx)` / `getArrowSymbol(node)` bridge the
+ * two-visit gap for arrow inits: symbol row pushed at
+ * `VariableDeclaration`, complexity counter pushed at
+ * `ArrowFunctionExpression`. WeakMap keyed by the init AST node.
+ */
+export interface ComplexityTracker {
+  pushFor(symbolIndex: number): void;
+  popTop(): void;
+  increment(): void;
+  markArrowSymbol(node: object, symbolIndex: number): void;
+  getArrowSymbol(node: object): number | undefined;
+}
+
+/**
+ * Lexical scope stack — `parent_name` (symbols), `caller_scope` (calls),
+ * future `scopes.id` (Tier 2 references). `scopesExtractor` owns pure-scope
+ * handlers (`MethodDefinition`); other extractors with scope-mutating
+ * handlers (`symbolsExtractor` on FunctionDeclaration / Class) call
+ * `push` / `pop` inline so read/push order matches pre-lift semantics.
+ */
+export interface ScopeTracker {
+  push(name: string): void;
+  pop(): void;
+  /** Innermost named scope, or `null` at module top level. */
+  currentParent(): string | null;
+  /** Dot-joined path outermost→innermost, e.g. `"OuterClass.method.foo"`. */
+  currentScope(): string;
+  top(): string | undefined;
+}
+
+/**
+ * Per-file context passed to every extractor's `register()`. Inputs are
+ * immutable; output sinks are appended by visitor handlers. Per-extractor
+ * state lives in each extractor's own closure — only state genuinely
+ * shared across extractors lives here.
+ */
+export interface ExtractContext {
+  readonly filePath: string;
+  readonly relPath: string;
+  readonly source: string;
+  readonly lang: "ts" | "tsx" | "js" | "jsx";
+  readonly isTsx: boolean;
+  readonly lineMap: number[];
+  readonly comments: readonly Comment[];
+  readonly exportedNames: ReadonlySet<string>;
+  readonly defaultExportedNames: ReadonlySet<string>;
+
+  readonly symbols: SymbolRow[];
+  readonly imports: ImportRow[];
+  readonly exports: ExportRow[];
+  readonly components: ComponentRow[];
+  readonly markers: MarkerRow[];
+  readonly typeMembers: TypeMemberRow[];
+  readonly calls: CallRow[];
+
+  readonly scopes: ScopeTracker;
+  readonly complexity: ComplexityTracker;
+  // Named `componentDetector` (not `components`) to avoid clashing with
+  // the `components: ComponentRow[]` output array.
+  readonly componentDetector: ComponentDetector;
+}
+
+/**
+ * One file per tier under `src/extractors/`. `register()` attaches
+ * node-type handlers + sets up per-file state in its closure. Multiple
+ * extractors on the same node type chain in registration order. Optional
+ * `finalize()` runs after the visit — used today by `markersExtractor`
+ * (regex pass over raw source), reserved for Tier 2's pass-2 binding
+ * resolution per [R.12].
+ */
+export interface TierExtractor {
+  readonly tierId: ExtractionTierId;
+  register(visitor: VisitorObject, ctx: ExtractContext): void;
+  finalize?(ctx: ExtractContext): void;
+}
