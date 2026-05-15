@@ -4,8 +4,8 @@ SELECT
   kind,
   name,
   CASE
-    WHEN is_skipped = 1 THEN 'skipped'
     WHEN is_only = 1 THEN 'only'
+    WHEN is_skipped = 1 THEN 'skipped'
     WHEN is_todo = 1 THEN 'todo'
   END AS status,
   framework

@@ -6,7 +6,7 @@ params:
     description: Exported name (exact match — `default` for default exports, the local-aliased name for `export { x as y }`).
 actions:
   - type: navigate-to-export-sites
-    description: "Each row carries `file_path:line_start:column_start` (callee-token-precise per R.6) plus `is_re_export` so consumers can branch on direct-export vs alias-chain shape."
+    description: "Each row carries `file_path:line_start:column_start` (export-name-token-precise per R.6) plus `is_re_export` so consumers can branch on direct-export vs alias-chain shape."
 ---
 
 # find-export-sites

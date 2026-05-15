@@ -148,8 +148,10 @@ function registerSymbolHandlers(
           continue;
         }
         const init = decl.init;
-        const lineStart = offsetToLine(lineMap, node.start);
-        const lineEnd = offsetToLine(lineMap, node.end);
+        // Per-declarator span — `const a = (…) => long, b = (…) => longer`
+        // must NOT use the whole-statement range or every row inflates.
+        const lineStart = offsetToLine(lineMap, decl.start);
+        const lineEnd = offsetToLine(lineMap, decl.end);
         const isExported =
           exportedNames.has(name) || defaultExportedNames.has(name);
         const isDefault = defaultExportedNames.has(name);

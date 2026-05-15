@@ -30,7 +30,11 @@ export function createScopeTracker(filePath: string): ScopeTracker {
     push(name, kind, lineStart, lineEnd) {
       const localId = nextLocalId++;
       stack.push({ name, localId });
-      scopeStr = scopeStr ? `${scopeStr}.${name}` : name;
+      // Anonymous scopes (callbacks, catch, for body) need a stable token
+      // so two sibling anons don't share `caller_scope` and dedup as one
+      // edge in `calls`.
+      const seg = name || `$anon_${localId}`;
+      scopeStr = scopeStr ? `${scopeStr}.${seg}` : seg;
       recorded.push({
         file_path: filePath,
         local_id: localId,
@@ -44,7 +48,7 @@ export function createScopeTracker(filePath: string): ScopeTracker {
     },
     pop() {
       stack.pop();
-      scopeStr = stack.map((s) => s.name).join(".");
+      scopeStr = stack.map((s) => s.name || `$anon_${s.localId}`).join(".");
     },
     currentParent() {
       // Skip anonymous scopes (empty-name, e.g. callback arrows) so

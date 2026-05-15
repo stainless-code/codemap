@@ -7,7 +7,7 @@ actions:
 
 # large-functions
 
-Functions, arrows, and methods whose `body_line_count` is ≥ 50, ranked by size. Joins with `complexity` (already on the row) so you can spot the ones that are both long and branchy in a single scan.
+Functions, arrows, and methods whose `body_line_count` is ≥ 50, ranked by size — top 50 returned (`LIMIT 50` in the SQL). Joins with `complexity` (already on the row) so you can spot the ones that are both long and branchy in a single scan.
 
 ```bash
 codemap query --recipe large-functions

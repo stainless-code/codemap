@@ -5,16 +5,28 @@
  * for `function_params.type_text` / `generic_params.constraint_text`.
  */
 
+/**
+ * Resolve a TSQualifiedName chain to its full dot-joined identifier.
+ * `tn.left` is itself a TSQualifiedName for ≥3-segment chains (`A.B.C`).
+ */
+function qualifiedNameOf(tn: any): string | null {
+  if (!tn) return null;
+  if (tn.type === "Identifier") return tn.name;
+  if (typeof tn.name === "string") return tn.name;
+  if (tn.type === "TSQualifiedName") {
+    const left = qualifiedNameOf(tn.left);
+    const right = tn.right?.name;
+    if (!left || !right) return null;
+    return `${left}.${right}`;
+  }
+  return null;
+}
+
 export function stringifyTypeNode(node: any): string | null {
   if (!node) return null;
   switch (node.type) {
     case "TSTypeReference": {
-      let name: string | null = null;
-      const tn = node.typeName;
-      if (tn?.type === "Identifier") name = tn.name;
-      else if (typeof tn?.name === "string") name = tn.name;
-      else if (tn?.type === "TSQualifiedName")
-        name = `${tn.left?.name ?? ""}.${tn.right?.name ?? ""}`;
+      const name = qualifiedNameOf(node.typeName);
       if (!name) return null;
       const ta = node.typeArguments ?? node.typeParameters;
       if (ta?.params?.length) {

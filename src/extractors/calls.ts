@@ -35,12 +35,27 @@ export const callsExtractor: TierExtractor = {
           tokenEnd = callee.end;
         } else if (
           callee?.type === "MemberExpression" &&
+          !callee.computed &&
           callee.property?.name
         ) {
-          if (callee.object?.type === "Identifier") {
-            calleeName = `${callee.object.name}.${callee.property.name}`;
-          } else if (callee.object?.type === "ThisExpression") {
-            calleeName = `this.${callee.property.name}`;
+          // Computed segments (`a[i].b()`) drop the chain — recipes filter
+          // by dot-joined identifier shape, computed breaks the shape.
+          const segments: string[] = [callee.property.name];
+          let cursor: any = callee.object;
+          while (
+            cursor?.type === "MemberExpression" &&
+            !cursor.computed &&
+            cursor.property?.name
+          ) {
+            segments.unshift(cursor.property.name);
+            cursor = cursor.object;
+          }
+          if (cursor?.type === "Identifier") {
+            segments.unshift(cursor.name);
+            calleeName = segments.join(".");
+          } else if (cursor?.type === "ThisExpression") {
+            segments.unshift("this");
+            calleeName = segments.join(".");
           }
           tokenStart = callee.property.start;
           tokenEnd = callee.property.end;

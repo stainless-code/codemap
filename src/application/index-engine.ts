@@ -444,7 +444,7 @@ export async function indexFiles(
               insertImportSpecifiers(db, data.importSpecifiers);
             if (data.scopes.length) insertScopes(db, data.scopes);
             if (data.references.length) insertReferences(db, data.references);
-            insertFileMetrics(db, [data.fileMetrics]);
+            if (data.fileMetrics) insertFileMetrics(db, [data.fileMetrics]);
             if (data.functionParams.length)
               insertFunctionParams(db, data.functionParams);
             if (data.runtimeMarkers.length)

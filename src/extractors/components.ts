@@ -17,25 +17,29 @@ const RE_HOOK = /^use[A-Z]/;
 export function createComponentDetector() {
   const hookCalls = new Map<string, string[]>(); // scope name → hooks (insertion-ordered)
   const jsxScopes = new Set<string>();
-  let currentScope: string | null = null;
+  // Stack so `function Outer() { function Inner() {…} }` keeps Outer's
+  // attribution after Inner exits.
+  const stack: string[] = [];
 
   return {
     enter(name: string) {
-      currentScope = name;
+      stack.push(name);
       if (!hookCalls.has(name)) hookCalls.set(name, []);
     },
     current() {
-      return currentScope;
+      return stack.length ? stack[stack.length - 1]! : null;
     },
     exit() {
-      currentScope = null;
+      stack.pop();
     },
     markJsx() {
-      if (currentScope) jsxScopes.add(currentScope);
+      const top = stack[stack.length - 1];
+      if (top) jsxScopes.add(top);
     },
     recordHook(hookName: string) {
-      if (!currentScope) return;
-      const list = hookCalls.get(currentScope);
+      const top = stack[stack.length - 1];
+      if (!top) return;
+      const list = hookCalls.get(top);
       if (list && !list.includes(hookName)) list.push(hookName);
     },
     hasJsxOrHooks(name: string) {

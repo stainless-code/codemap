@@ -14,6 +14,37 @@ export const referencesExtractor: TierExtractor = {
     const { references, relPath, lineMap, scopes } = ctx;
     const writePositions = new Set<number>();
     const suppressedReads = new Set<number>();
+    // `suppressRead` only on simple `=` — compound `+=` etc. read first.
+    function markPatternWrites(node: any, suppressRead: boolean): void {
+      if (!node) return;
+      if (node.type === "Identifier") {
+        writePositions.add(node.start);
+        if (suppressRead) suppressedReads.add(node.start);
+        return;
+      }
+      if (node.type === "ObjectPattern") {
+        for (const prop of node.properties ?? []) {
+          if (prop.type === "RestElement") {
+            markPatternWrites(prop.argument, suppressRead);
+          } else {
+            markPatternWrites(prop.value, suppressRead);
+          }
+        }
+        return;
+      }
+      if (node.type === "ArrayPattern") {
+        for (const el of node.elements ?? [])
+          markPatternWrites(el, suppressRead);
+        return;
+      }
+      if (node.type === "AssignmentPattern") {
+        markPatternWrites(node.left, suppressRead);
+        return;
+      }
+      if (node.type === "RestElement") {
+        markPatternWrites(node.argument, suppressRead);
+      }
+    }
     // JSX identifiers that are NOT bindings: lowercase native HTML tag
     // names (`div`, `span`) + attribute names (`className`, `onClick`) +
     // JSXMemberExpression .property (`<Foo.Bar />` Bar is a member).
@@ -52,11 +83,8 @@ export const referencesExtractor: TierExtractor = {
       // oxc walks parents before children — pre-marks land before the
       // Identifier handler fires on the same node.
       AssignmentExpression(node: any) {
-        if (node.left?.type === "Identifier") {
-          writePositions.add(node.left.start);
-          // Simple `=` is write-only; compound (`+=`, etc.) dual-emits.
-          if (node.operator === "=") suppressedReads.add(node.left.start);
-        }
+        const isSimple = node.operator === "=";
+        markPatternWrites(node.left, isSimple);
       },
       UpdateExpression(node: any) {
         if (node.argument?.type === "Identifier") {
