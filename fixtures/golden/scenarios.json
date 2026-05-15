@@ -47,7 +47,7 @@
     {
       "id": "markers-notes-todo",
       "prompt": "TODO marker in fixture notes markdown",
-      "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
+      "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md' ORDER BY line_number"
     },
     {
       "id": "exports-client",
