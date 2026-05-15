@@ -492,13 +492,33 @@ Empirical (codemap-self, 933 files):
 | Full reindex                 | 1513 ms          | 1025 ms                   | -32% (less binding work) |
 | Targeted (1 file)            | 9 ms             | 9 ms                      | no regression            |
 
-Deferred to a future slice (NOT Tier 2 anymore — separate work):
+**Tier 2.4 ship report (2026-05-15):** the final close.
 
-- Callback arrow scoping (`.map((s) => …)` — `s` currently resolves to enclosing function; pushes scope ambiguity). Most of the remaining 5.5% unresolved is callback arrows.
-- Interface / type-alias type-param scoping.
-- External-module bindings via `.d.ts` parsing.
+What landed:
 
-**Tier 2 closed.** 5.5% unresolved is the conservative-on-ambiguity floor for the current scope model; further reductions require structural changes to arrow scoping.
+- **`claimedScopeNodes: WeakSet<object>`** on `ExtractContext`. Every extractor that pushes a scope for a specific AST node marks the node here so downstream extractors don't double-push.
+- **`ArrowFunctionExpression` handler** in `scopesExtractor`. For arrows NOT already claimed (i.e. callback arrows like `arr.map((s) => …)`), pushes an anonymous "arrow" scope and emits params. Named arrows (`const foo = () => …`) stay claimed by `symbolsExtractor.VariableDeclaration` and don't double-push.
+- **`CatchClause` handler** — `try { … } catch (err) { … }` gets its own anonymous scope, with the param emitted as a `kind='param'` symbol. Bindingless `catch { … }` (TS 4.4+ optional binding) is handled.
+- **`ScopeTracker.currentParent`** walks past anonymous scopes (empty-name) so `parent_name` of nested symbols still anchors to the nearest named owner — preserving pre-Tier-2.4 semantics for `const foo = () => { const bar = … }`.
+- **Extra globals:** `Bun`, `Deno` runtime globals.
+
+Empirical (codemap-self, 933 files):
+
+| Metric            | Pre-Tier 2.4     | Post-Tier 2.4    | Delta               |
+| ----------------- | ---------------- | ---------------- | ------------------- |
+| Same-file         | 51,972           | 55,480           | +6.7%               |
+| Global            | 5,954            | 6,019            | +1.1%               |
+| **Unresolved**    | **4,634 (5.5%)** | **1,102 (1.3%)** | **-76% / -4.2 pts** |
+| Full reindex      | 1025 ms          | 1224 ms          | +19%                |
+| Targeted (1 file) | 9 ms             | 9 ms             | no regression       |
+
+Deferred to a future slice (out of Tier 2 scope):
+
+- Interface / type-alias type-param scoping (currently same-letter type params across interfaces collide at module scope).
+- External-module bindings via `.d.ts` parsing (`react`'s `useState`, etc. resolve to `is_external=1, resolved_symbol_id=NULL`).
+- `for (const x of …)` / `for (const x in …)` body-scoping (today `x` shares parent function scope).
+
+**Tier 2 closed at 1.3% unresolved.** The remaining bucket is dominated by truly unindexable refs (`infer T` in conditional types, `.codemap/audit-cache/` re-indexed worktrees) and a thin tail of complex AST patterns.
 
 ---
 

@@ -103,6 +103,7 @@ function registerSymbolHandlers(
       complexity.pushFor(symbolIndex);
 
       scopes.push(name, "function", lineStart, lineEnd);
+      ctx.claimedScopeNodes.add(node);
       pushTypeParams(node.typeParameters, scopes.currentLocalId(), name, ctx);
       pushParams(
         node.params,
@@ -178,6 +179,7 @@ function registerSymbolHandlers(
 
         if (isArrowOrFn) {
           scopes.push(name, "arrow", lineStart, lineEnd);
+          ctx.claimedScopeNodes.add(init);
           if (init) complexity.markArrowSymbol(init, symbolIndex);
           pushTypeParams(
             init.typeParameters,
@@ -386,6 +388,7 @@ function registerSymbolHandlers(
         classLineStart,
         offsetToLine(lineMap, node.end),
       );
+      ctx.claimedScopeNodes.add(node);
       const classScopeLocalId = scopes.currentLocalId();
       pushTypeParams(node.typeParameters, classScopeLocalId, name, ctx);
       // Constructor params live in the class scope (constructor is a

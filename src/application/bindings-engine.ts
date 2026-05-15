@@ -185,6 +185,8 @@ const GLOBALS = new Set([
   "__dirname",
   "__filename",
   "self",
+  "Bun",
+  "Deno",
 ]);
 
 interface SymbolEntry {

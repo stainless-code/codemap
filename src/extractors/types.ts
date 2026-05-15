@@ -113,6 +113,13 @@ export interface ExtractContext {
   // Named `componentDetector` (not `components`) to avoid clashing with
   // the `components: ComponentRow[]` output array.
   readonly componentDetector: ComponentDetector;
+  /**
+   * AST nodes whose scope has been pushed by their owning extractor.
+   * Function-shape extractors (Function/Class/Method/named arrow) mark
+   * their node here; arrowScopesExtractor uses it to detect orphan
+   * callback arrows that still need a scope.
+   */
+  readonly claimedScopeNodes: WeakSet<object>;
 }
 
 /**

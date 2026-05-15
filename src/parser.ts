@@ -179,6 +179,7 @@ export function extractFileData(
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
+    claimedScopeNodes: new WeakSet(),
   };
 
   const multiplexedVisitor = new Visitor(

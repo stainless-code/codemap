@@ -47,7 +47,15 @@ export function createScopeTracker(filePath: string): ScopeTracker {
       scopeStr = stack.map((s) => s.name).join(".");
     },
     currentParent() {
-      return stack.length ? stack[stack.length - 1]!.name : null;
+      // Skip anonymous scopes (empty-name, e.g. callback arrows) so
+      // nested symbols' parent_name still points at the nearest named
+      // owner — preserves pre-arrow-scoping semantics for
+      // `const foo = () => { const bar = … }` style code.
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const n = stack[i]!.name;
+        if (n) return n;
+      }
+      return null;
     },
     currentScope() {
       return scopeStr;
@@ -79,6 +87,10 @@ export const scopesExtractor: TierExtractor = {
         const lineStart = node.loc?.start?.line ?? 0;
         const lineEnd = node.loc?.end?.line ?? 0;
         scopes.push(name, "method", lineStart, lineEnd);
+        ctx.claimedScopeNodes.add(node);
+        // Method bodies are FunctionExpression — mark them too so the
+        // arrow handler doesn't re-push.
+        if (node.value) ctx.claimedScopeNodes.add(node.value);
         // Constructor params already emitted as class-scope symbols by
         // symbolsExtractor.ClassDeclaration — skip to avoid duplicates.
         if (node.kind !== "constructor" && node.value?.params?.length) {
@@ -103,6 +115,55 @@ export const scopesExtractor: TierExtractor = {
         if (name && scopes.top() === name) {
           scopes.pop();
         }
+      },
+      // Orphan callback arrows (`arr.map((x) => …)`): push an anonymous
+      // scope so params don't collide with the enclosing function's.
+      // VariableDeclaration / MethodDefinition / FunctionDeclaration
+      // claim their arrows in `claimedScopeNodes` so we don't double-push.
+      ArrowFunctionExpression(node: any) {
+        if (ctx.claimedScopeNodes.has(node)) return;
+        const lineStart = node.loc?.start?.line ?? 0;
+        const lineEnd = node.loc?.end?.line ?? 0;
+        scopes.push("", "arrow", lineStart, lineEnd);
+        if (node.params?.length) {
+          pushParams(
+            node.params,
+            scopes.currentLocalId(),
+            null,
+            ctx,
+            jsDocComments,
+            source,
+          );
+        }
+      },
+      "ArrowFunctionExpression:exit"(node: any) {
+        if (ctx.claimedScopeNodes.has(node)) return;
+        if (scopes.top() === "") scopes.pop();
+      },
+      // `try { … } catch (err) { … }` — `err` is bound in catch body's
+      // own scope. Push anonymous scope + emit param so the body refs
+      // resolve. Bindingless `catch { … }` (TS 4.4+ optional param) has
+      // `param === null` — no symbol needed.
+      CatchClause(node: any) {
+        scopes.push(
+          "",
+          "function",
+          node.loc?.start?.line ?? 0,
+          node.loc?.end?.line ?? 0,
+        );
+        if (node.param) {
+          pushParams(
+            [node.param],
+            scopes.currentLocalId(),
+            null,
+            ctx,
+            jsDocComments,
+            source,
+          );
+        }
+      },
+      "CatchClause:exit"() {
+        if (scopes.top() === "") scopes.pop();
       },
     });
   },
