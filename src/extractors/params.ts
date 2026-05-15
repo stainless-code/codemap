@@ -1,9 +1,10 @@
 /**
- * Function/method parameter symbol emission. Helpers called from the
- * function-shape handlers in `symbolsExtractor` / `scopesExtractor` so
- * the caller's already-pushed scope is the param's scope_local_id.
- * Destructuring patterns (Array/Object) defer to a follow-up — v1 only
- * Identifier / AssignmentPattern / RestElement / TSParameterProperty.
+ * Function/method parameter + variable-destructuring symbol emission.
+ * Helpers called from the function-shape handlers in `symbolsExtractor`
+ * / `scopesExtractor` so the caller's already-pushed scope is the
+ * binding's scope_local_id. `walkPattern` handles Identifier /
+ * AssignmentPattern / RestElement / TSParameterProperty / ObjectPattern
+ * / ArrayPattern recursively.
  */
 
 import type { JsDocEntry } from "./jsdoc";
@@ -12,52 +13,71 @@ import { offsetToLine } from "./offsets";
 import { stringifyTypeNode } from "./type-stringify";
 import type { ExtractContext } from "./types";
 
-interface ParamIdentifier {
+interface PatternBinding {
   id: { name: string; start: number; end: number };
   typeAnnotation: any;
   isRest: boolean;
   isOptional: boolean;
 }
 
-function paramIdentifier(p: any): ParamIdentifier | null {
-  if (!p) return null;
+/**
+ * Recursively yield every leaf Identifier binding in a binding-position
+ * pattern. Handles `function f(a, { b, c: x } = {}, ...rest)`-style
+ * destructuring + TS parameter properties.
+ */
+function* walkPattern(p: any): Generator<PatternBinding> {
+  if (!p) return;
   if (p.type === "Identifier") {
-    return {
+    yield {
       id: p,
       typeAnnotation: p.typeAnnotation?.typeAnnotation,
       isRest: false,
       isOptional: p.optional === true,
     };
+    return;
   }
-  if (p.type === "AssignmentPattern" && p.left?.type === "Identifier") {
-    return {
-      id: p.left,
-      typeAnnotation: p.left.typeAnnotation?.typeAnnotation,
-      isRest: false,
-      isOptional: true,
-    };
+  if (p.type === "AssignmentPattern") {
+    yield* walkPattern(p.left);
+    return;
   }
-  if (p.type === "RestElement" && p.argument?.type === "Identifier") {
-    return {
-      id: p.argument,
-      typeAnnotation: p.typeAnnotation?.typeAnnotation,
-      isRest: true,
-      isOptional: false,
-    };
+  if (p.type === "RestElement") {
+    for (const inner of walkPattern(p.argument)) {
+      yield { ...inner, isRest: true };
+    }
+    return;
   }
-  // `constructor(public foo: T)` — TS parameter property
+  if (p.type === "ObjectPattern") {
+    for (const prop of p.properties ?? []) {
+      if (prop.type === "RestElement") {
+        for (const inner of walkPattern(prop.argument)) {
+          yield { ...inner, isRest: true };
+        }
+      } else {
+        // Property — shorthand `{ a }` has value === key; renamed
+        // `{ a: b }` binds the local name `b`. Either way the binding
+        // is the `value` slot.
+        yield* walkPattern(prop.value);
+      }
+    }
+    return;
+  }
+  if (p.type === "ArrayPattern") {
+    for (const el of p.elements ?? []) {
+      yield* walkPattern(el);
+    }
+    return;
+  }
   if (p.type === "TSParameterProperty" && p.parameter) {
-    return paramIdentifier(p.parameter);
+    yield* walkPattern(p.parameter);
   }
-  return null;
 }
 
 /**
  * Push type-parameter symbols (kind='type-param') for a generic
  * function/class. Caller's already-pushed scope is the type-param's
- * scope_local_id. Interfaces/type aliases skipped in v1 — they don't
- * push their own scope, so collisions across same-letter type params
- * (`interface A<T>`, `interface B<T>`) can't be disambiguated yet.
+ * scope_local_id. Interfaces/type aliases skipped — they don't push
+ * their own scope, so same-letter type params (`interface A<T>`,
+ * `interface B<T>`) can't be disambiguated. Tracked as follow-up.
  */
 export function pushTypeParams(
   typeParameters: any,
@@ -116,28 +136,72 @@ export function pushParams(
   if (!params?.length) return;
   const { symbols, relPath, lineMap } = ctx;
   for (const p of params) {
-    const parsed = paramIdentifier(p);
-    if (!parsed) continue;
-    const { id, typeAnnotation, isRest, isOptional } = parsed;
+    for (const parsed of walkPattern(p)) {
+      const { id, typeAnnotation, isRest, isOptional } = parsed;
+      const lineStart = offsetToLine(lineMap, id.start);
+      const lineStartOffset = lineMap[lineStart - 1] ?? 0;
+      const typeStr = typeAnnotation ? stringifyTypeNode(typeAnnotation) : null;
+      const prefix = isRest ? "..." : "";
+      const suffix = isOptional ? "?" : "";
+      const sig = typeStr
+        ? `${prefix}${id.name}${suffix}: ${typeStr}`
+        : `${prefix}${id.name}${suffix}`;
+      symbols.push({
+        file_path: relPath,
+        name: id.name,
+        kind: "param",
+        line_start: lineStart,
+        line_end: lineStart,
+        signature: sig,
+        is_exported: 0,
+        is_default_export: 0,
+        members: null,
+        doc_comment: findJsDoc(jsDocComments, id.start, source),
+        value: null,
+        parent_name: parentName,
+        visibility: null,
+        name_column_start: id.start - lineStartOffset,
+        name_column_end: id.end - lineStartOffset,
+        scope_local_id: scopeLocalId,
+      });
+    }
+  }
+}
+
+/**
+ * Emit each leaf binding of a `const`/`let`/`var` destructuring as a
+ * `kind='const'` symbol in the declarator's scope. Same walker as
+ * function params; the scope is the parent (declarator scope), not a
+ * pushed function scope.
+ */
+export function pushDestructuredVars(
+  pattern: any,
+  scopeLocalId: number,
+  parentName: string | null,
+  ctx: ExtractContext,
+) {
+  if (!pattern) return;
+  const { symbols, relPath, lineMap } = ctx;
+  for (const parsed of walkPattern(pattern)) {
+    const { id, typeAnnotation, isRest } = parsed;
     const lineStart = offsetToLine(lineMap, id.start);
     const lineStartOffset = lineMap[lineStart - 1] ?? 0;
     const typeStr = typeAnnotation ? stringifyTypeNode(typeAnnotation) : null;
     const prefix = isRest ? "..." : "";
-    const suffix = isOptional ? "?" : "";
     const sig = typeStr
-      ? `${prefix}${id.name}${suffix}: ${typeStr}`
-      : `${prefix}${id.name}${suffix}`;
+      ? `${prefix}${id.name}: ${typeStr}`
+      : `${prefix}${id.name}`;
     symbols.push({
       file_path: relPath,
       name: id.name,
-      kind: "param",
+      kind: "const",
       line_start: lineStart,
       line_end: lineStart,
       signature: sig,
       is_exported: 0,
       is_default_export: 0,
       members: null,
-      doc_comment: findJsDoc(jsDocComments, id.start, source),
+      doc_comment: null,
       value: null,
       parent_name: parentName,
       visibility: null,

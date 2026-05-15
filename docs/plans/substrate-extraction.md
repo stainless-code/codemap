@@ -276,7 +276,7 @@ New recipe candidates: `dedupe-imports`, `consolidate-type-only-imports`, `stale
 
 ### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier)
 
-**Status (2026-05-15):** scopes + references shipped 2026-05-15; bindings shipped 2026-05-15 (Tier 2.1). See ship reports below.
+**Status (2026-05-15):** Tier 2 closed. Scopes + references shipped 2026-05-15; bindings shipped 2026-05-15 (Tier 2.1); params + type params + re-export chains shipped 2026-05-15 (Tier 2.2); member-access + destructuring + type globals shipped 2026-05-15 (Tier 2.3). See ship reports below.
 
 **Goal:** Every identifier _use_ — call, type position, JSX, decorator, shorthand, member access, spread — becomes a queryable row. Plus a lexical scope graph and per-reference binding resolution to the originating symbol.
 
@@ -460,12 +460,45 @@ Empirical (codemap-self, 933 files):
 | Full reindex      | 1175 ms      | 1513 ms       | +29%                         |
 | Targeted (1 file) | 9 ms         | 9 ms          | no regression                |
 
-Deferred to **Tier 2.3**:
+Deferred to **Tier 2.3** (shipped 2026-05-15 — see report below):
 
 - Destructuring pattern params (`function f({ a, b }) {...}` — emits 0 param symbols today).
 - Interface / type-alias type-param scoping (would unlock generic-type refs inside type definitions).
 - Callback arrow scoping (`arr.map((x) => …)` — `x` is currently scoped to the enclosing function, not the arrow).
 - External-module bindings (`react`, etc.) via `package.json` `types` lookup → indexed `.d.ts` parsing.
+
+**Tier 2.3 ship report (2026-05-15):**
+
+What landed (SCHEMA_VERSION 17 → 18):
+
+- **`kind='member'` references** for non-computed property access (`obj.foo`). Replaces the misleading `value`-kind emission of property names. Bindings resolver skips these — they're property names, not bindings. Cut unresolved by ~50% on its own.
+- **Object-literal / class-member key suppression**. Long-hand `Property` keys (`{ name: "x" }`), `MethodDefinition` keys, `PropertyDefinition` keys, `TSPropertySignature` / `TSMethodSignature` keys are NOT emitted as references. Shorthand and computed keys still emit normally.
+- **Destructuring pattern bindings** for `const { a, b } = obj` and `const [x, y] = arr`. `walkPattern` generator handles Identifier / AssignmentPattern / RestElement / ObjectPattern / ArrayPattern / TSParameterProperty recursively; same helper used by `pushParams` (which now handles `function f({a, b})` correctly) and `pushDestructuredVars` (variable destructuring at the parent scope).
+- **`TYPE_GLOBALS` set** in `bindings-engine` — TypeScript built-ins (`Record`, `Partial`, `ReadonlyArray`, `Map`, etc.) resolve to `resolution_kind='global'` instead of `unresolved`.
+- **Extra value globals** added: `performance`, `import`, `require`, `module`, `exports`, `__dirname`, `__filename`, `self`.
+- **`as const` skip**: `TSTypeReference` with name `const` is no longer emitted (it's a TS keyword in type position).
+
+Empirical (codemap-self, 933 files):
+
+| Metric                       | Pre-Tier 2.3     | Post-Tier 2.3             | Delta                    |
+| ---------------------------- | ---------------- | ------------------------- | ------------------------ |
+| Total refs                   | 127,313          | 128,387 (+1k member kind) | small                    |
+| `references.kind = 'member'` | 0                | 26,701                    | new                      |
+| Bindings rows                | 127k             | 84k                       | -34% (members skipped)   |
+| Same-file                    | 51,299           | 51,972                    | +1.3%                    |
+| Imported                     | 21,889           | 21,777                    | -0.5%                    |
+| Global                       | 5,554            | 5,954                     | +7% (type globals)       |
+| **Unresolved**               | **49,534 (39%)** | **4,634 (5.5%)**          | **-90% / -34 pts**       |
+| Full reindex                 | 1513 ms          | 1025 ms                   | -32% (less binding work) |
+| Targeted (1 file)            | 9 ms             | 9 ms                      | no regression            |
+
+Deferred to a future slice (NOT Tier 2 anymore — separate work):
+
+- Callback arrow scoping (`.map((s) => …)` — `s` currently resolves to enclosing function; pushes scope ambiguity). Most of the remaining 5.5% unresolved is callback arrows.
+- Interface / type-alias type-param scoping.
+- External-module bindings via `.d.ts` parsing.
+
+**Tier 2 closed.** 5.5% unresolved is the conservative-on-ambiguity floor for the current scope model; further reductions require structural changes to arrow scoping.
 
 ---
 

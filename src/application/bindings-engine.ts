@@ -7,6 +7,97 @@
 import type { BindingRow, CodemapDatabase } from "../db";
 import { insertBindings } from "../db";
 
+// TypeScript built-in type names — `Record`, `Partial`, etc. plus the
+// stdlib types DOM exposes (`RegExp`, `Map`, `Set`, …). Used only for
+// kind='type' refs.
+const TYPE_GLOBALS = new Set([
+  "Record",
+  "Partial",
+  "Required",
+  "Readonly",
+  "Pick",
+  "Omit",
+  "Exclude",
+  "Extract",
+  "NonNullable",
+  "Parameters",
+  "ReturnType",
+  "InstanceType",
+  "Awaited",
+  "ThisType",
+  "ThisParameterType",
+  "OmitThisParameter",
+  "ConstructorParameters",
+  "Uppercase",
+  "Lowercase",
+  "Capitalize",
+  "Uncapitalize",
+  "ReadonlyArray",
+  "ReadonlyMap",
+  "ReadonlySet",
+  "Array",
+  "Map",
+  "Set",
+  "WeakMap",
+  "WeakSet",
+  "Promise",
+  "Date",
+  "RegExp",
+  "RegExpExecArray",
+  "RegExpMatchArray",
+  "Error",
+  "TypeError",
+  "RangeError",
+  "SyntaxError",
+  "ReferenceError",
+  "Iterable",
+  "IterableIterator",
+  "Iterator",
+  "AsyncIterable",
+  "AsyncIterator",
+  "Generator",
+  "AsyncGenerator",
+  "MessageEvent",
+  "Event",
+  "EventTarget",
+  "Worker",
+  "Window",
+  "Document",
+  "HTMLElement",
+  "URL",
+  "URLSearchParams",
+  "Buffer",
+  "Uint8Array",
+  "Uint16Array",
+  "Uint32Array",
+  "Int8Array",
+  "Int16Array",
+  "Int32Array",
+  "Float32Array",
+  "Float64Array",
+  "BigInt64Array",
+  "BigUint64Array",
+  "ArrayBuffer",
+  "SharedArrayBuffer",
+  "DataView",
+  "Function",
+  "Object",
+  "String",
+  "Number",
+  "Boolean",
+  "Symbol",
+  "BigInt",
+  "ErrorEvent",
+  "MessagePort",
+  "MessageChannel",
+  "BroadcastChannel",
+  "FormData",
+  "FileReader",
+  "Headers",
+  "Request",
+  "Response",
+]);
+
 // Conservative set — DOM + Node + ES2022 mainline only. Extending bumps
 // the false-positive rate on `unresolved` recipes (typo detection).
 const GLOBALS = new Set([
@@ -86,6 +177,14 @@ const GLOBALS = new Set([
   "decodeURIComponent",
   "encodeURI",
   "decodeURI",
+  "performance",
+  "import",
+  "require",
+  "module",
+  "exports",
+  "__dirname",
+  "__filename",
+  "self",
 ]);
 
 interface SymbolEntry {
@@ -282,13 +381,18 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
       .map((r) => r.path),
   );
 
+  // Skip kind='member' refs — property access RHS isn't a binding.
+  // Consumers querying for member usage filter `kind='member'` directly.
   const refs = db
     .query<{
       id: number;
       file_path: string;
       name: string;
       scope_local_id: number;
-    }>('SELECT id, file_path, name, scope_local_id FROM "references"')
+      kind: string;
+    }>(
+      "SELECT id, file_path, name, scope_local_id, kind FROM \"references\" WHERE kind != 'member'",
+    )
     .all();
 
   const out: BindingRow[] = [];
@@ -341,7 +445,13 @@ function followReExportChain(
 }
 
 function resolveOne(
-  ref: { id: number; file_path: string; name: string; scope_local_id: number },
+  ref: {
+    id: number;
+    file_path: string;
+    name: string;
+    scope_local_id: number;
+    kind: string;
+  },
   symbolsByFile: Map<string, Map<string, SymbolEntry[]>>,
   scopeParents: Map<string, Map<number, number | null>>,
   importsByFile: Map<string, Map<string, ImportSpec>>,
@@ -409,6 +519,14 @@ function resolveOne(
   }
 
   if (GLOBALS.has(ref.name)) {
+    return {
+      reference_id: ref.id,
+      resolved_symbol_id: null,
+      resolution_kind: "global",
+      is_external: 1,
+    };
+  }
+  if (ref.kind === "type" && TYPE_GLOBALS.has(ref.name)) {
     return {
       reference_id: ref.id,
       resolved_symbol_id: null,

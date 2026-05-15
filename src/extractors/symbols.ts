@@ -16,7 +16,7 @@ import { isComponentCandidate } from "./components";
 import { buildJsDocIndex, findJsDoc } from "./jsdoc";
 import type { JsDocEntry } from "./jsdoc";
 import { offsetToLine } from "./offsets";
-import { pushParams, pushTypeParams } from "./params";
+import { pushDestructuredVars, pushParams, pushTypeParams } from "./params";
 import {
   buildFunctionSignature,
   extractLiteralValue,
@@ -128,7 +128,22 @@ function registerSymbolHandlers(
     VariableDeclaration(node: any) {
       for (const decl of node.declarations) {
         const name = decl.id?.name;
-        if (!name) continue;
+        if (!name) {
+          // Destructuring pattern: `const { a, b } = ...` or `const [x] = ...`.
+          // Emit each leaf as a kind='const' symbol at the current scope.
+          if (
+            decl.id?.type === "ObjectPattern" ||
+            decl.id?.type === "ArrayPattern"
+          ) {
+            pushDestructuredVars(
+              decl.id,
+              scopes.currentLocalId(),
+              scopes.currentParent(),
+              ctx,
+            );
+          }
+          continue;
+        }
         const init = decl.init;
         const lineStart = offsetToLine(lineMap, node.start);
         const lineEnd = offsetToLine(lineMap, node.end);

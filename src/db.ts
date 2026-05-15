@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -181,7 +181,7 @@ export function createTables(db: CodemapDatabase) {
       line_start INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
       column_end INTEGER NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('value','type','jsx')),
+      kind TEXT NOT NULL CHECK (kind IN ('value','type','jsx','member')),
       scope_local_id INTEGER NOT NULL DEFAULT 0,
       is_write INTEGER NOT NULL DEFAULT 0
     ) STRICT;
@@ -955,7 +955,7 @@ export interface ReferenceRow {
   line_start: number;
   column_start: number;
   column_end: number;
-  kind: "value" | "type" | "jsx";
+  kind: "value" | "type" | "jsx" | "member";
   /** Matches `scopes.local_id` within the same file (`0` = module scope). */
   scope_local_id: number;
   is_write: number;

@@ -24,7 +24,7 @@ export const referencesExtractor: TierExtractor = {
       name: string,
       start: number,
       end: number,
-      kind: "value" | "type" | "jsx",
+      kind: "value" | "type" | "jsx" | "member",
       isWrite: number,
     ) {
       const seen = isWrite ? emittedWrite : emittedRead;
@@ -132,8 +132,46 @@ export const referencesExtractor: TierExtractor = {
       TSTypeReference(node: any) {
         const tn = node.typeName;
         if (tn?.type === "Identifier" && typeof tn.name === "string") {
+          // `as const` / `<const T>` — TS keyword in type position, not
+          // a real type name.
+          if (tn.name === "const") return;
           pushRef(tn.name, tn.start, tn.end, "type", 0);
         }
+      },
+      // Non-computed property access (`obj.foo`) — the property identifier
+      // is a member name, not a binding. Suppress the default value-row
+      // and emit as kind='member' so consumers can opt in.
+      MemberExpression(node: any) {
+        if (node.computed || node.property?.type !== "Identifier") return;
+        const p = node.property;
+        suppressedReads.add(p.start);
+        pushRef(p.name, p.start, p.end, "member", 0);
+      },
+      // Object-literal property keys (`{ foo: 1 }`). Skip shorthand
+      // (`{ foo }`) — there the key IS the binding ref. Also skip
+      // computed (`{ [expr]: 1 }`) — `expr` is a real value ref.
+      Property(node: any) {
+        if (node.shorthand || node.computed) return;
+        if (node.key?.type !== "Identifier") return;
+        suppressedReads.add(node.key.start);
+      },
+      // Class method / property name (`class { foo() {} }` / `foo = 1;`).
+      MethodDefinition(node: any) {
+        if (node.computed || node.key?.type !== "Identifier") return;
+        suppressedReads.add(node.key.start);
+      },
+      PropertyDefinition(node: any) {
+        if (node.computed || node.key?.type !== "Identifier") return;
+        suppressedReads.add(node.key.start);
+      },
+      // TS interface / type-literal member signatures (`{ foo: T }`).
+      TSPropertySignature(node: any) {
+        if (node.computed || node.key?.type !== "Identifier") return;
+        suppressedReads.add(node.key.start);
+      },
+      TSMethodSignature(node: any) {
+        if (node.computed || node.key?.type !== "Identifier") return;
+        suppressedReads.add(node.key.start);
       },
     });
   },
