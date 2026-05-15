@@ -16,6 +16,7 @@ Full rule (today's version, served by the installed binary):
 
 - **CLI:** `codemap rule`
 - **MCP:** read resource `codemap://rule`
+- **HTTP:** `GET /resources/{encoded-uri}` against `codemap serve`
 
 If `codemap` prints a pointer-protocol warning on startup, re-run `codemap agents init --force` to refresh this template.
 

@@ -72,13 +72,13 @@ Append alone would duplicate on every run — markers + replace are what prevent
 
 Once `agents init` has written the pointer templates, the consumer's disk holds 12–20 lines per file. The actual content is served live:
 
-| Surface                | Skill                                         | Rule                      |
-| ---------------------- | --------------------------------------------- | ------------------------- |
-| CLI                    | `codemap skill`                               | `codemap rule`            |
-| MCP                    | resource `codemap://skill`                    | resource `codemap://rule` |
-| HTTP (`codemap serve`) | `GET /resources/{encoded-uri}` for either URI | —                         |
+| Surface                | Skill                                                    | Rule                                                    |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| CLI                    | `codemap skill`                                          | `codemap rule`                                          |
+| MCP                    | resource `codemap://skill`                               | resource `codemap://rule`                               |
+| HTTP (`codemap serve`) | `GET /resources/{encoded uri}` against `codemap://skill` | `GET /resources/{encoded uri}` against `codemap://rule` |
 
-All three resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts`; the MCP path caches lazily per-process, the CLI re-assembles every call (cheap — markdown read + concat).
+All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts`; the CLI re-assembles every call (cheap — markdown read + concat).
 
 ## Section assembler and `*.gen.md`
 

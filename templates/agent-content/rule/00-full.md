@@ -95,7 +95,7 @@ Validation: SQL is rejected at load time if it starts with DML/DDL (DELETE/DROP/
 
 To use from your agent host: launch `codemap mcp` as the MCP server command. Most hosts (Claude Code, Cursor, Codex) accept a stdio command + working directory; codemap will index the working directory's project root.
 
-**Bundled rules/skills:** **`codemap agents init`** writes thin pointer files into **`.agents/`** (rule + skill); full content for each is served live by **`codemap rule`** / **`codemap skill`** (CLI) and **`codemap://rule`** / **`codemap://skill`** (MCP) — so `bun update @stainless-code/codemap` auto-refreshes the content without re-running init (see [docs/agents.md](../../../docs/agents.md)).
+**Bundled rules/skills:** **`codemap agents init`** writes thin pointer files into **`.agents/`** (rule + skill); full content for each is served live by **`codemap rule`** / **`codemap skill`** (CLI), **`codemap://rule`** / **`codemap://skill`** (MCP), and the same URIs via `GET /resources/{encoded-uri}` against **`codemap serve`** (HTTP) — so `bun update @stainless-code/codemap` auto-refreshes the content without re-running init (see [docs/agents.md](../../../docs/agents.md)).
 
 Index another project: **`--root /path/to/repo`**, or set **`CODEMAP_ROOT`** or **`CODEMAP_TEST_BENCH`** (e.g. in **`.env`** — see [docs/benchmark.md § Indexing another project](../../../docs/benchmark.md#indexing-another-project)). Full rebuild: **`--full`**. Targeted re-index: **`--files path/to/a.ts path/to/b.tsx`**.
 
@@ -224,7 +224,7 @@ codemap query --json "<SQL>"
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 
-For the full schema, advanced query patterns, and troubleshooting, fetch the skill: **`codemap skill`** (CLI) or **`codemap://skill`** (MCP) — the on-disk `.agents/skills/codemap/SKILL.md` is a thin pointer to that live content.
+For the full schema, advanced query patterns, and troubleshooting, fetch the skill: **`codemap skill`** (CLI), **`codemap://skill`** (MCP), or `GET /resources/{encoded-uri}` for that URI against **`codemap serve`** (HTTP) — the on-disk `.agents/skills/codemap/SKILL.md` is a thin pointer to that live content.
 
 ## Keeping it fresh
 
