@@ -14,6 +14,10 @@ export const referencesExtractor: TierExtractor = {
     const { references, relPath, lineMap, scopes } = ctx;
     const writePositions = new Set<number>();
     const suppressedReads = new Set<number>();
+    // JSX identifiers that are NOT bindings: lowercase native HTML tag
+    // names (`div`, `span`) + attribute names (`className`, `onClick`) +
+    // JSXMemberExpression .property (`<Foo.Bar />` Bar is a member).
+    const suppressedJsx = new Set<number>();
     // Dedup: shorthand `import {foo}` / `export {foo}` / `{foo}` property
     // share the same Identifier between imported/local, exported/local,
     // or key/value edges — oxc visits both, hitting the node twice.
@@ -125,9 +129,48 @@ export const referencesExtractor: TierExtractor = {
         }
       },
       JSXIdentifier(node: any) {
+        if (suppressedJsx.has(node.start)) return;
         const name = node.name;
         if (typeof name !== "string" || name.length === 0) return;
         pushRef(name, node.start, node.end, "jsx", 0);
+      },
+      // Pre-mark JSX positions that AREN'T bindings.
+      JSXOpeningElement(node: any) {
+        const nameNode = node.name;
+        // Lowercase tag = native HTML element, not a binding.
+        if (
+          nameNode?.type === "JSXIdentifier" &&
+          typeof nameNode.name === "string" &&
+          /^[a-z]/.test(nameNode.name)
+        ) {
+          suppressedJsx.add(nameNode.start);
+        }
+        // Attribute names are prop names (like object-literal keys).
+        for (const attr of node.attributes ?? []) {
+          if (attr.type !== "JSXAttribute") continue;
+          const n = attr.name;
+          if (n?.type === "JSXIdentifier") {
+            suppressedJsx.add(n.start);
+          } else if (n?.type === "JSXNamespacedName") {
+            if (n.namespace) suppressedJsx.add(n.namespace.start);
+            if (n.name) suppressedJsx.add(n.name.start);
+          }
+        }
+      },
+      JSXClosingElement(node: any) {
+        if (
+          node.name?.type === "JSXIdentifier" &&
+          typeof node.name.name === "string" &&
+          /^[a-z]/.test(node.name.name)
+        ) {
+          suppressedJsx.add(node.name.start);
+        }
+      },
+      JSXMemberExpression(node: any) {
+        // `<Foo.Bar />` — Bar is a member access, not a binding.
+        if (node.property?.type === "JSXIdentifier") {
+          suppressedJsx.add(node.property.start);
+        }
       },
       TSTypeReference(node: any) {
         const tn = node.typeName;
@@ -136,6 +179,27 @@ export const referencesExtractor: TierExtractor = {
           // a real type name.
           if (tn.name === "const") return;
           pushRef(tn.name, tn.start, tn.end, "type", 0);
+        }
+        // TSQualifiedName (`React.ReactNode`) is handled by its own
+        // pre-marker; nothing to do here for the qualified case.
+      },
+      // `A.B` / `A.B.C` in type position — `A` is a real type ref (the
+      // namespace), `.B` / `.C` are member accesses. Walker descends to
+      // children after this handler, so pre-mark them.
+      TSQualifiedName(node: any) {
+        if (node.left?.type === "Identifier") {
+          suppressedReads.add(node.left.start);
+          pushRef(node.left.name, node.left.start, node.left.end, "type", 0);
+        }
+        if (node.right?.type === "Identifier") {
+          suppressedReads.add(node.right.start);
+          pushRef(
+            node.right.name,
+            node.right.start,
+            node.right.end,
+            "member",
+            0,
+          );
         }
       },
       // Non-computed property access (`obj.foo`) — the property identifier
