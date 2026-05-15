@@ -3,13 +3,11 @@ SELECT
   kind,
   file_path,
   line_start,
-  line_end,
   body_line_count,
-  param_count,
   complexity,
   nesting_depth
 FROM symbols
-WHERE body_line_count IS NOT NULL
-  AND body_line_count >= 50
-ORDER BY body_line_count DESC
+WHERE nesting_depth IS NOT NULL
+  AND nesting_depth >= 4
+ORDER BY nesting_depth DESC, complexity DESC
 LIMIT 50;

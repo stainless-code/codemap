@@ -145,6 +145,11 @@
       "recipe": "large-functions"
     },
     {
+      "id": "deeply-nested-functions",
+      "prompt": "Functions with nesting_depth >= 4, ranked by depth/complexity.",
+      "recipe": "deeply-nested-functions"
+    },
+    {
       "id": "circular-imports",
       "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
       "recipe": "circular-imports"

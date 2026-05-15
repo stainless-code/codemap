@@ -14,23 +14,39 @@ import type { ComplexityTracker, TierExtractor } from "./types";
 export function createComplexityTracker(
   symbols: SymbolRow[],
 ): ComplexityTracker {
-  const stack: { symbolIndex: number; count: number }[] = [];
+  const stack: {
+    symbolIndex: number;
+    count: number;
+    currentDepth: number;
+    maxDepth: number;
+  }[] = [];
   const arrowMap = new WeakMap<object, number>();
 
   return {
     pushFor(symbolIndex) {
-      stack.push({ symbolIndex, count: 1 });
+      stack.push({ symbolIndex, count: 1, currentDepth: 0, maxDepth: 0 });
     },
     popTop() {
       const top = stack.pop();
       if (!top) return;
       if (top.symbolIndex >= 0) {
         symbols[top.symbolIndex].complexity = top.count;
+        symbols[top.symbolIndex].nesting_depth = top.maxDepth;
       }
     },
     increment() {
       const top = stack[stack.length - 1];
       if (top) top.count++;
+    },
+    enterNest() {
+      const top = stack[stack.length - 1];
+      if (!top) return;
+      top.currentDepth++;
+      if (top.currentDepth > top.maxDepth) top.maxDepth = top.currentDepth;
+    },
+    exitNest() {
+      const top = stack[stack.length - 1];
+      if (top && top.currentDepth > 0) top.currentDepth--;
     },
     markArrowSymbol(node, symbolIndex) {
       arrowMap.set(node, symbolIndex);
@@ -45,7 +61,11 @@ export const complexityExtractor: TierExtractor = {
   tierId: "complexity",
   register(visitor, ctx) {
     const { complexity } = ctx;
-    const inc = () => complexity.increment();
+    const nest = () => {
+      complexity.enterNest();
+      complexity.increment();
+    };
+    const unnest = () => complexity.exitNest();
 
     Object.assign(visitor, {
       // `symbolsExtractor`'s VariableDeclaration populates the arrow
@@ -64,19 +84,30 @@ export const complexityExtractor: TierExtractor = {
         complexity.popTop();
       },
 
-      // Cyclomatic-complexity branching nodes — each adds 1 to the
-      // currently-walked function's count. Tracks if/loops/case/catch/&&/||/??/?:.
-      IfStatement: inc,
-      WhileStatement: inc,
-      DoWhileStatement: inc,
-      ForStatement: inc,
-      ForInStatement: inc,
-      ForOfStatement: inc,
-      ConditionalExpression: inc, // `a ? b : c`
-      CatchClause: inc,
+      // Cyclomatic-complexity branching nodes — each adds 1. Block-bearing
+      // forms (if/for/while/try/ternary) ALSO increment nesting_depth
+      // on enter and decrement on exit.
+      IfStatement: nest,
+      "IfStatement:exit": unnest,
+      WhileStatement: nest,
+      "WhileStatement:exit": unnest,
+      DoWhileStatement: nest,
+      "DoWhileStatement:exit": unnest,
+      ForStatement: nest,
+      "ForStatement:exit": unnest,
+      ForInStatement: nest,
+      "ForInStatement:exit": unnest,
+      ForOfStatement: nest,
+      "ForOfStatement:exit": unnest,
+      ConditionalExpression: nest, // `a ? b : c`
+      "ConditionalExpression:exit": unnest,
+      CatchClause: nest,
+      "CatchClause:exit": unnest,
       SwitchCase(node: any) {
         // `default:` is the fall-through arm, not a decision point — only
-        // count `case X:` arms.
+        // count `case X:` arms. SwitchCase is a child of SwitchStatement;
+        // we count the cases, not the switch wrapper, for cyclomatic. No
+        // nesting bump (switch arms are sibling, not depth).
         if (node.test !== null && node.test !== undefined) {
           complexity.increment();
         }

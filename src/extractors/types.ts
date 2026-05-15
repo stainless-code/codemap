@@ -53,6 +53,10 @@ export interface ComplexityTracker {
   pushFor(symbolIndex: number): void;
   popTop(): void;
   increment(): void;
+  /** Enter a nesting-bearing block (if/for/while/ternary/try). Updates current+max depth. */
+  enterNest(): void;
+  /** Exit a nesting-bearing block. */
+  exitNest(): void;
   markArrowSymbol(node: object, symbolIndex: number): void;
   getArrowSymbol(node: object): number | undefined;
 }
