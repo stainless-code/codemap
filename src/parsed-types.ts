@@ -12,6 +12,8 @@ import type {
   CssKeyframeRow,
   TypeMemberRow,
   CallRow,
+  ScopeRow,
+  ReferenceRow,
 } from "./db";
 
 /**
@@ -39,6 +41,8 @@ export interface ParsedFile {
   suppressions?: SuppressionRow[];
   typeMembers?: TypeMemberRow[];
   calls?: CallRow[];
+  scopes?: ScopeRow[];
+  references?: ReferenceRow[];
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

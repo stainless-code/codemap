@@ -100,7 +100,7 @@ function registerSymbolHandlers(
       });
       complexity.pushFor(symbolIndex);
 
-      scopes.push(name);
+      scopes.push(name, "function", lineStart, lineEnd);
       if (isComponentCandidate(name, isTsx)) {
         componentDetector.enter(name);
       }
@@ -150,7 +150,7 @@ function registerSymbolHandlers(
         });
 
         if (isArrowOrFn) {
-          scopes.push(name);
+          scopes.push(name, "arrow", lineStart, lineEnd);
           if (init) complexity.markArrowSymbol(init, symbolIndex);
         }
         if (isArrowOrFn && isComponentCandidate(name, isTsx)) {
@@ -335,7 +335,12 @@ function registerSymbolHandlers(
         visibility: null,
         ...nameTokenColumns(node.id, classLineStart, lineMap),
       });
-      scopes.push(name);
+      scopes.push(
+        name,
+        "class",
+        classLineStart,
+        offsetToLine(lineMap, node.end),
+      );
       extractClassMembers(
         node.body?.body,
         relPath,

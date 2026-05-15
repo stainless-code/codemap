@@ -119,6 +119,18 @@
       "params": { "imported_name": "ProductCard" }
     },
     {
+      "id": "find-references",
+      "prompt": "Parametrised recipe: every identifier USE of ProductCard (value/type/jsx with column-precise position + scope context per R.11)",
+      "recipe": "find-references",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-write-sites",
+      "prompt": "Parametrised recipe: every WRITE to `perms` per R.13 (assignments, declarations, compound updates)",
+      "recipe": "find-write-sites",
+      "params": { "name": "perms" }
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

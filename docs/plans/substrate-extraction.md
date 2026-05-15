@@ -276,6 +276,8 @@ New recipe candidates: `dedupe-imports`, `consolidate-type-only-imports`, `stale
 
 ### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier)
 
+**Status (2026-05-15):** scopes + references **shipped**; bindings deferred to Tier 2.1 follow-up. See "Tier 2 ship report" below.
+
 **Goal:** Every identifier _use_ — call, type position, JSX, decorator, shorthand, member access, spread — becomes a queryable row. Plus a lexical scope graph and per-reference binding resolution to the originating symbol.
 
 **Schema delta:**
@@ -379,6 +381,37 @@ New recipe candidates: `rename-app-wide` (extends `rename-preview` to JOIN `refe
 - (a) `references.is_write` — **RESOLVED 2026-05-14 → [R.13](#pre-locked-decisions).** Boolean column; compound assignment emits two rows (one read, one write).
 - (b) Per Q2 / R.12: pre-resolution settled.
 - (c) Per Q12 / R.14: FTS5 stays file-content-only; B-tree index on `references.name` is the strategy.
+
+**Tier 2 ship report (2026-05-15):**
+
+What landed (commit `<tier2>` against SCHEMA_VERSION 16):
+
+- **`scopes` table** — composite PK `(file_path, local_id)`, `WITHOUT ROWID`. `local_id` is a per-file 0-based counter assigned at parse time so refs encode their scope without round-tripping SQLite autoincrement. Kinds: `module` / `function` / `arrow` / `class` / `method`. Block / for / catch deferred — R.11's conservative-on-ambiguity escape valve covers it (body refs resolve to enclosing function scope).
+- **`references` table** — `(id, file_path, name, line_start, column_start, column_end, kind, scope_local_id, is_write)`. Kinds shipped: `value` / `type` / `jsx`. Reserved kinds in the original CHECK enum (`decorator` / `shorthand-prop` / `member-access` / etc.) deferred — see "what didn't ship" below.
+- **`is_write` per R.13** — handled via `writePositions` / `suppressedReads` sets keyed by node.start. Pre-marker handlers for `AssignmentExpression` (simple `=` suppresses the read), `UpdateExpression` (`++` / `--` dual-emits), `UnaryExpression(delete)` (dual-emit), `VariableDeclarator` with initializer (write-only), `ForOfStatement` / `ForInStatement` LHS, `AssignmentPattern`.
+- **Declaration suppression** — `FunctionDeclaration` / `ClassDeclaration` / `TSInterfaceDeclaration` / `TSTypeAliasDeclaration` / `TSEnumDeclaration` / `TSModuleDeclaration` `.id` Identifiers are NOT emitted as references. They live in `symbols` (Tier 1's `name_column_start/end`). App-wide rename consumers query both tables; this avoids duplication.
+- **Shorthand dedup** — oxc walker visits the SAME Identifier twice when `import {foo}` / `export {foo}` / `{foo}` (Property shorthand) share the imported/local / exported/local / key/value nodes. Dedup by `(node.start, is_write)` in the Identifier handler.
+- **`referencesExtractor`** — new module per R.17 (`src/extractors/references.ts`, 132 lines). Registers Identifier / JSXIdentifier / TSTypeReference + the parent pre-markers above. Wires through `ExtractContext` / `ParsedFile` / `index-engine`.
+- **`ScopeTracker` extension** — `pushKind(name, kind, lineStart, lineEnd)` + `currentLocalId()` + `getRecorded()`. Factory accepts `filePath` (needed for scope rows). Module scope (`local_id = 0`) eagerly inserted; `finaliseModule(lineEnd)` updates its `line_end` after the walk.
+- **Recipes (Slice 2.D):** `find-references --params name=X` (refs JOIN scopes, every kind/is_write), `find-write-sites --params name=X` (`is_write=1` filter). Both have golden fixtures.
+- **Schema bumps:** 14 → 15 (scopes) → 16 (references). Full rebuild on bump per R.16.
+
+What didn't ship (deferred to **Tier 2.1**, a focused follow-up slice):
+
+- **`bindings` table + pass-2 resolution** — same-file scope walk → imports → exports → re-export chains. The most complex piece of R.12; isolating it as Tier 2.1 keeps Tier 2 reviewable.
+- **Reference kinds:** `decorator` / `shorthand-prop` / `shorthand-import` / `member-access` / `computed-member` / `spread` / `rest` / `as-cast` / `typeof` / `keyof`. The current `CHECK` enum is narrowed to `value` / `type` / `jsx`. Tier 2.1 expands the enum and adds handlers.
+- **Block / for / catch scope kinds** — body refs currently resolve to the enclosing function/class scope (acceptable per R.11's conservative-on-ambiguity escape valve). True block scoping arrives with a Tier 2.2.
+
+**Empirical perf (codemap-self, 925 files):**
+
+| Metric                    | Pre-Tier 2 (Tier 1 shipped) | Post-Tier 2                       | Delta |
+| ------------------------- | --------------------------- | --------------------------------- | ----- |
+| Full reindex              | ~300 ms                     | 767 ms                            | +2.5× |
+| Targeted reindex (1 file) | 8 ms                        | 9 ms                              | +12%  |
+| DB rows                   | n/a                         | 127,313 references / 2,062 scopes | new   |
+| Write refs                | n/a                         | ~10k (~8% of all refs)            | new   |
+
+Both numbers are well within the plan's thresholds (full < 1 min, targeted < 100 ms per R.9 / R.10).
 
 ---
 

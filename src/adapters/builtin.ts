@@ -27,6 +27,8 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     typeMembers: data.typeMembers,
     calls: data.calls,
     importSpecifiers: data.importSpecifiers,
+    scopes: data.scopes,
+    references: data.references,
   };
 }
 

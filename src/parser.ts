@@ -18,6 +18,8 @@ import type {
   MarkerRow,
   TypeMemberRow,
   CallRow,
+  ScopeRow,
+  ReferenceRow,
 } from "./db";
 import { callsExtractor } from "./extractors/calls";
 import {
@@ -31,6 +33,7 @@ import {
 import { extractVisibility } from "./extractors/jsdoc";
 import { markersExtractor } from "./extractors/markers";
 import { buildLineMap, offsetToLine } from "./extractors/offsets";
+import { referencesExtractor } from "./extractors/references";
 import { createScopeTracker, scopesExtractor } from "./extractors/scopes";
 import { symbolsExtractor } from "./extractors/symbols";
 import type { ExtractContext, TierExtractor } from "./extractors/types";
@@ -47,6 +50,8 @@ interface ExtractedData {
   markers: MarkerRow[];
   typeMembers: TypeMemberRow[];
   calls: CallRow[];
+  scopes: ScopeRow[];
+  references: ReferenceRow[];
 }
 
 /**
@@ -89,6 +94,7 @@ const EXTRACTORS: readonly TierExtractor[] = [
   complexityExtractor,
   callsExtractor,
   componentsExtractor,
+  referencesExtractor,
   markersExtractor,
 ];
 
@@ -121,6 +127,7 @@ export function extractFileData(
   const markers: MarkerRow[] = [];
   const typeMembers: TypeMemberRow[] = [];
   const calls: CallRow[] = [];
+  const references: ReferenceRow[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -168,7 +175,8 @@ export function extractFileData(
     markers,
     typeMembers,
     calls,
-    scopes: createScopeTracker(),
+    references,
+    scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
   };
@@ -195,6 +203,8 @@ export function extractFileData(
     markers,
     typeMembers,
     calls,
+    scopes: [...ctx.scopes.getRecorded()],
+    references,
   };
 }
 

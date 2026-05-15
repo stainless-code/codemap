@@ -6,6 +6,7 @@ import type {
   ExportRow,
   ImportRow,
   MarkerRow,
+  ReferenceRow,
   SymbolRow,
   TypeMemberRow,
 } from "../db";
@@ -57,19 +58,37 @@ export interface ComplexityTracker {
 
 /**
  * Lexical scope stack — `parent_name` (symbols), `caller_scope` (calls),
- * future `scopes.id` (Tier 2 references). `scopesExtractor` owns pure-scope
+ * `scope_local_id` (Tier 2 references). `scopesExtractor` owns pure-scope
  * handlers (`MethodDefinition`); other extractors with scope-mutating
  * handlers (`symbolsExtractor` on FunctionDeclaration / Class) call
  * `push` / `pop` inline so read/push order matches pre-lift semantics.
+ *
+ * Per [R.11] Tier 2: the tracker also RECORDS each push as a `ScopeRow`
+ * with a per-file `local_id` counter (module = 0). `getRecorded()`
+ * returns the full set for orchestrator flush. Block / for / catch
+ * scopes defer to a future slice — function / arrow / class / method are
+ * sufficient for v1 reference→scope resolution per R.11's
+ * conservative-on-ambiguity escape valve.
  */
 export interface ScopeTracker {
-  push(name: string): void;
+  push(
+    name: string,
+    kind?: "function" | "arrow" | "class" | "method",
+    lineStart?: number,
+    lineEnd?: number,
+  ): void;
   pop(): void;
   /** Innermost named scope, or `null` at module top level. */
   currentParent(): string | null;
   /** Dot-joined path outermost→innermost, e.g. `"OuterClass.method.foo"`. */
   currentScope(): string;
   top(): string | undefined;
+  /** Per-file scope id of the innermost scope. `0` = module scope. */
+  currentLocalId(): number;
+  /** Set the module-scope owner once the file's last line is known. */
+  finaliseModule(lineEnd: number): void;
+  /** All recorded scope rows for the file, in insertion order. */
+  getRecorded(): readonly import("../db").ScopeRow[];
 }
 
 /**
@@ -96,6 +115,7 @@ export interface ExtractContext {
   readonly markers: MarkerRow[];
   readonly typeMembers: TypeMemberRow[];
   readonly calls: CallRow[];
+  readonly references: ReferenceRow[];
 
   readonly scopes: ScopeTracker;
   readonly complexity: ComplexityTracker;
