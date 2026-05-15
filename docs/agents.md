@@ -4,9 +4,22 @@
 
 ## What it does
 
-The published package ships **`templates/agents/`** (rules + skills). This repo also has [`.agents/`](../.agents/) for **Codemap development** (CLI from source); it is **not** identical to **`templates/agents/`** for every file (e.g. the **codemap** rule/skill). The command **`codemap agents init`** writes each bundled template file into **`<project>/.agents/`** with per-file copies (not a wholesale directory sync) — the **canonical** copy consumers edit (SQL, team conventions, paths).
+The published package ships two parallel directories under `templates/`:
 
-**Maintenance discipline:** Core CLI / schema / recipe changes must update **both** copies of the codemap rule + skill in the same PR — see [README.md Rule 10](./README.md). Drift between `templates/agents/` and `.agents/` should be CLI-prefix-only (`codemap` vs `bun src/index.ts`).
+| Directory                      | Role                                                                                                                 | Lifecycle                                                                    |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| **`templates/agents/`**        | Consumer-disk targets — what **`codemap agents init`** copies into **`<project>/.agents/`**                          | Stable across releases; only changes when the pointer protocol shape changes |
+| **`templates/agent-content/`** | Server-side source served by **`codemap skill`** / **`codemap rule`** / **`codemap://skill`** / **`codemap://rule`** | Updates every release as recipes / schema / narrative evolve                 |
+
+The split exists so consumers can `bun update @stainless-code/codemap` and pick up today's reference content automatically — **the file on their disk is a thin pointer that always fetches live**. No `agents init --force` needed unless the pointer shape itself changes.
+
+This repo also has [`.agents/`](../.agents/) for Codemap development (CLI from source); after the v1 pointer rewrite it mirrors `templates/agents/` (pointers, not fat content). Drift between the two should be zero — both regenerate from the same templates via `bun src/index.ts agents init --force`.
+
+**Maintenance discipline (post-pointer-protocol):**
+
+- **Code, schema, recipe changes** → auto-flow into the served skill via `*.gen.md` renderers in `src/application/agent-content.ts`. No template edit required.
+- **Hand-written narrative changes** (overview, recipes context, query patterns, maintenance, troubleshooting) → edit `templates/agent-content/skill/*.md` directly. Single source of truth.
+- **Pointer template shape changes** (frontmatter schema, fetch instructions, marker comments) → edit `templates/agents/{rules/codemap,skills/codemap/SKILL}.md` AND bump `EXPECTED_POINTER_VERSION` in `src/application/agent-content.ts` so consumers see the staleness nag and re-run `agents init --force`.
 
 **Query examples** in the bundled **codemap** rule and skill lead with **`codemap query --json`** (agents and automation). Omit **`--json`** when you want **`console.table`** in a terminal — see [README.md § CLI](../README.md#cli).
 
@@ -55,15 +68,68 @@ Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md
 
 Append alone would duplicate on every run — markers + replace are what prevent duplicates and staleness.
 
+## Live fetch surface (CLI + MCP + HTTP)
+
+Once `agents init` has written the pointer templates, the consumer's disk holds 12–20 lines per file. The actual content is served live:
+
+| Surface                | Skill                                                    | Rule                                                    |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
+| CLI                    | `codemap skill`                                          | `codemap rule`                                          |
+| MCP                    | resource `codemap://skill`                               | resource `codemap://rule`                               |
+| HTTP (`codemap serve`) | `GET /resources/{encoded uri}` against `codemap://skill` | `GET /resources/{encoded uri}` against `codemap://rule` |
+
+All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts`; the CLI re-assembles every call (cheap — markdown read + concat).
+
+## Section assembler and `*.gen.md`
+
+`templates/agent-content/<kind>/` is a directory of section files concatenated in lexical name order (joined with a blank line). A numeric prefix (`00-`, `10-`, …) controls section order so renumbering is a file-rename, never a code edit.
+
+`*.gen.md` files have special semantics: if a renderer is registered for the path `<kind>/<filename>` in the `RENDERERS` map (in `agent-content.ts`), the renderer's output replaces the on-disk file body at assembly time. The on-disk file still controls section ordering and carries a hand-written fallback for environments where the renderer's data source is unreachable (today: none).
+
+Current skill section layout:
+
+| File                    | Source                                    | Updates when                                                         |
+| ----------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
+| `00-overview.md`        | Hand-written                              | Rare (intro / CLI usage / output contract)                           |
+| `10-recipes-context.md` | Hand-written                              | Rare (flags, MCP/HTTP/Apply, tools, resources)                       |
+| `20-recipes.gen.md`     | Generated from `listQueryRecipeCatalog()` | Every recipe added under `templates/recipes/` or `.codemap/recipes/` |
+| `30-schema.gen.md`      | Generated from `createTables()` DDL       | Every column / table added in `src/db.ts`                            |
+| `40-query-patterns.md`  | Hand-written                              | Rare (basic / dep / component / CSS / agg examples)                  |
+| `50-maintenance.md`     | Hand-written                              | Rare (re-indexing guidance)                                          |
+| `90-troubleshooting.md` | Hand-written                              | Rare (FAQ)                                                           |
+
+Adding a new generated section: write a renderer, register it in `RENDERERS`, drop a placeholder `XX-name.gen.md` in the kind directory (the placeholder body is the offline-fallback prose). No assembler change.
+
+## Pointer protocol and staleness detection
+
+Every consumer-disk template carries an HTML-comment stamp:
+
+```markdown
+<!-- codemap-pointer-version: 1 -->
+```
+
+On every codemap invocation the runtime scans `<root>/.agents/{skills/codemap/SKILL,rules/codemap}.md` once and prints a single stderr nag when:
+
+- Stamp present and `< EXPECTED_POINTER_VERSION` → "v0, expected v1".
+- Stamp absent and file is "fat" (>50 lines) → treated as pre-pointer legacy.
+- Stamp absent and file is short → silent (assumed user-managed override).
+
+Cure: `codemap agents init --force` rewrites the bundled paths to current pointers. Should fire roughly once a year — only bump `EXPECTED_POINTER_VERSION` when the **shape** of the pointer file changes (frontmatter schema, fetch URI list, marker comments), not when the served content changes.
+
+Warning goes to stderr only so `codemap skill > file.md` stays clean.
+
 ## Implementation (for contributors)
 
-| Source                               | Role                                                                                                                                                                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`src/agents-init.ts`**             | **`runAgentsInit`**, **`upsertCodemapPointerFile`**, **`listRegularFilesRecursive`**, **`applyAgentsInitTargets`** (per-file **`copyFileSync`** / **`symlinkFilesGranular`**), **`ensureGitignoreCodemapPattern`**, **`targetsNeedLinkMode`**. |
-| **`src/agents-init-interactive.ts`** | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                                                                                                          |
-| **`src/cli/cmd-agents.ts`**          | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                                                                                                                        |
+| Source                                     | Role                                                                                                                                                                                                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`src/agents-init.ts`**                   | **`runAgentsInit`**, **`upsertCodemapPointerFile`**, **`listRegularFilesRecursive`**, **`applyAgentsInitTargets`** (per-file **`copyFileSync`** / **`symlinkFilesGranular`**), **`ensureGitignoreCodemapPattern`**, **`targetsNeedLinkMode`**. |
+| **`src/agents-init-interactive.ts`**       | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                                                                                                          |
+| **`src/cli/cmd-agents.ts`**                | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                                                                                                                        |
+| **`src/cli/cmd-skill.ts`**                 | `codemap skill` / `codemap rule` verbs; thin wrapper over `assembleAgentContent(kind)`.                                                                                                                                                        |
+| **`src/application/agent-content.ts`**     | `assembleAgentContent`, `RENDERERS` map, `renderRecipesSection`, `renderSchemaSection`, `checkConsumerPointers`, `maybeWarnStalePointers`, `EXPECTED_POINTER_VERSION`.                                                                         |
+| **`src/application/resource-handlers.ts`** | `readSkill` / `readRule` (MCP + HTTP resource handlers; both delegate to `assembleAgentContent`).                                                                                                                                              |
 
-Do **not** duplicate long IDE matrices, **`--force`** / pointer behavior, or **`codemap-pointer`** details in **README.md** or **packaging.md** — link **here** instead.
+Do **not** duplicate long IDE matrices, **`--force`** / pointer behavior, **`codemap-pointer`** details, section assembler shape, or pointer-version semantics in **README.md** or **packaging.md** — link **here** instead.
 
 ## Related
 

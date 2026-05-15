@@ -105,6 +105,7 @@ Resources:
     codemap://recipes/{id}       Single recipe (id, description, sql).
     codemap://schema             Live DDL of every table.
     codemap://skill              Bundled SKILL.md.
+    codemap://rule               Bundled codemap rule markdown.
   Live read-per-call (no caching — see latest indexed state every read):
     codemap://files/{path}       Per-file roll-up (symbols, imports,
                                  exports, coverage). URI-encode the path.

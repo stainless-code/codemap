@@ -7,6 +7,12 @@ How **@stainless-code/codemap** is built and published. **Doc index:** [README.m
 - **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs build.
 - **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** — no `src/` on npm.
 
+The `templates/` directory ships two parallel subtrees:
+
+- **`templates/agents/`** — consumer-disk targets copied by `codemap agents init` (thin pointer files: ~16-line SKILL.md + ~22-line rule).
+- **`templates/agent-content/`** — server-side source assembled live by `codemap skill` / `codemap rule` / `codemap://skill` / `codemap://rule`. Section files in `agent-content/skill/` concatenate in lexical order; `*.gen.md` files are replaced at fetch time by renderers in `src/application/agent-content.ts`. See [agents.md](./agents.md#section-assembler-and-genmd) for the split rationale.
+- **`templates/recipes/`** — bundled SQL recipe `.sql` + `.md` pairs (every recipe in `--recipes-json`).
+
 ## Consuming locally
 
 Published tarballs match **`package.json` `files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** (no `src/`). **`bun run pack`**, then point the consumer at **`file:…/stainless-code-codemap-*.tgz`**, or use **`file:/path/to/repo`** after build, or **`bun link`**. If **`better-sqlite3`** fails in the consumer, **`npm rebuild better-sqlite3`** (native addon must match that Node).

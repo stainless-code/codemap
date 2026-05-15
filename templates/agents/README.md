@@ -1,9 +1,7 @@
 # Bundled agent templates
 
-These files ship with **`@stainless-code/codemap`** for **`codemap agents init`** — written for **npm consumers** ( **`codemap`**, **`npx @stainless-code/codemap`**, etc.).
+`codemap agents init` copies these files into `<your-project>/.agents/`. Since v1, both `rules/codemap.md` and `skills/codemap/SKILL.md` are **thin pointers** (~16–22 lines). The full content is served live by `codemap rule` / `codemap skill` (CLI), `codemap://rule` / `codemap://skill` (MCP), and `GET /resources/{encoded-uri}` against `codemap serve` (HTTP) — all three resolve to the same source under `templates/agent-content/`.
 
-In **this** repository, **`.agents/`** (and **`.cursor/`** symlinks) are **maintainer / dev** copies: examples use **`bun src/index.ts`** where that matters. **`templates/agents/`** is the **published** agent surface and is **not** required to match **`.agents/`** byte-for-byte (the **codemap** rule and skill intentionally differ). Query examples in the **codemap** rule and skill lead with **`codemap query --json`**; omit **`--json`** for **`console.table`** in a terminal ([README § CLI](../../README.md#cli)).
+Package upgrades carry today's content automatically; you don't normally edit the pointer files. To add your own project-specific rules / skills, drop **sibling** files (e.g. `.agents/rules/my-team-conventions.md`, `.agents/skills/my-domain/SKILL.md`) — the codemap pointers stay package-managed.
 
-**Documentation:** [docs/agents.md](../../docs/agents.md) — interactive setup, **`.gitignore`**, and optional IDE wiring (Cursor, Copilot, …).
-
-After running the command in **your** project, **edit** **`.agents/`** there (paths, SQL, team conventions). Treat updates here as a reference when refreshing your copy.
+**Full docs:** [`docs/agents.md` on GitHub](https://github.com/stainless-code/codemap/blob/main/docs/agents.md) — pointer protocol, section assembler, IDE wiring (Cursor, Copilot, …), staleness detection.

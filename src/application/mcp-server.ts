@@ -311,6 +311,12 @@ function registerResources(server: McpServer): void {
     "codemap://skill",
     "Full text of the bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.",
   );
+  registerStaticResource(
+    server,
+    "rule",
+    "codemap://rule",
+    "Full text of the bundled `templates/agents/rules/codemap.md` (always-on priming for agents working in this repo).",
+  );
 
   // codemap://recipes/{id} — one recipe (template form). Payload includes
   // `body` / `source` / `shadows` from the catalog entry — session-start
