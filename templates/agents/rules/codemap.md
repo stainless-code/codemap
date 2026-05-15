@@ -6,7 +6,7 @@ alwaysApply: true
 
 > **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first. This is not optional when the question matches a trigger pattern below.
 
-A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports, exports, components, dependencies, markers, CSS variables, CSS classes, CSS keyframes, and (after `codemap ingest-coverage <path>`) static coverage from Istanbul JSON or LCOV. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** — codemap version bumps auto-apply on next run, no manual cleanup needed.
+A local database (default **`.codemap/index.db`**) indexes structure: symbols, imports + per-specifier `import_specifiers`, exports, components, dependencies, markers, scopes + every identifier USE (`references`) + per-reference resolution (`bindings`), `function_params` (typed), `runtime_markers` (console / debugger / throw / process.env), `test_suites` (describe / it / skip / only / todo + framework), `re_export_chains` (resolved barrel paths), `module_cycles` (Tarjan SCC), `file_metrics` (LOC + counts), CSS variables / classes / keyframes, and (after `codemap ingest-coverage <path>`) static coverage from Istanbul JSON or LCOV. The `.codemap/` directory holds every codemap-managed file (`index.db` + WAL/SHM, `audit-cache/`, project `recipes/`, `config.{ts,js,json}`, self-managed `.gitignore`); override the dir with `--state-dir <path>` or `CODEMAP_STATE_DIR`. The `.codemap/.gitignore` is **codemap-managed and reconciled on every boot** — codemap version bumps auto-apply on next run, no manual cleanup needed.
 
 **Generic defaults:** This rule is **project-agnostic**. After **`codemap agents init`** (or copying these files into **`.agents/`**), **edit your copy** to add app-specific triggers and SQL — upstream text is only a baseline.
 
@@ -121,32 +121,45 @@ Violating this order is wrong even if you get the right answer — it wastes tim
 
 If the question looks like any of these → use the index:
 
-| Question shape                                                | Table(s)                                                  |
-| ------------------------------------------------------------- | --------------------------------------------------------- |
-| "What/which files import X?"                                  | `imports` (by `source`) or `dependencies` (by `to_path`)  |
-| "Where is X defined?"                                         | `symbols`                                                 |
-| "What does file X export?"                                    | `exports`                                                 |
-| "What hooks does component X use?" / "List React components"  | `components`                                              |
-| "What are the CSS variables/tokens for X?"                    | `css_variables`                                           |
-| "Find all TODOs/FIXMEs"                                       | `markers`                                                 |
-| "Who depends on file X?" / "What does file X depend on?"      | `dependencies`                                            |
-| "How many files/symbols/components are there?"                | any table with `COUNT(*)`                                 |
-| "What are the CSS classes in X?"                              | `css_classes`                                             |
-| "What keyframe animations exist?"                             | `css_keyframes`                                           |
-| "What fields does interface/type X have?"                     | `type_members`                                            |
-| "Is symbol X deprecated?" / "What does X do?"                 | `symbols` (`doc_comment`)                                 |
-| "What's `@internal` / `@beta` / `@alpha` / `@private`?"       | `symbols.visibility` (parsed JSDoc tag — not regex)       |
-| "Who calls X?" / "What does X call?"                          | `calls`                                                   |
-| "Is symbol X tested?" / "What's the coverage of file Y?"      | `coverage` (after `ingest-coverage`)                      |
-| "What's structurally dead AND untested?"                      | `--recipe untested-and-dead`                              |
-| "Rank files by test coverage"                                 | `--recipe files-by-coverage`                              |
-| "Worst-covered exported functions"                            | `--recipe worst-covered-exports`                          |
-| "Which components touch deprecated APIs?"                     | `--recipe components-touching-deprecated`                 |
-| "What's risky to refactor right now?"                         | `--recipe refactor-risk-ranking`                          |
-| "Which exports has nobody imported?"                          | `--recipe unimported-exports`                             |
-| "Find @deprecated functions with TODO/FIXME and low coverage" | `--recipe text-in-deprecated-functions` (needs FTS5 on)   |
-| "What's high-complexity AND undertested?"                     | `--recipe high-complexity-untested`                       |
-| "What's the cyclomatic complexity of symbol X?"               | `SELECT name, complexity FROM symbols WHERE name = '...'` |
+| Question shape                                                | Table(s)                                                     |
+| ------------------------------------------------------------- | ------------------------------------------------------------ |
+| "What/which files import X?"                                  | `imports` (by `source`) or `dependencies` (by `to_path`)     |
+| "Where is X defined?"                                         | `symbols`                                                    |
+| "What does file X export?"                                    | `exports`                                                    |
+| "What hooks does component X use?" / "List React components"  | `components`                                                 |
+| "What are the CSS variables/tokens for X?"                    | `css_variables`                                              |
+| "Find all TODOs/FIXMEs"                                       | `markers`                                                    |
+| "Who depends on file X?" / "What does file X depend on?"      | `dependencies`                                               |
+| "How many files/symbols/components are there?"                | any table with `COUNT(*)`                                    |
+| "What are the CSS classes in X?"                              | `css_classes`                                                |
+| "What keyframe animations exist?"                             | `css_keyframes`                                              |
+| "What fields does interface/type X have?"                     | `type_members`                                               |
+| "Is symbol X deprecated?" / "What does X do?"                 | `symbols` (`doc_comment`)                                    |
+| "What's `@internal` / `@beta` / `@alpha` / `@private`?"       | `symbols.visibility` (parsed JSDoc tag — not regex)          |
+| "Who calls X?" / "What does X call?"                          | `calls`                                                      |
+| "Where is X used?" / "Every reference to X"                   | `--recipe find-references` (name-keyed)                      |
+| "Every reference to X defined in file Y" (precise rename)     | `--recipe find-symbol-references` (bindings-precise)         |
+| "Every write to X"                                            | `--recipe find-write-sites`                                  |
+| "Every fn taking a `User` param"                              | `--recipe find-by-param-type` (params `type_text=…`)         |
+| "Are there import cycles?"                                    | `--recipe circular-imports`                                  |
+| "Where do barrel files re-export from?"                       | `--recipe barrel-chains`                                     |
+| "Leftover `console.log` calls"                                | `--recipe find-leftover-console`                             |
+| "What `process.env.X` vars does this app read?"               | `--recipe env-var-audit`                                     |
+| "Find `.skip` / `.only` / `.todo` tests"                      | `--recipe find-skipped-tests`                                |
+| "Tests per file (counts + framework)"                         | `--recipe tests-by-file`                                     |
+| "Functions over 50 lines"                                     | `--recipe large-functions`                                   |
+| "Deeply nested functions"                                     | `--recipe deeply-nested-functions`                           |
+| "Is symbol X tested?" / "What's the coverage of file Y?"      | `coverage` (after `ingest-coverage`)                         |
+| "What's structurally dead AND untested?"                      | `--recipe untested-and-dead`                                 |
+| "Rank files by test coverage"                                 | `--recipe files-by-coverage`                                 |
+| "Worst-covered exported functions"                            | `--recipe worst-covered-exports`                             |
+| "Which components touch deprecated APIs?"                     | `--recipe components-touching-deprecated`                    |
+| "What's risky to refactor right now?"                         | `--recipe refactor-risk-ranking`                             |
+| "Which exports has nobody imported?"                          | `--recipe unimported-exports`                                |
+| "Find @deprecated functions with TODO/FIXME and low coverage" | `--recipe text-in-deprecated-functions` (needs FTS5 on)      |
+| "What's high-complexity AND undertested?"                     | `--recipe high-complexity-untested`                          |
+| "What's the cyclomatic complexity of symbol X?"               | `SELECT name, complexity FROM symbols WHERE name = '...'`    |
+| "How deep is the nesting in symbol X?"                        | `SELECT name, nesting_depth FROM symbols WHERE name = '...'` |
 
 ## When Grep / Read IS appropriate
 
@@ -168,37 +181,46 @@ codemap query --json "<SQL>"
 
 ## Quick reference queries
 
-| I need to...                      | Query                                                                                                        |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Find a symbol                     | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'`              |
-| Find a symbol (fuzzy)             | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                              |
-| See file exports                  | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'`                                     |
-| See file imports                  | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'`                           |
-| Who imports this module?          | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'`                                  |
-| Who imports this file?            | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                      |
-| What does this depend on?         | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                      |
-| Component info                    | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                     |
-| All components                    | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name`                               |
-| TODOs in a file                   | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                     |
-| Most complex files                | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10`        |
-| CSS design tokens                 | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'`                                      |
-| CSS module classes                | `SELECT name, file_path FROM css_classes WHERE is_module = 1`                                                |
-| CSS keyframes                     | `SELECT name, file_path FROM css_keyframes`                                                                  |
-| Type/interface shape              | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                    |
-| Deprecated symbols                | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`              |
-| Visibility-tagged symbols         | `SELECT name, kind, visibility, file_path FROM symbols WHERE visibility IS NOT NULL` (or `= 'beta'`, etc.)   |
-| Symbol docs                       | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`            |
-| Const values                      | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'` |
-| Class members                     | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                        |
-| Top-level only                    | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'`              |
-| Who calls X?                      | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                |
-| What does X call?                 | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                           |
-| Call hotspots                     | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`       |
-| Symbol coverage                   | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`          |
-| Untested + dead exports           | `codemap query --json --recipe untested-and-dead`                                                            |
-| Components touching `@deprecated` | `codemap query --json --recipe components-touching-deprecated`                                               |
-| Refactor-risk-ranked files        | `codemap query --json --recipe refactor-risk-ranking`                                                        |
-| Exports nobody imports            | `codemap query --json --recipe unimported-exports`                                                           |
+| I need to...                      | Query                                                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Find a symbol                     | `SELECT name, kind, file_path, line_start, line_end, signature FROM symbols WHERE name = '...'`                                                        |
+| Find a symbol (fuzzy)             | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                                                                        |
+| See file exports                  | `SELECT name, kind, is_default FROM exports WHERE file_path LIKE '%...'`                                                                               |
+| See file imports                  | `SELECT source, specifiers, is_type_only FROM imports WHERE file_path LIKE '%...'`                                                                     |
+| Who imports this module?          | `SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/some/module%'`                                                                            |
+| Who imports this file?            | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                                                                |
+| What does this depend on?         | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                                                                |
+| Component info                    | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                                                               |
+| All components                    | `SELECT name, file_path, props_type, hooks_used FROM components ORDER BY name`                                                                         |
+| TODOs in a file                   | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                                                               |
+| Most complex files                | `SELECT from_path, COUNT(*) as deps FROM dependencies GROUP BY from_path ORDER BY deps DESC LIMIT 10`                                                  |
+| CSS design tokens                 | `SELECT name, value, scope FROM css_variables WHERE name LIKE '--%...'`                                                                                |
+| CSS module classes                | `SELECT name, file_path FROM css_classes WHERE is_module = 1`                                                                                          |
+| CSS keyframes                     | `SELECT name, file_path FROM css_keyframes`                                                                                                            |
+| Type/interface shape              | `SELECT name, type, is_optional, is_readonly FROM type_members WHERE symbol_name = '...'`                                                              |
+| Deprecated symbols                | `SELECT name, kind, file_path, doc_comment FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                                        |
+| Visibility-tagged symbols         | `SELECT name, kind, visibility, file_path FROM symbols WHERE visibility IS NOT NULL` (or `= 'beta'`, etc.)                                             |
+| Symbol docs                       | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...' AND doc_comment IS NOT NULL`                                                      |
+| Const values                      | `SELECT name, value, file_path FROM symbols WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%...'`                                           |
+| Class members                     | `SELECT name, kind, signature FROM symbols WHERE parent_name = '...'`                                                                                  |
+| Top-level only                    | `SELECT name, kind, signature FROM symbols WHERE parent_name IS NULL AND file_path LIKE '%...'`                                                        |
+| Who calls X?                      | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                                                                          |
+| What does X call?                 | `SELECT DISTINCT callee_name FROM calls WHERE caller_name = '...'`                                                                                     |
+| Call hotspots                     | `SELECT callee_name, COUNT(*) as fan_in FROM calls GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10`                                                 |
+| Symbol coverage                   | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                                                    |
+| Untested + dead exports           | `codemap query --json --recipe untested-and-dead`                                                                                                      |
+| Components touching `@deprecated` | `codemap query --json --recipe components-touching-deprecated`                                                                                         |
+| Refactor-risk-ranked files        | `codemap query --json --recipe refactor-risk-ranking`                                                                                                  |
+| Exports nobody imports            | `codemap query --json --recipe unimported-exports`                                                                                                     |
+| Find references (any kind)        | `SELECT file_path, line_start, column_start, kind, is_write FROM "references" WHERE name = '...'`                                                      |
+| Find writes only                  | `SELECT file_path, line_start FROM "references" WHERE name = '...' AND is_write = 1`                                                                   |
+| Symbol the ref points at          | `SELECT s.name, s.file_path FROM "references" r JOIN bindings b ON b.reference_id=r.id JOIN symbols s ON s.id=b.resolved_symbol_id WHERE r.name='...'` |
+| Function params by type           | `SELECT owner_name, file_path FROM function_params WHERE type_text = 'User'`                                                                           |
+| Leftover console calls            | `SELECT file_path, line_start, detail FROM runtime_markers WHERE kind = 'console'`                                                                     |
+| Env vars used                     | `SELECT detail, COUNT(*) FROM runtime_markers WHERE kind = 'process-env' GROUP BY detail`                                                              |
+| Skipped tests                     | `SELECT file_path, name FROM test_suites WHERE is_skipped = 1 OR is_only = 1 OR is_todo = 1`                                                           |
+| Files in cycles                   | `SELECT cycle_id, file_path FROM module_cycles`                                                                                                        |
+| Barrel chains > 1 hop             | `SELECT from_file, from_name, to_file, hops FROM re_export_chains WHERE hops >= 2`                                                                     |
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 

@@ -216,6 +216,142 @@ LIMIT 10
 | from_path | TEXT FK | The file that imports   |
 | to_path   | TEXT    | The file being imported |
 
+### `import_specifiers` — Per-specifier breakdown of `imports.specifiers`
+
+| Column        | Type    | Description                                                                |
+| ------------- | ------- | -------------------------------------------------------------------------- |
+| file_path     | TEXT FK | File containing the import                                                 |
+| source        | TEXT    | Module specifier                                                           |
+| line          | INTEGER | Line number                                                                |
+| column_start  | INTEGER | 0-based column of the specifier                                            |
+| column_end    | INTEGER | One-past-last column                                                       |
+| imported_name | TEXT    | Original exported name (or `default` / `*`)                                |
+| local_name    | TEXT    | Local binding (different from `imported_name` for `import { foo as bar }`) |
+| kind          | TEXT    | `named` / `default` / `namespace`                                          |
+| is_type_only  | INTEGER | 1 if this specifier is `type`-only                                         |
+
+### `scopes` — Lexical scope graph (per file)
+
+| Column            | Type    | Description                                                                                         |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| file_path         | TEXT FK | File (PK part 1)                                                                                    |
+| local_id          | INTEGER | Per-file 0-based scope id (PK part 2). Module = 0                                                   |
+| kind              | TEXT    | `module` / `function` / `arrow` / `class` / `method` / `interface` / `type-alias` / `for` / `catch` |
+| parent_local_id   | INTEGER | Enclosing scope's `local_id`, NULL for module root                                                  |
+| line_start        | INTEGER | Body start line                                                                                     |
+| line_end          | INTEGER | Body end line                                                                                       |
+| owner_symbol_name | TEXT    | Named owner (function/class/method), NULL for anonymous (callback arrows, catch, for)               |
+
+### `references` — Every identifier USE
+
+`kind='member'` rows are emitted for non-computed property access (`obj.foo` → `foo` member ref) but skipped by the bindings resolver. Native HTML JSX tags, JSXAttribute names, and long-hand object-literal keys are NOT emitted.
+
+| Column         | Type       | Description                                                                           |
+| -------------- | ---------- | ------------------------------------------------------------------------------------- |
+| id             | INTEGER PK | Auto-increment row id                                                                 |
+| file_path      | TEXT FK    | File                                                                                  |
+| name           | TEXT       | Identifier name                                                                       |
+| line_start     | INTEGER    | 1-based line                                                                          |
+| column_start   | INTEGER    | 0-based byte column                                                                   |
+| column_end     | INTEGER    | One-past-last column                                                                  |
+| kind           | TEXT       | `value` / `type` / `jsx` / `member`                                                   |
+| scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id`)                                             |
+| is_write       | INTEGER    | 1 for assignment LHS / `++` / `--` / `delete` / declaration-with-init / for-of/in LHS |
+
+### `bindings` — Per-reference resolution to the originating symbol
+
+One row per non-`member`-kind `references` row. Full-rebuild only (targeted reindex skips for speed).
+
+| Column             | Type    | Description                                                            |
+| ------------------ | ------- | ---------------------------------------------------------------------- |
+| reference_id       | INTEGER | PK + FK → `references(id)` CASCADE                                     |
+| resolved_symbol_id | INTEGER | FK → `symbols(id)`; NULL for `is_external=1` / `global` / `unresolved` |
+| resolution_kind    | TEXT    | `same-file` / `imported` / `global` / `unresolved`                     |
+| is_external        | INTEGER | 1 when import target isn't indexed (e.g. `react`)                      |
+
+### `function_params` — Typed parameters per function/method
+
+| Column       | Type    | Description                                                    |
+| ------------ | ------- | -------------------------------------------------------------- |
+| file_path    | TEXT FK | File containing the owning function                            |
+| owner_name   | TEXT    | Function / method / arrow / constructor / getter / setter name |
+| owner_kind   | TEXT    | Disambiguates same-name function vs method in the same file    |
+| position     | INTEGER | 0-based index in the params array                              |
+| name         | TEXT    | Leaf binding name                                              |
+| type_text    | TEXT    | Stringified type annotation (NULL for untyped)                 |
+| default_text | TEXT    | Raw default-expression source (NULL when no default)           |
+| is_rest      | INTEGER | 1 for `...rest` params                                         |
+| is_optional  | INTEGER | 1 for `?` or default-valued params                             |
+| line_start   | INTEGER | 1-based                                                        |
+| column_start | INTEGER | 0-based                                                        |
+| column_end   | INTEGER | One-past-last                                                  |
+
+### `file_metrics` — Per-file aggregate metrics
+
+| Column          | Type    | Description                           |
+| --------------- | ------- | ------------------------------------- |
+| file_path       | TEXT PK | FK → `files(path)` CASCADE            |
+| total_lines     | INTEGER | All lines, including blank + comment  |
+| code_lines      | INTEGER | `total - blank - comment`             |
+| blank_lines     | INTEGER | Whitespace-only lines                 |
+| comment_lines   | INTEGER | Lines starting with `//` / `/*` / `*` |
+| function_count  | INTEGER | `symbols.kind = 'function'` count     |
+| class_count     | INTEGER | `symbols.kind = 'class'` count        |
+| interface_count | INTEGER | `symbols.kind = 'interface'` count    |
+| export_count    | INTEGER | `exports` row count                   |
+
+### `re_export_chains` — Materialised re-export resolution
+
+One row per `(from_file, from_name)` re-export walked to its terminal definition. Bounded at 10 hops with cycle detection.
+
+| Column    | Type    | Description                                    |
+| --------- | ------- | ---------------------------------------------- |
+| from_file | TEXT FK | Re-exporting file (PK part 1)                  |
+| from_name | TEXT    | Exported name (PK part 2)                      |
+| to_file   | TEXT    | Terminal definition site                       |
+| to_name   | TEXT    | Name at the terminal                           |
+| hops      | INTEGER | Chain length walked                            |
+| truncated | INTEGER | 1 if hit the cap or an unindexed file mid-walk |
+
+### `module_cycles` — Files participating in import cycles
+
+Computed via Tarjan after the full index pass. Non-cyclic files have no row.
+
+| Column     | Type    | Description                            |
+| ---------- | ------- | -------------------------------------- |
+| file_path  | TEXT PK | FK → `files(path)`                     |
+| cycle_id   | INTEGER | Cycle id (shared across cycle members) |
+| cycle_size | INTEGER | Number of files in the cycle           |
+
+### `runtime_markers` — Operational signals
+
+| Column         | Type    | Description                                                                                        |
+| -------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| file_path      | TEXT FK | Containing file                                                                                    |
+| kind           | TEXT    | `console` / `debugger` / `throw` / `process-env`                                                   |
+| line_start     | INTEGER | 1-based line                                                                                       |
+| column_start   | INTEGER | 0-based                                                                                            |
+| column_end     | INTEGER | One-past-last                                                                                      |
+| detail         | TEXT    | Method name for `console`, env-var name for `process-env`, truncated thrown expression for `throw` |
+| scope_local_id | INTEGER | Enclosing scope                                                                                    |
+
+### `test_suites` — describe / it / test / suite blocks
+
+Framework detected per-file from imports.
+
+| Column          | Type    | Description                                                                                |
+| --------------- | ------- | ------------------------------------------------------------------------------------------ |
+| file_path       | TEXT FK | Containing file                                                                            |
+| name            | TEXT    | Block name (from first string-literal / template arg)                                      |
+| kind            | TEXT    | `describe` / `it` / `test` / `suite` / `context`                                           |
+| line_start      | INTEGER | 1-based                                                                                    |
+| line_end        | INTEGER | 1-based                                                                                    |
+| parent_suite_id | INTEGER | FK → `test_suites(id)` for nested describes; NULL at top level                             |
+| is_skipped      | INTEGER | 1 for `.skip` modifier                                                                     |
+| is_only         | INTEGER | 1 for `.only` modifier                                                                     |
+| is_todo         | INTEGER | 1 for `.todo` modifier                                                                     |
+| framework       | TEXT    | `vitest` / `jest` / `bun-test` / `node-test` / `mocha` / `unknown` (detected from imports) |
+
 ### `markers` — TODO/FIXME/HACK/NOTE comments
 
 | Column      | Type    | Description                     |
