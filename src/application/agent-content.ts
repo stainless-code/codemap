@@ -17,6 +17,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
+import { listQueryRecipeCatalog } from "./query-recipes";
 
 export type AgentContentKind = "skill" | "rule";
 
@@ -36,25 +37,88 @@ export function resolveAgentContentDir(): string {
   return join(resolveAgentsTemplateDir(), "..", "agent-content");
 }
 
-/** Section files for `kind`, sorted by filename. */
-function listSectionFiles(kind: AgentContentKind): string[] {
+/**
+ * Renderer registry — keyed by `<kind>/<filename>`. Files ending in
+ * `.gen.md` are treated as generated content: if a renderer is
+ * registered for the path, its output replaces the on-disk file body.
+ * The on-disk file still controls section ordering (lexical) and can
+ * carry a hand-written fallback for environments where the renderer's
+ * data source is unavailable.
+ */
+const RENDERERS: Record<string, () => string> = {
+  "skill/10-recipes.gen.md": renderRecipesSection,
+};
+
+function isGeneratedSection(kind: AgentContentKind, name: string): boolean {
+  return name.endsWith(".gen.md") && `${kind}/${name}` in RENDERERS;
+}
+
+function renderSection(
+  kind: AgentContentKind,
+  name: string,
+  path: string,
+): string {
+  if (isGeneratedSection(kind, name)) {
+    return RENDERERS[`${kind}/${name}`]!().trimEnd();
+  }
+  return readFileSync(path, "utf8").trimEnd();
+}
+
+/** Section names for `kind`, sorted lexically. */
+function listSectionNames(kind: AgentContentKind): string[] {
   const dir = join(resolveAgentContentDir(), kind);
   return readdirSync(dir)
     .filter((name) => name.endsWith(".md"))
-    .sort()
-    .map((name) => join(dir, name));
+    .sort();
 }
 
 /**
  * Assemble the full markdown for `kind` by concatenating every section
- * file in lexical order (joined with a blank line). Cheap enough to call
+ * in lexical order (joined with a blank line). Cheap enough to call
  * per request — caches live one level up (`resource-handlers.ts`).
+ * `*.gen.md` sections route to a registered renderer; plain `.md`
+ * sections are read verbatim from disk.
  */
 export function assembleAgentContent(kind: AgentContentKind): string {
-  const sections = listSectionFiles(kind).map((path) =>
-    readFileSync(path, "utf8").trimEnd(),
+  const dir = join(resolveAgentContentDir(), kind);
+  const sections = listSectionNames(kind).map((name) =>
+    renderSection(kind, name, join(dir, name)),
   );
   return sections.join("\n\n") + "\n";
+}
+
+/**
+ * Markdown table of every bundled (and, when the runtime is up, project-local)
+ * recipe — id, description, params. Reflects the live catalog so adding a
+ * recipe automatically surfaces it in `codemap skill` without any template
+ * edit. Pure formatter; no DB needed (catalog is loaded from disk).
+ */
+function renderRecipesSection(): string {
+  const entries = listQueryRecipeCatalog();
+  const lines: string[] = [];
+  lines.push("## Recipe catalog (auto-generated)");
+  lines.push("");
+  lines.push(
+    "Every recipe id you can pass to `codemap query --recipe <id>`. This section is regenerated from the live catalog on every fetch, so new recipes appear automatically (no template edit required).",
+  );
+  lines.push("");
+  lines.push("| id | source | params | description |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const e of entries) {
+    const params =
+      e.params && e.params.length > 0
+        ? e.params.map((p) => `\`${p.name}\``).join(", ")
+        : "—";
+    const desc = e.description.replace(/\|/g, "\\|").replace(/\n/g, " ");
+    lines.push(
+      `| \`${e.id}\` | ${e.source}${e.shadows ? " (shadows bundled)" : ""} | ${params} | ${desc} |`,
+    );
+  }
+  lines.push("");
+  lines.push(
+    "Run `codemap query --recipes-json` for the JSON catalog (includes SQL bodies + per-row `actions` templates + recency fields).",
+  );
+  return lines.join("\n");
 }
 
 /** Convenience: `assembleAgentContent("skill")`. Kept for callsite locality. */

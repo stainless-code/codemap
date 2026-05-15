@@ -21,6 +21,17 @@ describe("agent content fetch surfaces", () => {
     expect(text).toContain("alwaysApply: true");
     expect(text.length).toBeGreaterThan(500);
   });
+
+  it("inlines auto-generated recipe catalog into the skill", () => {
+    const text = assembleAgentContent("skill");
+    expect(text).toContain("Recipe catalog (auto-generated)");
+    // A few bundled ids that should always be present.
+    expect(text).toContain("| `fan-out` |");
+    expect(text).toContain("| `unimported-exports` |");
+    // The "see live catalog" fallback line from the placeholder file
+    // should NOT appear (renderer takes precedence).
+    expect(text).not.toContain("See the live catalog:");
+  });
 });
 
 describe("checkConsumerPointers (staleness detection)", () => {
