@@ -8,4 +8,4 @@
 
 ## Schema reference
 
-See the live DDL: `codemap query "SELECT name, sql FROM sqlite_schema WHERE type='table' ORDER BY name"` or the MCP resource `codemap://schema`.
+See the live DDL: `codemap query "SELECT name, sql FROM sqlite_schema WHERE type='table' ORDER BY name"`, MCP resource `codemap://schema`, or HTTP `GET /resources/{encoded-uri}` (encoded `codemap://schema`) against `codemap serve`.

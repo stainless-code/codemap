@@ -8,4 +8,4 @@
 
 ## Recipe catalog
 
-See the live catalog: `codemap query --recipes-json` or the MCP resource `codemap://recipes`.
+See the live catalog: `codemap query --recipes-json`, MCP resource `codemap://recipes`, or HTTP `GET /resources/{encoded-uri}` (encoded `codemap://recipes`) against `codemap serve`.
