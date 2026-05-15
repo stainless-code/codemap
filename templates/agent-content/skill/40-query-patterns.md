@@ -149,6 +149,59 @@ FROM css_variables
 GROUP BY prefix ORDER BY count DESC;
 ```
 
+### Substrate tables (references, params, runtime, tests, cycles, coverage)
+
+```sql
+-- Every reference to a name (USE-sites; not just calls)
+-- `references` is a reserved word in SQLite — quote it.
+SELECT file_path, line_start, column_start, kind, is_write
+FROM "references" WHERE name = 'fetchUser';
+
+-- Only the write-sites of a name (assignment / update / declaration-with-init)
+SELECT file_path, line_start FROM "references"
+WHERE name = 'currentUser' AND is_write = 1;
+
+-- The symbol a reference resolves to (bindings join)
+SELECT s.name, s.file_path, s.line_start
+FROM "references" r
+JOIN bindings b ON b.reference_id = r.id
+JOIN symbols s ON s.id = b.resolved_symbol_id
+WHERE r.name = 'fetchUser';
+
+-- Functions taking a parameter of a specific type
+SELECT owner_name, owner_kind, file_path, line_start
+FROM function_params WHERE type_text = 'User' ORDER BY file_path, line_start;
+
+-- Functions with a rest parameter
+SELECT owner_name, name, file_path FROM function_params
+WHERE is_rest = 1 ORDER BY file_path;
+
+-- Leftover console.* calls
+SELECT file_path, line_start, detail FROM runtime_markers
+WHERE kind = 'console' ORDER BY file_path, line_start;
+
+-- Env vars referenced anywhere (process.env.X)
+SELECT detail AS env_var, COUNT(*) AS uses
+FROM runtime_markers WHERE kind = 'process-env'
+GROUP BY detail ORDER BY uses DESC;
+
+-- Skipped / only / todo tests (any modifier)
+SELECT file_path, name, kind, framework FROM test_suites
+WHERE is_skipped = 1 OR is_only = 1 OR is_todo = 1;
+
+-- Files participating in an import cycle
+SELECT cycle_id, file_path FROM module_cycles ORDER BY cycle_id, file_path;
+
+-- Re-export chains longer than one hop (barrel files)
+SELECT from_file, from_name, to_file, to_name, hops
+FROM re_export_chains WHERE hops >= 2 ORDER BY hops DESC;
+
+-- Coverage of every measured symbol in a file
+SELECT name, hit_statements, total_statements, coverage_pct
+FROM coverage WHERE file_path = 'src/foo.ts'
+ORDER BY coverage_pct ASC NULLS LAST;
+```
+
 ### Efficient pagination (cursor-based)
 
 For large result sets, avoid `OFFSET` — use cursor-based pagination with the last-seen value:
