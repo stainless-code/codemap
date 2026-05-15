@@ -94,7 +94,8 @@
     "oxfmt": "^0.49.0",
     "oxlint": "^1.64.0",
     "tsdown": "^0.22.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "unrun": "^0.3.0"
   },
   "overrides": {
     "zod": "$zod"
