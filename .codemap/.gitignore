@@ -1,6 +1,5 @@
-# codemap-managed — edits will be overwritten by `ensureStateGitignore`.
-# Blacklist of generated artifacts; tracked sources (recipes/, config.*)
-# default to tracked. Bump alongside any new cache (Rule 9 analogue).
+# Managed by codemap — overwritten on next run.
+# Generated artifacts only; user-authored config (config.*, recipes/) stays tracked.
 index.db
 index.db-shm
 index.db-wal
