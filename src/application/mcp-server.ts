@@ -15,9 +15,11 @@ import {
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import {
+  applyArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
+  handleApply,
   handleAudit,
   handleContext,
   handleDropBaseline,
@@ -120,6 +122,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   registerShowTool(server, opts);
   registerSnippetTool(server, opts);
   registerImpactTool(server);
+  registerApplyTool(server, opts);
   registerResources(server);
 
   return server;
@@ -266,6 +269,18 @@ function registerImpactTool(server: McpServer): void {
       inputSchema: impactArgsSchema,
     },
     (args) => wrapToolResult(handleImpact(args)),
+  );
+}
+
+function registerApplyTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "apply",
+    {
+      description:
+        "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
+      inputSchema: applyArgsSchema,
+    },
+    (args) => wrapToolResult(handleApply(args, opts.root)),
   );
 }
 

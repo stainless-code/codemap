@@ -1,12 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
-import { handleQueryRecipe } from "./tool-handlers";
+import { handleApply, handleQueryRecipe } from "./tool-handlers";
 
 let projectRoot: string;
 
@@ -74,5 +81,85 @@ describe("handleQueryRecipe params", () => {
       ok: false,
       error: expect.stringContaining('missing required param "name_pattern"'),
     });
+  });
+});
+
+describe("handleApply", () => {
+  it("returns 404 for an unknown recipe", () => {
+    const result = handleApply(
+      { recipe: "no-such-recipe-id", dry_run: true },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 404,
+      error: expect.stringContaining("unknown recipe"),
+    });
+  });
+
+  it("rejects a write request without yes (Q6 — non-TTY transports)", () => {
+    const result = handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry" },
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("yes: true"),
+    });
+  });
+
+  it("rejects dry_run + yes as mutually exclusive", () => {
+    const result = handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry" },
+        dry_run: true,
+        yes: true,
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("mutually exclusive"),
+    });
+  });
+
+  it("returns the dry-run envelope shape on a parametrised recipe", () => {
+    // Realpath the project root so oxc-resolver's symlink-derefed
+    // resolved_path aligns with the indexed file paths (mirrors the
+    // CLI integration test).
+    const realRoot = realpathSync(projectRoot);
+    // Write the actual source file the indexed symbol points at so
+    // phase-1 can read it when the recipe row resolves.
+    writeFileSync(
+      join(realRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry", kind: "function" },
+        dry_run: true,
+      },
+      realRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as Record<string, unknown>;
+      expect(payload.mode).toBe("dry-run");
+      expect(payload.applied).toBe(false);
+      expect(payload.summary).toMatchObject({
+        rows: 1,
+        rows_applied: 0,
+      });
+      // Disk untouched.
+      expect(readFileSync(join(realRoot, "src", "query.ts"), "utf8")).toBe(
+        "export function runQuery() {}\n",
+      );
+    }
   });
 });

@@ -271,6 +271,31 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "apply") {
+    const { parseApplyRest, printApplyCmdHelp, runApplyCmd } =
+      await import("./cmd-apply.js");
+    const parsed = parseApplyRest(rest);
+    if (parsed.kind === "help") {
+      printApplyCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runApplyCmd({
+      root,
+      configFile,
+      stateDir,
+      recipeId: parsed.recipeId,
+      params: parsed.params,
+      dryRun: parsed.dryRun,
+      yes: parsed.yes,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "audit") {
     const { parseAuditRest, printAuditCmdHelp, runAuditCmd } =
       await import("./cmd-audit.js");
