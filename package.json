@@ -97,7 +97,6 @@
     "typescript": "^6.0.3"
   },
   "overrides": {
-    "ip-address": "^10.2.0",
     "zod": "$zod"
   },
   "engines": {
