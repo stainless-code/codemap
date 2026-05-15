@@ -30,6 +30,13 @@ export async function main(): Promise<void> {
     return;
   }
 
+  // Once-per-process stderr nag if the consumer's pointer files are out
+  // of date relative to `EXPECTED_POINTER_VERSION`. Cure: `agents init
+  // --force`. Polite to stdout (warning is stderr only).
+  const { maybeWarnStalePointers } =
+    await import("../application/agent-content.js");
+  maybeWarnStalePointers(root);
+
   // Outcome aliases — rewrite `<alias>` to `query --recipe <id>` so the
   // existing query dispatch handles every flag pass-through. See ./aliases.ts.
   if (rest[0] && isOutcomeAlias(rest[0])) {
