@@ -1,5 +1,68 @@
 # @stainless-code/codemap
 
+## 0.6.0
+
+### Minor Changes
+
+- [#80](https://github.com/stainless-code/codemap/pull/80) [`7c3ba71`](https://github.com/stainless-code/codemap/commit/7c3ba71381fb43e07c61fc5e70dda472b4ff7602) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap skill` / `codemap rule` — live-served agent content. Consumer-disk `.agents/skills/codemap/SKILL.md` and `.agents/rules/codemap.md` are now **thin pointer files** (~16-22 lines); the full content is served live by the installed binary, so `bun update @stainless-code/codemap` automatically refreshes what agents see without re-running `agents init`.
+
+  **Three transports, one engine:**
+  - **CLI:** `codemap skill` / `codemap rule`
+  - **MCP:** resources `codemap://skill` / `codemap://rule`
+  - **HTTP:** `GET /resources/{encoded-uri}` against `codemap serve`
+
+  All three resolve through the same `assembleAgentContent(kind)` function. MCP and HTTP share a lazy per-process cache.
+
+  **Section assembler with `*.gen.md` renderers:** `templates/agent-content/<kind>/*.md` files concatenate in lexical name order. Files ending in `.gen.md` route through `RENDERERS` in `src/application/agent-content.ts` — today, `20-recipes.gen.md` regenerates the recipe catalog from `listQueryRecipeCatalog()` on every fetch, and `30-schema.gen.md` regenerates table DDL from `createTables()`. Adding a recipe under `templates/recipes/` or a column in `src/db.ts` now surfaces in the served skill automatically with **zero template edits**.
+
+  **Pointer protocol + staleness detection:** every consumer-disk pointer carries `<!-- codemap-pointer-version: N -->`. On startup, codemap scans the consumer's `.agents/{skills/codemap/SKILL,rules/codemap}.md`; if the stamp is `< EXPECTED_POINTER_VERSION` (or absent on a fat legacy file > 50 lines), a one-line stderr nag prints with the fix command (`codemap agents init --force`). Warning is stderr-only so `codemap skill > file.md` stays clean.
+
+  **Rule trimmed to priming surface:** the always-on rule shrank from 248 → 102 lines (~70% token reduction per turn) — STOP banner + trigger patterns table + top-11 quick reference queries + pointer to the skill for full reference. CLI command table / MCP narrative / audit + apply detail moved into the skill where they belong (on-demand, not every-turn).
+
+  **Migration:** existing consumers re-run `codemap agents init --force` to swap their fat `.agents/` files for the new pointer templates (the staleness nag prompts them on first invocation).
+
+- [#78](https://github.com/stainless-code/codemap/pull/78) [`84f9b97`](https://github.com/stainless-code/codemap/commit/84f9b97d332fcc0174b6231d318921dd8999f7a1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap apply <recipe-id>` — substrate-shaped fix executor over the existing `--format diff-json` row contract. The recipe SQL describes the transformation (`{file_path, line_start, before_pattern, after_pattern}` rows); codemap is the executor. Floor "No fix engine" preserved — codemap doesn't synthesise edits, it only executes the hunks the recipe row described.
+
+  **Three transports, one engine:**
+  - **CLI:** `codemap apply <recipe-id> [--params k=v[,k=v]] [--dry-run] [--yes] [--json]`
+  - **MCP tool:** `apply` (registered alongside `impact` / `show` / `snippet`)
+  - **HTTP:** `POST /tool/apply`
+
+  All three dispatch the same pure `applyDiffPayload` engine in `application/apply-engine.ts`.
+
+  **Decisions worth knowing (Q1–Q10 locked in `docs/plans/codemap-apply.md`, lifted into `docs/architecture.md § Apply wiring` on this PR):**
+  - **Apply-by-default, `--dry-run` opts into preview.** Verb-name semantics + `git apply` / `terraform apply` precedent.
+  - **Per-recipe-run all-or-nothing (Q2 (c)).** Phase 1 validates every row first; any conflict aborts phase 2 entirely before any file is touched. Cross-file invariants matter — `rename-preview` produces a definition row + N import rows, and partial application leaves the project syntactically broken.
+  - **Scan-and-collect conflicts (Q3 (b)).** Phase 1 walks every row and collects all conflicts in one pass — better remediation UX than fail-fast.
+  - **TTY prompt + `--yes` gate (Q6 (a)).** Interactive contexts (TTY) get a `Proceed? [y/N]` prompt with default-N; non-interactive contexts (CI / agents / MCP / HTTP) require `--yes` (or `yes: true`) explicitly. `--dry-run` + `--yes` mutually exclusive.
+  - **Substring match per row, single-line (Q8 (a)).** Mirrors `buildDiffJson`'s contract verbatim — `actual.includes(before_pattern)` + `actual.replace(before, after)` with `$`-pre-escape per `String.prototype.replace`'s GetSubstitution rule. Exemplar: `templates/recipes/rename-preview.sql` emits `before_pattern = old_name` (the bare identifier). When `before_pattern` appears more than once on the line (e.g. `const foo = foo();`), only the leftmost is replaced — same shape `--format diff` previews; recipe authors normalise their SQL if they need a different occurrence.
+  - **Path-containment guard.** Every `file_path` is rejected with a `path escapes project root` conflict if it's absolute or if `path.resolve(projectRoot, file_path)` lands outside the project root. Defends the CLI + MCP + HTTP write paths against malicious or malformed recipe rows.
+  - **Overlap detection.** Two rows targeting the same `(file_path, line_start)` are rejected with a `duplicate edit on same line` conflict during phase 1. Without it, the second row's substring assertion would fail mid-phase-2 (after earlier files in alphabetical order had already been renamed) — that would leave the project in a partial-write state and violate Q2 (c).
+  - **Atomic per-file writes via temp + rename.** Sibling `<file>.codemap-apply-<rand>.tmp` then `renameSync` — POSIX-atomic so concurrent readers see either pre-rename or post-rename content, never a torn write.
+  - **Q7 idempotency (conflict-only path).** Re-running on already-applied code reports `line content drifted` with `actual_at_line` showing the post-rename content; user re-runs `codemap` to refresh the index → next run produces 0 rows → vacuous clean apply.
+  - **Single envelope shape across modes (Q5).** `{mode, applied, files, conflicts, summary}` — same shape for `dry-run` and `apply`; consumers pattern-match on `mode` + `applied`.
+  - **No SARIF / annotations.** Apply is a write action, not a findings list.
+
+  **Boundary discipline (Q10):** only `cli/cmd-apply.ts` + `application/tool-handlers.ts` may import the apply engine — re-runnable kit at `docs/architecture.md § Boundary verification — apply write path`.
+
+  Plan: PR [#77](https://github.com/stainless-code/codemap/issues/77) (merged). Implementation: this PR.
+
+- [#79](https://github.com/stainless-code/codemap/pull/79) [`ec91bdf`](https://github.com/stainless-code/codemap/commit/ec91bdfb8f9eea5c0c4011a491f5656afef6175e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap-richer-index` — substrate extraction across 12 tiers. **Schema bump** (`SCHEMA_VERSION` 10 → 26) — first run after upgrade rebuilds `.codemap/index.db` from source.
+
+  **10 new substrate tables**: `import_specifiers`, `scopes`, `references`, `bindings`, `function_params`, `file_metrics`, `re_export_chains`, `module_cycles`, `runtime_markers`, `test_suites`.
+
+  **Column additions**: `symbols.{name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth}` · `calls.{line_start, column_start, column_end}` · `exports.{is_re_export, line_start, line_end, column_start, column_end}` · `markers.{column_start, column_end}`.
+
+  **12 new recipes**: `find-references` · `find-symbol-references` · `find-write-sites` · `find-by-param-type` · `large-functions` · `deeply-nested-functions` · `circular-imports` · `barrel-chains` · `find-leftover-console` · `env-var-audit` · `find-skipped-tests` · `tests-by-file`.
+
+  **Architecture**: modular extractor pattern (R.17) splits `parser.ts` into per-tier extractors under `src/extractors/` with a shared `ExtractContext`. Targeted reindex stays sub-100ms; full reindex includes bindings resolution + Tarjan SCC + re-export chain materialisation.
+
+  **Reference precision**: `references` table emits every identifier USE with column-precise positions; `kind='member'` rows distinguish non-computed property access from bindings. Native JSX tags + JSXAttribute names + long-hand object-literal keys are suppressed. `TSQualifiedName` (e.g. `React.ReactNode`) splits into namespace head (`kind='type'`) + member tail (`kind='member'`). Bindings resolver (full-rebuild only) walks same-file scope → imports → globals → unresolved with deduped TypeScript / DOM / Node / ES global sets. Re-export chains followed up to 10 hops with cycle detection.
+
+  **Dependency bumps**: `oxc-parser` 0.127 → 0.130 · `zod` 4.3 → 4.4 (dedupe override added so the MCP SDK keeps a single `$ZodType` identity) · `tsdown` 0.21 → 0.22 (declared `unrun` as devDep to unblock CI build under Node's tsdown binstub).
+
+  **Docs sync**: `docs/architecture.md` § Schema reflects every new table + column; `docs/glossary.md` gains 10 new entries; `docs/golden-queries.md` + `fixtures/golden/` regenerated. Templates (`templates/agents/`) updated with the new schema overview + trigger patterns.
+
 ## 0.5.0
 
 ### Minor Changes
