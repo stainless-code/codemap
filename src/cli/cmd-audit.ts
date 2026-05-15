@@ -258,11 +258,12 @@ for CI exit codes.
 
 Snapshot sources (one of these must resolve; --base and --baseline are mutually exclusive):
 
-  --base <ref>                 Materialise <ref> via git worktree to a sha-keyed cache
-                               under .codemap/audit-cache/, reindex into a temp DB, then
-                               diff. <ref> = any committish (origin/main, HEAD~5, sha,
-                               tag, …). Cache hit on second run against same sha is
-                               sub-100ms. Requires a git repository.
+  --base <ref>                 Materialise <ref> via git archive | tar -x to a sha-keyed
+                               cache under .codemap/audit-cache/ (plain tree, no .git
+                               artifact), reindex into a temp DB, then diff. <ref> = any
+                               committish (origin/main, HEAD~5, sha, tag, …). Cache hit
+                               on second run against same sha is sub-100ms. Requires a
+                               git repository.
 
   --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
                                <prefix>-dependencies, <prefix>-deprecated in
