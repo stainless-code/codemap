@@ -30,17 +30,8 @@ function gitSpawnEnv(): NodeJS.ProcessEnv {
 /**
  * Sha-keyed source cache for `audit --base <ref>`. Each entry is a plain
  * extracted tree at `<projectRoot>/.codemap/audit-cache/<sha>/` (no `.git`
- * artifact, no registered git worktree) with its own `.codemap/index.db`.
- * Cache-hit detection: that DB exists.
- *
- * **Why no `git worktree`** — older revisions used `git worktree add`, which
- * created a registered worktree (`<repo>/.git/worktrees/-tmp.<sha>...`) and
- * a `.git` pointer file inside the cache. Two consequences hurt downstream
- * cleanup UX: (a) `git clean -xdf` refuses to descend into registered
- * worktrees, requiring consumers to escalate to `-ff` (which also nukes
- * unrelated nested repos), and (b) plain `rm -rf` left dangling registrations
- * in `<repo>/.git/worktrees/`. `git archive | tar -x` produces an identical
- * file tree from the same sha with neither footgun.
+ * artifact — `git archive | tar -x`, NOT `git worktree add`) with its own
+ * `.codemap/index.db`. Cache-hit detection: that DB exists.
  *
  * **Concurrency.** Per-pid temp dir + POSIX `rename` to the final `<sha>/`
  * slot — losers fall through to cache-hit; no lock files.
@@ -132,22 +123,17 @@ export function lookupCacheEntry(
 
 export interface PopulateOpts extends WorktreeCacheOpts {
   sha: string;
-  /** Reindex callback — receives the worktree path, must build `.codemap/index.db` inside it. */
-  reindex: (worktreePath: string) => Promise<void>;
+  /** Reindex callback — builds `.codemap/index.db` inside `worktreePath`.
+   *  `commit` is the resolved sha (so the caller can stamp it without a `git rev-parse HEAD` shell-out in the `.git`-less cache dir). */
+  reindex: (worktreePath: string, commit: string) => Promise<void>;
 }
 
 /**
- * Populate a cache entry atomically (D11):
- * 1. mkdir per-pid temp dir under the cache root
- * 2. `git archive --format=tar <sha>` | `tar -x` into the temp dir — emits a
- *    plain file tree from the sha's object, with no `.git` artifact and no
- *    registered git worktree.
- * 3. caller's `reindex(<tmp>, <sha>)` builds `.codemap/index.db`
- * 4. `rename(<tmp>, <sha>)` — POSIX-atomic; if the final slot already exists
- *    (raced with a concurrent populate), discard the temp and use the winner.
- *
- * On failure mid-populate, the temp dir is removed in a `finally`
- * so `.codemap/audit-cache/.tmp.*` never accumulates.
+ * Populate a cache entry atomically (D11): per-pid temp dir → `git archive |
+ * tar -x` → caller's `reindex` builds the DB → POSIX `rename` to the final
+ * `<sha>/` slot. Lost-race losers fall through to `lookupCacheEntry`. Temp
+ * dirs are removed in `finally` so `.codemap/audit-cache/.tmp.*` never
+ * accumulates.
  */
 export async function populateWorktree(
   opts: PopulateOpts,
@@ -166,9 +152,8 @@ export async function populateWorktree(
   let cleanup = true;
   try {
     mkdirSync(tmpPath, { recursive: true });
-    // 1 GiB cap on the tarball buffer — `spawnSync`'s default `maxBuffer`
-    // of 1 MiB silently truncates large archives; a real-sized monorepo
-    // checkout can comfortably push past that.
+    // `spawnSync`'s default `maxBuffer` (1 MiB) silently truncates real-sized
+    // monorepo tarballs; 1 GiB is the working cap.
     const archive = spawnSync("git", ["archive", "--format=tar", opts.sha], {
       cwd: opts.projectRoot,
       env: gitSpawnEnv(),
@@ -176,9 +161,8 @@ export async function populateWorktree(
     });
     if (archive.status !== 0) {
       const stderr = archive.stderr.toString().trim();
-      // `worktree-add-failed` code preserved for API stability — external
-      // consumers (CLI / MCP / HTTP envelopes) discriminate on `code`, not
-      // the underlying primitive. The message reflects the new shape.
+      // `worktree-add-failed` code retained for API stability — external
+      // consumers discriminate on `code`, not the underlying primitive.
       return {
         code: "worktree-add-failed",
         error: `codemap audit: git archive failed for sha ${opts.sha}${
@@ -200,7 +184,7 @@ export async function populateWorktree(
     }
 
     try {
-      await opts.reindex(tmpPath);
+      await opts.reindex(tmpPath, opts.sha);
     } catch (err) {
       return {
         code: "reindex-failed",
@@ -246,12 +230,8 @@ export async function populateWorktree(
 }
 
 /**
- * `rm -rf <path>`. Used by both rollback (failed populate) and eviction.
- * Errors are swallowed — best-effort cleanup; the next eviction cycle
- * sweeps stragglers. Earlier revisions also ran `git worktree remove
- * --force` because cache entries were registered worktrees; the
- * archive-based populate produces plain trees so the git step is no
- * longer needed.
+ * `rm -rf <path>` — used by rollback (failed populate) and eviction. Errors
+ * are swallowed; the next eviction cycle sweeps stragglers.
  */
 function removeWorktree(worktreePath: string): void {
   if (existsSync(worktreePath)) {
