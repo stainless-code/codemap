@@ -305,7 +305,17 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM calls) as calls,
         (SELECT COUNT(*) FROM css_variables) as css_vars,
         (SELECT COUNT(*) FROM css_classes) as css_classes,
-        (SELECT COUNT(*) FROM css_keyframes) as css_keyframes`,
+        (SELECT COUNT(*) FROM css_keyframes) as css_keyframes,
+        (SELECT COUNT(*) FROM scopes) as scopes,
+        (SELECT COUNT(*) FROM "references") as "references",
+        (SELECT COUNT(*) FROM bindings) as bindings,
+        (SELECT COUNT(*) FROM import_specifiers) as import_specifiers,
+        (SELECT COUNT(*) FROM function_params) as function_params,
+        (SELECT COUNT(*) FROM runtime_markers) as runtime_markers,
+        (SELECT COUNT(*) FROM test_suites) as test_suites,
+        (SELECT COUNT(*) FROM re_export_chains) as re_export_chains,
+        (SELECT COUNT(*) FROM module_cycles) as module_cycles,
+        (SELECT COUNT(*) FROM file_metrics) as file_metrics`,
     )
     .get()!;
   return row as IndexTableStats;

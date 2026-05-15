@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -247,6 +247,7 @@ export function createTables(db: CodemapDatabase) {
       kind TEXT NOT NULL CHECK (kind IN ('console','debugger','throw','process-env')),
       line_start INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
       detail TEXT,
       scope_local_id INTEGER NOT NULL DEFAULT 0
     ) STRICT;
@@ -1298,6 +1299,7 @@ export interface RuntimeMarkerRow {
   kind: "console" | "debugger" | "throw" | "process-env";
   line_start: number;
   column_start: number;
+  column_end: number;
   /** Qualifier — method name for console, env-var name for process-env, expression text for throw, NULL for debugger. */
   detail: string | null;
   scope_local_id: number;
@@ -1310,14 +1312,15 @@ export function insertRuntimeMarkers(
   batchInsert(
     db,
     rows,
-    "INSERT INTO runtime_markers (file_path, kind, line_start, column_start, detail, scope_local_id)",
-    "(?,?,?,?,?,?)",
+    "INSERT INTO runtime_markers (file_path, kind, line_start, column_start, column_end, detail, scope_local_id)",
+    "(?,?,?,?,?,?,?)",
     (r, v) =>
       v.push(
         r.file_path,
         r.kind,
         r.line_start,
         r.column_start,
+        r.column_end,
         r.detail,
         r.scope_local_id,
       ),

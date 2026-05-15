@@ -99,9 +99,6 @@ const TYPE_GLOBALS = new Set([
   // DOM HTML element types — TS DOM lib.
   "Element",
   "Node",
-  "Window",
-  "Document",
-  "HTMLElement",
   "HTMLDivElement",
   "HTMLSpanElement",
   "HTMLInputElement",
@@ -144,7 +141,6 @@ const TYPE_GLOBALS = new Set([
   "SVGLineElement",
   "SVGTextElement",
   // DOM event types (TS DOM, distinct from React Synthetic events).
-  "Event",
   "EventListener",
   "EventListenerOrEventListenerObject",
   "MouseEvent",
@@ -324,7 +320,6 @@ const GLOBALS = new Set([
   "instanceof",
   "in",
   "of",
-  "Number",
   "isNaN",
   "isFinite",
   "parseInt",
@@ -350,24 +345,14 @@ const GLOBALS = new Set([
   // `React.useState(...)` / `React.createElement(...)` in transpiled
   // output and component code without an explicit import.
   "React",
-  // Constructor-callable Web APIs (`new IntersectionObserver(…)`, etc.).
+  // Constructor-callable Web APIs (`new IntersectionObserver(…)`, etc.) not
+  // already listed above.
   "IntersectionObserver",
   "ResizeObserver",
   "MutationObserver",
   "PerformanceObserver",
-  "FileReader",
-  "Image",
-  "FormData",
-  "AbortController",
   "Event",
   "CustomEvent",
-  "Headers",
-  "Request",
-  "Response",
-  "Blob",
-  "File",
-  "URL",
-  "URLSearchParams",
 ]);
 
 interface SymbolEntry {
@@ -385,6 +370,22 @@ interface ReExportEntry {
   source: string;
   /** Original local name in the source module. `'default'` for star/default. */
   imported_name: string;
+}
+
+/**
+ * Split parser output `'./Foo.default'` into `{ source: './Foo', imported_name:
+ * 'default' }` — the `.default` suffix encodes `export { default as X } from
+ * './Foo'`. Without a suffix the export name binds to itself.
+ */
+function parseReExportSource(raw: string, fallbackName: string): ReExportEntry {
+  const dotIdx = raw.lastIndexOf(".");
+  const sourceTail = raw.split("/").pop() ?? "";
+  const hasNameSuffix =
+    !sourceTail.startsWith(".") && dotIdx > raw.lastIndexOf("/") && dotIdx > 0;
+  return {
+    source: hasNameSuffix ? raw.slice(0, dotIdx) : raw,
+    imported_name: hasNameSuffix ? raw.slice(dotIdx + 1) : fallbackName,
+  };
 }
 
 const SOURCE_EXTS = [
@@ -538,21 +539,7 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
         re = new Map();
         reExportsByFile.set(r.file_path, re);
       }
-      // `re_export_source` shape: `./Foo` or `./Foo.default` for
-      // `export { default as X } from './Foo'` per the parser.
-      const dotIdx = r.re_export_source.lastIndexOf(".");
-      const sourceTail = r.re_export_source.split("/").pop() ?? "";
-      const hasNameSuffix =
-        sourceTail.startsWith(".") === false &&
-        dotIdx > r.re_export_source.lastIndexOf("/") &&
-        dotIdx > 0;
-      const importedName = hasNameSuffix
-        ? r.re_export_source.slice(dotIdx + 1)
-        : r.name;
-      const source = hasNameSuffix
-        ? r.re_export_source.slice(0, dotIdx)
-        : r.re_export_source;
-      re.set(r.name, { source, imported_name: importedName });
+      re.set(r.name, parseReExportSource(r.re_export_source, r.name));
     }
   }
 
@@ -749,19 +736,7 @@ export function resolveReExportChains(db: CodemapDatabase): ReExportChainRow[] {
       re = new Map();
       reExportsByFile.set(r.file_path, re);
     }
-    const dotIdx = r.re_export_source.lastIndexOf(".");
-    const sourceTail = r.re_export_source.split("/").pop() ?? "";
-    const hasNameSuffix =
-      sourceTail.startsWith(".") === false &&
-      dotIdx > r.re_export_source.lastIndexOf("/") &&
-      dotIdx > 0;
-    const importedName = hasNameSuffix
-      ? r.re_export_source.slice(dotIdx + 1)
-      : r.name;
-    const source = hasNameSuffix
-      ? r.re_export_source.slice(0, dotIdx)
-      : r.re_export_source;
-    re.set(r.name, { source, imported_name: importedName });
+    re.set(r.name, parseReExportSource(r.re_export_source, r.name));
   }
 
   const indexedPaths = new Set<string>(
@@ -810,11 +785,13 @@ export function resolveReExportChains(db: CodemapDatabase): ReExportChainRow[] {
   return out;
 }
 
+/** Truncates + rewrites `re_export_chains` from current exports/imports. */
 export function persistReExportChains(db: CodemapDatabase) {
   db.run("DELETE FROM re_export_chains");
   insertReExportChains(db, resolveReExportChains(db));
 }
 
+/** Clears orphan binding rows + inserts the resolved set. Idempotent. */
 export function persistBindings(db: CodemapDatabase, rows: BindingRow[]) {
   // Clear orphans — references re-emitted on incremental indexes have
   // new AUTOINCREMENT ids. CASCADE handles it; explicit DELETE keeps the

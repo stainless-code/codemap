@@ -40,10 +40,10 @@ export const runtimeMarkersExtractor: TierExtractor = {
         kind,
         line_start: lineStart,
         column_start: start - lineStartOffset,
+        column_end: end - lineStartOffset,
         detail,
         scope_local_id: scopes.currentLocalId(),
       });
-      void end;
     }
 
     Object.assign(visitor, {

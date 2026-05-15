@@ -17,6 +17,16 @@ export interface IndexTableStats extends Record<string, number> {
   css_vars: number;
   css_classes: number;
   css_keyframes: number;
+  scopes: number;
+  references: number;
+  bindings: number;
+  import_specifiers: number;
+  function_params: number;
+  runtime_markers: number;
+  test_suites: number;
+  re_export_chains: number;
+  module_cycles: number;
+  file_metrics: number;
 }
 
 /**

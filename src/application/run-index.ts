@@ -57,6 +57,16 @@ function emptyStats(): IndexTableStats {
     css_vars: 0,
     css_classes: 0,
     css_keyframes: 0,
+    scopes: 0,
+    references: 0,
+    bindings: 0,
+    import_specifiers: 0,
+    function_params: 0,
+    runtime_markers: 0,
+    test_suites: 0,
+    re_export_chains: 0,
+    module_cycles: 0,
+    file_metrics: 0,
   };
 }
 

@@ -97,6 +97,8 @@ Where the five positions diverge. Each axis carries the per-source position with
 
 **A4's Path B sketch (~30 lines of user-side glue):**
 
+> _Unvalidated illustration._ The `@stainless-code/codemap-mcp` package and `codemap.query_recipe` shape are aspirational — actual exports may differ when this Path lands. `ts-morph` is real.
+
 ```ts
 import { codemap } from "@stainless-code/codemap-mcp";
 import { Project } from "ts-morph";
