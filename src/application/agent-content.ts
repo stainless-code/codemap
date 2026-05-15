@@ -48,8 +48,8 @@ export function resolveAgentContentDir(): string {
  * data source is unavailable.
  */
 const RENDERERS: Record<string, () => string> = {
-  "skill/10-recipes.gen.md": renderRecipesSection,
-  "skill/20-schema.gen.md": renderSchemaSection,
+  "skill/20-recipes.gen.md": renderRecipesSection,
+  "skill/30-schema.gen.md": renderSchemaSection,
 };
 
 function isGeneratedSection(kind: AgentContentKind, name: string): boolean {
