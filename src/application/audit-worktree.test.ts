@@ -160,6 +160,33 @@ describe("populateWorktree + lookupCacheEntry", () => {
     expect(hit?.dbPath).toBe((populated as { dbPath: string }).dbPath);
   });
 
+  it("cache entry is a plain tree — no `.git` artifact and no registered worktree", async () => {
+    const populated = await populateWorktree({
+      projectRoot,
+      sha: baseSha,
+      reindex: async (worktreePath) => {
+        const db = openCodemapDatabase(
+          join(worktreePath, ".codemap", "index.db"),
+        );
+        createTables(db);
+        db.close();
+      },
+    });
+    expect(populated).toMatchObject({ sha: baseSha });
+    const worktreePath = (populated as { worktreePath: string }).worktreePath;
+    // No `.git` file / dir produced by `git archive | tar -x` (the worktree-
+    // add path emitted a pointer file under this name).
+    expect(existsSync(join(worktreePath, ".git"))).toBe(false);
+    // Nor any registered worktree entry — `git worktree list` should only
+    // show the main repo, never the cache path.
+    const list = spawnSync("git", ["worktree", "list", "--porcelain"], {
+      cwd: projectRoot,
+      env: fixtureEnv(),
+    });
+    expect(list.status).toBe(0);
+    expect(list.stdout.toString()).not.toContain(worktreePath);
+  });
+
   it("cache hit short-circuits — second populate would reindex but lookup returns first", async () => {
     let reindexCalls = 0;
     const reindex = async (wp: string) => {
