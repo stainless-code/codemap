@@ -28,15 +28,15 @@ function gitSpawnEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Sha-keyed worktree cache for `audit --base <ref>`. Each entry is a
- * `git worktree` at `<projectRoot>/.codemap/audit-cache/<sha>/` with its
- * own `.codemap/index.db`. Cache-hit detection: that DB exists.
+ * Sha-keyed source cache for `audit --base <ref>`. Each entry is a plain
+ * extracted tree at `<projectRoot>/.codemap/audit-cache/<sha>/` (no `.git`
+ * artifact — `git archive | tar -x`, NOT `git worktree add`) with its own
+ * `.codemap/index.db`. Cache-hit detection: that DB exists.
  *
  * **Concurrency.** Per-pid temp dir + POSIX `rename` to the final `<sha>/`
  * slot — losers fall through to cache-hit; no lock files.
  *
- * **Eviction.** LRU after 5 entries OR 500 MiB (D2); `git worktree remove
- * --force` + `rm -rf`.
+ * **Eviction.** LRU after 5 entries OR 500 MiB (D2); plain `rm -rf`.
  */
 
 const CACHE_DIR_NAME = ".codemap/audit-cache";
@@ -123,20 +123,17 @@ export function lookupCacheEntry(
 
 export interface PopulateOpts extends WorktreeCacheOpts {
   sha: string;
-  /** Reindex callback — receives the worktree path, must build `.codemap/index.db` inside it. */
-  reindex: (worktreePath: string) => Promise<void>;
+  /** Reindex callback — builds `.codemap/index.db` inside `worktreePath`.
+   *  `commit` is the resolved sha (so the caller can stamp it without a `git rev-parse HEAD` shell-out in the `.git`-less cache dir). */
+  reindex: (worktreePath: string, commit: string) => Promise<void>;
 }
 
 /**
- * Populate a cache entry atomically (D11):
- * 1. mkdir per-pid temp dir under the cache root
- * 2. `git worktree add <tmp> <sha>`
- * 3. caller's `reindex(<tmp>)` builds `.codemap/index.db`
- * 4. `rename(<tmp>, <sha>)` — POSIX-atomic; if the final slot already exists
- *    (raced with a concurrent populate), discard the temp and use the winner.
- *
- * On failure mid-populate, the temp dir + worktree are removed in a `finally`
- * so `.codemap/audit-cache/.tmp.*` never accumulates.
+ * Populate a cache entry atomically (D11): per-pid temp dir → `git archive |
+ * tar -x` → caller's `reindex` builds the DB → POSIX `rename` to the final
+ * `<sha>/` slot. Lost-race losers fall through to `lookupCacheEntry`. Temp
+ * dirs are removed in `finally` so `.codemap/audit-cache/.tmp.*` never
+ * accumulates.
  */
 export async function populateWorktree(
   opts: PopulateOpts,
@@ -154,23 +151,40 @@ export async function populateWorktree(
 
   let cleanup = true;
   try {
-    const add = spawnSync(
-      "git",
-      ["worktree", "add", "--detach", tmpPath, opts.sha],
-      { cwd: opts.projectRoot, env: gitSpawnEnv() },
-    );
-    if (add.status !== 0) {
-      const stderr = add.stderr.toString().trim();
+    mkdirSync(tmpPath, { recursive: true });
+    // `spawnSync`'s default `maxBuffer` (1 MiB) silently truncates real-sized
+    // monorepo tarballs; 1 GiB is the working cap.
+    const archive = spawnSync("git", ["archive", "--format=tar", opts.sha], {
+      cwd: opts.projectRoot,
+      env: gitSpawnEnv(),
+      maxBuffer: 1024 * 1024 * 1024,
+    });
+    if (archive.status !== 0) {
+      const stderr = archive.stderr.toString().trim();
+      // `worktree-add-failed` code retained for API stability — external
+      // consumers discriminate on `code`, not the underlying primitive.
       return {
         code: "worktree-add-failed",
-        error: `codemap audit: git worktree add failed for sha ${opts.sha}${
+        error: `codemap audit: git archive failed for sha ${opts.sha}${
+          stderr ? ` (${stderr})` : ""
+        }.`,
+      };
+    }
+    const extract = spawnSync("tar", ["-xf", "-", "-C", tmpPath], {
+      input: archive.stdout,
+    });
+    if (extract.status !== 0) {
+      const stderr = extract.stderr.toString().trim();
+      return {
+        code: "worktree-add-failed",
+        error: `codemap audit: tar extract failed for sha ${opts.sha}${
           stderr ? ` (${stderr})` : ""
         }.`,
       };
     }
 
     try {
-      await opts.reindex(tmpPath);
+      await opts.reindex(tmpPath, opts.sha);
     } catch (err) {
       return {
         code: "reindex-failed",
@@ -198,7 +212,7 @@ export async function populateWorktree(
     }
   } finally {
     if (cleanup && existsSync(tmpPath)) {
-      removeWorktree(tmpPath, opts.projectRoot);
+      removeWorktree(tmpPath);
     }
   }
 
@@ -216,15 +230,10 @@ export async function populateWorktree(
 }
 
 /**
- * `git worktree remove --force <path>` followed by `rm -rf` for safety.
- * Used by both rollback (failed populate) and eviction. Errors are
- * swallowed — best-effort cleanup; the next eviction cycle sweeps stragglers.
+ * `rm -rf <path>` — used by rollback (failed populate) and eviction. Errors
+ * are swallowed; the next eviction cycle sweeps stragglers.
  */
-function removeWorktree(worktreePath: string, projectRoot: string): void {
-  spawnSync("git", ["worktree", "remove", "--force", worktreePath], {
-    cwd: projectRoot,
-    env: gitSpawnEnv(),
-  });
+function removeWorktree(worktreePath: string): void {
   if (existsSync(worktreePath)) {
     try {
       rmSync(worktreePath, { recursive: true, force: true });
@@ -269,7 +278,7 @@ function evictIfOverLimits(projectRoot: string, protectPath?: string): void {
       // Sweep orphan temp dirs older than 10 min — must be from crashed runs
       // because successful populates rename the dir away within seconds.
       if (now - stat.mtimeMs > 10 * 60 * 1000) {
-        removeWorktree(path, projectRoot);
+        removeWorktree(path);
       }
       continue;
     }
@@ -291,7 +300,7 @@ function evictIfOverLimits(projectRoot: string, protectPath?: string): void {
   ) {
     const victim = entries.pop();
     if (!victim) break;
-    removeWorktree(victim.path, projectRoot);
+    removeWorktree(victim.path);
     totalBytes -= victim.sizeBytes;
     count -= 1;
   }
@@ -332,6 +341,6 @@ export function _wipeCacheForTests(projectRoot: string): void {
   const cacheRoot = join(projectRoot, CACHE_DIR_NAME);
   if (!existsSync(cacheRoot)) return;
   for (const name of readdirSync(cacheRoot)) {
-    removeWorktree(join(cacheRoot, name), projectRoot);
+    removeWorktree(join(cacheRoot, name));
   }
 }

@@ -251,18 +251,19 @@ export function printAuditCmdHelp(): void {
   console.log(`Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
 
 Diff the current .codemap.db against per-delta baselines (saved by \`codemap query --save-baseline\`)
-or against a git ref (\`--base <ref>\` materialises a worktree + reindex), and emit structural deltas
+or against a git ref (\`--base <ref>\` materialises via \`git archive | tar -x\` + reindex), and emit structural deltas
 as a {head, deltas} envelope. Each delta carries its own \`base\` metadata. v1 ships three deltas:
 files, dependencies, deprecated. No verdict / threshold / non-zero exit codes — compose --json + jq
 for CI exit codes.
 
 Snapshot sources (one of these must resolve; --base and --baseline are mutually exclusive):
 
-  --base <ref>                 Materialise <ref> via git worktree to a sha-keyed cache
-                               under .codemap/audit-cache/, reindex into a temp DB, then
-                               diff. <ref> = any committish (origin/main, HEAD~5, sha,
-                               tag, …). Cache hit on second run against same sha is
-                               sub-100ms. Requires a git repository.
+  --base <ref>                 Materialise <ref> via git archive | tar -x to a sha-keyed
+                               cache under .codemap/audit-cache/ (plain tree, no .git
+                               artifact), reindex into a temp DB, then diff. <ref> = any
+                               committish (origin/main, HEAD~5, sha, tag, …). Cache hit
+                               on second run against same sha is sub-100ms. Requires a
+                               git repository.
 
   --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
                                <prefix>-dependencies, <prefix>-deprecated in

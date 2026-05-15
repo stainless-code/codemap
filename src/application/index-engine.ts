@@ -326,7 +326,13 @@ export async function indexFiles(
   filePaths: string[],
   fullRebuild: boolean,
   knownIndexedPaths?: Set<string>,
-  options?: { quiet?: boolean; performance?: boolean; collectMs?: number },
+  options?: {
+    quiet?: boolean;
+    performance?: boolean;
+    collectMs?: number;
+    /** Skip `git rev-parse HEAD` and stamp this sha. See `RunIndexOptions.commit`. */
+    commit?: string;
+  },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
   const wantPerformance = options?.performance === true;
@@ -493,7 +499,7 @@ export async function indexFiles(
     setMeta(db, "schema_version", String(SCHEMA_VERSION));
   }
 
-  setMeta(db, "last_indexed_commit", getCurrentCommit());
+  setMeta(db, "last_indexed_commit", options?.commit ?? getCurrentCommit());
   setMeta(db, "indexed_at", new Date().toISOString());
   const fileCount = db
     .query<{ c: number }>("SELECT COUNT(*) as c FROM files")

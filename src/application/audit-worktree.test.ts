@@ -160,6 +160,46 @@ describe("populateWorktree + lookupCacheEntry", () => {
     expect(hit?.dbPath).toBe((populated as { dbPath: string }).dbPath);
   });
 
+  it("cache entry is a plain tree — no `.git` artifact and no registered worktree", async () => {
+    const populated = await populateWorktree({
+      projectRoot,
+      sha: baseSha,
+      reindex: async (worktreePath) => {
+        const db = openCodemapDatabase(
+          join(worktreePath, ".codemap", "index.db"),
+        );
+        createTables(db);
+        db.close();
+      },
+    });
+    expect(populated).toMatchObject({ sha: baseSha });
+    const worktreePath = (populated as { worktreePath: string }).worktreePath;
+    expect(existsSync(join(worktreePath, ".git"))).toBe(false);
+    const list = spawnSync("git", ["worktree", "list", "--porcelain"], {
+      cwd: projectRoot,
+      env: fixtureEnv(),
+    });
+    expect(list.status).toBe(0);
+    expect(list.stdout.toString()).not.toContain(worktreePath);
+  });
+
+  it("passes the resolved sha to the reindex callback", async () => {
+    let seenCommit: string | undefined;
+    await populateWorktree({
+      projectRoot,
+      sha: baseSha,
+      reindex: async (worktreePath, commit) => {
+        seenCommit = commit;
+        const db = openCodemapDatabase(
+          join(worktreePath, ".codemap", "index.db"),
+        );
+        createTables(db);
+        db.close();
+      },
+    });
+    expect(seenCommit).toBe(baseSha);
+  });
+
   it("cache hit short-circuits — second populate would reindex but lookup returns first", async () => {
     let reindexCalls = 0;
     const reindex = async (wp: string) => {

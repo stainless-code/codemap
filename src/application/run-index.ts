@@ -96,6 +96,12 @@ export interface RunIndexOptions {
    * rebuild only). Off by default — wired by the CLI's `--performance` flag.
    */
   performance?: boolean;
+  /**
+   * Explicit sha for `meta.last_indexed_commit` — skips `git rev-parse HEAD`.
+   * Audit-cache reindex uses this: the cache dir has no `.git` so the shell-out
+   * would emit `fatal: not a git repository` and stamp an empty string.
+   */
+  commit?: string;
 }
 
 /**
@@ -139,6 +145,7 @@ export async function runCodemapIndex(
         quiet,
         performance: wantPerformance,
         collectMs,
+        commit: options.commit,
       });
       return {
         mode: "full",

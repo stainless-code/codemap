@@ -319,12 +319,17 @@ function tryGetGitRef(): string | null {
 }
 
 /**
- * Reindex callback contract — `runAuditFromRef` injects this. The default
- * production implementation (`makeWorktreeReindex`) re-inits the runtime
- * singletons against the worktree path then calls `runCodemapIndex`; tests
- * inject a stub via this same hook.
+ * Reindex callback contract — `runAuditFromRef` injects this. Production:
+ * `makeWorktreeReindex` re-inits runtime singletons against the worktree
+ * path then calls `runCodemapIndex`. Tests inject stubs via the same hook.
+ * `commit` is the resolved sha; production passes it through so the cache
+ * DB's `meta.last_indexed_commit` is stamped without shelling out to
+ * `git rev-parse HEAD` in the (`.git`-less) cache dir.
  */
-export type ReindexFn = (worktreePath: string) => Promise<void>;
+export type ReindexFn = (
+  worktreePath: string,
+  commit?: string,
+) => Promise<void>;
 
 /**
  * Process-level serialiser for the runtime-singleton swap inside
@@ -348,7 +353,7 @@ let _reindexChain: Promise<void> = Promise.resolve();
  * process-wide via `_reindexChain` so concurrent audits don't interleave.
  */
 export function makeWorktreeReindex(): ReindexFn {
-  return (worktreePath: string) => {
+  return (worktreePath: string, commit?: string) => {
     const next = _reindexChain.then(async () => {
       // Cached worktree is a self-contained codemap project; DB resolves
       // to <worktree>/.codemap/index.db via the default state-dir.
@@ -359,7 +364,7 @@ export function makeWorktreeReindex(): ReindexFn {
         initCodemap(resolveCodemapConfig(worktreePath, wtUser));
         configureResolver(getProjectRoot(), getTsconfigPath());
         wtDb = openCodemapDatabase();
-        await runCodemapIndex(wtDb, { mode: "full", quiet: true });
+        await runCodemapIndex(wtDb, { mode: "full", quiet: true, commit });
       } finally {
         wtDb?.close();
         initCodemap(savedConfig);
