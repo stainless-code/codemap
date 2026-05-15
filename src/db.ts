@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -218,6 +218,16 @@ export function createTables(db: CodemapDatabase) {
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
 
+    -- Strongly-connected component (SCC) of the import dependency graph.
+    -- Only cyclic files appear here. Files sharing cycle_id import each
+    -- other directly or transitively. Computed via Tarjan's SCC on
+    -- dependencies after the full index pass.
+    CREATE TABLE IF NOT EXISTS module_cycles (
+      file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+      cycle_id INTEGER NOT NULL,
+      cycle_size INTEGER NOT NULL
+    ) STRICT;
+
     -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
     -- want specifier-precise rewrites (rename specifier, dedupe, type-only
     -- migrate) JOIN this table. The original imports.specifiers JSON stays
@@ -413,6 +423,9 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_bindings_resolved ON bindings(resolved_symbol_id);
     CREATE INDEX IF NOT EXISTS idx_bindings_kind ON bindings(resolution_kind);
 
+    CREATE INDEX IF NOT EXISTS idx_module_cycles_cid ON module_cycles(cycle_id);
+    CREATE INDEX IF NOT EXISTS idx_module_cycles_size ON module_cycles(cycle_size);
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -461,6 +474,7 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS module_cycles;
     DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1087,6 +1101,26 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
         r.interface_count,
         r.export_count,
       ),
+  );
+}
+
+/** Per-file SCC assignment per Tarjan's algorithm. */
+export interface ModuleCycleRow {
+  file_path: string;
+  cycle_id: number;
+  cycle_size: number;
+}
+
+export function insertModuleCycles(
+  db: CodemapDatabase,
+  rows: ModuleCycleRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO module_cycles (file_path, cycle_id, cycle_size)",
+    "(?,?,?)",
+    (r, v) => v.push(r.file_path, r.cycle_id, r.cycle_size),
   );
 }
 

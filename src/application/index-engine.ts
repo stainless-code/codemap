@@ -53,6 +53,7 @@ import {
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
 import { persistBindings, resolveBindings } from "./bindings-engine";
+import { persistModuleCycles } from "./cycles-engine";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -477,6 +478,7 @@ export async function indexFiles(
   if (fullRebuild) {
     const bindings = resolveBindings(db);
     persistBindings(db, bindings);
+    persistModuleCycles(db);
   }
 
   const elapsed = Math.round(performance.now() - startTime);

@@ -145,6 +145,11 @@
       "recipe": "large-functions"
     },
     {
+      "id": "circular-imports",
+      "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
+      "recipe": "circular-imports"
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"
