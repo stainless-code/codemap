@@ -24,6 +24,7 @@ import {
   insertFileMetrics,
   insertFunctionParams,
   insertRuntimeMarkers,
+  insertTestSuites,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -260,6 +261,8 @@ function insertParsedResults(
             insertFunctionParams(db, parsed.functionParams);
           if (parsed.runtimeMarkers?.length)
             insertRuntimeMarkers(db, parsed.runtimeMarkers);
+          if (parsed.testSuites?.length)
+            insertTestSuites(db, parsed.testSuites);
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -446,6 +449,7 @@ export async function indexFiles(
               insertFunctionParams(db, data.functionParams);
             if (data.runtimeMarkers.length)
               insertRuntimeMarkers(db, data.runtimeMarkers);
+            if (data.testSuites.length) insertTestSuites(db, data.testSuites);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);

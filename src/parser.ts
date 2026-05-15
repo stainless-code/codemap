@@ -23,6 +23,7 @@ import type {
   FileMetricsRow,
   FunctionParamRow,
   RuntimeMarkerRow,
+  TestSuiteRow,
 } from "./db";
 import { callsExtractor } from "./extractors/calls";
 import {
@@ -40,6 +41,7 @@ import { referencesExtractor } from "./extractors/references";
 import { runtimeMarkersExtractor } from "./extractors/runtime-markers";
 import { createScopeTracker, scopesExtractor } from "./extractors/scopes";
 import { symbolsExtractor } from "./extractors/symbols";
+import { testsExtractor } from "./extractors/tests";
 import type { ExtractContext, TierExtractor } from "./extractors/types";
 
 // Re-export for parser.test.ts compatibility — implementation in extractors/jsdoc.ts.
@@ -59,6 +61,7 @@ interface ExtractedData {
   fileMetrics: FileMetricsRow;
   functionParams: FunctionParamRow[];
   runtimeMarkers: RuntimeMarkerRow[];
+  testSuites: TestSuiteRow[];
 }
 
 /**
@@ -103,6 +106,7 @@ const EXTRACTORS: readonly TierExtractor[] = [
   componentsExtractor,
   referencesExtractor,
   runtimeMarkersExtractor,
+  testsExtractor,
   markersExtractor,
 ];
 
@@ -138,6 +142,7 @@ export function extractFileData(
   const references: ReferenceRow[] = [];
   const functionParams: FunctionParamRow[] = [];
   const runtimeMarkers: RuntimeMarkerRow[] = [];
+  const testSuites: TestSuiteRow[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -188,6 +193,7 @@ export function extractFileData(
     references,
     functionParams,
     runtimeMarkers,
+    testSuites,
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
@@ -221,6 +227,7 @@ export function extractFileData(
     fileMetrics: computeFileMetrics(relPath, source, lineMap, symbols, exports),
     functionParams,
     runtimeMarkers,
+    testSuites,
   };
 }
 

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -217,6 +217,25 @@ export function createTables(db: CodemapDatabase) {
       )),
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
+
+    -- Test suite metadata: describe / it / test / suite blocks with
+    -- their hierarchy + skip/only/todo flags. framework is detected
+    -- from imports (vitest / jest / bun-test / node-test / mocha) and
+    -- defaults to 'unknown' when no test framework import is found
+    -- in the file. parent_suite_id is NULL for top-level blocks.
+    CREATE TABLE IF NOT EXISTS test_suites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('describe','it','test','suite','context')),
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      parent_suite_id INTEGER REFERENCES test_suites(id) ON DELETE CASCADE,
+      is_skipped INTEGER NOT NULL DEFAULT 0,
+      is_only INTEGER NOT NULL DEFAULT 0,
+      is_todo INTEGER NOT NULL DEFAULT 0,
+      framework TEXT NOT NULL CHECK (framework IN ('vitest','jest','bun-test','node-test','mocha','unknown'))
+    ) STRICT;
 
     -- Runtime markers — operational signals worth auditing: console
     -- calls, debugger statements, raw throws, process.env reads. detail
@@ -486,6 +505,11 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_runtime_markers_file ON runtime_markers(file_path);
     CREATE INDEX IF NOT EXISTS idx_runtime_markers_detail ON runtime_markers(detail) WHERE detail IS NOT NULL;
 
+    CREATE INDEX IF NOT EXISTS idx_test_suites_file ON test_suites(file_path);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_kind ON test_suites(kind);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_parent ON test_suites(parent_suite_id);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_skipped ON test_suites(is_skipped) WHERE is_skipped = 1;
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -538,6 +562,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS re_export_chains;
     DROP TABLE IF EXISTS function_params;
     DROP TABLE IF EXISTS runtime_markers;
+    DROP TABLE IF EXISTS test_suites;
     DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1212,6 +1237,57 @@ export function insertFunctionParams(
         r.line_start,
         r.column_start,
         r.column_end,
+      ),
+  );
+}
+
+/**
+ * Test suite block — describe / it / test / suite / context with
+ * skip/only/todo flags. parent_suite_id stays NULL in the worker output;
+ * the orchestrator resolves it after bulk insert (or queries use the
+ * line range to infer parent).
+ */
+export interface TestSuiteRow {
+  file_path: string;
+  name: string;
+  kind: "describe" | "it" | "test" | "suite" | "context";
+  line_start: number;
+  line_end: number;
+  /** Index into the per-file rows array — orchestrator resolves to row id. */
+  parent_index: number | null;
+  is_skipped: number;
+  is_only: number;
+  is_todo: number;
+  framework: "vitest" | "jest" | "bun-test" | "node-test" | "mocha" | "unknown";
+}
+
+export function insertTestSuites(db: CodemapDatabase, rows: TestSuiteRow[]) {
+  if (!rows.length) return;
+  // Insert in a single transaction; rowids are sequential so the
+  // parent_index → real id mapping is `firstId + parent_index`.
+  const firstIdRow = db
+    .query<{ seq: number | null }>(
+      "SELECT seq FROM sqlite_sequence WHERE name = 'test_suites'",
+    )
+    .get();
+  const firstId = (firstIdRow?.seq ?? 0) + 1;
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO test_suites (file_path, name, kind, line_start, line_end, parent_suite_id, is_skipped, is_only, is_todo, framework)",
+    "(?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.name,
+        r.kind,
+        r.line_start,
+        r.line_end,
+        r.parent_index === null ? null : firstId + r.parent_index,
+        r.is_skipped,
+        r.is_only,
+        r.is_todo,
+        r.framework,
       ),
   );
 }

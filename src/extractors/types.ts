@@ -10,6 +10,7 @@ import type {
   ReferenceRow,
   RuntimeMarkerRow,
   SymbolRow,
+  TestSuiteRow,
   TypeMemberRow,
 } from "../db";
 
@@ -123,6 +124,7 @@ export interface ExtractContext {
   readonly references: ReferenceRow[];
   readonly functionParams: FunctionParamRow[];
   readonly runtimeMarkers: RuntimeMarkerRow[];
+  readonly testSuites: TestSuiteRow[];
 
   readonly scopes: ScopeTracker;
   readonly complexity: ComplexityTracker;

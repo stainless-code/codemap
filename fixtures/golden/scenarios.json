@@ -176,6 +176,16 @@
       "recipe": "env-var-audit"
     },
     {
+      "id": "find-skipped-tests",
+      "prompt": "Tests flagged skip / only / todo.",
+      "recipe": "find-skipped-tests"
+    },
+    {
+      "id": "tests-by-file",
+      "prompt": "Test roll-up per file.",
+      "recipe": "tests-by-file"
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

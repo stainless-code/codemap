@@ -17,6 +17,7 @@ import type {
   FileMetricsRow,
   FunctionParamRow,
   RuntimeMarkerRow,
+  TestSuiteRow,
 } from "./db";
 
 /**
@@ -49,6 +50,7 @@ export interface ParsedFile {
   fileMetrics?: FileMetricsRow;
   functionParams?: FunctionParamRow[];
   runtimeMarkers?: RuntimeMarkerRow[];
+  testSuites?: TestSuiteRow[];
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

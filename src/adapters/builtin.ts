@@ -32,6 +32,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     fileMetrics: data.fileMetrics,
     functionParams: data.functionParams,
     runtimeMarkers: data.runtimeMarkers,
+    testSuites: data.testSuites,
   };
 }
 
