@@ -429,6 +429,24 @@ describe("extractFileData", () => {
       expect(d.symbols.find((s) => s.name === "c")?.kind).toBe("var");
     });
 
+    it("for-of identifier binding inherits the declaration keyword", () => {
+      const src = `for (let x of xs) { void x; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "x")?.kind).toBe("let");
+    });
+
+    it("for-in identifier binding inherits the declaration keyword", () => {
+      const src = `for (const k in obj) { void k; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "k")?.kind).toBe("const");
+    });
+
+    it("for-of destructured binding inherits the declaration keyword", () => {
+      const src = `for (var { id } of items) { void id; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "id")?.kind).toBe("var");
+    });
+
     it("file_metrics counts each keyword separately", () => {
       const src = [
         `const a = 1;`,
