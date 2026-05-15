@@ -36,3 +36,5 @@ WHERE s.kind = 'const' AND r.is_write = 1 AND r.line_start > s.line_start;
 ```
 
 `find-symbol-by-kind` recipe params updated to enumerate the new values explicitly.
+
+**`file_metrics` keyword counts populate too** — `let_count` / `const_count` / `var_count` were previously hardcoded to `0` (`// let/const/var distinction not yet tracked` per the in-source TODO). They now reflect the actual per-file counts. `docs/architecture.md` § `file_metrics` drops the "Reserved (parser-keyword variant TBD)" notes.

@@ -389,9 +389,9 @@ One row per indexed TS/JS file. Line classification is regex-light (blank if `/^
 | code_lines      | INTEGER | `total - blank - comment`             |
 | blank_lines     | INTEGER | Whitespace-only lines                 |
 | comment_lines   | INTEGER | Lines starting with `//` / `/*` / `*` |
-| let_count       | INTEGER | Reserved (parser-keyword variant TBD) |
-| const_count     | INTEGER | Reserved (parser-keyword variant TBD) |
-| var_count       | INTEGER | Reserved (parser-keyword variant TBD) |
+| let_count       | INTEGER | `symbols.kind = 'let'` count          |
+| const_count     | INTEGER | `symbols.kind = 'const'` count        |
+| var_count       | INTEGER | `symbols.kind = 'var'` count          |
 | function_count  | INTEGER | `symbols.kind = 'function'` count     |
 | arrow_count     | INTEGER | Reserved (kind disambiguation TBD)    |
 | class_count     | INTEGER | `symbols.kind = 'class'` count        |

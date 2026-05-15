@@ -428,6 +428,21 @@ describe("extractFileData", () => {
       expect(d.symbols.find((s) => s.name === "b")?.kind).toBe("let");
       expect(d.symbols.find((s) => s.name === "c")?.kind).toBe("var");
     });
+
+    it("file_metrics counts each keyword separately", () => {
+      const src = [
+        `const a = 1;`,
+        `const b = 2;`,
+        `let c = 3;`,
+        `var d = 4;`,
+        `var e = 5;`,
+        `var f = 6;`,
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.fileMetrics?.const_count).toBe(2);
+      expect(d.fileMetrics?.let_count).toBe(1);
+      expect(d.fileMetrics?.var_count).toBe(3);
+    });
   });
 
   describe("symbol nesting and scope", () => {
