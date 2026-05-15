@@ -28,4 +28,4 @@ Suggested tuning axes for project-local overrides:
 - **Visibility weight** if `@public` / `@internal` / `@beta` JSDoc tags are used consistently: `+ CASE visibility WHEN 'public' THEN 20 WHEN 'beta' THEN 10 ELSE 0 END`.
 - **LOC weight** scale by file `line_count` (already on the `files` table).
 
-**Divergence from research note (`docs/research/non-goals-reassessment-2026-05.md` § 1.4):** the research note specified per-symbol ranking. Empirical test against codemap's own index showed per-symbol output was 30 rows from `src/db.ts` all tied at the same score (file-level fan_in inherited). v1 ships file-level aggregation as the more useful default; per-symbol via `calls` is one of the documented tuning axes above.
+**Per-symbol vs per-file:** the original design specified per-symbol ranking; empirical testing showed per-symbol output got dominated by long-tail symbols from a single hot file all tied at the same score (file-level `fan_in` inherited). v1 ships file-level aggregation as the more useful default; per-symbol via `calls` is one of the documented tuning axes above.

@@ -14,7 +14,7 @@ Combines two evidence axes:
 
 Returns nothing useful until you've run `codemap ingest-coverage <coverage-final.json|lcov.info>` (Istanbul or LCOV from any test runner). Without coverage data, every uncalled exported function appears — coverage is what makes the predicate precise.
 
-**Known v1 limitation (D11 of `docs/plans/coverage-ingestion.md`):** the `callee_name = s.name` predicate is name-only / lossy across cross-file collisions — two functions named `init` in different files will satisfy "no callers" together as long as neither is called _anywhere_. Three concrete narrowing patterns to apply on top of this recipe when the noise is high:
+**Known v1 limitation:** the `callee_name = s.name` predicate is name-only / lossy across cross-file collisions — two functions named `init` in different files will satisfy "no callers" together as long as neither is called _anywhere_. Three concrete narrowing patterns to apply on top of this recipe when the noise is high:
 
 1. **Scope by directory**: `AND s.file_path LIKE 'src/api/%'` — restricts the predicate to a single owner / package.
 2. **Exclude framework entry-point exports**: `AND s.is_default_export = 0` — Next.js page / layout / route handler default exports show up as "no callers" but are live entry points.

@@ -27,7 +27,7 @@ export default defineConfig({
 });
 ```
 
-The shape lives in the Zod config schema (`src/config.ts` `boundaries`); fields validate at config-load time. `action` defaults to `"deny"` — `"allow"` is reserved for future whitelist semantics and is currently a no-op.
+The shape lives in Codemap's Zod config schema (the `boundaries` array on the user-config object); fields validate at config-load time. `action` defaults to `"deny"` — `"allow"` is reserved for future whitelist semantics and is currently a no-op.
 
 ## Use
 

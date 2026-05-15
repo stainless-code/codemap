@@ -9,7 +9,7 @@ Functions with cyclomatic complexity `≥ 10` AND measured coverage `< 50%`. Com
 
 ## Cyclomatic complexity (per `symbols.complexity`)
 
-McCabe formula: `1 + (decision points)`. Branching nodes counted by codemap's parser walker (`src/parser.ts`):
+McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's parser walker:
 
 - `if` / `while` / `do…while` / `for` / `for…in` / `for…of`
 - `case X:` arms inside `switch` (the `default:` fall-through is **not** counted — it's not a decision point)
@@ -35,4 +35,4 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by codemap's pa
 
 ## v1 limitation — class methods are NULL
 
-Complexity is currently computed for top-level `function` declarations and arrow-function consts. Class methods (`MethodDefinition`) follow the same shape but don't push to the complexity stack yet. Refactor the `MethodDefinition` visitor in `src/parser.ts` to call `pushComplexityFor` / `popComplexityInto` if class-heavy projects need this.
+Complexity is currently computed for top-level `function` declarations and arrow-function consts; class methods (`MethodDefinition`) inherit `NULL`. Tracked for a future codemap release — file an issue if class-heavy projects need this sooner.
