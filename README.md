@@ -57,7 +57,7 @@ NODE_V8_COVERAGE=.cov bun test && codemap ingest-coverage .cov --runtime --json 
 codemap agents init                                          # scaffold .agents/ rules + skills
 ```
 
-**Version-matched agent guidance:** the published npm package ships **`templates/agents/`** (rules + skills) keyed to that version, so `codemap agents init` writes guidance that matches the CLI you installed. See [docs/agents.md](docs/agents.md).
+**Version-matched agent guidance:** `codemap agents init` writes **thin pointer files** to `.agents/` (~16-line SKILL.md + ~22-line rule). The full content is served live by **`codemap skill`** / **`codemap rule`** (CLI) and **`codemap://skill`** / **`codemap://rule`** (MCP / HTTP) — so `bun update @stainless-code/codemap` auto-refreshes the content agents see, no re-init needed. See [docs/agents.md](docs/agents.md).
 
 ### Full reference
 
@@ -201,7 +201,7 @@ codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fa
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
 #        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact
-# Resources: codemap://recipes, codemap://recipes/{id}, codemap://schema, codemap://skill (lazy-cached)
+# Resources: codemap://recipes, codemap://recipes/{id}, codemap://schema, codemap://skill, codemap://rule (lazy-cached)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
 # Another project
