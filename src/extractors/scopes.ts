@@ -233,21 +233,23 @@ export const scopesExtractor: TierExtractor = {
       // as a binding at the for-scope. Identifier form: `for (x of …)`
       // is reassignment, not a new binding — skip.
       if (left?.type === "VariableDeclaration") {
+        const varKind = left.kind as "const" | "let" | "var";
         for (const decl of left.declarations ?? []) {
-          if (decl.id?.type === "Identifier") {
-            pushParams(
-              [decl.id],
-              scopes.currentLocalId(),
-              null,
-              ctx,
-              jsDocComments,
-              source,
-            );
-          } else if (
+          // walkPattern in pushDestructuredVars handles Identifier,
+          // ObjectPattern, ArrayPattern uniformly — and crucially
+          // emits `kind = varKind` rather than `"param"`.
+          if (
+            decl.id?.type === "Identifier" ||
             decl.id?.type === "ObjectPattern" ||
             decl.id?.type === "ArrayPattern"
           ) {
-            pushDestructuredVars(decl.id, scopes.currentLocalId(), null, ctx);
+            pushDestructuredVars(
+              decl.id,
+              scopes.currentLocalId(),
+              null,
+              varKind,
+              ctx,
+            );
           }
         }
       }

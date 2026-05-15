@@ -26,4 +26,4 @@ Write semantics per R.13:
 - `for (x of …)` / `for (x in …)` LHS → one row.
 - Destructuring `AssignmentPattern` (e.g. `function f(x = 1)`) → one row.
 
-Useful for: hidden reassignment detection (variables that look `const` but get reassigned), state-mutation auditing, or finding every place a parameter gets re-bound. JOIN with `symbols` (`kind = 'const'`) to find `const`s that get illegally written.
+Useful for: hidden reassignment detection (variables that look `const` but get reassigned), state-mutation auditing, or finding every place a parameter gets re-bound. JOIN with `symbols` (`kind = 'const'`) to find `const`s that get illegally written — `let` and `var` are distinct `kind` values now, so the filter is precise (no false positives from mutable bindings).

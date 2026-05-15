@@ -266,10 +266,16 @@ function computeFileMetrics(
   let fn = 0;
   let cls = 0;
   let iface = 0;
+  let constCount = 0;
+  let letCount = 0;
+  let varCount = 0;
   for (const s of symbols) {
     if (s.kind === "function") fn++;
     else if (s.kind === "class") cls++;
     else if (s.kind === "interface") iface++;
+    else if (s.kind === "const") constCount++;
+    else if (s.kind === "let") letCount++;
+    else if (s.kind === "var") varCount++;
   }
   return {
     file_path: filePath,
@@ -277,10 +283,9 @@ function computeFileMetrics(
     code_lines: code,
     blank_lines: blank,
     comment_lines: comment,
-    // let/const/var distinction not yet tracked — emitted as kind='const'.
-    let_count: 0,
-    const_count: 0,
-    var_count: 0,
+    let_count: letCount,
+    const_count: constCount,
+    var_count: varCount,
     function_count: fn,
     arrow_count: 0,
     class_count: cls,

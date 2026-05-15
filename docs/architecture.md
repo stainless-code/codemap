@@ -187,7 +187,7 @@ Optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; def
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap/index.db`**.
 
-Current schema version: **10** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **27** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
@@ -210,7 +210,7 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | id                | INTEGER PK | Auto-increment row id                                                                                                                                                                                                                                                                                                                                              |
 | file_path         | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                                                                                                                                                                                                                                                         |
 | name              | TEXT       | Symbol name                                                                                                                                                                                                                                                                                                                                                        |
-| kind              | TEXT       | `function`, `const`, `class`, `interface`, `type`, `enum`, `method`, `property`, `getter`, `setter` (last four are class members)                                                                                                                                                                                                                                  |
+| kind              | TEXT       | `function`, `const`, `let`, `var`, `class`, `interface`, `type`, `enum`, `method`, `property`, `getter`, `setter` (last four are class members). `let` / `var` are distinct from `const` so callers can filter on mutability (e.g. `WHERE kind = 'const'` excludes mutable bindings; `WHERE kind IN ('let','var')` lists reassignable ones).                       |
 | line_start        | INTEGER    | Start line (1-based)                                                                                                                                                                                                                                                                                                                                               |
 | line_end          | INTEGER    | End line                                                                                                                                                                                                                                                                                                                                                           |
 | signature         | TEXT       | Reconstructed signature with generics and return types (e.g. `identity<T>(val): T`, `interface Repo<T> extends Iterable<T>`, `class Store<T> extends Base<T> implements IStore<T>`)                                                                                                                                                                                |
@@ -389,9 +389,9 @@ One row per indexed TS/JS file. Line classification is regex-light (blank if `/^
 | code_lines      | INTEGER | `total - blank - comment`             |
 | blank_lines     | INTEGER | Whitespace-only lines                 |
 | comment_lines   | INTEGER | Lines starting with `//` / `/*` / `*` |
-| let_count       | INTEGER | Reserved (parser-keyword variant TBD) |
-| const_count     | INTEGER | Reserved (parser-keyword variant TBD) |
-| var_count       | INTEGER | Reserved (parser-keyword variant TBD) |
+| let_count       | INTEGER | `symbols.kind = 'let'` count          |
+| const_count     | INTEGER | `symbols.kind = 'const'` count        |
+| var_count       | INTEGER | `symbols.kind = 'var'` count          |
 | function_count  | INTEGER | `symbols.kind = 'function'` count     |
 | arrow_count     | INTEGER | Reserved (kind disambiguation TBD)    |
 | class_count     | INTEGER | `symbols.kind = 'class'` count        |

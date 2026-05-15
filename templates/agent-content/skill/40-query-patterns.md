@@ -39,8 +39,28 @@ SELECT name, signature, doc_comment FROM symbols
 WHERE name = 'formatCurrency' AND doc_comment IS NOT NULL;
 
 -- Const values (config flags, magic strings)
+-- `kind = 'const'` excludes `let` / `var` (which can be reassigned anyway).
 SELECT name, value, file_path FROM symbols
 WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%URL%';
+
+-- Mutable bindings that should probably be `const` (only initialised, never written again).
+-- Resolve writes via `bindings` so shadowed same-name declarations in the same file aren't conflated.
+SELECT s.name, s.file_path, s.line_start FROM symbols s
+WHERE s.kind = 'let'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM bindings b
+    JOIN "references" r ON r.id = b.reference_id
+    WHERE b.resolved_symbol_id = s.id
+      AND r.is_write = 1
+      AND r.line_start > s.line_start
+  );
+
+-- `const`s that DO get reassigned (illegal — TypeScript usually catches it, but extracted symbols + write-refs make it queryable)
+SELECT s.name, s.file_path, s.line_start FROM symbols s
+JOIN bindings b ON b.resolved_symbol_id = s.id
+JOIN "references" r ON r.id = b.reference_id
+WHERE s.kind = 'const' AND r.is_write = 1 AND r.line_start > s.line_start;
 
 -- Class methods (what does class X expose?)
 SELECT name, kind, signature FROM symbols

@@ -388,6 +388,81 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("variable declaration keyword (const / let / var)", () => {
+    it("preserves `const` as kind", () => {
+      const src = `const x = 1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const x = d.symbols.find((s) => s.name === "x");
+      expect(x?.kind).toBe("const");
+      expect(x?.signature).toBe("const x");
+    });
+
+    it("preserves `let` as kind", () => {
+      const src = `let y = 2;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const y = d.symbols.find((s) => s.name === "y");
+      expect(y?.kind).toBe("let");
+      expect(y?.signature).toBe("let y");
+    });
+
+    it("preserves `var` as kind", () => {
+      const src = `var z = 3;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const z = d.symbols.find((s) => s.name === "z");
+      expect(z?.kind).toBe("var");
+      expect(z?.signature).toBe("var z");
+    });
+
+    it("arrow-function init still wins over the keyword (kind=function)", () => {
+      const src = `let handler = () => 1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "handler")?.kind).toBe(
+        "function",
+      );
+    });
+
+    it("destructuring inherits the declaration keyword", () => {
+      const src = `let { a, b } = obj;\nvar [c] = arr;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "a")?.kind).toBe("let");
+      expect(d.symbols.find((s) => s.name === "b")?.kind).toBe("let");
+      expect(d.symbols.find((s) => s.name === "c")?.kind).toBe("var");
+    });
+
+    it("for-of identifier binding inherits the declaration keyword", () => {
+      const src = `for (let x of xs) { void x; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "x")?.kind).toBe("let");
+    });
+
+    it("for-in identifier binding inherits the declaration keyword", () => {
+      const src = `for (const k in obj) { void k; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "k")?.kind).toBe("const");
+    });
+
+    it("for-of destructured binding inherits the declaration keyword", () => {
+      const src = `for (var { id } of items) { void id; }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "id")?.kind).toBe("var");
+    });
+
+    it("file_metrics counts each keyword separately", () => {
+      const src = [
+        `const a = 1;`,
+        `const b = 2;`,
+        `let c = 3;`,
+        `var d = 4;`,
+        `var e = 5;`,
+        `var f = 6;`,
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.fileMetrics?.const_count).toBe(2);
+      expect(d.fileMetrics?.let_count).toBe(1);
+      expect(d.fileMetrics?.var_count).toBe(3);
+    });
+  });
+
   describe("symbol nesting and scope", () => {
     it("top-level symbols have null parent_name", () => {
       const src = `export function foo(): void {}\nexport const bar = 42;\n`;

@@ -3,7 +3,7 @@ params:
   - name: kind
     type: string
     required: true
-    description: Symbol kind to match (function, const, class, interface, ...)
+    description: Symbol kind to match (function, const, let, var, class, interface, type, enum, method, ...)
   - name: name_pattern
     type: string
     required: true
