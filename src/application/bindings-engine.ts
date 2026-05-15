@@ -4,8 +4,8 @@
  * globals → unresolved order. Re-export chains defer to Tier 6.
  */
 
-import type { BindingRow, CodemapDatabase } from "../db";
-import { insertBindings } from "../db";
+import type { BindingRow, CodemapDatabase, ReExportChainRow } from "../db";
+import { insertBindings, insertReExportChains } from "../db";
 
 // TypeScript built-in type names — `Record`, `Partial`, etc. plus the
 // stdlib types DOM exposes (`RegExp`, `Map`, `Set`, …). Used only for
@@ -546,6 +546,95 @@ function resolveOne(
     resolution_kind: "unresolved",
     is_external: 0,
   };
+}
+
+/**
+ * Materialise every (file, exported_name) re-export entry into a row
+ * resolved at its terminal definition site. Re-walks the same engine
+ * used by bindings-resolve, but separately so consumers querying barrel
+ * files don't have to chase bindings.
+ */
+export function resolveReExportChains(db: CodemapDatabase): ReExportChainRow[] {
+  const reExportsByFile = new Map<string, Map<string, ReExportEntry>>();
+  const expRows = db
+    .query<{
+      file_path: string;
+      name: string;
+      is_re_export: number;
+      re_export_source: string | null;
+    }>("SELECT file_path, name, is_re_export, re_export_source FROM exports")
+    .all();
+  for (const r of expRows) {
+    if (r.is_re_export !== 1 || !r.re_export_source) continue;
+    let re = reExportsByFile.get(r.file_path);
+    if (!re) {
+      re = new Map();
+      reExportsByFile.set(r.file_path, re);
+    }
+    const dotIdx = r.re_export_source.lastIndexOf(".");
+    const sourceTail = r.re_export_source.split("/").pop() ?? "";
+    const hasNameSuffix =
+      sourceTail.startsWith(".") === false &&
+      dotIdx > r.re_export_source.lastIndexOf("/") &&
+      dotIdx > 0;
+    const importedName = hasNameSuffix
+      ? r.re_export_source.slice(dotIdx + 1)
+      : r.name;
+    const source = hasNameSuffix
+      ? r.re_export_source.slice(0, dotIdx)
+      : r.re_export_source;
+    re.set(r.name, { source, imported_name: importedName });
+  }
+
+  const indexedPaths = new Set<string>(
+    db
+      .query<{ path: string }>("SELECT path FROM files")
+      .all()
+      .map((r) => r.path),
+  );
+
+  const out: ReExportChainRow[] = [];
+  for (const [fromFile, names] of reExportsByFile) {
+    for (const fromName of names.keys()) {
+      let file = fromFile;
+      let name = fromName;
+      const visited = new Set<string>();
+      let hops = 0;
+      let truncated = 0;
+      for (; hops < MAX_REEXPORT_DEPTH; hops++) {
+        const key = `${file}|${name}`;
+        if (visited.has(key)) {
+          truncated = 1;
+          break;
+        }
+        visited.add(key);
+        const entry = reExportsByFile.get(file)?.get(name);
+        if (!entry) break;
+        const nextFile = resolveReExport(file, entry.source, indexedPaths);
+        if (!nextFile) {
+          truncated = 1;
+          break;
+        }
+        file = nextFile;
+        name = entry.imported_name;
+      }
+      if (hops >= MAX_REEXPORT_DEPTH) truncated = 1;
+      out.push({
+        from_file: fromFile,
+        from_name: fromName,
+        to_file: file,
+        to_name: name,
+        hops,
+        truncated,
+      });
+    }
+  }
+  return out;
+}
+
+export function persistReExportChains(db: CodemapDatabase) {
+  db.run("DELETE FROM re_export_chains");
+  insertReExportChains(db, resolveReExportChains(db));
 }
 
 export function persistBindings(db: CodemapDatabase, rows: BindingRow[]) {

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -218,6 +218,20 @@ export function createTables(db: CodemapDatabase) {
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
 
+    -- Materialised re-export chains. One row per (from_file, from_name)
+    -- pointing at the terminal definition site after walking through
+    -- barrel files (bounded at 10 hops). Same engine as bindings-engine
+    -- exposes the walk to ad-hoc SQL.
+    CREATE TABLE IF NOT EXISTS re_export_chains (
+      from_file TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      from_name TEXT NOT NULL,
+      to_file TEXT NOT NULL,
+      to_name TEXT NOT NULL,
+      hops INTEGER NOT NULL,
+      truncated INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (from_file, from_name)
+    ) STRICT, WITHOUT ROWID;
+
     -- Strongly-connected component (SCC) of the import dependency graph.
     -- Only cyclic files appear here. Files sharing cycle_id import each
     -- other directly or transitively. Computed via Tarjan's SCC on
@@ -426,6 +440,9 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_module_cycles_cid ON module_cycles(cycle_id);
     CREATE INDEX IF NOT EXISTS idx_module_cycles_size ON module_cycles(cycle_size);
 
+    CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
+    CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -475,6 +492,7 @@ export function createSchema(db: CodemapDatabase) {
 export function dropAll(db: CodemapDatabase) {
   db.run(`
     DROP TABLE IF EXISTS module_cycles;
+    DROP TABLE IF EXISTS re_export_chains;
     DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1100,6 +1118,38 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
         r.class_count,
         r.interface_count,
         r.export_count,
+      ),
+  );
+}
+
+/** Resolved re-export chain — bindings-engine and ad-hoc SQL share this. */
+export interface ReExportChainRow {
+  from_file: string;
+  from_name: string;
+  to_file: string;
+  to_name: string;
+  hops: number;
+  /** 1 if the walk hit MAX_REEXPORT_DEPTH without finding a non-re-export terminal. */
+  truncated: number;
+}
+
+export function insertReExportChains(
+  db: CodemapDatabase,
+  rows: ReExportChainRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
+    "(?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.from_file,
+        r.from_name,
+        r.to_file,
+        r.to_name,
+        r.hops,
+        r.truncated,
       ),
   );
 }

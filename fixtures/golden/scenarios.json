@@ -150,6 +150,11 @@
       "recipe": "circular-imports"
     },
     {
+      "id": "barrel-chains",
+      "prompt": "Resolved re-export chains — every export-from terminal site.",
+      "recipe": "barrel-chains"
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

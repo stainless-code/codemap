@@ -52,7 +52,11 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
-import { persistBindings, resolveBindings } from "./bindings-engine";
+import {
+  persistBindings,
+  persistReExportChains,
+  resolveBindings,
+} from "./bindings-engine";
 import { persistModuleCycles } from "./cycles-engine";
 import type { QueryBindValue } from "./query-engine";
 import type {
@@ -479,6 +483,7 @@ export async function indexFiles(
     const bindings = resolveBindings(db);
     persistBindings(db, bindings);
     persistModuleCycles(db);
+    persistReExportChains(db);
   }
 
   const elapsed = Math.round(performance.now() - startTime);
