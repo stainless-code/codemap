@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -217,6 +217,27 @@ export function createTables(db: CodemapDatabase) {
       )),
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
+
+    -- First-class parameter rows: one row per leaf parameter binding,
+    -- ordered by position. Keyed by (file_path, owner_name, owner_kind)
+    -- to disambiguate same-name functions vs methods in the same file.
+    -- type_text is the stringified annotation. default_text is the raw
+    -- default expression source (NULL when there is no default).
+    CREATE TABLE IF NOT EXISTS function_params (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      owner_name TEXT NOT NULL,
+      owner_kind TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type_text TEXT,
+      default_text TEXT,
+      is_rest INTEGER NOT NULL DEFAULT 0,
+      is_optional INTEGER NOT NULL DEFAULT 0,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL
+    ) STRICT;
 
     -- Materialised re-export chains. One row per (from_file, from_name)
     -- pointing at the terminal definition site after walking through
@@ -443,6 +464,10 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
 
+    CREATE INDEX IF NOT EXISTS idx_function_params_owner ON function_params(file_path, owner_name);
+    CREATE INDEX IF NOT EXISTS idx_function_params_name ON function_params(name);
+    CREATE INDEX IF NOT EXISTS idx_function_params_type ON function_params(type_text) WHERE type_text IS NOT NULL;
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -493,6 +518,7 @@ export function dropAll(db: CodemapDatabase) {
   db.run(`
     DROP TABLE IF EXISTS module_cycles;
     DROP TABLE IF EXISTS re_export_chains;
+    DROP TABLE IF EXISTS function_params;
     DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1118,6 +1144,55 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
         r.class_count,
         r.interface_count,
         r.export_count,
+      ),
+  );
+}
+
+/**
+ * One row per leaf parameter binding, ordered by position. Owner-kind
+ * lets `(file_path, owner_name, owner_kind)` disambiguate same-name
+ * functions vs methods.
+ */
+export interface FunctionParamRow {
+  file_path: string;
+  owner_name: string;
+  /** 'function' / 'method' / 'arrow' / 'constructor' / 'getter' / 'setter'. */
+  owner_kind: string;
+  /** 0-based index in the params array. */
+  position: number;
+  name: string;
+  type_text: string | null;
+  default_text: string | null;
+  is_rest: number;
+  is_optional: number;
+  line_start: number;
+  column_start: number;
+  column_end: number;
+}
+
+export function insertFunctionParams(
+  db: CodemapDatabase,
+  rows: FunctionParamRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO function_params (file_path, owner_name, owner_kind, position, name, type_text, default_text, is_rest, is_optional, line_start, column_start, column_end)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.owner_name,
+        r.owner_kind,
+        r.position,
+        r.name,
+        r.type_text,
+        r.default_text,
+        r.is_rest,
+        r.is_optional,
+        r.line_start,
+        r.column_start,
+        r.column_end,
       ),
   );
 }

@@ -21,6 +21,7 @@ import type {
   ScopeRow,
   ReferenceRow,
   FileMetricsRow,
+  FunctionParamRow,
 } from "./db";
 import { callsExtractor } from "./extractors/calls";
 import {
@@ -54,6 +55,7 @@ interface ExtractedData {
   scopes: ScopeRow[];
   references: ReferenceRow[];
   fileMetrics: FileMetricsRow;
+  functionParams: FunctionParamRow[];
 }
 
 /**
@@ -130,6 +132,7 @@ export function extractFileData(
   const typeMembers: TypeMemberRow[] = [];
   const calls: CallRow[] = [];
   const references: ReferenceRow[] = [];
+  const functionParams: FunctionParamRow[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -178,6 +181,7 @@ export function extractFileData(
     typeMembers,
     calls,
     references,
+    functionParams,
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
@@ -209,6 +213,7 @@ export function extractFileData(
     scopes: [...ctx.scopes.getRecorded()],
     references,
     fileMetrics: computeFileMetrics(relPath, source, lineMap, symbols, exports),
+    functionParams,
   };
 }
 

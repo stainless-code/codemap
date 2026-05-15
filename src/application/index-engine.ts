@@ -22,6 +22,7 @@ import {
   insertScopes,
   insertReferences,
   insertFileMetrics,
+  insertFunctionParams,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -254,6 +255,8 @@ function insertParsedResults(
           if (parsed.references?.length)
             insertReferences(db, parsed.references);
           if (parsed.fileMetrics) insertFileMetrics(db, [parsed.fileMetrics]);
+          if (parsed.functionParams?.length)
+            insertFunctionParams(db, parsed.functionParams);
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -436,6 +439,8 @@ export async function indexFiles(
             if (data.scopes.length) insertScopes(db, data.scopes);
             if (data.references.length) insertReferences(db, data.references);
             insertFileMetrics(db, [data.fileMetrics]);
+            if (data.functionParams.length)
+              insertFunctionParams(db, data.functionParams);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);

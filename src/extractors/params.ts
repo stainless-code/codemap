@@ -132,10 +132,19 @@ export function pushParams(
   ctx: ExtractContext,
   jsDocComments: JsDocEntry[],
   source: string,
+  ownerKind: string = "function",
 ) {
   if (!params?.length) return;
-  const { symbols, relPath, lineMap } = ctx;
-  for (const p of params) {
+  const { symbols, functionParams, relPath, lineMap } = ctx;
+  for (let i = 0; i < params.length; i++) {
+    const p = params[i];
+    // Capture default-text from the AssignmentPattern wrapper before
+    // walking into its left side; nested patterns inherit the same
+    // default for now (rare case).
+    const defaultText =
+      p?.type === "AssignmentPattern" && p.right
+        ? source.slice(p.right.start, p.right.end)
+        : null;
     for (const parsed of walkPattern(p)) {
       const { id, typeAnnotation, isRest, isOptional } = parsed;
       const lineStart = offsetToLine(lineMap, id.start);
@@ -164,6 +173,22 @@ export function pushParams(
         name_column_end: id.end - lineStartOffset,
         scope_local_id: scopeLocalId,
       });
+      if (parentName) {
+        functionParams.push({
+          file_path: relPath,
+          owner_name: parentName,
+          owner_kind: ownerKind,
+          position: i,
+          name: id.name,
+          type_text: typeStr,
+          default_text: defaultText,
+          is_rest: isRest ? 1 : 0,
+          is_optional: isOptional ? 1 : 0,
+          line_start: lineStart,
+          column_start: id.start - lineStartOffset,
+          column_end: id.end - lineStartOffset,
+        });
+      }
     }
   }
 }

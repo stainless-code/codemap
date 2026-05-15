@@ -155,6 +155,12 @@
       "recipe": "barrel-chains"
     },
     {
+      "id": "find-by-param-type",
+      "prompt": "Every fn that takes a ClientConfig param.",
+      "recipe": "find-by-param-type",
+      "params": { "type_text": "ClientConfig" }
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

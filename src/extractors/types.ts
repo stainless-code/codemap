@@ -4,6 +4,7 @@ import type {
   CallRow,
   ComponentRow,
   ExportRow,
+  FunctionParamRow,
   ImportRow,
   MarkerRow,
   ReferenceRow,
@@ -115,6 +116,7 @@ export interface ExtractContext {
   readonly typeMembers: TypeMemberRow[];
   readonly calls: CallRow[];
   readonly references: ReferenceRow[];
+  readonly functionParams: FunctionParamRow[];
 
   readonly scopes: ScopeTracker;
   readonly complexity: ComplexityTracker;
