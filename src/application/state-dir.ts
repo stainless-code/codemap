@@ -48,9 +48,8 @@ export function resolveStateDir(opts: ResolveStateDirOpts): string {
  * the source of truth — header, blank lines, and ordering all reproduce
  * verbatim. Add new generated artifacts in the same PR that introduces them.
  */
-export const STATE_GITIGNORE_BODY = `# codemap-managed — edits will be overwritten by \`ensureStateGitignore\`.
-# Blacklist of generated artifacts; tracked sources (recipes/, config.*)
-# default to tracked. Bump alongside any new cache (Rule 9 analogue).
+export const STATE_GITIGNORE_BODY = `# Managed by codemap — overwritten on next run.
+# Generated artifacts only; user-authored config (config.*, recipes/) stays tracked.
 index.db
 index.db-shm
 index.db-wal
