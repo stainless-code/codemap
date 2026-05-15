@@ -45,6 +45,9 @@ WHERE kind = 'const' AND value IS NOT NULL AND name LIKE '%URL%';
 
 -- Mutable bindings that should probably be `const` (only initialised, never written again).
 -- Resolve writes via `bindings` so shadowed same-name declarations in the same file aren't conflated.
+-- Add `AND s.scope_local_id = 0` (or whatever scope id you care about) to restrict scope —
+-- DO NOT use `s.parent_name IS NULL` as a "module-scope" filter: it also matches symbols
+-- inside top-level anonymous IIFEs / callbacks. `scope_local_id = 0` is the canonical answer.
 SELECT s.name, s.file_path, s.line_start FROM symbols s
 WHERE s.kind = 'let'
   AND NOT EXISTS (
