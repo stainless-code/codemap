@@ -1,0 +1,35 @@
+[
+  {
+    "file_path": "src/api/client.ts",
+    "line_start": 42,
+    "column_start": 9,
+    "column_end": 21,
+    "kind": "value",
+    "is_write": 0,
+    "resolution_kind": "same-file",
+    "scope_kind": "function",
+    "scope_owner": "legacyClient"
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 1,
+    "column_start": 9,
+    "column_end": 21,
+    "kind": "value",
+    "is_write": 0,
+    "resolution_kind": "imported",
+    "scope_kind": "module",
+    "scope_owner": null
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 12,
+    "column_start": 2,
+    "column_end": 14,
+    "kind": "value",
+    "is_write": 0,
+    "resolution_kind": "imported",
+    "scope_kind": "function",
+    "scope_owner": "run"
+  }
+]

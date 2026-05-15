@@ -57,18 +57,9 @@ export interface ComplexityTracker {
 }
 
 /**
- * Lexical scope stack — `parent_name` (symbols), `caller_scope` (calls),
- * `scope_local_id` (Tier 2 references). `scopesExtractor` owns pure-scope
- * handlers (`MethodDefinition`); other extractors with scope-mutating
- * handlers (`symbolsExtractor` on FunctionDeclaration / Class) call
- * `push` / `pop` inline so read/push order matches pre-lift semantics.
- *
- * Per [R.11] Tier 2: the tracker also RECORDS each push as a `ScopeRow`
- * with a per-file `local_id` counter (module = 0). `getRecorded()`
- * returns the full set for orchestrator flush. Block / for / catch
- * scopes defer to a future slice — function / arrow / class / method are
- * sufficient for v1 reference→scope resolution per R.11's
- * conservative-on-ambiguity escape valve.
+ * Lexical scope stack (parent_name in `symbols`, caller_scope in `calls`,
+ * scope_local_id in `references`). `scopesExtractor` owns MethodDefinition;
+ * other extractors call `push`/`pop` inline. Records each push as a `ScopeRow`.
  */
 export interface ScopeTracker {
   push(
@@ -128,9 +119,8 @@ export interface ExtractContext {
  * One file per tier under `src/extractors/`. `register()` attaches
  * node-type handlers + sets up per-file state in its closure. Multiple
  * extractors on the same node type chain in registration order. Optional
- * `finalize()` runs after the visit — used today by `markersExtractor`
- * (regex pass over raw source), reserved for Tier 2's pass-2 binding
- * resolution per [R.12].
+ * `finalize()` runs after the visit — used by `markersExtractor` for the
+ * regex pass over raw source.
  */
 export interface TierExtractor {
   readonly tierId: ExtractionTierId;

@@ -1,23 +1,8 @@
 /**
- * References extractor per [R.11]. Visits Identifier / JSXIdentifier /
- * TSTypeReference and emits one `ReferenceRow` per use.
- *
- * Write detection per [R.13]: parent-aware handlers (`AssignmentExpression`,
- * `UpdateExpression`, `UnaryExpression(delete)`, `VariableDeclarator` with
- * initializer, `ForOfStatement` / `ForInStatement`, `AssignmentPattern`)
- * pre-mark the LHS / target identifier's `node.start` in two sets:
- *
- * - `writePositions` — emits an additional `is_write=1` row at the same position.
- * - `suppressedReads` — skips the default `is_write=0` row.
- *
- * Simple `x = 1` → only the write row (read suppressed).
- * Compound `x += 1` / `x++` / `delete x` → both rows (per R.13).
- * Declaration `const x = 1` → only the write row (read suppressed —
- * declarations are in `symbols`, not duplicated in `references`).
- *
- * Scope id comes from `ctx.scopes.currentLocalId()` per [R.12]; the parser
- * walk is already inside the scope by the time identifier handlers fire
- * because `symbolsExtractor` registers first and pushes scope on enter.
+ * References extractor per [R.11] + [R.13]. Parent-aware handlers pre-mark
+ * write targets in `writePositions` (dual-emit) / `suppressedReads`
+ * (read-skip); the Identifier handler emits accordingly. Worked examples
+ * in `templates/recipes/find-references.md`.
  */
 
 import { offsetToLine } from "./offsets";
@@ -29,11 +14,9 @@ export const referencesExtractor: TierExtractor = {
     const { references, relPath, lineMap, scopes } = ctx;
     const writePositions = new Set<number>();
     const suppressedReads = new Set<number>();
-    // Dedup by node.start: shorthand `import {foo}` / `export {foo}` /
-    // `{foo}` property share the same Identifier between imported/local,
-    // exported/local, or key/value edges. The visitor traverses both,
-    // hitting the same node twice. Tracking emitted starts per kind
-    // avoids the duplicate without parent-shape awareness.
+    // Dedup: shorthand `import {foo}` / `export {foo}` / `{foo}` property
+    // share the same Identifier between imported/local, exported/local,
+    // or key/value edges — oxc visits both, hitting the node twice.
     const emittedRead = new Set<number>();
     const emittedWrite = new Set<number>();
 
@@ -62,22 +45,18 @@ export const referencesExtractor: TierExtractor = {
     }
 
     Object.assign(visitor, {
-      // Pre-mark write targets BEFORE the Identifier handler fires on the
-      // same node (the multiplexer chains in registration order; oxc walks
-      // parents before children regardless).
+      // oxc walks parents before children — pre-marks land before the
+      // Identifier handler fires on the same node.
       AssignmentExpression(node: any) {
         if (node.left?.type === "Identifier") {
           writePositions.add(node.left.start);
-          if (node.operator === "=") {
-            // Simple assignment: only the write row; suppress the read.
-            suppressedReads.add(node.left.start);
-          }
+          // Simple `=` is write-only; compound (`+=`, etc.) dual-emits.
+          if (node.operator === "=") suppressedReads.add(node.left.start);
         }
       },
       UpdateExpression(node: any) {
         if (node.argument?.type === "Identifier") {
           writePositions.add(node.argument.start);
-          // ++ / -- emits both read + write per R.13.
         }
       },
       UnaryExpression(node: any) {
@@ -90,9 +69,8 @@ export const referencesExtractor: TierExtractor = {
       },
       VariableDeclarator(node: any) {
         if (node.id?.type === "Identifier" && node.init) {
+          // Declaration position lives in `symbols`; emit write only.
           writePositions.add(node.id.start);
-          // Declaration: the identifier belongs in `symbols` not as a read
-          // reference; suppress the read row.
           suppressedReads.add(node.id.start);
         }
       },
@@ -111,9 +89,8 @@ export const referencesExtractor: TierExtractor = {
           writePositions.add(node.left.start);
         }
       },
-      // Declaration sites belong in `symbols` (via name_column_start/end
-      // per Tier 1) — not duplicated as references. Suppress the Identifier
-      // visit for the `.id` field of every declaration form.
+      // Declaration `.id` lives in `symbols.name_column_start/end` — fully
+      // suppress so it isn't duplicated in `references`.
       FunctionDeclaration(node: any) {
         if (node.id?.type === "Identifier") suppressedReads.add(node.id.start);
       },

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -58,7 +58,8 @@ export function createTables(db: CodemapDatabase) {
       visibility TEXT,
       complexity REAL,
       name_column_start INTEGER NOT NULL DEFAULT 0,
-      name_column_end INTEGER NOT NULL DEFAULT 0
+      name_column_end INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -155,13 +156,10 @@ export function createTables(db: CodemapDatabase) {
       is_readonly INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
-    -- Lexical scope graph per R.11. Scope kinds: module/function/arrow/
-    -- class/method. Block-level scopes (block/for/catch) defer to a future
-    -- slice. Body-of-function refs resolve to the enclosing function/
-    -- method scope, sufficient for the conservative-on-ambiguity escape
-    -- valve per R.11. Composite PK (file_path, local_id) where local_id
-    -- is a per-file 0-based counter assigned at parse time so references
-    -- can encode their scope without round-tripping SQLite autoincrement.
+    -- Lexical scope graph per R.11. Block/for/catch deferred — body refs
+    -- resolve to the enclosing function/method scope (conservative escape
+    -- valve). local_id is parser-assigned so refs avoid SQLite rowid
+    -- round-trips.
     CREATE TABLE IF NOT EXISTS scopes (
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       local_id INTEGER NOT NULL,
@@ -173,11 +171,9 @@ export function createTables(db: CodemapDatabase) {
       PRIMARY KEY (file_path, local_id)
     ) STRICT, WITHOUT ROWID;
 
-    -- Every identifier USE in source — value/type/jsx kinds for v1 per R.11.
-    -- scope_local_id matches scopes(local_id) within the same file (0 = module
-    -- scope). is_write per R.13: 0 = read, 1 = write. Compound assignment
-    -- ('x += 1') emits TWO rows (one each). Declarations (VariableDeclarator
-    -- with initializer) emit ONLY the write row (read is suppressed).
+    -- Identifier USEs per R.11 (kinds: value/type/jsx). is_write per R.13.
+    -- Compound assign emits two rows, declaration-with-init emits write
+    -- only. scope_local_id joins scopes(local_id), 0 = module.
     CREATE TABLE IF NOT EXISTS "references" (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
@@ -189,6 +185,17 @@ export function createTables(db: CodemapDatabase) {
       scope_local_id INTEGER NOT NULL DEFAULT 0,
       is_write INTEGER NOT NULL DEFAULT 0
     ) STRICT;
+
+    -- Per R.12. resolved_symbol_id NULL when is_external/global/unresolved.
+    -- Re-export chain walk defers to Tier 6.
+    CREATE TABLE IF NOT EXISTS bindings (
+      reference_id INTEGER PRIMARY KEY REFERENCES "references"(id) ON DELETE CASCADE,
+      resolved_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      resolution_kind TEXT NOT NULL CHECK (resolution_kind IN (
+        'same-file','imported','global','unresolved'
+      )),
+      is_external INTEGER NOT NULL DEFAULT 0
+    ) STRICT, WITHOUT ROWID;
 
     -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
     -- want specifier-precise rewrites (rename specifier, dedupe, type-only
@@ -382,6 +389,9 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_references_kind ON "references"(kind, file_path);
     CREATE INDEX IF NOT EXISTS idx_references_writes ON "references"(name, is_write) WHERE is_write = 1;
 
+    CREATE INDEX IF NOT EXISTS idx_bindings_resolved ON bindings(resolved_symbol_id);
+    CREATE INDEX IF NOT EXISTS idx_bindings_kind ON bindings(resolution_kind);
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -430,6 +440,7 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
     DROP TABLE IF EXISTS calls;
     DROP TABLE IF EXISTS suppressions;
@@ -577,6 +588,8 @@ export interface SymbolRow {
   name_column_start?: number;
   /** 0-based byte column one past the symbol-name token end. Optional for back-compat; defaults to 0. */
   name_column_end?: number;
+  /** Scope where the NAME is declared (parent of the body's own scope). Joins scopes.local_id. Defaults to 0 (module). */
+  scope_local_id?: number;
 }
 
 const BATCH_SIZE = 500;
@@ -609,8 +622,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -629,6 +642,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.complexity ?? null,
         s.name_column_start ?? 0,
         s.name_column_end ?? 0,
+        s.scope_local_id ?? 0,
       ),
   );
 }
@@ -920,11 +934,8 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
 }
 
 /**
- * Lexical scope row per [R.11]. `local_id` is a per-file 0-based counter
- * (so references can encode their scope without round-tripping through
- * SQLite autoincrement). `parent_local_id` is `null` for the module
- * scope; `owner_symbol_name` is the named owner (function name, class
- * name, method name) — `null` for module + arrow scopes.
+ * Lexical scope row per [R.11]. `parent_local_id` is `null` for the
+ * module scope; `owner_symbol_name` is `null` for module + arrow scopes.
  */
 export interface ScopeRow {
   file_path: string;
@@ -936,13 +947,7 @@ export interface ScopeRow {
   owner_symbol_name: string | null;
 }
 
-/**
- * Identifier use row per [R.11]. `kind` distinguishes value (default),
- * type (`TSTypeReference`), jsx (`JSXIdentifier`). `is_write` per [R.13]:
- * 1 for assignment LHS / `++` / `--` / `delete` / declaration initializer /
- * `for x of` LHS. Compound assignment (`x += 1`) emits two rows (read +
- * write) at the same position.
- */
+/** Identifier use row per [R.11] + [R.13]. */
 export interface ReferenceRow {
   file_path: string;
   name: string;
@@ -972,6 +977,30 @@ export function insertReferences(db: CodemapDatabase, rows: ReferenceRow[]) {
         r.kind,
         r.scope_local_id,
         r.is_write,
+      ),
+  );
+}
+
+/** Per-reference binding row per [R.12]. */
+export interface BindingRow {
+  reference_id: number;
+  resolved_symbol_id: number | null;
+  resolution_kind: "same-file" | "imported" | "global" | "unresolved";
+  is_external: number;
+}
+
+export function insertBindings(db: CodemapDatabase, rows: BindingRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
+    "(?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.reference_id,
+        r.resolved_symbol_id,
+        r.resolution_kind,
+        r.is_external,
       ),
   );
 }

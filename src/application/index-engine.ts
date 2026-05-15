@@ -51,6 +51,7 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
+import { persistBindings, resolveBindings } from "./bindings-engine";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -467,6 +468,13 @@ export async function indexFiles(
     .get()!.c;
   setMeta(db, "file_count", String(fileCount));
   setMeta(db, "project_root", getProjectRoot());
+
+  // Pass-2 binding resolution per R.12 — full-rebuild only to honor
+  // R.10's <100ms targeted contract. Orphan-cleared until next full.
+  if (fullRebuild) {
+    const bindings = resolveBindings(db);
+    persistBindings(db, bindings);
+  }
 
   const elapsed = Math.round(performance.now() - startTime);
   const stats = fetchTableStats(db);

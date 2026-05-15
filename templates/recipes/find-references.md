@@ -45,4 +45,4 @@ WHERE name = 'count' AND is_write = 1;
 
 For app-wide rename: every row's `(file_path, line_start, column_start, column_end)` is a TextEdit-ready coordinate. Pair with `find-symbol-definitions` to anchor the rename.
 
-Bindings (cross-file resolution — does this `useState` actually point at the React `useState`?) are deferred to Tier 2.1; v1 of this recipe is name-keyed and unscoped. Use `scope_kind` + `scope_owner` columns to disambiguate same-name refs in different scopes.
+This recipe is name-keyed — same-name refs in different scopes / from different imports all match. For bindings-precise resolution (refs that actually point at a specific symbol definition), use `find-symbol-references`.

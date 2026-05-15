@@ -1,19 +1,8 @@
 /**
- * Scope tracker + scopes extractor. Shared-state pattern per [R.17]:
- * tracker lives on `ctx.scopes`; mutated by any extractor whose handler
- * needs to push / pop scope.
- *
- * Per Tier 2 ([R.11]) the tracker ALSO records each push as a `ScopeRow`
- * with a per-file 0-based `local_id` counter. Module scope = `local_id 0`,
- * inserted eagerly by the factory. Nested pushes get monotonically-
- * increasing ids; `parent_local_id` points at the previous-top.
- * `scopesExtractor.finalize()` flushes the recorded rows to `ctx`.
- *
- * `scopesExtractor` owns only pure-scope handlers (`MethodDefinition` /
- * `:exit`). Handlers that interleave scope mutation with row emission
- * (`symbolsExtractor`'s FunctionDeclaration / VariableDeclaration /
- * ClassDeclaration) call `scopes.push/pop` inline so observable
- * read/push ordering matches the pre-lift implementation.
+ * Scope tracker (shared state on `ctx.scopes` per [R.17]) + scopes
+ * extractor (pure-scope handlers; symbol-emitting handlers push/pop
+ * inline in `symbolsExtractor`). Module scope = `local_id 0`, eagerly
+ * inserted; nested pushes increment. See [R.11].
  */
 
 import type { ScopeRow } from "../db";
@@ -29,7 +18,7 @@ export function createScopeTracker(filePath: string): ScopeTracker {
       kind: "module",
       parent_local_id: null,
       line_start: 1,
-      line_end: 1, // Updated by finaliseModule().
+      line_end: 1, // finalised by `finaliseModule` once the walk completes.
       owner_symbol_name: null,
     },
   ];
@@ -84,7 +73,6 @@ export const scopesExtractor: TierExtractor = {
       MethodDefinition(node: any) {
         const name = node.key?.name;
         if (!name) return;
-        // Compute line range here so the row records the method body.
         const lineStart = node.loc?.start?.line ?? 0;
         const lineEnd = node.loc?.end?.line ?? 0;
         scopes.push(name, "method", lineStart, lineEnd);
@@ -98,9 +86,8 @@ export const scopesExtractor: TierExtractor = {
     });
   },
   finalize(ctx) {
-    // Module scope `line_end` finalised here: the orchestrator's line_map
-    // length is the line count. We approximate via the highest line we've
-    // seen on any row; falling back to 1 if no rows ever pushed.
+    // Approximate the module's line_end as the max recorded child line —
+    // the orchestrator's lineMap length isn't passed to finalize.
     const recorded = ctx.scopes.getRecorded();
     let maxLine = 1;
     for (const r of recorded) {

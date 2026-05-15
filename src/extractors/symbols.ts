@@ -97,6 +97,7 @@ function registerSymbolHandlers(
         parent_name: scopes.currentParent(),
         visibility: null,
         ...nameTokenColumns(node.id, lineStart, lineMap),
+        scope_local_id: scopes.currentLocalId(),
       });
       complexity.pushFor(symbolIndex);
 
@@ -147,6 +148,7 @@ function registerSymbolHandlers(
           parent_name: scopes.currentParent(),
           visibility: null,
           ...nameTokenColumns(decl.id, lineStart, lineMap),
+          scope_local_id: scopes.currentLocalId(),
         });
 
         if (isArrowOrFn) {
@@ -196,6 +198,7 @@ function registerSymbolHandlers(
         parent_name: scopes.currentParent(),
         visibility: null,
         ...nameTokenColumns(node.id, lineStart, lineMap),
+        scope_local_id: scopes.currentLocalId(),
       });
       if (node.typeAnnotation?.type === "TSTypeLiteral") {
         extractObjectMembers(
@@ -244,6 +247,7 @@ function registerSymbolHandlers(
         parent_name: scopes.currentParent(),
         visibility: null,
         ...nameTokenColumns(node.id, interfaceLineStart, lineMap),
+        scope_local_id: scopes.currentLocalId(),
       });
       extractObjectMembers(node.body?.body, relPath, name, typeMembers);
     },
@@ -285,6 +289,7 @@ function registerSymbolHandlers(
         parent_name: scopes.currentParent(),
         visibility: null,
         ...nameTokenColumns(node.id, enumLineStart, lineMap),
+        scope_local_id: scopes.currentLocalId(),
       });
     },
 
@@ -334,6 +339,7 @@ function registerSymbolHandlers(
         parent_name: scopes.currentParent(),
         visibility: null,
         ...nameTokenColumns(node.id, classLineStart, lineMap),
+        scope_local_id: scopes.currentLocalId(),
       });
       scopes.push(
         name,
@@ -341,10 +347,12 @@ function registerSymbolHandlers(
         classLineStart,
         offsetToLine(lineMap, node.end),
       );
+      const classScopeLocalId = scopes.currentLocalId();
       extractClassMembers(
         node.body?.body,
         relPath,
         name,
+        classScopeLocalId,
         lineMap,
         symbols,
         jsDocComments,
@@ -368,6 +376,7 @@ function extractClassMembers(
   members: any[] | undefined,
   filePath: string,
   className: string,
+  classScopeLocalId: number,
   lineMap: number[],
   out: SymbolRow[],
   jsDocComments: JsDocEntry[],
@@ -405,6 +414,7 @@ function extractClassMembers(
         parent_name: className,
         visibility: null,
         ...nameTokenColumns(m.key, methodLineStart, lineMap),
+        scope_local_id: classScopeLocalId,
       });
     } else if (m.type === "PropertyDefinition") {
       let prefix = "";
@@ -432,6 +442,7 @@ function extractClassMembers(
         parent_name: className,
         visibility: null,
         ...nameTokenColumns(m.key, propLineStart, lineMap),
+        scope_local_id: classScopeLocalId,
       });
     }
   }

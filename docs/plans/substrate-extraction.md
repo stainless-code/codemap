@@ -276,7 +276,7 @@ New recipe candidates: `dedupe-imports`, `consolidate-type-only-imports`, `stale
 
 ### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier)
 
-**Status (2026-05-15):** scopes + references **shipped**; bindings deferred to Tier 2.1 follow-up. See "Tier 2 ship report" below.
+**Status (2026-05-15):** scopes + references shipped 2026-05-15; bindings shipped 2026-05-15 (Tier 2.1). See ship reports below.
 
 **Goal:** Every identifier _use_ — call, type position, JSX, decorator, shorthand, member access, spread — becomes a queryable row. Plus a lexical scope graph and per-reference binding resolution to the originating symbol.
 
@@ -412,6 +412,33 @@ What didn't ship (deferred to **Tier 2.1**, a focused follow-up slice):
 | Write refs                | n/a                         | ~10k (~8% of all refs)            | new   |
 
 Both numbers are well within the plan's thresholds (full < 1 min, targeted < 100 ms per R.9 / R.10).
+
+**Tier 2.1 ship report (2026-05-15):**
+
+What landed (SCHEMA_VERSION 16 → 17):
+
+- **`bindings` table** — `(reference_id, resolved_symbol_id, resolution_kind, is_external)`. PK on `reference_id`. `resolution_kind` enum: `same-file` / `imported` / `global` / `unresolved`. `re-exported` deferred to Tier 6.
+- **`symbols.scope_local_id`** column — captured BEFORE the symbol's own scope is pushed (so it points at the declaring scope, not the body). Class members anchor to their class's pushed scope.
+- **`resolveBindings`** engine (`src/application/bindings-engine.ts`) — two-phase: one SELECT per table into in-memory Maps, then per-reference resolution via scope-walk → imports → globals → unresolved. ~300ms for ~127k refs.
+- **Cross-file resolution** uses `imports.resolved_path` (not `dependencies`, which lacks the module specifier). When `imp.imported_name` matches an export and the target file has a module-scope symbol of the same name → `is_external=0` with a real symbol id. Non-indexed module → `is_external=1`.
+- **Run-cadence:** pass-2 runs only on **full rebuild** to honor R.10's <100ms targeted contract. Orphan bindings rows are CASCADE-cleared on incremental edits; the next `--full` re-resolves.
+- **Recipe:** `find-symbol-references --params name=X,file_path=Y` — bindings-precise (filters same-name shadows + different-source imports).
+
+Empirical (codemap-self, 932 files):
+
+| Metric               | Pre-Tier 2.1 | Post-Tier 2.1                                             | Delta |
+| -------------------- | ------------ | --------------------------------------------------------- | ----- |
+| Full reindex         | 767 ms       | 1175 ms                                                   | +53%  |
+| Targeted (1 file)    | 9 ms         | 9 ms                                                      | 0     |
+| Binding distribution | n/a          | 33% same-file / 17% imported / 4% global / 45% unresolved | new   |
+
+The 45% unresolved bucket is mostly TypeScript type parameters (T/K/V), function parameters (not yet in `symbols`), object-pattern keys, and JSX prop names — expected v1 shape; future tiers (function-params + type-params extraction) shrink it.
+
+Deferred to **Tier 2.2**:
+
+- Re-export chain walking (currently `import { x } from './barrel'` where the barrel does `export { x } from './x'` resolves to the barrel's export row, not the original symbol).
+- Function-parameter symbols (would shrink the unresolved bucket significantly).
+- Type-parameter symbols (`<T>`, `<K, V>`).
 
 ---
 

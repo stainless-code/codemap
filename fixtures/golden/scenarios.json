@@ -131,6 +131,15 @@
       "params": { "name": "perms" }
     },
     {
+      "id": "find-symbol-references",
+      "prompt": "Parametrised recipe: bindings-precise refs to createClient defined in src/api/client.ts (per R.12)",
+      "recipe": "find-symbol-references",
+      "params": {
+        "name": "createClient",
+        "file_path": "src/api/client.ts"
+      }
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"
