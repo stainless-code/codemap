@@ -1,0 +1,22 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "name": "perms",
+    "line_start": 12,
+    "column_start": 8,
+    "column_end": 13,
+    "kind": "value",
+    "scope_kind": "function",
+    "scope_owner": "ProductCard"
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "name": "perms",
+    "line_start": 8,
+    "column_start": 8,
+    "column_end": 13,
+    "kind": "value",
+    "scope_kind": "function",
+    "scope_owner": "ShopButton"
+  }
+]

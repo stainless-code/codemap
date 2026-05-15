@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 26;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -56,7 +56,31 @@ export function createTables(db: CodemapDatabase) {
       value TEXT,
       parent_name TEXT,
       visibility TEXT,
-      complexity REAL
+      complexity REAL,
+      name_column_start INTEGER NOT NULL DEFAULT 0,
+      name_column_end INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0,
+      body_line_count INTEGER,
+      param_count INTEGER,
+      nesting_depth INTEGER
+    ) STRICT;
+
+    -- One row per indexed file. Pure counters from the AST walk.
+    -- Joins to files(path).
+    CREATE TABLE IF NOT EXISTS file_metrics (
+      file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+      total_lines INTEGER NOT NULL,
+      code_lines INTEGER NOT NULL,
+      blank_lines INTEGER NOT NULL,
+      comment_lines INTEGER NOT NULL,
+      let_count INTEGER NOT NULL DEFAULT 0,
+      const_count INTEGER NOT NULL DEFAULT 0,
+      var_count INTEGER NOT NULL DEFAULT 0,
+      function_count INTEGER NOT NULL DEFAULT 0,
+      arrow_count INTEGER NOT NULL DEFAULT 0,
+      class_count INTEGER NOT NULL DEFAULT 0,
+      interface_count INTEGER NOT NULL DEFAULT 0,
+      export_count INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -75,7 +99,12 @@ export function createTables(db: CodemapDatabase) {
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
       is_default INTEGER NOT NULL DEFAULT 0,
-      re_export_source TEXT
+      re_export_source TEXT,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      is_re_export INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS components (
@@ -98,7 +127,9 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       line_number INTEGER NOT NULL,
       kind TEXT NOT NULL,
-      content TEXT NOT NULL
+      content TEXT NOT NULL,
+      column_start INTEGER NOT NULL DEFAULT 0,
+      column_end INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS css_variables (
@@ -130,7 +161,10 @@ export function createTables(db: CodemapDatabase) {
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       caller_name TEXT NOT NULL,
       caller_scope TEXT NOT NULL,
-      callee_name TEXT NOT NULL
+      callee_name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS type_members (
@@ -141,6 +175,143 @@ export function createTables(db: CodemapDatabase) {
       type TEXT,
       is_optional INTEGER NOT NULL DEFAULT 0,
       is_readonly INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- Lexical scope graph per R.11. Block/for/catch deferred — body refs
+    -- resolve to the enclosing function/method scope (conservative escape
+    -- valve). local_id is parser-assigned so refs avoid SQLite rowid
+    -- round-trips.
+    CREATE TABLE IF NOT EXISTS scopes (
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      local_id INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('module','function','arrow','class','method','interface','type-alias','for','catch')),
+      parent_local_id INTEGER,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      owner_symbol_name TEXT,
+      PRIMARY KEY (file_path, local_id)
+    ) STRICT, WITHOUT ROWID;
+
+    -- Identifier USEs per R.11 (kinds: value/type/jsx). is_write per R.13.
+    -- Compound assign emits two rows, declaration-with-init emits write
+    -- only. scope_local_id joins scopes(local_id), 0 = module.
+    CREATE TABLE IF NOT EXISTS "references" (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('value','type','jsx','member')),
+      scope_local_id INTEGER NOT NULL DEFAULT 0,
+      is_write INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- Per R.12. resolved_symbol_id NULL when is_external/global/unresolved.
+    -- Re-export chain walk defers to Tier 6.
+    CREATE TABLE IF NOT EXISTS bindings (
+      reference_id INTEGER PRIMARY KEY REFERENCES "references"(id) ON DELETE CASCADE,
+      resolved_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      resolution_kind TEXT NOT NULL CHECK (resolution_kind IN (
+        'same-file','imported','global','unresolved'
+      )),
+      is_external INTEGER NOT NULL DEFAULT 0
+    ) STRICT, WITHOUT ROWID;
+
+    -- Test suite metadata: describe / it / test / suite blocks with
+    -- their hierarchy + skip/only/todo flags. framework is detected
+    -- from imports (vitest / jest / bun-test / node-test / mocha) and
+    -- defaults to 'unknown' when no test framework import is found
+    -- in the file. parent_suite_id is NULL for top-level blocks.
+    CREATE TABLE IF NOT EXISTS test_suites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('describe','it','test','suite','context')),
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      parent_suite_id INTEGER REFERENCES test_suites(id) ON DELETE CASCADE,
+      is_skipped INTEGER NOT NULL DEFAULT 0,
+      is_only INTEGER NOT NULL DEFAULT 0,
+      is_todo INTEGER NOT NULL DEFAULT 0,
+      framework TEXT NOT NULL CHECK (framework IN ('vitest','jest','bun-test','node-test','mocha','unknown'))
+    ) STRICT;
+
+    -- Runtime markers — operational signals worth auditing: console
+    -- calls, debugger statements, raw throws, process.env reads. detail
+    -- is the qualifier (console.log → 'log', throw → expression text,
+    -- process.env.X → 'X').
+    CREATE TABLE IF NOT EXISTS runtime_markers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('console','debugger','throw','process-env')),
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      detail TEXT,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- First-class parameter rows: one row per leaf parameter binding,
+    -- ordered by position. Keyed by (file_path, owner_name, owner_kind)
+    -- to disambiguate same-name functions vs methods in the same file.
+    -- type_text is the stringified annotation. default_text is the raw
+    -- default expression source (NULL when there is no default).
+    CREATE TABLE IF NOT EXISTS function_params (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      owner_name TEXT NOT NULL,
+      owner_kind TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      type_text TEXT,
+      default_text TEXT,
+      is_rest INTEGER NOT NULL DEFAULT 0,
+      is_optional INTEGER NOT NULL DEFAULT 0,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL
+    ) STRICT;
+
+    -- Materialised re-export chains. One row per (from_file, from_name)
+    -- pointing at the terminal definition site after walking through
+    -- barrel files (bounded at 10 hops). Same engine as bindings-engine
+    -- exposes the walk to ad-hoc SQL.
+    CREATE TABLE IF NOT EXISTS re_export_chains (
+      from_file TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      from_name TEXT NOT NULL,
+      to_file TEXT NOT NULL,
+      to_name TEXT NOT NULL,
+      hops INTEGER NOT NULL,
+      truncated INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (from_file, from_name)
+    ) STRICT, WITHOUT ROWID;
+
+    -- Strongly-connected component (SCC) of the import dependency graph.
+    -- Only cyclic files appear here. Files sharing cycle_id import each
+    -- other directly or transitively. Computed via Tarjan's SCC on
+    -- dependencies after the full index pass.
+    CREATE TABLE IF NOT EXISTS module_cycles (
+      file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+      cycle_id INTEGER NOT NULL,
+      cycle_size INTEGER NOT NULL
+    ) STRICT;
+
+    -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
+    -- want specifier-precise rewrites (rename specifier, dedupe, type-only
+    -- migrate) JOIN this table. The original imports.specifiers JSON stays
+    -- in place as a v1 convenience surface.
+    CREATE TABLE IF NOT EXISTS import_specifiers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      source TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      imported_name TEXT NOT NULL,
+      local_name TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace')),
+      is_type_only INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     -- Opt-in suppressions — recipes LEFT JOIN to honor, ad-hoc SQL unaffected.
@@ -284,6 +455,8 @@ export function createIndexes(db: CodemapDatabase) {
 
     CREATE INDEX IF NOT EXISTS idx_exports_name ON exports(name, file_path, kind, is_default);
     CREATE INDEX IF NOT EXISTS idx_exports_file ON exports(file_path);
+    CREATE INDEX IF NOT EXISTS idx_exports_position ON exports(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_exports_re_export ON exports(is_re_export, file_path);
 
     CREATE INDEX IF NOT EXISTS idx_components_name ON components(name, file_path, props_type, hooks_used);
     CREATE INDEX IF NOT EXISTS idx_components_file ON components(file_path, name);
@@ -307,10 +480,47 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_type_members_symbol ON type_members(symbol_name, file_path, name, type, is_optional, is_readonly);
     CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
 
+    CREATE INDEX IF NOT EXISTS idx_scopes_parent ON scopes(file_path, parent_local_id);
+    CREATE INDEX IF NOT EXISTS idx_scopes_kind ON scopes(kind, file_path);
+    CREATE INDEX IF NOT EXISTS idx_scopes_owner ON scopes(owner_symbol_name, file_path);
+
+    CREATE INDEX IF NOT EXISTS idx_references_name ON "references"(name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_references_file ON "references"(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_references_kind ON "references"(kind, file_path);
+    CREATE INDEX IF NOT EXISTS idx_references_writes ON "references"(name, is_write) WHERE is_write = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_bindings_resolved ON bindings(resolved_symbol_id);
+    CREATE INDEX IF NOT EXISTS idx_bindings_kind ON bindings(resolution_kind);
+
+    CREATE INDEX IF NOT EXISTS idx_module_cycles_cid ON module_cycles(cycle_id);
+    CREATE INDEX IF NOT EXISTS idx_module_cycles_size ON module_cycles(cycle_size);
+
+    CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
+    CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_function_params_owner ON function_params(file_path, owner_name);
+    CREATE INDEX IF NOT EXISTS idx_function_params_name ON function_params(name);
+    CREATE INDEX IF NOT EXISTS idx_function_params_type ON function_params(type_text) WHERE type_text IS NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_kind ON runtime_markers(kind);
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_file ON runtime_markers(file_path);
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_detail ON runtime_markers(detail) WHERE detail IS NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_test_suites_file ON test_suites(file_path);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_kind ON test_suites(kind);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_parent ON test_suites(parent_suite_id);
+    CREATE INDEX IF NOT EXISTS idx_test_suites_skipped ON test_suites(is_skipped) WHERE is_skipped = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_source ON import_specifiers(source, file_path);
+
     CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_position ON calls(file_path, line_start);
 
     -- Mirrors the typical join shape symbols.(file_path, name, line_start).
     -- The (file_path, name) prefix also covers GROUP BY file_path scans
@@ -349,8 +559,18 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS module_cycles;
+    DROP TABLE IF EXISTS re_export_chains;
+    DROP TABLE IF EXISTS function_params;
+    DROP TABLE IF EXISTS runtime_markers;
+    DROP TABLE IF EXISTS test_suites;
+    DROP TABLE IF EXISTS file_metrics;
+    DROP TABLE IF EXISTS bindings;
+    DROP TABLE IF EXISTS "references";
     DROP TABLE IF EXISTS calls;
     DROP TABLE IF EXISTS suppressions;
+    DROP TABLE IF EXISTS scopes;
+    DROP TABLE IF EXISTS import_specifiers;
     DROP TABLE IF EXISTS type_members;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
@@ -489,6 +709,18 @@ export interface SymbolRow {
    * column existed; absence binds as `null`.
    */
   complexity?: number | null;
+  /** 0-based byte column of the symbol-name token start on `line_start` (per [R.6]). Optional for back-compat; defaults to 0. */
+  name_column_start?: number;
+  /** 0-based byte column one past the symbol-name token end. Optional for back-compat; defaults to 0. */
+  name_column_end?: number;
+  /** Scope where the NAME is declared (parent of the body's own scope). Joins scopes.local_id. Defaults to 0 (module). */
+  scope_local_id?: number;
+  /** Body line count (line_end - line_start + 1) for function-shaped symbols. NULL otherwise. */
+  body_line_count?: number | null;
+  /** Param count for function-shaped symbols. NULL otherwise. */
+  param_count?: number | null;
+  /** Max nesting depth (conditionals/loops/ternaries) for function-shaped symbols. NULL otherwise. */
+  nesting_depth?: number | null;
 }
 
 const BATCH_SIZE = 500;
@@ -521,8 +753,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -539,6 +771,12 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.parent_name,
         s.visibility,
         s.complexity ?? null,
+        s.name_column_start ?? 0,
+        s.name_column_end ?? 0,
+        s.scope_local_id ?? 0,
+        s.body_line_count ?? null,
+        s.param_count ?? null,
+        s.nesting_depth ?? null,
       ),
   );
 }
@@ -585,16 +823,37 @@ export interface ExportRow {
   kind: string;
   is_default: number;
   re_export_source: string | null;
+  /** 1-based line of the exported name token (per [R.6]). */
+  line_start: number;
+  /** 1-based line of the export statement end (for multi-line exports). */
+  line_end: number;
+  /** 0-based byte column of the exported name token start. */
+  column_start: number;
+  /** 0-based byte column one past the exported name token end. */
+  column_end: number;
+  /** 1 when the export is `export … from 'mod'` (has `re_export_source`). */
+  is_re_export: number;
 }
 
 export function insertExports(db: CodemapDatabase, exports: ExportRow[]) {
   batchInsert(
     db,
     exports,
-    "INSERT INTO exports (file_path, name, kind, is_default, re_export_source)",
-    "(?,?,?,?,?)",
+    "INSERT INTO exports (file_path, name, kind, is_default, re_export_source, line_start, line_end, column_start, column_end, is_re_export)",
+    "(?,?,?,?,?,?,?,?,?,?)",
     (e, v) =>
-      v.push(e.file_path, e.name, e.kind, e.is_default, e.re_export_source),
+      v.push(
+        e.file_path,
+        e.name,
+        e.kind,
+        e.is_default,
+        e.re_export_source,
+        e.line_start,
+        e.line_end,
+        e.column_start,
+        e.column_end,
+        e.is_re_export,
+      ),
   );
 }
 
@@ -659,15 +918,27 @@ export interface MarkerRow {
   line_number: number;
   kind: string;
   content: string;
+  /** 0-based byte column where the marker tag (e.g. `TODO`) starts. Optional for back-compat. */
+  column_start?: number;
+  /** 0-based byte column one past the marker tag end. Optional for back-compat. */
+  column_end?: number;
 }
 
 export function insertMarkers(db: CodemapDatabase, markers: MarkerRow[]) {
   batchInsert(
     db,
     markers,
-    "INSERT INTO markers (file_path, line_number, kind, content)",
-    "(?,?,?,?)",
-    (m, v) => v.push(m.file_path, m.line_number, m.kind, m.content),
+    "INSERT INTO markers (file_path, line_number, kind, content, column_start, column_end)",
+    "(?,?,?,?,?,?)",
+    (m, v) =>
+      v.push(
+        m.file_path,
+        m.line_number,
+        m.kind,
+        m.content,
+        m.column_start ?? 0,
+        m.column_end ?? 0,
+      ),
   );
 }
 
@@ -769,15 +1040,406 @@ export interface CallRow {
   caller_name: string;
   caller_scope: string;
   callee_name: string;
+  /** 1-based line of the callee identifier token (per [R.6]). */
+  line_start: number;
+  /** 0-based byte column of the callee identifier start. */
+  column_start: number;
+  /** 0-based byte column one past the callee identifier end. */
+  column_end: number;
 }
 
 export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name)",
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)",
+    "(?,?,?,?,?,?,?)",
+    (c, v) =>
+      v.push(
+        c.file_path,
+        c.caller_name,
+        c.caller_scope,
+        c.callee_name,
+        c.line_start,
+        c.column_start,
+        c.column_end,
+      ),
+  );
+}
+
+/**
+ * Lexical scope row per [R.11]. `parent_local_id` is `null` for the
+ * module scope; `owner_symbol_name` is `null` for module + arrow scopes.
+ */
+export interface ScopeRow {
+  file_path: string;
+  local_id: number;
+  kind:
+    | "module"
+    | "function"
+    | "arrow"
+    | "class"
+    | "method"
+    | "interface"
+    | "type-alias"
+    | "for"
+    | "catch";
+  parent_local_id: number | null;
+  line_start: number;
+  line_end: number;
+  owner_symbol_name: string | null;
+}
+
+/** Identifier use row per [R.11] + [R.13]. */
+export interface ReferenceRow {
+  file_path: string;
+  name: string;
+  /** 1-based line of the identifier token. */
+  line_start: number;
+  column_start: number;
+  column_end: number;
+  kind: "value" | "type" | "jsx" | "member";
+  /** Matches `scopes.local_id` within the same file (`0` = module scope). */
+  scope_local_id: number;
+  is_write: number;
+}
+
+export function insertReferences(db: CodemapDatabase, rows: ReferenceRow[]) {
+  batchInsert(
+    db,
+    rows,
+    'INSERT INTO "references" (file_path, name, line_start, column_start, column_end, kind, scope_local_id, is_write)',
+    "(?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.name,
+        r.line_start,
+        r.column_start,
+        r.column_end,
+        r.kind,
+        r.scope_local_id,
+        r.is_write,
+      ),
+  );
+}
+
+/** Per-reference binding row per [R.12]. */
+export interface BindingRow {
+  reference_id: number;
+  resolved_symbol_id: number | null;
+  resolution_kind: "same-file" | "imported" | "global" | "unresolved";
+  is_external: number;
+}
+
+export function insertBindings(db: CodemapDatabase, rows: BindingRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
     "(?,?,?,?)",
-    (c, v) => v.push(c.file_path, c.caller_name, c.caller_scope, c.callee_name),
+    (r, v) =>
+      v.push(
+        r.reference_id,
+        r.resolved_symbol_id,
+        r.resolution_kind,
+        r.is_external,
+      ),
+  );
+}
+
+/**
+ * Per-file aggregate metrics row. One row per file. NULL `code_lines` /
+ * `comment_lines` for files we don't parse with the AST (rare).
+ */
+export interface FileMetricsRow {
+  file_path: string;
+  total_lines: number;
+  code_lines: number;
+  blank_lines: number;
+  comment_lines: number;
+  let_count: number;
+  const_count: number;
+  var_count: number;
+  function_count: number;
+  arrow_count: number;
+  class_count: number;
+  interface_count: number;
+  export_count: number;
+}
+
+export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.total_lines,
+        r.code_lines,
+        r.blank_lines,
+        r.comment_lines,
+        r.let_count,
+        r.const_count,
+        r.var_count,
+        r.function_count,
+        r.arrow_count,
+        r.class_count,
+        r.interface_count,
+        r.export_count,
+      ),
+  );
+}
+
+/**
+ * One row per leaf parameter binding, ordered by position. Owner-kind
+ * lets `(file_path, owner_name, owner_kind)` disambiguate same-name
+ * functions vs methods.
+ */
+export interface FunctionParamRow {
+  file_path: string;
+  owner_name: string;
+  /** 'function' / 'method' / 'arrow' / 'constructor' / 'getter' / 'setter'. */
+  owner_kind: string;
+  /** 0-based index in the params array. */
+  position: number;
+  name: string;
+  type_text: string | null;
+  default_text: string | null;
+  is_rest: number;
+  is_optional: number;
+  line_start: number;
+  column_start: number;
+  column_end: number;
+}
+
+export function insertFunctionParams(
+  db: CodemapDatabase,
+  rows: FunctionParamRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO function_params (file_path, owner_name, owner_kind, position, name, type_text, default_text, is_rest, is_optional, line_start, column_start, column_end)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.owner_name,
+        r.owner_kind,
+        r.position,
+        r.name,
+        r.type_text,
+        r.default_text,
+        r.is_rest,
+        r.is_optional,
+        r.line_start,
+        r.column_start,
+        r.column_end,
+      ),
+  );
+}
+
+/**
+ * Test suite block — describe / it / test / suite / context with
+ * skip/only/todo flags. parent_suite_id stays NULL in the worker output;
+ * the orchestrator resolves it after bulk insert (or queries use the
+ * line range to infer parent).
+ */
+export interface TestSuiteRow {
+  file_path: string;
+  name: string;
+  kind: "describe" | "it" | "test" | "suite" | "context";
+  line_start: number;
+  line_end: number;
+  /** Index into the per-file rows array — orchestrator resolves to row id. */
+  parent_index: number | null;
+  is_skipped: number;
+  is_only: number;
+  is_todo: number;
+  framework: "vitest" | "jest" | "bun-test" | "node-test" | "mocha" | "unknown";
+}
+
+export function insertTestSuites(db: CodemapDatabase, rows: TestSuiteRow[]) {
+  if (!rows.length) return;
+  // Insert in a single transaction; rowids are sequential so the
+  // parent_index → real id mapping is `firstId + parent_index`.
+  const firstIdRow = db
+    .query<{ seq: number | null }>(
+      "SELECT seq FROM sqlite_sequence WHERE name = 'test_suites'",
+    )
+    .get();
+  const firstId = (firstIdRow?.seq ?? 0) + 1;
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO test_suites (file_path, name, kind, line_start, line_end, parent_suite_id, is_skipped, is_only, is_todo, framework)",
+    "(?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.name,
+        r.kind,
+        r.line_start,
+        r.line_end,
+        r.parent_index === null ? null : firstId + r.parent_index,
+        r.is_skipped,
+        r.is_only,
+        r.is_todo,
+        r.framework,
+      ),
+  );
+}
+
+/** Operational signal — console.log / debugger / throw / process.env. */
+export interface RuntimeMarkerRow {
+  file_path: string;
+  kind: "console" | "debugger" | "throw" | "process-env";
+  line_start: number;
+  column_start: number;
+  column_end: number;
+  /** Qualifier — method name for console, env-var name for process-env, expression text for throw, NULL for debugger. */
+  detail: string | null;
+  scope_local_id: number;
+}
+
+export function insertRuntimeMarkers(
+  db: CodemapDatabase,
+  rows: RuntimeMarkerRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO runtime_markers (file_path, kind, line_start, column_start, column_end, detail, scope_local_id)",
+    "(?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.kind,
+        r.line_start,
+        r.column_start,
+        r.column_end,
+        r.detail,
+        r.scope_local_id,
+      ),
+  );
+}
+
+/** Resolved re-export chain — bindings-engine and ad-hoc SQL share this. */
+export interface ReExportChainRow {
+  from_file: string;
+  from_name: string;
+  to_file: string;
+  to_name: string;
+  hops: number;
+  /** 1 if the walk hit MAX_REEXPORT_DEPTH without finding a non-re-export terminal. */
+  truncated: number;
+}
+
+export function insertReExportChains(
+  db: CodemapDatabase,
+  rows: ReExportChainRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
+    "(?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.from_file,
+        r.from_name,
+        r.to_file,
+        r.to_name,
+        r.hops,
+        r.truncated,
+      ),
+  );
+}
+
+/** Per-file SCC assignment per Tarjan's algorithm. */
+export interface ModuleCycleRow {
+  file_path: string;
+  cycle_id: number;
+  cycle_size: number;
+}
+
+export function insertModuleCycles(
+  db: CodemapDatabase,
+  rows: ModuleCycleRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO module_cycles (file_path, cycle_id, cycle_size)",
+    "(?,?,?)",
+    (r, v) => v.push(r.file_path, r.cycle_id, r.cycle_size),
+  );
+}
+
+export function insertScopes(db: CodemapDatabase, rows: ScopeRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO scopes (file_path, local_id, kind, parent_local_id, line_start, line_end, owner_symbol_name)",
+    "(?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.local_id,
+        r.kind,
+        r.parent_local_id,
+        r.line_start,
+        r.line_end,
+        r.owner_symbol_name,
+      ),
+  );
+}
+
+/**
+ * Per-specifier row for `import { foo, bar as baz }` / `import foo from 'mod'`
+ * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) have
+ * no specifiers. JOIN to `imports` by (file_path, line, source) when the
+ * import statement's other fields are needed.
+ */
+export interface ImportSpecifierRow {
+  file_path: string;
+  source: string;
+  line: number;
+  /** 0-based byte column of the imported (or local) name token start (per [R.6]). */
+  column_start: number;
+  column_end: number;
+  /** Name as written in the source module (`foo` in `import { foo as bar }`); equals `local_name` when no alias. */
+  imported_name: string;
+  /** Name as bound locally (`bar` in `import { foo as bar }`); equals `imported_name` when no alias. For default + namespace imports, this is the binding name. */
+  local_name: string;
+  kind: "named" | "default" | "namespace";
+  is_type_only: number;
+}
+
+export function insertImportSpecifiers(
+  db: CodemapDatabase,
+  rows: ImportSpecifierRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO import_specifiers (file_path, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.source,
+        r.line,
+        r.column_start,
+        r.column_end,
+        r.imported_name,
+        r.local_name,
+        r.kind,
+        r.is_type_only,
+      ),
   );
 }
 

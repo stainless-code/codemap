@@ -47,7 +47,7 @@
     {
       "id": "markers-notes-todo",
       "prompt": "TODO marker in fixture notes markdown",
-      "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md'"
+      "sql": "SELECT file_path, line_number, kind, content FROM markers WHERE file_path = 'src/notes.md' ORDER BY line_number"
     },
     {
       "id": "exports-client",
@@ -93,6 +93,97 @@
       "id": "calls-consumer",
       "prompt": "What does the run function in consumer.ts call?",
       "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
+    },
+    {
+      "id": "find-call-sites",
+      "prompt": "Parametrised recipe: where is createClient called from? (column-precise per R.6)",
+      "recipe": "find-call-sites",
+      "params": { "callee": "createClient" }
+    },
+    {
+      "id": "find-export-sites",
+      "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
+      "recipe": "find-export-sites",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-symbol-definitions",
+      "prompt": "Parametrised recipe: where is ProductCard defined? (name-token-precise)",
+      "recipe": "find-symbol-definitions",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-import-sites",
+      "prompt": "Parametrised recipe: where is ProductCard imported (specifier-precise)?",
+      "recipe": "find-import-sites",
+      "params": { "imported_name": "ProductCard" }
+    },
+    {
+      "id": "find-references",
+      "prompt": "Parametrised recipe: every identifier USE of ProductCard (value/type/jsx with column-precise position + scope context per R.11)",
+      "recipe": "find-references",
+      "params": { "name": "ProductCard" }
+    },
+    {
+      "id": "find-write-sites",
+      "prompt": "Parametrised recipe: every WRITE to `perms` per R.13 (assignments, declarations, compound updates)",
+      "recipe": "find-write-sites",
+      "params": { "name": "perms" }
+    },
+    {
+      "id": "find-symbol-references",
+      "prompt": "Parametrised recipe: bindings-precise refs to createClient defined in src/api/client.ts (per R.12)",
+      "recipe": "find-symbol-references",
+      "params": {
+        "name": "createClient",
+        "file_path": "src/api/client.ts"
+      }
+    },
+    {
+      "id": "large-functions",
+      "prompt": "Functions over 50 lines, ranked by body_line_count.",
+      "recipe": "large-functions"
+    },
+    {
+      "id": "deeply-nested-functions",
+      "prompt": "Functions with nesting_depth >= 4, ranked by depth/complexity.",
+      "recipe": "deeply-nested-functions"
+    },
+    {
+      "id": "circular-imports",
+      "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
+      "recipe": "circular-imports"
+    },
+    {
+      "id": "barrel-chains",
+      "prompt": "Resolved re-export chains — every export-from terminal site.",
+      "recipe": "barrel-chains"
+    },
+    {
+      "id": "find-by-param-type",
+      "prompt": "Every fn that takes a ClientConfig param.",
+      "recipe": "find-by-param-type",
+      "params": { "type_text": "ClientConfig" }
+    },
+    {
+      "id": "find-leftover-console",
+      "prompt": "Every console.* call site.",
+      "recipe": "find-leftover-console"
+    },
+    {
+      "id": "env-var-audit",
+      "prompt": "Distinct process.env.X reads ranked by use.",
+      "recipe": "env-var-audit"
+    },
+    {
+      "id": "find-skipped-tests",
+      "prompt": "Tests flagged skip / only / todo.",
+      "recipe": "find-skipped-tests"
+    },
+    {
+      "id": "tests-by-file",
+      "prompt": "Test roll-up per file.",
+      "recipe": "tests-by-file"
     },
     {
       "id": "deprecated-symbols",

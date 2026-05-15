@@ -26,6 +26,13 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     suppressions: extractSuppressions(ctx.source, ctx.relPath),
     typeMembers: data.typeMembers,
     calls: data.calls,
+    importSpecifiers: data.importSpecifiers,
+    scopes: data.scopes,
+    references: data.references,
+    fileMetrics: data.fileMetrics,
+    functionParams: data.functionParams,
+    runtimeMarkers: data.runtimeMarkers,
+    testSuites: data.testSuites,
   };
 }
 

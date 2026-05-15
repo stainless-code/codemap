@@ -13,17 +13,25 @@ export function extractMarkers(source: string, filePath: string): MarkerRow[] {
   MARKER_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   let lineNum = 1;
+  let lineStartOffset = 0;
   let lastIdx = 0;
   while ((match = MARKER_RE.exec(source)) !== null) {
     for (let i = lastIdx; i < match.index; i++) {
-      if (source.charCodeAt(i) === 10) lineNum++;
+      if (source.charCodeAt(i) === 10) {
+        lineNum++;
+        lineStartOffset = i + 1;
+      }
     }
     lastIdx = match.index;
+    const tagStart = match.index;
+    const tagEnd = tagStart + match[1].length;
     markers.push({
       file_path: filePath,
       line_number: lineNum,
       kind: match[1],
       content: match[2].trim(),
+      column_start: tagStart - lineStartOffset,
+      column_end: tagEnd - lineStartOffset,
     });
   }
   return markers;

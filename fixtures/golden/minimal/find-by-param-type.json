@@ -1,0 +1,14 @@
+[
+  {
+    "file_path": "src/api/client.ts",
+    "owner_name": "createClient",
+    "owner_kind": "function",
+    "position": 0,
+    "name": "config",
+    "default_text": null,
+    "is_rest": 0,
+    "is_optional": 1,
+    "line_start": 15,
+    "column_start": 29
+  }
+]

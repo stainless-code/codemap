@@ -18,6 +18,13 @@ import {
   insertFile,
   insertSymbols,
   insertImports,
+  insertImportSpecifiers,
+  insertScopes,
+  insertReferences,
+  insertFileMetrics,
+  insertFunctionParams,
+  insertRuntimeMarkers,
+  insertTestSuites,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -48,6 +55,12 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
+import {
+  persistBindings,
+  persistReExportChains,
+  resolveBindings,
+} from "./bindings-engine";
+import { persistModuleCycles } from "./cycles-engine";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -237,6 +250,19 @@ function insertParsedResults(
             insertImports(db, parsed.imports);
             if (deps.length) insertDependencies(db, deps);
           }
+          if (parsed.importSpecifiers?.length) {
+            insertImportSpecifiers(db, parsed.importSpecifiers);
+          }
+          if (parsed.scopes?.length) insertScopes(db, parsed.scopes);
+          if (parsed.references?.length)
+            insertReferences(db, parsed.references);
+          if (parsed.fileMetrics) insertFileMetrics(db, [parsed.fileMetrics]);
+          if (parsed.functionParams?.length)
+            insertFunctionParams(db, parsed.functionParams);
+          if (parsed.runtimeMarkers?.length)
+            insertRuntimeMarkers(db, parsed.runtimeMarkers);
+          if (parsed.testSuites?.length)
+            insertTestSuites(db, parsed.testSuites);
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -279,7 +305,17 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM calls) as calls,
         (SELECT COUNT(*) FROM css_variables) as css_vars,
         (SELECT COUNT(*) FROM css_classes) as css_classes,
-        (SELECT COUNT(*) FROM css_keyframes) as css_keyframes`,
+        (SELECT COUNT(*) FROM css_keyframes) as css_keyframes,
+        (SELECT COUNT(*) FROM scopes) as scopes,
+        (SELECT COUNT(*) FROM "references") as "references",
+        (SELECT COUNT(*) FROM bindings) as bindings,
+        (SELECT COUNT(*) FROM import_specifiers) as import_specifiers,
+        (SELECT COUNT(*) FROM function_params) as function_params,
+        (SELECT COUNT(*) FROM runtime_markers) as runtime_markers,
+        (SELECT COUNT(*) FROM test_suites) as test_suites,
+        (SELECT COUNT(*) FROM re_export_chains) as re_export_chains,
+        (SELECT COUNT(*) FROM module_cycles) as module_cycles,
+        (SELECT COUNT(*) FROM file_metrics) as file_metrics`,
     )
     .get()!;
   return row as IndexTableStats;
@@ -414,6 +450,16 @@ export async function indexFiles(
             if (data.symbols.length) insertSymbols(db, data.symbols);
             const deps = resolveImports(absPath, data.imports, indexedPaths);
             if (data.imports.length) insertImports(db, data.imports);
+            if (data.importSpecifiers.length)
+              insertImportSpecifiers(db, data.importSpecifiers);
+            if (data.scopes.length) insertScopes(db, data.scopes);
+            if (data.references.length) insertReferences(db, data.references);
+            if (data.fileMetrics) insertFileMetrics(db, [data.fileMetrics]);
+            if (data.functionParams.length)
+              insertFunctionParams(db, data.functionParams);
+            if (data.runtimeMarkers.length)
+              insertRuntimeMarkers(db, data.runtimeMarkers);
+            if (data.testSuites.length) insertTestSuites(db, data.testSuites);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);
@@ -454,6 +500,15 @@ export async function indexFiles(
     .get()!.c;
   setMeta(db, "file_count", String(fileCount));
   setMeta(db, "project_root", getProjectRoot());
+
+  // Pass-2 binding resolution per R.12 — full-rebuild only to honor
+  // R.10's <100ms targeted contract. Orphan-cleared until next full.
+  if (fullRebuild) {
+    const bindings = resolveBindings(db);
+    persistBindings(db, bindings);
+    persistModuleCycles(db);
+    persistReExportChains(db);
+  }
 
   const elapsed = Math.round(performance.now() - startTime);
   const stats = fetchTableStats(db);

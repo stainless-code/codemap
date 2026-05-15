@@ -24,7 +24,7 @@ function seedSymbol(name: string, file: string, kind = "function") {
 
 function seedCall(file: string, caller: string, callee: string) {
   db.run(
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name) VALUES (?, ?, ?, ?)",
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end) VALUES (?, ?, ?, ?, 1, 0, 1)",
     [file, caller, "function", callee],
   );
 }

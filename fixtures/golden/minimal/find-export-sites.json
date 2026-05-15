@@ -1,0 +1,26 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "name": "ProductCard",
+    "kind": "value",
+    "is_default": 0,
+    "is_re_export": 0,
+    "re_export_source": null,
+    "line_start": 11,
+    "line_end": 19,
+    "column_start": 16,
+    "column_end": 27
+  },
+  {
+    "file_path": "src/components/shop/index.ts",
+    "name": "ProductCard",
+    "kind": "re-export",
+    "is_default": 0,
+    "is_re_export": 1,
+    "re_export_source": "./ProductCard",
+    "line_start": 4,
+    "line_end": 4,
+    "column_start": 9,
+    "column_end": 20
+  }
+]

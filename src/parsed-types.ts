@@ -2,6 +2,7 @@ import type {
   FileRow,
   SymbolRow,
   ImportRow,
+  ImportSpecifierRow,
   ExportRow,
   ComponentRow,
   MarkerRow,
@@ -11,6 +12,12 @@ import type {
   CssKeyframeRow,
   TypeMemberRow,
   CallRow,
+  ScopeRow,
+  ReferenceRow,
+  FileMetricsRow,
+  FunctionParamRow,
+  RuntimeMarkerRow,
+  TestSuiteRow,
 } from "./db";
 
 /**
@@ -31,12 +38,19 @@ export interface ParsedFile {
   parseMs?: number;
   symbols?: SymbolRow[];
   imports?: ImportRow[];
+  importSpecifiers?: ImportSpecifierRow[];
   exports?: ExportRow[];
   components?: ComponentRow[];
   markers?: MarkerRow[];
   suppressions?: SuppressionRow[];
   typeMembers?: TypeMemberRow[];
   calls?: CallRow[];
+  scopes?: ScopeRow[];
+  references?: ReferenceRow[];
+  fileMetrics?: FileMetricsRow;
+  functionParams?: FunctionParamRow[];
+  runtimeMarkers?: RuntimeMarkerRow[];
+  testSuites?: TestSuiteRow[];
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

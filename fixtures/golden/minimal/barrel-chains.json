@@ -1,0 +1,34 @@
+[
+  {
+    "from_file": "src/components/shop/index.ts",
+    "from_name": "FormatPrice",
+    "to_file": "src/components/shop/ShopButton.tsx",
+    "to_name": "FormatPrice",
+    "hops": 1,
+    "truncated": 0
+  },
+  {
+    "from_file": "src/components/shop/index.ts",
+    "from_name": "PrimaryShopButton",
+    "to_file": "src/components/shop/ShopButton.tsx",
+    "to_name": "default",
+    "hops": 1,
+    "truncated": 0
+  },
+  {
+    "from_file": "src/components/shop/index.ts",
+    "from_name": "ProductCard",
+    "to_file": "src/components/shop/ProductCard.tsx",
+    "to_name": "ProductCard",
+    "hops": 1,
+    "truncated": 0
+  },
+  {
+    "from_file": "src/components/shop/index.ts",
+    "from_name": "ShopButton",
+    "to_file": "src/components/shop/ShopButton.tsx",
+    "to_name": "ShopButton",
+    "hops": 1,
+    "truncated": 0
+  }
+]

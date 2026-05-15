@@ -1,0 +1,32 @@
+[
+  {
+    "file_path": "src/components/shop/index.ts",
+    "line_start": 4,
+    "column_start": 9,
+    "column_end": 20,
+    "kind": "value",
+    "is_write": 0,
+    "scope_kind": "module",
+    "scope_owner": null
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 2,
+    "column_start": 9,
+    "column_end": 20,
+    "kind": "value",
+    "is_write": 0,
+    "scope_kind": "module",
+    "scope_owner": null
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 16,
+    "column_start": 35,
+    "column_end": 46,
+    "kind": "value",
+    "is_write": 0,
+    "scope_kind": "function",
+    "scope_owner": "run"
+  }
+]
