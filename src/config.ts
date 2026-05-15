@@ -38,6 +38,10 @@ export const DEFAULT_INCLUDE_PATTERNS = [
 export const DEFAULT_EXCLUDE_DIR_NAMES = [
   "node_modules",
   ".git",
+  // Audit worktrees materialised by `codemap audit --base <ref>`. Each
+  // entry under .codemap/audit-cache/<sha>/ is a snapshot of the whole
+  // project — indexing them would duplicate every row N× per snapshot.
+  "audit-cache",
   "dist",
   "build",
   ".next",
