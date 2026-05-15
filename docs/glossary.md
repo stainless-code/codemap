@@ -55,6 +55,10 @@ In Codemap usage: a file with a high number of `exports` rows — typically a pu
 
 The shared `batchInsert<T>()` helper in `src/db.ts`. Splits inserts into multi-row `INSERT … VALUES (…),(…)` statements of `BATCH_SIZE` (500) rows each, with pre-computed placeholder strings. Used by every `insertX` function.
 
+### `bindings` (table) / bindings resolver
+
+Per-reference resolution to the originating symbol per [R.12]. One row per non-`member`-kind `references` row, with `resolution_kind` in `{same-file, imported, global, unresolved}` and a nullable `resolved_symbol_id` joining `symbols(id)`. Resolved in a single in-memory pass (`src/application/bindings-engine.ts`) after files/symbols/imports settle. Full-rebuild only — targeted reindex skips per [R.10]. Powers `find-symbol-references` (bindings-precise rename substrate).
+
 ### `boundaries` (config) / `boundary_rules` (table) / `boundary-violations` (recipe)
 
 Architecture-boundary substrate. Users declare `boundaries: [{name, from_glob, to_glob, action?}]` in `.codemap/config.ts`; the resolver fills `action` to `"deny"` when omitted. Every index pass calls `reconcileBoundaryRules` (in `src/db.ts`) which clears `boundary_rules` and re-inserts from the resolved config — config is the single source of truth, the table is a denormalised lookup. Bundled `boundary-violations` recipe joins `dependencies` × `boundary_rules` via SQLite `GLOB` and surfaces forbidden import edges; `--format sarif` lights up automatically because the recipe row aliases `dependencies.from_path` to `file_path`. CHECK constraint pins `action ∈ {'deny','allow'}`. v1 only honours `'deny'`; `'allow'` reserves the slot for future whitelist semantics. See [architecture.md § `boundary_rules`](./architecture.md#boundary_rules--architecture-boundary-rules-config-derived-strict-without-rowid).
@@ -106,6 +110,14 @@ CI-aggregate flag on `codemap query` and `codemap audit`. Aliases `--format sari
 ### `codemap validate`
 
 CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses: `stale | missing | unindexed`. Exits `1` on any drift.
+
+### `module_cycles` (table) / circular imports
+
+Strongly-connected components of the import dependency graph computed via Tarjan after the full index pass. Only cyclic files appear (SCC size ≥ 2, or size-1 with a self-edge). Powers `circular-imports` recipe.
+
+### `re_export_chains` (table)
+
+Materialised re-export resolution. One row per `(from_file, from_name)` walked through barrel files to the terminal definition site. Bounded at 10 hops with cycle detection. `truncated = 1` flags chains that hit the cap or an unindexed file mid-walk. Powers `barrel-chains` recipe.
 
 ### `components` (table)
 
@@ -275,6 +287,10 @@ Index mode that diffs against `last_indexed_commit` (git) and only re-indexes ch
 
 Symbol or file blast-radius walker. CLI: `codemap impact <target> [--direction up|down|both] [--depth N] [--via dependencies|calls|imports|all] [--limit N] [--summary] [--json]`. MCP: `impact` tool. HTTP: `POST /tool/impact`. Replaces hand-composed `WITH RECURSIVE` queries that agents struggle to write reliably. Walks compatible graphs based on resolved target kind: **symbol** targets walk `calls` (callers / callees by name); **file** targets walk `dependencies` + `imports` (`resolved_path` only). Mismatched explicit `--via` choices land in `skipped_backends` instead of failing. Cycle-detected via path-string `instr` check inside the recursive CTE; bounded by `--depth` (default 3, 0 = unbounded but still cycle-detected and limit-capped) and `--limit` (default 500). Result envelope: `{target, direction, via, depth_limit, matches: [{depth, direction, edge, kind, name?, file_path}], summary: {nodes, max_depth_reached, by_kind, terminated_by: 'depth'|'limit'|'exhausted'}}`. `--summary` trims `matches` for cheap CI gate consumption (`jq '.summary.nodes'`) but preserves the count. Pure transport-agnostic engine in `application/impact-engine.ts`; CLI / MCP / HTTP all dispatch the same `findImpact` function. `sarif` / `annotations` formats not supported (impact rows are graph traversals, not findings).
 
+### `import_specifiers` (table)
+
+Per-specifier breakdown of the `imports.specifiers` JSON blob. One row per imported binding — `imported_name` (original) and `local_name` (renamed via `as`), `kind` in `{named, default, namespace}`, `is_type_only`, column-precise position. Powers specifier-precise rewrites and the `find-import-sites` recipe.
+
 ### `imports` (table)
 
 Raw `import` statements. `specifiers` is JSON-encoded; `resolved_path` is non-null only when the resolver could map `source` to an indexed file. See `ImportRow` and the resolved view `dependencies`.
@@ -318,6 +334,14 @@ Stdio MCP (Model Context Protocol) server exposing codemap's structural-query su
 ### `query_batch` (MCP-only tool)
 
 MCP tool with no CLI counterpart — runs N read-only SQL statements in one round-trip. Items are `string | {sql, summary?, changed_since?, group_by?}`: bare strings inherit batch-wide flag defaults; object form overrides on a per-key basis. Output is an N-element array; per-element shape mirrors single-`query`'s output for that statement's effective flag set. Per-statement errors are isolated (failed statement returns `{error}` in its slot; siblings still execute). Distinct from making `query` accept `;`-delimited batches (rejected — would need a SQL tokenizer and would diverge `query`'s output shape from its CLI counterpart). SQL-only (no `recipe` polymorphism); `query_recipe_batch` is an additive future change if a real consumer asks.
+
+### `file_metrics` (table)
+
+Per-file aggregate metrics (one row per indexed TS/JS file): `total_lines`, `code_lines`, `blank_lines`, `comment_lines`, plus symbol-kind counts (`function_count`, `class_count`, `interface_count`, `export_count`). Line classification is regex-light per [Tier 11 ship report](./plans/substrate-extraction.md#tier-11--metrics-expansion-per-symbol--per-file).
+
+### `function_params` (table)
+
+First-class function parameters — one row per leaf parameter binding, ordered by `position`. Keyed by `(file_path, owner_name, owner_kind)` to disambiguate same-name function vs method. `type_text` is the stringified annotation; `default_text` is the raw default-expression source. Powers `find-by-param-type` recipe.
 
 ### markers
 
@@ -370,6 +394,14 @@ Code that turns source bytes into structured rows. Three implementations: `parse
 ### plan
 
 A `docs/plans/<feature-name>.md` file tracking in-flight work. Created on commit; deleted when the feature ships per [README § Rule 3](./README.md#rules-for-agents).
+
+### `references` (table)
+
+Every identifier USE per [R.11], column-precise per [R.6]. `kind` in `{value, type, jsx, member}`; `is_write` distinguishes reads from writes per [R.13]; `scope_local_id` joins `scopes` in the same file. Native HTML JSX tags, attribute names, and long-hand object-literal keys are NOT emitted (they're not bindings). `kind='member'` rows DO emit for non-computed property access — they're skipped by the bindings resolver but available for consumers that want member-name positions.
+
+### `runtime_markers` (table)
+
+Operational signals worth auditing: `console.*` calls, `debugger` statements, `throw` statements, `process.env.X` accesses. `kind` in `{console, debugger, throw, process-env}`; `detail` carries the qualifier (method name, env-var name, truncated throw expression). Powers `find-leftover-console` + `env-var-audit` recipes.
 
 ### `pr-comment` (CLI verb)
 
@@ -440,6 +472,10 @@ One record in a SQLite table. Each table has a corresponding TS interface (`File
 
 ## S
 
+### `scopes` (table) / scope tracker
+
+Lexical scope graph per [R.11]. Composite PK `(file_path, local_id)` with module scope at `local_id = 0` and nested scopes incrementing. Kinds: `module / function / arrow / class / method / interface / type-alias / for / catch`. `parent_local_id` walks the chain. Anonymous scopes (callbacks, catch, for) get owner*symbol_name=NULL; the tracker (`createScopeTracker`) emits `$anon*<localId>`segments in`scopeStr`so sibling anons don't collide on`calls.caller_scope`. Foundation for bindings resolution.
+
 ### schema
 
 Conceptually, the structure of the SQLite database — every table, column, constraint, and index. Defined by **DDL** in `src/db.ts`. Versioned by **`SCHEMA_VERSION`**. Documented in [architecture § Schema](./architecture.md#schema).
@@ -497,6 +533,10 @@ TS shape for one row of the `symbols` table.
 ---
 
 ## T
+
+### `test_suites` (table)
+
+Test metadata — describe / it / test / suite / context blocks with skip/only/todo flags and detected `framework` in `{vitest, jest, bun-test, node-test, mocha, unknown}`. Framework detection is per-file from imports (mixed-framework codebases handled automatically). `parent_suite_id` resolves nested describes. Powers `find-skipped-tests` + `tests-by-file` recipes.
 
 ### targeted reindex
 

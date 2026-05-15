@@ -220,16 +220,25 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | parent_name       | TEXT       | Name of the enclosing symbol (class, function) for nested symbols. NULL for top-level (module scope). Class methods/properties point to their class                                                                                                                                                                                                                |
 | visibility        | TEXT       | JSDoc visibility tag derived from `doc_comment` at parse time: `public` / `private` / `internal` / `alpha` / `beta`. NULL when no tag present. Tag must start its own line (after the JSDoc `*` prefix); first match in document order wins. Powers the `visibility-tags` recipe and `WHERE visibility = ?` queries via the partial index `idx_symbols_visibility` |
 | complexity        | REAL       | Cyclomatic complexity (McCabe; `1 + decision points`) for function-shaped symbols only. NULL for non-functions (interfaces, types, enums, plain consts) and class methods (v1 limitation). Decision points: `if`, `while`, `do…while`, `for`, `for…in`, `for…of`, `case X:` arms (not `default:`), short-circuit `&&` / `                                          |     | `/`??`, ternary `?:`, and `catch`clauses. Powers the`high-complexity-untested` recipe |
+| name_column_start | INTEGER    | 0-based column of the symbol-name token on `line_start` (per [R.6])                                                                                                                                                                                                                                                                                                |
+| name_column_end   | INTEGER    | One-past-last column of the symbol-name token                                                                                                                                                                                                                                                                                                                      |
+| scope_local_id    | INTEGER    | Enclosing scope where the symbol's NAME is declared (joins `scopes.local_id`). Default `0` (module)                                                                                                                                                                                                                                                                |
+| body_line_count   | INTEGER    | `line_end - line_start + 1` for function-shaped symbols; NULL for non-functions                                                                                                                                                                                                                                                                                    |
+| param_count       | INTEGER    | Parameter count for function-shaped symbols; NULL otherwise                                                                                                                                                                                                                                                                                                        |
+| nesting_depth     | INTEGER    | Max conditional/loop/ternary nesting inside the body; NULL for non-functions                                                                                                                                                                                                                                                                                       |
 
 ### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
 
-| Column       | Type       | Description                                                                        |
-| ------------ | ---------- | ---------------------------------------------------------------------------------- |
-| id           | INTEGER PK | Auto-increment row id                                                              |
-| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                         |
-| caller_name  | TEXT       | Name of the calling function/method                                                |
-| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Disambiguates same-named methods   |
-| callee_name  | TEXT       | Name of the called function, `obj.method` for member calls, `this.method` for self |
+| Column       | Type       | Description                                                                                                                       |
+| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| id           | INTEGER PK | Auto-increment row id                                                                                                             |
+| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
+| caller_name  | TEXT       | Name of the calling function/method                                                                                               |
+| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
+| callee_name  | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
+| line_start   | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
+| column_start | INTEGER    | 0-based byte column of the callee token                                                                                           |
+| column_end   | INTEGER    | One-past-last column                                                                                                              |
 
 Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` three times in the same file, only one row is stored. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
@@ -259,14 +268,19 @@ Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` thre
 
 ### `exports` — Export declarations (`STRICT`)
 
-| Column           | Type       | Description                  |
-| ---------------- | ---------- | ---------------------------- |
-| id               | INTEGER PK | Auto-increment row id        |
-| file_path        | TEXT FK    | File containing the export   |
-| name             | TEXT       | Exported name                |
-| kind             | TEXT       | `value`, `type`, `re-export` |
-| is_default       | INTEGER    | 1 if default export          |
-| re_export_source | TEXT       | Source module if re-exported |
+| Column           | Type       | Description                                                                         |
+| ---------------- | ---------- | ----------------------------------------------------------------------------------- |
+| id               | INTEGER PK | Auto-increment row id                                                               |
+| file_path        | TEXT FK    | File containing the export                                                          |
+| name             | TEXT       | Exported name                                                                       |
+| kind             | TEXT       | `value`, `type`, `re-export`                                                        |
+| is_default       | INTEGER    | 1 if default export                                                                 |
+| re_export_source | TEXT       | Source module if re-exported (suffix `.default` for `export { default as X } from`) |
+| is_re_export     | INTEGER    | 1 when `kind = 're-export'`                                                         |
+| line_start       | INTEGER    | 1-based line of the export-name token (per [R.6])                                   |
+| line_end         | INTEGER    | 1-based last line of the export declaration                                         |
+| column_start     | INTEGER    | 0-based byte column of the name token                                               |
+| column_end       | INTEGER    | One-past-last column                                                                |
 
 ### `components` — React components (detected by PascalCase + JSX return or hook usage) (`STRICT`)
 
@@ -285,6 +299,158 @@ Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` thre
 | --------- | ------- | -------------------------- |
 | from_path | TEXT FK | Importing file (PK part 1) |
 | to_path   | TEXT    | Imported file (PK part 2)  |
+
+### `import_specifiers` — Per-specifier breakdown of `imports.specifiers` (`STRICT`)
+
+| Column        | Type       | Description                                                                     |
+| ------------- | ---------- | ------------------------------------------------------------------------------- |
+| id            | INTEGER PK | Auto-increment row id                                                           |
+| file_path     | TEXT FK    | File containing the import                                                      |
+| source        | TEXT       | Module specifier                                                                |
+| line          | INTEGER    | Line number                                                                     |
+| column_start  | INTEGER    | 0-based column of the specifier token                                           |
+| column_end    | INTEGER    | One-past-last column                                                            |
+| imported_name | TEXT       | Original exported name (or `default` / `*`)                                     |
+| local_name    | TEXT       | Local binding name (different from `imported_name` for `import { foo as bar }`) |
+| kind          | TEXT       | `named` / `default` / `namespace`                                               |
+| is_type_only  | INTEGER    | 1 if this specifier is `type`-only                                              |
+
+### `scopes` — Lexical scope graph (`STRICT, WITHOUT ROWID`)
+
+Per [R.11]. One row per function / arrow / class / method / interface / type-alias / for / catch + module-root scope (`local_id = 0`).
+
+| Column            | Type    | Description                                                                                         |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| file_path         | TEXT FK | File containing the scope (PK part 1)                                                               |
+| local_id          | INTEGER | Per-file 0-based scope id (PK part 2). Module = 0; nested scopes increment                          |
+| kind              | TEXT    | `module` / `function` / `arrow` / `class` / `method` / `interface` / `type-alias` / `for` / `catch` |
+| parent_local_id   | INTEGER | Enclosing scope's `local_id`, NULL for the module root                                              |
+| line_start        | INTEGER | Body start line                                                                                     |
+| line_end          | INTEGER | Body end line                                                                                       |
+| owner_symbol_name | TEXT    | Named owner (function/class/method name), NULL for anonymous (callback arrows, catch, for)          |
+
+### `references` — Every identifier USE (`STRICT`)
+
+Per [R.11]. Column-precise per [R.6]. Native HTML JSX tags / attribute names / object-literal long-hand keys / non-computed member accesses are NOT emitted (they're not bindings); the table tracks identifier bindings only. `kind='member'` rows ARE emitted for non-computed property access so consumers that want member-name positions can filter them in.
+
+| Column         | Type       | Description                                                                           |
+| -------------- | ---------- | ------------------------------------------------------------------------------------- |
+| id             | INTEGER PK | Auto-increment row id                                                                 |
+| file_path      | TEXT FK    | File containing the reference                                                         |
+| name           | TEXT       | Identifier name                                                                       |
+| line_start     | INTEGER    | 1-based line                                                                          |
+| column_start   | INTEGER    | 0-based byte column                                                                   |
+| column_end     | INTEGER    | One-past-last column                                                                  |
+| kind           | TEXT       | `value` / `type` / `jsx` / `member`                                                   |
+| scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id` in the same file)                            |
+| is_write       | INTEGER    | 1 for assignment LHS / `++` / `--` / `delete` / declaration-with-init / for-of/in LHS |
+
+### `bindings` — Per-reference resolution to the originating symbol (`STRICT, WITHOUT ROWID`)
+
+Per [R.12]. One row per non-`member`-kind `references` row. Resolved in a single pass after files+symbols+imports settle (full-rebuild only — targeted reindex skips per [R.10]).
+
+| Column             | Type    | Description                                                                     |
+| ------------------ | ------- | ------------------------------------------------------------------------------- |
+| reference_id       | INTEGER | PK + FK → `references(id)` CASCADE                                              |
+| resolved_symbol_id | INTEGER | FK → `symbols(id)` SET NULL. NULL for `is_external=1` / `global` / `unresolved` |
+| resolution_kind    | TEXT    | `same-file` / `imported` / `global` / `unresolved`                              |
+| is_external        | INTEGER | 1 when the import target isn't in the indexed set (e.g. `react`, `lodash`)      |
+
+### `function_params` — Typed parameters per function/method (`STRICT`)
+
+One row per leaf parameter binding, ordered by `position`. Pattern params (`function f({a, b})`) emit one row per leaf.
+
+| Column       | Type       | Description                                                    |
+| ------------ | ---------- | -------------------------------------------------------------- |
+| id           | INTEGER PK | Auto-increment row id                                          |
+| file_path    | TEXT FK    | File containing the owning function                            |
+| owner_name   | TEXT       | Function / method / arrow / constructor / getter / setter name |
+| owner_kind   | TEXT       | Disambiguates same-name function vs method in the same file    |
+| position     | INTEGER    | 0-based index in the params array                              |
+| name         | TEXT       | Leaf binding name                                              |
+| type_text    | TEXT       | Stringified type annotation (NULL for untyped params)          |
+| default_text | TEXT       | Raw default-expression source (NULL when no default)           |
+| is_rest      | INTEGER    | 1 for `...rest` params                                         |
+| is_optional  | INTEGER    | 1 for `?` or AssignmentPattern (default-valued) params         |
+| line_start   | INTEGER    | 1-based line of the binding                                    |
+| column_start | INTEGER    | 0-based column of the binding token                            |
+| column_end   | INTEGER    | One-past-last column                                           |
+
+### `file_metrics` — Per-file aggregate metrics (`STRICT`)
+
+One row per indexed TS/JS file. Line classification is regex-light (blank if `/^\s*$/`; comment if line starts with `//`, `/*`, `*`, `*/`).
+
+| Column          | Type    | Description                           |
+| --------------- | ------- | ------------------------------------- |
+| file_path       | TEXT PK | FK → `files(path)` CASCADE            |
+| total_lines     | INTEGER | All lines, including blank + comment  |
+| code_lines      | INTEGER | `total - blank - comment`             |
+| blank_lines     | INTEGER | Whitespace-only lines                 |
+| comment_lines   | INTEGER | Lines starting with `//` / `/*` / `*` |
+| let_count       | INTEGER | Reserved (parser-keyword variant TBD) |
+| const_count     | INTEGER | Reserved (parser-keyword variant TBD) |
+| var_count       | INTEGER | Reserved (parser-keyword variant TBD) |
+| function_count  | INTEGER | `symbols.kind = 'function'` count     |
+| arrow_count     | INTEGER | Reserved (kind disambiguation TBD)    |
+| class_count     | INTEGER | `symbols.kind = 'class'` count        |
+| interface_count | INTEGER | `symbols.kind = 'interface'` count    |
+| export_count    | INTEGER | `exports` row count for this file     |
+
+### `re_export_chains` — Materialised re-export resolution (`STRICT, WITHOUT ROWID`)
+
+One row per `(from_file, from_name)` re-export, walked through barrel files to the terminal definition site. Bounded at 10 hops with cycle detection. Powers `barrel-chains` recipe.
+
+| Column    | Type    | Description                                                    |
+| --------- | ------- | -------------------------------------------------------------- |
+| from_file | TEXT FK | Re-exporting file (PK part 1)                                  |
+| from_name | TEXT    | Name as exported from `from_file` (PK part 2)                  |
+| to_file   | TEXT    | Terminal definition site (or last reachable file)              |
+| to_name   | TEXT    | Name at the terminal                                           |
+| hops      | INTEGER | Chain length walked                                            |
+| truncated | INTEGER | 1 if the walk hit the depth cap or an unindexed file mid-chain |
+
+### `module_cycles` — Files participating in import cycles (`STRICT, WITHOUT ROWID`)
+
+SCCs of size ≥ 2 from `dependencies`, plus size-1 SCCs with a self-edge. Computed via Tarjan after the full index pass. Non-cyclic files have no row.
+
+| Column     | Type    | Description                                                 |
+| ---------- | ------- | ----------------------------------------------------------- |
+| file_path  | TEXT PK | FK → `files(path)` CASCADE                                  |
+| cycle_id   | INTEGER | Per-PR auto-numbered cycle id (shared across cycle members) |
+| cycle_size | INTEGER | Number of files in the cycle                                |
+
+### `runtime_markers` — Operational signals (`STRICT`)
+
+Every `console.*` call, `debugger` statement, `throw` statement, and `process.env.X` access. Powers `find-leftover-console` + `env-var-audit`.
+
+| Column         | Type       | Description                                                                                        |
+| -------------- | ---------- | -------------------------------------------------------------------------------------------------- |
+| id             | INTEGER PK | Auto-increment row id                                                                              |
+| file_path      | TEXT FK    | Containing file                                                                                    |
+| kind           | TEXT       | `console` / `debugger` / `throw` / `process-env`                                                   |
+| line_start     | INTEGER    | 1-based line                                                                                       |
+| column_start   | INTEGER    | 0-based column of the start token                                                                  |
+| column_end     | INTEGER    | One-past-last column                                                                               |
+| detail         | TEXT       | Method name for `console`, env-var name for `process-env`, truncated thrown expression for `throw` |
+| scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id`)                                                          |
+
+### `test_suites` — describe / it / test / suite blocks (`STRICT`)
+
+Per-block extraction with skip/only/todo flags + framework detection from imports.
+
+| Column          | Type       | Description                                                                                |
+| --------------- | ---------- | ------------------------------------------------------------------------------------------ |
+| id              | INTEGER PK | Auto-increment row id                                                                      |
+| file_path       | TEXT FK    | Containing file                                                                            |
+| name            | TEXT       | Block name (from first string-literal / template arg)                                      |
+| kind            | TEXT       | `describe` / `it` / `test` / `suite` / `context`                                           |
+| line_start      | INTEGER    | 1-based                                                                                    |
+| line_end        | INTEGER    | 1-based                                                                                    |
+| parent_suite_id | INTEGER    | FK → `test_suites(id)` CASCADE for nested describes; NULL at top level                     |
+| is_skipped      | INTEGER    | 1 for `.skip` modifier                                                                     |
+| is_only         | INTEGER    | 1 for `.only` modifier                                                                     |
+| is_todo         | INTEGER    | 1 for `.todo` modifier                                                                     |
+| framework       | TEXT       | `vitest` / `jest` / `bun-test` / `node-test` / `mocha` / `unknown` (detected from imports) |
 
 ### `css_variables` — CSS custom properties (design tokens) (`STRICT`)
 
@@ -318,13 +484,15 @@ Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` thre
 
 ### `markers` — TODO/FIXME/HACK/NOTE comments (extracted from all file types) (`STRICT`)
 
-| Column      | Type       | Description                        |
-| ----------- | ---------- | ---------------------------------- |
-| id          | INTEGER PK | Auto-increment row id              |
-| file_path   | TEXT FK    | File with the marker               |
-| line_number | INTEGER    | Line number                        |
-| kind        | TEXT       | `TODO`, `FIXME`, `HACK`, or `NOTE` |
-| content     | TEXT       | Comment text                       |
+| Column       | Type       | Description                             |
+| ------------ | ---------- | --------------------------------------- |
+| id           | INTEGER PK | Auto-increment row id                   |
+| file_path    | TEXT FK    | File with the marker                    |
+| line_number  | INTEGER    | Line number                             |
+| kind         | TEXT       | `TODO`, `FIXME`, `HACK`, or `NOTE`      |
+| content      | TEXT       | Comment text                            |
+| column_start | INTEGER    | 0-based byte column of the marker token |
+| column_end   | INTEGER    | One-past-last column                    |
 
 ### `suppressions` — Opt-in recipe suppression markers (`STRICT`)
 
