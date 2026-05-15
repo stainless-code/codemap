@@ -17,6 +17,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
+import { createTables } from "../db";
+import { openCodemapDatabase } from "../sqlite-db";
 import { listQueryRecipeCatalog } from "./query-recipes";
 
 export type AgentContentKind = "skill" | "rule";
@@ -47,6 +49,7 @@ export function resolveAgentContentDir(): string {
  */
 const RENDERERS: Record<string, () => string> = {
   "skill/10-recipes.gen.md": renderRecipesSection,
+  "skill/20-schema.gen.md": renderSchemaSection,
 };
 
 function isGeneratedSection(kind: AgentContentKind, name: string): boolean {
@@ -190,4 +193,48 @@ export function maybeWarnStalePointers(root: string): void {
       `codemap: ${s.path} pointer protocol ${got} != expected v${EXPECTED_POINTER_VERSION}. Re-run \`codemap agents init --force\` to refresh.`,
     );
   }
+}
+
+// DDL is static at compile time — render once per process, reuse forever.
+let schemaSectionCache: string | undefined;
+
+/**
+ * Markdown enumeration of every table created by `createTables()`,
+ * sourced from the live DDL: opens an in-memory SQLite, runs the same
+ * `createTables` codemap uses for real indexes, then reads
+ * `sqlite_schema`. Adding a table / column in `db.ts` propagates here
+ * automatically — no separate schema doc to keep in sync.
+ */
+function renderSchemaSection(): string {
+  if (schemaSectionCache !== undefined) return schemaSectionCache;
+  const db = openCodemapDatabase(":memory:");
+  let rows: { name: string; sql: string | null }[];
+  try {
+    createTables(db);
+    rows = db
+      .query(
+        "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      )
+      .all() as { name: string; sql: string | null }[];
+  } finally {
+    db.close();
+  }
+  const lines: string[] = [];
+  lines.push("## Schema reference (auto-generated)");
+  lines.push("");
+  lines.push(
+    "Every table in `.codemap/index.db`. Sourced from the live `createTables()` DDL in `src/db.ts`; this section regenerates on every fetch so column additions show up automatically.",
+  );
+  lines.push("");
+  for (const r of rows) {
+    if (r.sql === null) continue;
+    lines.push(`### \`${r.name}\``);
+    lines.push("");
+    lines.push("```sql");
+    lines.push(r.sql.trim());
+    lines.push("```");
+    lines.push("");
+  }
+  schemaSectionCache = lines.join("\n").trimEnd();
+  return schemaSectionCache;
 }

@@ -32,6 +32,17 @@ describe("agent content fetch surfaces", () => {
     // should NOT appear (renderer takes precedence).
     expect(text).not.toContain("See the live catalog:");
   });
+
+  it("inlines auto-generated schema DDL into the skill", () => {
+    const text = assembleAgentContent("skill");
+    expect(text).toContain("Schema reference (auto-generated)");
+    // A few stable tables — present since v1 of the schema.
+    expect(text).toContain("### `symbols`");
+    expect(text).toContain("### `imports`");
+    expect(text).toContain("### `exports`");
+    // Schema renderer fallback prose should not leak through.
+    expect(text).not.toContain("See the live DDL:");
+  });
 });
 
 describe("checkConsumerPointers (staleness detection)", () => {
