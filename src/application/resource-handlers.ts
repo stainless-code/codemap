@@ -8,12 +8,8 @@
  * time because the index can change between calls under `--watch`.
  */
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
-import { resolveAgentsTemplateDir } from "../agents-init";
 import { closeDb, openDb } from "../db";
-import { assembleSkill } from "./agent-content";
+import { assembleAgentContent } from "./agent-content";
 import {
   getQueryRecipeCatalogEntry,
   listQueryRecipeCatalog,
@@ -163,17 +159,16 @@ function readSkill(): ResourcePayload {
   if (skillCache !== undefined) return skillCache;
   skillCache = {
     mimeType: "text/markdown",
-    text: assembleSkill(),
+    text: assembleAgentContent("skill"),
   };
   return skillCache;
 }
 
 function readRule(): ResourcePayload {
   if (ruleCache !== undefined) return ruleCache;
-  const rulePath = join(resolveAgentsTemplateDir(), "rules", "codemap.md");
   ruleCache = {
     mimeType: "text/markdown",
-    text: readFileSync(rulePath, "utf8"),
+    text: assembleAgentContent("rule"),
   };
   return ruleCache;
 }
