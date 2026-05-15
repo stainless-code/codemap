@@ -96,9 +96,21 @@ SELECT 'export', name, kind FROM exports WHERE file_path LIKE '%OrderRow%';
 
 **Use `DISTINCT`** on dependency and import queries — a file importing multiple specifiers from the same module produces duplicate rows.
 
+**`imports.source` vs `imports.resolved_path`** — the two columns rarely match for the same row, so picking the wrong one is the single most common cause of empty result sets on alias-using codebases (TS `paths`, Webpack / Vite aliases, Node subpath imports `#internal/…`, monorepo workspace packages).
+
+- `source` = the **raw, unresolved** specifier as written (`~/lib/api`, `@app/utils`, `react`, `node:fs`).
+- `resolved_path` = the on-disk path after alias / module resolution; **`NULL` for external packages** (no on-disk file).
+
 ```sql
--- Who imports a module by its alias? (matches raw import source string)
+-- "Who imports module X via its alias / source name?" → filter `source`
 SELECT DISTINCT file_path FROM imports WHERE source LIKE '~/lib/api%';
+SELECT DISTINCT file_path FROM imports WHERE source = 'react';
+
+-- "Who imports this file on disk?" → filter `resolved_path`
+SELECT DISTINCT file_path FROM imports WHERE resolved_path = 'app/lib/api.ts';
+
+-- "What external packages does the codebase pull in?" → `resolved_path IS NULL`
+SELECT DISTINCT source FROM imports WHERE resolved_path IS NULL ORDER BY source;
 
 -- Direct dependents (who imports this file? uses resolved paths)
 SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%format-date%';
