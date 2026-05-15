@@ -195,7 +195,7 @@ export function pushParams(
 
 /**
  * Emit each leaf binding of a `const`/`let`/`var` destructuring as a
- * `kind='const'` symbol in the declarator's scope. Same walker as
+ * `kind=varKind` symbol in the declarator's scope. Same walker as
  * function params; the scope is the parent (declarator scope), not a
  * pushed function scope.
  */
@@ -203,6 +203,7 @@ export function pushDestructuredVars(
   pattern: any,
   scopeLocalId: number,
   parentName: string | null,
+  varKind: "const" | "let" | "var",
   ctx: ExtractContext,
 ) {
   if (!pattern) return;
@@ -219,7 +220,7 @@ export function pushDestructuredVars(
     symbols.push({
       file_path: relPath,
       name: id.name,
-      kind: "const",
+      kind: varKind,
       line_start: lineStart,
       line_end: lineStart,
       signature: sig,

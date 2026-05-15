@@ -129,11 +129,12 @@ function registerSymbolHandlers(
     },
 
     VariableDeclaration(node: any) {
+      const varKind = node.kind as "const" | "let" | "var";
       for (const decl of node.declarations) {
         const name = decl.id?.name;
         if (!name) {
-          // Destructuring pattern: `const { a, b } = ...` or `const [x] = ...`.
-          // Emit each leaf as a kind='const' symbol at the current scope.
+          // Destructuring pattern: `const { a, b } = ...` or `let [x] = ...`.
+          // Emit each leaf as a kind=varKind symbol at the current scope.
           if (
             decl.id?.type === "ObjectPattern" ||
             decl.id?.type === "ArrayPattern"
@@ -142,6 +143,7 @@ function registerSymbolHandlers(
               decl.id,
               scopes.currentLocalId(),
               scopes.currentParent(),
+              varKind,
               ctx,
             );
           }
@@ -164,12 +166,12 @@ function registerSymbolHandlers(
         symbols.push({
           file_path: relPath,
           name,
-          kind: isArrowOrFn ? "function" : "const",
+          kind: isArrowOrFn ? "function" : varKind,
           line_start: lineStart,
           line_end: lineEnd,
           signature: isArrowOrFn
             ? buildFunctionSignature(name, init)
-            : `const ${name}`,
+            : `${varKind} ${name}`,
           is_exported: isExported ? 1 : 0,
           is_default_export: isDefault ? 1 : 0,
           members: null,

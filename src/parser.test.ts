@@ -388,6 +388,48 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("variable declaration keyword (const / let / var)", () => {
+    it("preserves `const` as kind", () => {
+      const src = `const x = 1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const x = d.symbols.find((s) => s.name === "x");
+      expect(x?.kind).toBe("const");
+      expect(x?.signature).toBe("const x");
+    });
+
+    it("preserves `let` as kind", () => {
+      const src = `let y = 2;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const y = d.symbols.find((s) => s.name === "y");
+      expect(y?.kind).toBe("let");
+      expect(y?.signature).toBe("let y");
+    });
+
+    it("preserves `var` as kind", () => {
+      const src = `var z = 3;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const z = d.symbols.find((s) => s.name === "z");
+      expect(z?.kind).toBe("var");
+      expect(z?.signature).toBe("var z");
+    });
+
+    it("arrow-function init still wins over the keyword (kind=function)", () => {
+      const src = `let handler = () => 1;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "handler")?.kind).toBe(
+        "function",
+      );
+    });
+
+    it("destructuring inherits the declaration keyword", () => {
+      const src = `let { a, b } = obj;\nvar [c] = arr;\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "a")?.kind).toBe("let");
+      expect(d.symbols.find((s) => s.name === "b")?.kind).toBe("let");
+      expect(d.symbols.find((s) => s.name === "c")?.kind).toBe("var");
+    });
+  });
+
   describe("symbol nesting and scope", () => {
     it("top-level symbols have null parent_name", () => {
       const src = `export function foo(): void {}\nexport const bar = 42;\n`;

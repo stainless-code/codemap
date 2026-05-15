@@ -159,7 +159,7 @@ describe("query-recipes shim — params metadata", () => {
         type: "string",
         required: true,
         description:
-          "Symbol kind to match (function, const, class, interface, ...)",
+          "Symbol kind to match (function, const, let, var, class, interface, type, enum, method, ...)",
       },
       {
         name: "name_pattern",
