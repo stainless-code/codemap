@@ -2,25 +2,31 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
+import { assembleSkill } from "../application/agent-content";
 
 /**
  * `codemap skill` / `codemap rule` — print the bundled agent content
  * shipped with this installed codemap version. Pointer files written by
  * `agents init` direct agents here so package upgrades carry today's
- * content without re-running init (see `docs/plans/...`).
+ * content without re-running init.
+ *
+ * Skill text is assembled from `templates/agent-content/skill/*.md` so
+ * future bullets can add auto-generated sections (recipes, schema) by
+ * dropping new section files alongside the hand-written ones. Rule text
+ * still reads the single-file consumer template — bullet 4 generalises.
  */
 export type AgentContentKind = "skill" | "rule";
 
 export function printAgentContentCmdHelp(kind: AgentContentKind): void {
   const verb = kind;
-  const target =
+  const source =
     kind === "skill"
-      ? "templates/agents/skills/codemap/SKILL.md"
+      ? "templates/agent-content/skill/*.md (assembled)"
       : "templates/agents/rules/codemap.md";
   console.log(`Usage: codemap ${verb}
 
 Prints the full ${kind} markdown bundled with the installed codemap
-package (sourced from ${target}). Pointer files written by
+package (source: ${source}). Pointer files written by
 \`codemap agents init\` redirect agents here so upgrading codemap
 auto-refreshes the served content — no \`agents init\` re-run needed.
 
@@ -30,15 +36,11 @@ Examples:
 `);
 }
 
-export function resolveAgentContentPath(kind: AgentContentKind): string {
-  const root = resolveAgentsTemplateDir();
-  return kind === "skill"
-    ? join(root, "skills", "codemap", "SKILL.md")
-    : join(root, "rules", "codemap.md");
-}
-
 export function runAgentContentCmd(kind: AgentContentKind): void {
-  const path = resolveAgentContentPath(kind);
-  const text = readFileSync(path, "utf8");
-  process.stdout.write(text);
+  if (kind === "skill") {
+    process.stdout.write(assembleSkill());
+    return;
+  }
+  const path = join(resolveAgentsTemplateDir(), "rules", "codemap.md");
+  process.stdout.write(readFileSync(path, "utf8"));
 }

@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
 import { closeDb, openDb } from "../db";
+import { assembleSkill } from "./agent-content";
 import {
   getQueryRecipeCatalogEntry,
   listQueryRecipeCatalog,
@@ -160,15 +161,9 @@ function readSchema(): ResourcePayload {
 
 function readSkill(): ResourcePayload {
   if (skillCache !== undefined) return skillCache;
-  const skillPath = join(
-    resolveAgentsTemplateDir(),
-    "skills",
-    "codemap",
-    "SKILL.md",
-  );
   skillCache = {
     mimeType: "text/markdown",
-    text: readFileSync(skillPath, "utf8"),
+    text: assembleSkill(),
   };
   return skillCache;
 }
