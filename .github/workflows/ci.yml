@@ -115,6 +115,16 @@ jobs:
       - name: Node smoke (dist + better-sqlite3)
         run: node dist/index.mjs query "SELECT 1 as ok"
 
+      # 0.6.0 regression guard — `resolveBundledRecipesDir()` walked
+      # past the package root, so `--recipes-json` returned `[]` even
+      # though the tarball shipped the 40 recipes correctly.
+      - name: Node smoke (bundled recipes resolve from dist)
+        run: |
+          set -euo pipefail
+          count=$(node dist/index.mjs query --recipes-json | jq 'length')
+          echo "bundled recipes resolved: $count"
+          [ "$count" -gt 0 ] || { echo "bundled recipes catalog is empty — resolver path broke"; exit 1; }
+
       # Full rebuild exercises multi-statement DDL (`runSql`), `dropAll`, workers path — Node only.
       - name: Node full index (fixtures/minimal)
         run: |

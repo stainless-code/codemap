@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
+import { resolveAgentsTemplateDir } from "../agents-init";
 import { getProjectRoot } from "../runtime";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
@@ -40,19 +40,14 @@ export interface QueryRecipeCatalogEntry {
 }
 
 /**
- * Directory containing the bundled recipe `.sql` + `.md` files (next to
- * `dist/` and `templates/agents/` in the published npm artifact). Mirrors
- * `resolveAgentsTemplateDir()`'s layout — see [`docs/architecture.md`
- * § Recipes wiring].
+ * Bundled `.sql` + `.md` recipe directory. Derived off
+ * `resolveAgentsTemplateDir()` (which already handles the source-vs-dist
+ * depth difference — the bundler flattens every chunk into `dist/`, so a
+ * file deeper in `src/` has different hop-count to repo-root in each
+ * mode). Same shape as `resolveAgentContentDir()`.
  */
 export function resolveBundledRecipesDir(): string {
-  return join(
-    dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "..",
-    "templates",
-    "recipes",
-  );
+  return join(resolveAgentsTemplateDir(), "..", "recipes");
 }
 
 /**
