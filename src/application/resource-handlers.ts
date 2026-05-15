@@ -3,9 +3,12 @@
  * codemap server exposes (`codemap://recipes`, `codemap://recipes/{id}`,
  * `codemap://schema`, `codemap://skill`, `codemap://rule`,
  * `codemap://files/{path}`, `codemap://symbols/{name}`) is also reachable
- * over HTTP via `GET /resources/{encoded-uri}`. Catalog-style resources
- * cache lazily; data-shaped resources (files / symbols) read live every
- * time because the index can change between calls under `--watch`.
+ * over HTTP via `GET /resources/{encoded-uri}`. Lazy-cached:
+ * `schema` / `skill` / `rule` (constant for the process lifetime).
+ * Live read-per-call: `recipes` / `recipes/{id}` (recipes carry inline
+ * recency fields that must reflect mutations during the server lifetime),
+ * `files/{path}` / `symbols/{name}` (the index can change between calls
+ * under `--watch`).
  */
 
 import { closeDb, openDb } from "../db";

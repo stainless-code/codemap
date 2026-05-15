@@ -201,7 +201,7 @@ codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fa
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
 #        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact
-# Resources: codemap://recipes, codemap://recipes/{id}, codemap://schema, codemap://skill, codemap://rule (lazy-cached)
+# Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached); codemap://recipes, codemap://recipes/{id} (live read-per-call — keep recency fresh)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
 # Another project
