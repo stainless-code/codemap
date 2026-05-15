@@ -1,11 +1,11 @@
 /**
  * Pure transport-agnostic resource fetchers — every MCP resource the
  * codemap server exposes (`codemap://recipes`, `codemap://recipes/{id}`,
- * `codemap://schema`, `codemap://skill`, `codemap://files/{path}`,
- * `codemap://symbols/{name}`) is also reachable over HTTP via
- * `GET /resources/{encoded-uri}`. Catalog-style resources cache lazily;
- * data-shaped resources (files / symbols) read live every time because
- * the index can change between calls under `--watch`.
+ * `codemap://schema`, `codemap://skill`, `codemap://rule`,
+ * `codemap://files/{path}`, `codemap://symbols/{name}`) is also reachable
+ * over HTTP via `GET /resources/{encoded-uri}`. Catalog-style resources
+ * cache lazily; data-shaped resources (files / symbols) read live every
+ * time because the index can change between calls under `--watch`.
  */
 
 import { readFileSync } from "node:fs";
@@ -28,10 +28,11 @@ export interface ResourcePayload {
 // Recipes / one-recipe deliberately NOT cached — inline recency fields
 // (last_run_at / run_count) need to reflect mutations during the
 // `codemap mcp` / `codemap serve` lifetime; a cached snapshot would
-// freeze them at first-read. Schema / skill stay cached — neither
-// changes mid-session.
+// freeze them at first-read. Schema / skill / rule stay cached — none
+// change mid-session.
 let schemaCache: ResourcePayload | undefined;
 let skillCache: ResourcePayload | undefined;
+let ruleCache: ResourcePayload | undefined;
 
 /**
  * Test-only escape hatch — drops every cached payload so a temp-DB test
@@ -40,6 +41,7 @@ let skillCache: ResourcePayload | undefined;
 export function _resetResourceCachesForTests(): void {
   schemaCache = undefined;
   skillCache = undefined;
+  ruleCache = undefined;
 }
 
 /**
@@ -59,6 +61,7 @@ export function readResource(uri: string): ResourcePayload | undefined {
   }
   if (uri === "codemap://schema") return readSchema();
   if (uri === "codemap://skill") return readSkill();
+  if (uri === "codemap://rule") return readRule();
   if (uri.startsWith("codemap://files/")) {
     const path = decodeURIComponent(uri.slice("codemap://files/".length));
     return readFileResource(path);
@@ -90,6 +93,10 @@ export function listResources(): { uri: string; description: string }[] {
     {
       uri: "codemap://skill",
       description: "Full text of the bundled SKILL.md.",
+    },
+    {
+      uri: "codemap://rule",
+      description: "Full text of the bundled codemap rule markdown.",
     },
     {
       uri: "codemap://files/{path}",
@@ -164,6 +171,16 @@ function readSkill(): ResourcePayload {
     text: readFileSync(skillPath, "utf8"),
   };
   return skillCache;
+}
+
+function readRule(): ResourcePayload {
+  if (ruleCache !== undefined) return ruleCache;
+  const rulePath = join(resolveAgentsTemplateDir(), "rules", "codemap.md");
+  ruleCache = {
+    mimeType: "text/markdown",
+    text: readFileSync(rulePath, "utf8"),
+  };
+  return ruleCache;
 }
 
 /**

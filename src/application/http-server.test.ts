@@ -460,6 +460,7 @@ describe("http-server — GET /resources", () => {
     expect(uris).toContain("codemap://recipes");
     expect(uris).toContain("codemap://schema");
     expect(uris).toContain("codemap://skill");
+    expect(uris).toContain("codemap://rule");
   });
 
   it("GET /resources/{encoded uri} returns the recipes catalog", async () => {

@@ -707,7 +707,7 @@ function readResourceText(r: { contents: unknown[] }): string {
 }
 
 describe("MCP server — resources", () => {
-  it("lists all four resources via resources/list (one as template)", async () => {
+  it("lists all static resources via resources/list (one as template)", async () => {
     const { client, server } = await makeClient();
     try {
       const list = await client.listResources();
@@ -716,6 +716,7 @@ describe("MCP server — resources", () => {
       expect(uris).toContain("codemap://recipes");
       expect(uris).toContain("codemap://schema");
       expect(uris).toContain("codemap://skill");
+      expect(uris).toContain("codemap://rule");
       // The recipe-by-id resource is a template — surfaced via list-template
       // callback as one entry per recipe id.
       const recipeUris = uris.filter((u) => u.startsWith("codemap://recipes/"));
@@ -788,6 +789,20 @@ describe("MCP server — resources", () => {
       const text = readResourceText(r);
       // SKILL.md begins with the YAML frontmatter convention.
       expect(text.startsWith("---")).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://rule returns the bundled rule markdown", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({ uri: "codemap://rule" });
+      const first = r.contents[0] as { mimeType?: string };
+      expect(first.mimeType).toBe("text/markdown");
+      const text = readResourceText(r);
+      expect(text.startsWith("---")).toBe(true);
+      expect(text).toContain("alwaysApply: true");
     } finally {
       await server.close();
     }

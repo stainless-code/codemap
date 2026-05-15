@@ -207,6 +207,7 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
                                         codemap://recipes/{id}
                                         codemap://schema
                                         codemap://skill
+                                        codemap://rule
                                         codemap://files/{path}
                                         codemap://symbols/{name}
 
