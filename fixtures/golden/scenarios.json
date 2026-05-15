@@ -140,6 +140,11 @@
       }
     },
     {
+      "id": "large-functions",
+      "prompt": "Functions over 50 lines, ranked by body_line_count.",
+      "recipe": "large-functions"
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

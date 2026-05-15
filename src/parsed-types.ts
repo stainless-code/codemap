@@ -14,6 +14,7 @@ import type {
   CallRow,
   ScopeRow,
   ReferenceRow,
+  FileMetricsRow,
 } from "./db";
 
 /**
@@ -43,6 +44,7 @@ export interface ParsedFile {
   calls?: CallRow[];
   scopes?: ScopeRow[];
   references?: ReferenceRow[];
+  fileMetrics?: FileMetricsRow;
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

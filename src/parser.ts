@@ -20,6 +20,7 @@ import type {
   CallRow,
   ScopeRow,
   ReferenceRow,
+  FileMetricsRow,
 } from "./db";
 import { callsExtractor } from "./extractors/calls";
 import {
@@ -52,6 +53,7 @@ interface ExtractedData {
   calls: CallRow[];
   scopes: ScopeRow[];
   references: ReferenceRow[];
+  fileMetrics: FileMetricsRow;
 }
 
 /**
@@ -206,6 +208,65 @@ export function extractFileData(
     calls,
     scopes: [...ctx.scopes.getRecorded()],
     references,
+    fileMetrics: computeFileMetrics(relPath, source, lineMap, symbols, exports),
+  };
+}
+
+/**
+ * Per-file metric aggregation. Pure post-processing — no extra walks.
+ * Line classification is regex-light: blank if /^\s*$/, comment if /^\s*(?:\/\/|\/\*|\*|\*\/)/.
+ * Imperfect on multi-line strings but cheap and good enough for top-level
+ * size signals.
+ */
+function computeFileMetrics(
+  filePath: string,
+  source: string,
+  lineMap: number[],
+  symbols: SymbolRow[],
+  exports: ExportRow[],
+): FileMetricsRow {
+  const totalLines = lineMap.length;
+  let blank = 0;
+  let comment = 0;
+  for (let i = 0; i < lineMap.length; i++) {
+    const start = lineMap[i]!;
+    const end = i + 1 < lineMap.length ? lineMap[i + 1]! : source.length;
+    const line = source.slice(start, end).trim();
+    if (line.length === 0) {
+      blank++;
+    } else if (
+      line.startsWith("//") ||
+      line.startsWith("/*") ||
+      line.startsWith("*") ||
+      line.startsWith("*/")
+    ) {
+      comment++;
+    }
+  }
+  const code = totalLines - blank - comment;
+  let fn = 0;
+  let cls = 0;
+  let iface = 0;
+  for (const s of symbols) {
+    if (s.kind === "function") fn++;
+    else if (s.kind === "class") cls++;
+    else if (s.kind === "interface") iface++;
+  }
+  return {
+    file_path: filePath,
+    total_lines: totalLines,
+    code_lines: code,
+    blank_lines: blank,
+    comment_lines: comment,
+    // let/const/var distinction not yet tracked — emitted as kind='const'.
+    let_count: 0,
+    const_count: 0,
+    var_count: 0,
+    function_count: fn,
+    arrow_count: 0,
+    class_count: cls,
+    interface_count: iface,
+    export_count: exports.length,
   };
 }
 

@@ -99,6 +99,8 @@ function registerSymbolHandlers(
         visibility: null,
         ...nameTokenColumns(node.id, lineStart, lineMap),
         scope_local_id: scopes.currentLocalId(),
+        body_line_count: lineEnd - lineStart + 1,
+        param_count: node.params?.length ?? 0,
       });
       complexity.pushFor(symbolIndex);
 
@@ -175,6 +177,8 @@ function registerSymbolHandlers(
           visibility: null,
           ...nameTokenColumns(decl.id, lineStart, lineMap),
           scope_local_id: scopes.currentLocalId(),
+          body_line_count: isArrowOrFn ? lineEnd - lineStart + 1 : null,
+          param_count: isArrowOrFn ? (init.params?.length ?? 0) : null,
         });
 
         if (isArrowOrFn) {
@@ -459,12 +463,13 @@ function extractClassMembers(
       if (fn?.async) prefix += "async ";
       const sig = `${prefix}${buildFunctionSignature(name, fn)}`;
       const methodLineStart = offsetToLine(lineMap, m.start);
+      const methodLineEnd = offsetToLine(lineMap, m.end);
       out.push({
         file_path: filePath,
         name,
         kind,
         line_start: methodLineStart,
-        line_end: offsetToLine(lineMap, m.end),
+        line_end: methodLineEnd,
         signature: sig,
         is_exported: 0,
         is_default_export: 0,
@@ -475,6 +480,8 @@ function extractClassMembers(
         visibility: null,
         ...nameTokenColumns(m.key, methodLineStart, lineMap),
         scope_local_id: classScopeLocalId,
+        body_line_count: methodLineEnd - methodLineStart + 1,
+        param_count: fn?.params?.length ?? 0,
       });
     } else if (m.type === "PropertyDefinition") {
       let prefix = "";

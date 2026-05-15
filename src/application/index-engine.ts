@@ -21,6 +21,7 @@ import {
   insertImportSpecifiers,
   insertScopes,
   insertReferences,
+  insertFileMetrics,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -247,6 +248,7 @@ function insertParsedResults(
           if (parsed.scopes?.length) insertScopes(db, parsed.scopes);
           if (parsed.references?.length)
             insertReferences(db, parsed.references);
+          if (parsed.fileMetrics) insertFileMetrics(db, [parsed.fileMetrics]);
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -428,6 +430,7 @@ export async function indexFiles(
               insertImportSpecifiers(db, data.importSpecifiers);
             if (data.scopes.length) insertScopes(db, data.scopes);
             if (data.references.length) insertReferences(db, data.references);
+            insertFileMetrics(db, [data.fileMetrics]);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -59,7 +59,28 @@ export function createTables(db: CodemapDatabase) {
       complexity REAL,
       name_column_start INTEGER NOT NULL DEFAULT 0,
       name_column_end INTEGER NOT NULL DEFAULT 0,
-      scope_local_id INTEGER NOT NULL DEFAULT 0
+      scope_local_id INTEGER NOT NULL DEFAULT 0,
+      body_line_count INTEGER,
+      param_count INTEGER,
+      nesting_depth INTEGER
+    ) STRICT;
+
+    -- One row per indexed file. Pure counters from the AST walk.
+    -- Joins to files(path).
+    CREATE TABLE IF NOT EXISTS file_metrics (
+      file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+      total_lines INTEGER NOT NULL,
+      code_lines INTEGER NOT NULL,
+      blank_lines INTEGER NOT NULL,
+      comment_lines INTEGER NOT NULL,
+      let_count INTEGER NOT NULL DEFAULT 0,
+      const_count INTEGER NOT NULL DEFAULT 0,
+      var_count INTEGER NOT NULL DEFAULT 0,
+      function_count INTEGER NOT NULL DEFAULT 0,
+      arrow_count INTEGER NOT NULL DEFAULT 0,
+      class_count INTEGER NOT NULL DEFAULT 0,
+      interface_count INTEGER NOT NULL DEFAULT 0,
+      export_count INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -440,6 +461,7 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
     DROP TABLE IF EXISTS calls;
@@ -590,6 +612,12 @@ export interface SymbolRow {
   name_column_end?: number;
   /** Scope where the NAME is declared (parent of the body's own scope). Joins scopes.local_id. Defaults to 0 (module). */
   scope_local_id?: number;
+  /** Body line count (line_end - line_start + 1) for function-shaped symbols. NULL otherwise. */
+  body_line_count?: number | null;
+  /** Param count for function-shaped symbols. NULL otherwise. */
+  param_count?: number | null;
+  /** Max nesting depth (conditionals/loops/ternaries) for function-shaped symbols. NULL otherwise. */
+  nesting_depth?: number | null;
 }
 
 const BATCH_SIZE = 500;
@@ -622,8 +650,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -643,6 +671,9 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.name_column_start ?? 0,
         s.name_column_end ?? 0,
         s.scope_local_id ?? 0,
+        s.body_line_count ?? null,
+        s.param_count ?? null,
+        s.nesting_depth ?? null,
       ),
   );
 }
@@ -1010,6 +1041,51 @@ export function insertBindings(db: CodemapDatabase, rows: BindingRow[]) {
         r.resolved_symbol_id,
         r.resolution_kind,
         r.is_external,
+      ),
+  );
+}
+
+/**
+ * Per-file aggregate metrics row. One row per file. NULL `code_lines` /
+ * `comment_lines` for files we don't parse with the AST (rare).
+ */
+export interface FileMetricsRow {
+  file_path: string;
+  total_lines: number;
+  code_lines: number;
+  blank_lines: number;
+  comment_lines: number;
+  let_count: number;
+  const_count: number;
+  var_count: number;
+  function_count: number;
+  arrow_count: number;
+  class_count: number;
+  interface_count: number;
+  export_count: number;
+}
+
+export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT OR REPLACE INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.total_lines,
+        r.code_lines,
+        r.blank_lines,
+        r.comment_lines,
+        r.let_count,
+        r.const_count,
+        r.var_count,
+        r.function_count,
+        r.arrow_count,
+        r.class_count,
+        r.interface_count,
+        r.export_count,
       ),
   );
 }
