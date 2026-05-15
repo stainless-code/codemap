@@ -30,6 +30,15 @@ export async function main(): Promise<void> {
     return;
   }
 
+  // Project recipes live at `<root>/.codemap/recipes/<id>.sql`. Argv-parse-time
+  // validation (`parseQueryRest` calls `getQueryRecipeSql` on `--recipe <id>` /
+  // `--recipes-json` / `--print-sql`) runs BEFORE `bootstrapCodemap` and would
+  // otherwise see `getProjectRoot()` throw → silent fallback to bundled-only.
+  // Plumb the already-resolved root in so parser-side discovery works too.
+  const { setQueryRecipesProjectRoot } =
+    await import("../application/query-recipes.js");
+  setQueryRecipesProjectRoot(root);
+
   // Once-per-process stderr nag if the consumer's pointer files are out
   // of date relative to `EXPECTED_POINTER_VERSION`. Cure: `agents init
   // --force`. Polite to stdout (warning is stderr only).
