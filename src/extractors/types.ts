@@ -64,7 +64,15 @@ export interface ComplexityTracker {
 export interface ScopeTracker {
   push(
     name: string,
-    kind?: "function" | "arrow" | "class" | "method",
+    kind?:
+      | "function"
+      | "arrow"
+      | "class"
+      | "method"
+      | "interface"
+      | "type-alias"
+      | "for"
+      | "catch",
     lineStart?: number,
     lineEnd?: number,
   ): void;

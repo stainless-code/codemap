@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -163,7 +163,7 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS scopes (
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
       local_id INTEGER NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('module','function','arrow','class','method')),
+      kind TEXT NOT NULL CHECK (kind IN ('module','function','arrow','class','method','interface','type-alias','for','catch')),
       parent_local_id INTEGER,
       line_start INTEGER NOT NULL,
       line_end INTEGER NOT NULL,
@@ -940,7 +940,16 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
 export interface ScopeRow {
   file_path: string;
   local_id: number;
-  kind: "module" | "function" | "arrow" | "class" | "method";
+  kind:
+    | "module"
+    | "function"
+    | "arrow"
+    | "class"
+    | "method"
+    | "interface"
+    | "type-alias"
+    | "for"
+    | "catch";
   parent_local_id: number | null;
   line_start: number;
   line_end: number;

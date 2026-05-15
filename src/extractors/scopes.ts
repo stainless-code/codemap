@@ -7,7 +7,7 @@
 
 import type { ScopeRow } from "../db";
 import { buildJsDocIndex } from "./jsdoc";
-import { pushParams, pushTypeParams } from "./params";
+import { pushDestructuredVars, pushParams, pushTypeParams } from "./params";
 import type { ScopeTracker, TierExtractor } from "./types";
 
 export function createScopeTracker(filePath: string): ScopeTracker {
@@ -140,14 +140,13 @@ export const scopesExtractor: TierExtractor = {
         if (ctx.claimedScopeNodes.has(node)) return;
         if (scopes.top() === "") scopes.pop();
       },
-      // `try { … } catch (err) { … }` — `err` is bound in catch body's
-      // own scope. Push anonymous scope + emit param so the body refs
-      // resolve. Bindingless `catch { … }` (TS 4.4+ optional param) has
-      // `param === null` — no symbol needed.
+      // `try { … } catch (err) { … }` — `err` is bound in the catch
+      // body's own scope. Bindingless `catch { … }` (TS 4.4+) has no
+      // param, no symbol needed.
       CatchClause(node: any) {
         scopes.push(
           "",
-          "function",
+          "catch",
           node.loc?.start?.line ?? 0,
           node.loc?.end?.line ?? 0,
         );
@@ -165,7 +164,90 @@ export const scopesExtractor: TierExtractor = {
       "CatchClause:exit"() {
         if (scopes.top() === "") scopes.pop();
       },
+      // Generic / type-param-bearing types: push a scope so type-params
+      // resolve via the standard walk inside the body. Symbol row for
+      // the interface itself was emitted by symbolsExtractor at the
+      // parent scope (ran first per the EXTRACTORS array order).
+      TSInterfaceDeclaration(node: any) {
+        const name = node.id?.name ?? "";
+        scopes.push(
+          name,
+          "interface",
+          node.loc?.start?.line ?? 0,
+          node.loc?.end?.line ?? 0,
+        );
+        ctx.claimedScopeNodes.add(node);
+        pushTypeParams(node.typeParameters, scopes.currentLocalId(), name, ctx);
+      },
+      "TSInterfaceDeclaration:exit"(node: any) {
+        const name = node.id?.name;
+        if (name && scopes.top() === name) scopes.pop();
+        else if (!name && scopes.top() === "") scopes.pop();
+      },
+      TSTypeAliasDeclaration(node: any) {
+        const name = node.id?.name ?? "";
+        scopes.push(
+          name,
+          "type-alias",
+          node.loc?.start?.line ?? 0,
+          node.loc?.end?.line ?? 0,
+        );
+        ctx.claimedScopeNodes.add(node);
+        pushTypeParams(node.typeParameters, scopes.currentLocalId(), name, ctx);
+      },
+      "TSTypeAliasDeclaration:exit"(node: any) {
+        const name = node.id?.name;
+        if (name && scopes.top() === name) scopes.pop();
+        else if (!name && scopes.top() === "") scopes.pop();
+      },
+      // `for (const x of …)` / `for (const x in …)` — `x` is bound in
+      // the for body's own scope. ForStatement (C-style) deferred — its
+      // init is a regular VariableDeclaration already handled.
+      ForOfStatement(node: any) {
+        pushForScope(node);
+      },
+      "ForOfStatement:exit"() {
+        if (scopes.top() === "") scopes.pop();
+      },
+      ForInStatement(node: any) {
+        pushForScope(node);
+      },
+      "ForInStatement:exit"() {
+        if (scopes.top() === "") scopes.pop();
+      },
     });
+
+    function pushForScope(node: any) {
+      scopes.push(
+        "",
+        "for",
+        node.loc?.start?.line ?? 0,
+        node.loc?.end?.line ?? 0,
+      );
+      const left = node.left;
+      // VariableDeclaration form: `for (const x of …)` — emit each leaf
+      // as a binding at the for-scope. Identifier form: `for (x of …)`
+      // is reassignment, not a new binding — skip.
+      if (left?.type === "VariableDeclaration") {
+        for (const decl of left.declarations ?? []) {
+          if (decl.id?.type === "Identifier") {
+            pushParams(
+              [decl.id],
+              scopes.currentLocalId(),
+              null,
+              ctx,
+              jsDocComments,
+              source,
+            );
+          } else if (
+            decl.id?.type === "ObjectPattern" ||
+            decl.id?.type === "ArrayPattern"
+          ) {
+            pushDestructuredVars(decl.id, scopes.currentLocalId(), null, ctx);
+          }
+        }
+      }
+    }
   },
   finalize(ctx) {
     // Approximate the module's line_end as the max recorded child line —

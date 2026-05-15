@@ -187,6 +187,9 @@ const GLOBALS = new Set([
   "self",
   "Bun",
   "Deno",
+  "RegExp",
+  "Iterator",
+  "AsyncIterator",
 ]);
 
 interface SymbolEntry {
