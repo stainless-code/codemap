@@ -434,11 +434,38 @@ Empirical (codemap-self, 932 files):
 
 The 45% unresolved bucket is mostly TypeScript type parameters (T/K/V), function parameters (not yet in `symbols`), object-pattern keys, and JSX prop names — expected v1 shape; future tiers (function-params + type-params extraction) shrink it.
 
-Deferred to **Tier 2.2**:
+Deferred to **Tier 2.2** (shipped 2026-05-15 — see report below):
 
 - Re-export chain walking (currently `import { x } from './barrel'` where the barrel does `export { x } from './x'` resolves to the barrel's export row, not the original symbol).
 - Function-parameter symbols (would shrink the unresolved bucket significantly).
 - Type-parameter symbols (`<T>`, `<K, V>`).
+
+**Tier 2.2 ship report (2026-05-15):**
+
+What landed:
+
+- **Function/method/arrow params** as `symbols` rows with `kind='param'`, `scope_local_id` = the function's own scope. Constructor params with `public`/`private`/`readonly` (TSParameterProperty) emit at class scope, not method scope, matching their TS semantics. Destructuring patterns (Array/Object) deferred; v1 covers Identifier / AssignmentPattern / RestElement / TSParameterProperty.
+- **Type params** (`<T>`, `<K, V>`) as `kind='type-param'` for `FunctionDeclaration`, `ClassDeclaration`, arrow vars, and class methods. Interfaces / type aliases skipped — they don't push their own scope, so same-letter type params across multiple interfaces would collide at module scope (deferred).
+- **Re-export chain walking** in `bindings-engine`. Bounded at 10 hops with cycle detection. Path resolution is relative-only (`./foo`, `../bar`) against the indexed-paths set — bare specifiers (`react`) stay external. `find-symbol-references` now resolves through barrel files to the original definition.
+- **`pushParams` / `pushTypeParams` helpers** in `src/extractors/params.ts`. Called from `symbolsExtractor` (FunctionDeclaration, VariableDeclaration arrow) + `scopesExtractor` (MethodDefinition) so the just-pushed scope is the param's `scope_local_id`.
+
+Empirical (codemap-self, 933 files):
+
+| Metric            | Pre-Tier 2.2 | Post-Tier 2.2 | Delta                        |
+| ----------------- | ------------ | ------------- | ---------------------------- |
+| Symbols           | ~11.8k       | 14k           | +2.2k (params + type-params) |
+| Same-file refs    | 42,257       | 51,299        | +9,042 (+21%)                |
+| Unresolved refs   | 58,073       | 49,534        | -8,539 (-15%)                |
+| Unresolved %      | 45%          | 39%           | down                         |
+| Full reindex      | 1175 ms      | 1513 ms       | +29%                         |
+| Targeted (1 file) | 9 ms         | 9 ms          | no regression                |
+
+Deferred to **Tier 2.3**:
+
+- Destructuring pattern params (`function f({ a, b }) {...}` — emits 0 param symbols today).
+- Interface / type-alias type-param scoping (would unlock generic-type refs inside type definitions).
+- Callback arrow scoping (`arr.map((x) => …)` — `x` is currently scoped to the enclosing function, not the arrow).
+- External-module bindings (`react`, etc.) via `package.json` `types` lookup → indexed `.d.ts` parsing.
 
 ---
 

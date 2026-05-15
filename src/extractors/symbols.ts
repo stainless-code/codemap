@@ -16,6 +16,7 @@ import { isComponentCandidate } from "./components";
 import { buildJsDocIndex, findJsDoc } from "./jsdoc";
 import type { JsDocEntry } from "./jsdoc";
 import { offsetToLine } from "./offsets";
+import { pushParams, pushTypeParams } from "./params";
 import {
   buildFunctionSignature,
   extractLiteralValue,
@@ -102,6 +103,15 @@ function registerSymbolHandlers(
       complexity.pushFor(symbolIndex);
 
       scopes.push(name, "function", lineStart, lineEnd);
+      pushTypeParams(node.typeParameters, scopes.currentLocalId(), name, ctx);
+      pushParams(
+        node.params,
+        scopes.currentLocalId(),
+        name,
+        ctx,
+        jsDocComments,
+        source,
+      );
       if (isComponentCandidate(name, isTsx)) {
         componentDetector.enter(name);
       }
@@ -154,6 +164,20 @@ function registerSymbolHandlers(
         if (isArrowOrFn) {
           scopes.push(name, "arrow", lineStart, lineEnd);
           if (init) complexity.markArrowSymbol(init, symbolIndex);
+          pushTypeParams(
+            init.typeParameters,
+            scopes.currentLocalId(),
+            name,
+            ctx,
+          );
+          pushParams(
+            init.params,
+            scopes.currentLocalId(),
+            name,
+            ctx,
+            jsDocComments,
+            source,
+          );
         }
         if (isArrowOrFn && isComponentCandidate(name, isTsx)) {
           componentDetector.enter(name);
@@ -348,6 +372,24 @@ function registerSymbolHandlers(
         offsetToLine(lineMap, node.end),
       );
       const classScopeLocalId = scopes.currentLocalId();
+      pushTypeParams(node.typeParameters, classScopeLocalId, name, ctx);
+      // Constructor params live in the class scope (constructor is a
+      // method but its params with `public`/`private` modifiers also
+      // become class properties — TSParameterProperty handled in
+      // `pushParams`).
+      const ctor = node.body?.body?.find(
+        (m: any) => m.type === "MethodDefinition" && m.kind === "constructor",
+      );
+      if (ctor?.value?.params?.length) {
+        pushParams(
+          ctor.value.params,
+          classScopeLocalId,
+          name,
+          ctx,
+          jsDocComments,
+          source,
+        );
+      }
       extractClassMembers(
         node.body?.body,
         relPath,

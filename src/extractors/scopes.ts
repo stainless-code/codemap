@@ -6,6 +6,8 @@
  */
 
 import type { ScopeRow } from "../db";
+import { buildJsDocIndex } from "./jsdoc";
+import { pushParams, pushTypeParams } from "./params";
 import type { ScopeTracker, TierExtractor } from "./types";
 
 export function createScopeTracker(filePath: string): ScopeTracker {
@@ -68,7 +70,8 @@ export function createScopeTracker(filePath: string): ScopeTracker {
 export const scopesExtractor: TierExtractor = {
   tierId: "scopes",
   register(visitor, ctx) {
-    const { scopes } = ctx;
+    const { scopes, comments, source } = ctx;
+    const jsDocComments = buildJsDocIndex(comments);
     Object.assign(visitor, {
       MethodDefinition(node: any) {
         const name = node.key?.name;
@@ -76,6 +79,24 @@ export const scopesExtractor: TierExtractor = {
         const lineStart = node.loc?.start?.line ?? 0;
         const lineEnd = node.loc?.end?.line ?? 0;
         scopes.push(name, "method", lineStart, lineEnd);
+        // Constructor params already emitted as class-scope symbols by
+        // symbolsExtractor.ClassDeclaration — skip to avoid duplicates.
+        if (node.kind !== "constructor" && node.value?.params?.length) {
+          pushTypeParams(
+            node.value.typeParameters,
+            scopes.currentLocalId(),
+            name,
+            ctx,
+          );
+          pushParams(
+            node.value.params,
+            scopes.currentLocalId(),
+            name,
+            ctx,
+            jsDocComments,
+            source,
+          );
+        }
       },
       "MethodDefinition:exit"(node: any) {
         const name = node.key?.name;

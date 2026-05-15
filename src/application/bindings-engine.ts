@@ -98,6 +98,60 @@ interface ImportSpec {
   imported_name: string;
 }
 
+interface ReExportEntry {
+  /** Raw source string from `export { x } from '...'`. */
+  source: string;
+  /** Original local name in the source module. `'default'` for star/default. */
+  imported_name: string;
+}
+
+const SOURCE_EXTS = [
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mts",
+  ".cts",
+  ".mjs",
+  ".cjs",
+];
+
+/**
+ * Resolve a relative-path re-export source (`./foo`, `../bar`) against the
+ * indexed-paths set. Returns the first matching file path. Bare specifiers
+ * (`react`, `lodash`) return null — those are external.
+ */
+function resolveReExport(
+  fromFile: string,
+  source: string,
+  indexedPaths: Set<string>,
+): string | null {
+  if (!source.startsWith(".")) return null;
+  const fromDir = fromFile.includes("/")
+    ? fromFile.slice(0, fromFile.lastIndexOf("/"))
+    : "";
+  // Posix-join — strip './' / '../' segments without OS-specific helpers.
+  const segs: string[] = fromDir ? fromDir.split("/") : [];
+  for (const part of source.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      segs.pop();
+      continue;
+    }
+    segs.push(part);
+  }
+  const base = segs.join("/");
+  if (indexedPaths.has(base)) return base;
+  for (const ext of SOURCE_EXTS) {
+    if (indexedPaths.has(base + ext)) return base + ext;
+  }
+  for (const ext of SOURCE_EXTS) {
+    const idx = `${base}/index${ext}`;
+    if (indexedPaths.has(idx)) return idx;
+  }
+  return null;
+}
+
 export function resolveBindings(db: CodemapDatabase): BindingRow[] {
   const symbolsByFile = new Map<string, Map<string, SymbolEntry[]>>();
   const symbolRows = db
@@ -178,10 +232,16 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
   }
 
   const exportsByFile = new Map<string, Set<string>>();
+  // Re-export chain: (file, exported_name) → {source, imported_name}.
+  // Resolved in step 2 by walking the chain until we hit a non-re-export.
+  const reExportsByFile = new Map<string, Map<string, ReExportEntry>>();
   const expRows = db
-    .query<{ file_path: string; name: string }>(
-      "SELECT file_path, name FROM exports",
-    )
+    .query<{
+      file_path: string;
+      name: string;
+      is_re_export: number;
+      re_export_source: string | null;
+    }>("SELECT file_path, name, is_re_export, re_export_source FROM exports")
     .all();
   for (const r of expRows) {
     let s = exportsByFile.get(r.file_path);
@@ -190,7 +250,37 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
       exportsByFile.set(r.file_path, s);
     }
     s.add(r.name);
+    if (r.is_re_export === 1 && r.re_export_source) {
+      let re = reExportsByFile.get(r.file_path);
+      if (!re) {
+        re = new Map();
+        reExportsByFile.set(r.file_path, re);
+      }
+      // `re_export_source` shape: `./Foo` or `./Foo.default` for
+      // `export { default as X } from './Foo'` per the parser.
+      const dotIdx = r.re_export_source.lastIndexOf(".");
+      const sourceTail = r.re_export_source.split("/").pop() ?? "";
+      const hasNameSuffix =
+        sourceTail.startsWith(".") === false &&
+        dotIdx > r.re_export_source.lastIndexOf("/") &&
+        dotIdx > 0;
+      const importedName = hasNameSuffix
+        ? r.re_export_source.slice(dotIdx + 1)
+        : r.name;
+      const source = hasNameSuffix
+        ? r.re_export_source.slice(0, dotIdx)
+        : r.re_export_source;
+      re.set(r.name, { source, imported_name: importedName });
+    }
   }
+
+  // Indexed-paths set for re-export resolution.
+  const indexedPaths = new Set<string>(
+    db
+      .query<{ path: string }>("SELECT path FROM files")
+      .all()
+      .map((r) => r.path),
+  );
 
   const refs = db
     .query<{
@@ -211,10 +301,43 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
         importsByFile,
         depsByFile,
         exportsByFile,
+        reExportsByFile,
+        indexedPaths,
       ),
     );
   }
   return out;
+}
+
+const MAX_REEXPORT_DEPTH = 10;
+
+/**
+ * Follow re-export chains starting at (file, name). Returns the final
+ * non-re-export {file, name} pair, or null on cycle/unresolvable. Bounded
+ * by `MAX_REEXPORT_DEPTH` to break pathological circulars.
+ */
+function followReExportChain(
+  startFile: string,
+  startName: string,
+  reExportsByFile: Map<string, Map<string, ReExportEntry>>,
+  indexedPaths: Set<string>,
+): { file: string; name: string } | null {
+  let file = startFile;
+  let name = startName;
+  const visited = new Set<string>();
+  for (let i = 0; i < MAX_REEXPORT_DEPTH; i++) {
+    const key = `${file}|${name}`;
+    if (visited.has(key)) return null;
+    visited.add(key);
+    const fileReExports = reExportsByFile.get(file);
+    const entry = fileReExports?.get(name);
+    if (!entry) return { file, name };
+    const nextFile = resolveReExport(file, entry.source, indexedPaths);
+    if (!nextFile) return null;
+    file = nextFile;
+    name = entry.imported_name;
+  }
+  return null;
 }
 
 function resolveOne(
@@ -224,6 +347,8 @@ function resolveOne(
   importsByFile: Map<string, Map<string, ImportSpec>>,
   depsByFile: Map<string, Map<string, string>>,
   exportsByFile: Map<string, Set<string>>,
+  reExportsByFile: Map<string, Map<string, ReExportEntry>>,
+  indexedPaths: Set<string>,
 ): BindingRow {
   // Same-file scope walk — innermost match wins (shadow-correct).
   const fileSymbols = symbolsByFile.get(ref.file_path);
@@ -256,10 +381,15 @@ function resolveOne(
       const exportName =
         imp.imported_name === "default" ? "default" : imp.imported_name;
       if (targetExports?.has(exportName)) {
-        const targetSymbols = symbolsByFile.get(targetFile);
-        const symList = targetSymbols?.get(exportName);
-        // Pick the module-scope hit; nested same-name symbols can't be the
-        // export target.
+        // Follow re-export chain to the actual definition site.
+        const resolved = followReExportChain(
+          targetFile,
+          exportName,
+          reExportsByFile,
+          indexedPaths,
+        ) ?? { file: targetFile, name: exportName };
+        const targetSymbols = symbolsByFile.get(resolved.file);
+        const symList = targetSymbols?.get(resolved.name);
         const targetSym = symList?.find((s) => s.scope_local_id === 0);
         return {
           reference_id: ref.id,

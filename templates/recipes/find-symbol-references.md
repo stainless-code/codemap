@@ -30,6 +30,7 @@ Workflow for app-wide rename:
 
 Limitations:
 
-- Re-export chains (`export { foo } from './bar'` rebinds `foo`) aren't walked — refs going through a re-export resolve to the re-export's local binding, not the original. Use `find-references` to catch those too.
-- Refs to external modules (`react`, `lodash`, etc.) have `resolved_symbol_id=NULL` because their definitions aren't indexed. Use `find-references` for those.
+- Refs to external modules (`react`, `lodash`, etc.) have `resolved_symbol_id=NULL` — their definitions aren't indexed. Use `find-references` for those.
 - Targeted reindex skips bindings refresh. Run `bun src/index.ts --full` after editing source if you need fresh bindings.
+
+Re-export chains (`export { foo } from './bar'`) ARE walked — refs through a barrel file resolve to the original symbol, bounded at 10 hops to break circulars.
