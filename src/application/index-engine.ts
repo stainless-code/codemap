@@ -23,6 +23,7 @@ import {
   insertReferences,
   insertFileMetrics,
   insertFunctionParams,
+  insertRuntimeMarkers,
   insertExports,
   insertComponents,
   insertDependencies,
@@ -257,6 +258,8 @@ function insertParsedResults(
           if (parsed.fileMetrics) insertFileMetrics(db, [parsed.fileMetrics]);
           if (parsed.functionParams?.length)
             insertFunctionParams(db, parsed.functionParams);
+          if (parsed.runtimeMarkers?.length)
+            insertRuntimeMarkers(db, parsed.runtimeMarkers);
 
           if (parsed.exports?.length) insertExports(db, parsed.exports);
           if (parsed.components?.length) {
@@ -441,6 +444,8 @@ export async function indexFiles(
             insertFileMetrics(db, [data.fileMetrics]);
             if (data.functionParams.length)
               insertFunctionParams(db, data.functionParams);
+            if (data.runtimeMarkers.length)
+              insertRuntimeMarkers(db, data.runtimeMarkers);
             if (deps.length) insertDependencies(db, deps);
             if (data.exports.length) insertExports(db, data.exports);
             if (data.components.length) insertComponents(db, data.components);

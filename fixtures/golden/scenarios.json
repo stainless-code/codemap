@@ -166,6 +166,16 @@
       "params": { "type_text": "ClientConfig" }
     },
     {
+      "id": "find-leftover-console",
+      "prompt": "Every console.* call site.",
+      "recipe": "find-leftover-console"
+    },
+    {
+      "id": "env-var-audit",
+      "prompt": "Distinct process.env.X reads ranked by use.",
+      "recipe": "env-var-audit"
+    },
+    {
       "id": "deprecated-symbols",
       "prompt": "Which symbols are flagged @deprecated in JSDoc?",
       "recipe": "deprecated-symbols"

@@ -31,6 +31,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     references: data.references,
     fileMetrics: data.fileMetrics,
     functionParams: data.functionParams,
+    runtimeMarkers: data.runtimeMarkers,
   };
 }
 

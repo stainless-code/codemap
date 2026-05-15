@@ -35,6 +35,7 @@ export type ParsedFilePayload = Pick<
   | "references"
   | "fileMetrics"
   | "functionParams"
+  | "runtimeMarkers"
   | "cssVariables"
   | "cssClasses"
   | "cssKeyframes"

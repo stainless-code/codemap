@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -217,6 +217,20 @@ export function createTables(db: CodemapDatabase) {
       )),
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
+
+    -- Runtime markers — operational signals worth auditing: console
+    -- calls, debugger statements, raw throws, process.env reads. detail
+    -- is the qualifier (console.log → 'log', throw → expression text,
+    -- process.env.X → 'X').
+    CREATE TABLE IF NOT EXISTS runtime_markers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      kind TEXT NOT NULL CHECK (kind IN ('console','debugger','throw','process-env')),
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      detail TEXT,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
 
     -- First-class parameter rows: one row per leaf parameter binding,
     -- ordered by position. Keyed by (file_path, owner_name, owner_kind)
@@ -468,6 +482,10 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_function_params_name ON function_params(name);
     CREATE INDEX IF NOT EXISTS idx_function_params_type ON function_params(type_text) WHERE type_text IS NOT NULL;
 
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_kind ON runtime_markers(kind);
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_file ON runtime_markers(file_path);
+    CREATE INDEX IF NOT EXISTS idx_runtime_markers_detail ON runtime_markers(detail) WHERE detail IS NOT NULL;
+
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_imported ON import_specifiers(imported_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
@@ -519,6 +537,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS module_cycles;
     DROP TABLE IF EXISTS re_export_chains;
     DROP TABLE IF EXISTS function_params;
+    DROP TABLE IF EXISTS runtime_markers;
     DROP TABLE IF EXISTS file_metrics;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1193,6 +1212,38 @@ export function insertFunctionParams(
         r.line_start,
         r.column_start,
         r.column_end,
+      ),
+  );
+}
+
+/** Operational signal — console.log / debugger / throw / process.env. */
+export interface RuntimeMarkerRow {
+  file_path: string;
+  kind: "console" | "debugger" | "throw" | "process-env";
+  line_start: number;
+  column_start: number;
+  /** Qualifier — method name for console, env-var name for process-env, expression text for throw, NULL for debugger. */
+  detail: string | null;
+  scope_local_id: number;
+}
+
+export function insertRuntimeMarkers(
+  db: CodemapDatabase,
+  rows: RuntimeMarkerRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO runtime_markers (file_path, kind, line_start, column_start, detail, scope_local_id)",
+    "(?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.kind,
+        r.line_start,
+        r.column_start,
+        r.detail,
+        r.scope_local_id,
       ),
   );
 }
