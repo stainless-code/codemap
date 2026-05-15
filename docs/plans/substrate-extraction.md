@@ -2,6 +2,8 @@
 
 > **Status:** open · plan iterating in parallel with the broader [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) write-engine direction.
 >
+> **Per-tier ship status (2026-05-15, PR #79):** Tiers **1** and **2** fully shipped. Tiers **4 / 6 / 9 / 10 / 11 / 12** partially shipped — their foundation tables landed in [`src/db.ts`](../../src/db.ts) but with narrowed shape vs the proposals below; remaining columns / sibling tables stay deferred under their tier headings. Tiers **3 (JSX) / 5 (Behavioral) / 7 (CSS rich) / 8 (Project meta) / 13 (ORM/SQL)** not shipped. Each tier's "Ship status" line below is the canonical per-tier verdict; the schema deltas in each tier preserve the originally-proposed shape so deferred bits stay grep-able.
+>
 > **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Today the schema captures symbols + imports + exports + calls + components + markers + type*members + css*{variables,classes,keyframes} + suppressions. The AST contains roughly 4× more queryable structure that we discard at parse time. This plan enumerates the entire extraction surface — ~13 tiers spanning identifier references, scope graph, binding resolution, JSX, type-system depth, behavioral facts, module-graph topology, CSS rule structure, test-suite metadata, runtime/dev markers, metrics expansion, and ORM/SQL tracking — and sequences them as independent tracer-bullet PRs that compound into a maximal substrate. Once landed, every recipe / write capability discussed in the synthesis doc (and many more) lights up via SQL JOINs alone, with zero engine work.
 >
 > **Tier:** XL effort (~3-4 months) spread across ~13 sequential tracer-bullet PRs. No single PR is large; the value compounds. Each tier ships as its own vertical slice (parser → schema → migration → recipes → tests → docs) per [`tracer-bullets`](../../.cursor/rules/tracer-bullets.mdc).
@@ -274,7 +276,7 @@ New recipe candidates: `dedupe-imports`, `consolidate-type-only-imports`, `stale
 
 ---
 
-### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier)
+### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier) — **SHIPPED 2026-05-15**
 
 **Status (2026-05-15):** Tier 2 closed. Scopes + references shipped 2026-05-15; bindings shipped 2026-05-15 (Tier 2.1); params + type params + re-export chains shipped 2026-05-15 (Tier 2.2); member-access + destructuring + type globals shipped 2026-05-15 (Tier 2.3). See ship reports below.
 
@@ -524,6 +526,8 @@ Deferred to a future slice (out of Tier 2 scope):
 
 ### Tier 3 — JSX elements + attributes
 
+**Ship status (2026-05-15):** Not shipped. `jsx_elements` / `jsx_attributes` absent from [`src/db.ts`](../../src/db.ts). Open.
+
 **Goal:** Every JSX element + every JSX attribute becomes a queryable row with column-precise positions.
 
 **Schema delta:**
@@ -596,7 +600,9 @@ New recipe candidates: `rename-component` (alongside `rename-app-wide`); `migrat
 
 ---
 
-### Tier 4 — Type / signature depth (params, generics, predicates)
+### Tier 4 — Type / signature depth (params, generics, predicates) — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** `function_params` table shipped via Tier 2.2 (different keying — `(file_path, owner_name, owner_kind, position)` instead of `symbol_id`-FK; columns `name` / `type_text` / `default_text` / `is_rest` / `is_optional` + position triplet). Params also emit as `symbols` rows with `kind='param'` so cross-file binding resolution works. **Deferred:** `generic_params` table (type-params currently emit as `symbols.kind='type-param'` instead — adequate for binding resolution; structured constraint/default columns deferred); `type_predicates` table; `symbols.{return_type, is_async, is_generator, throws_clauses}` columns. Recipes that need per-param JOINs work today against the shipped `function_params`; recipes needing predicates / async / return-type / generics-with-constraints stay open.
 
 **Goal:** Function parameters + generic parameters + type predicates + return types become structured queryable facts, not just stringified into `symbols.signature`.
 
@@ -677,6 +683,8 @@ New recipe candidates: `swap-positional-to-named-args` (extends `rename-preview`
 ---
 
 ### Tier 5 — Behavioral facts (async, try/catch, decorators, structured JSDoc)
+
+**Ship status (2026-05-15):** Not shipped. `async_calls` / `try_catch` / `decorators` / `jsdoc_tags` absent from [`src/db.ts`](../../src/db.ts). Open.
 
 **Goal:** Capture runtime-shape behavioral facts the AST encodes but today's index discards.
 
@@ -779,7 +787,9 @@ New recipe candidates: `find-awaits-in-loops`; `find-empty-catches`; `find-depre
 
 ---
 
-### Tier 6 — Module-graph enrichment
+### Tier 6 — Module-graph enrichment — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** `re_export_chains` shipped via Tier 2.2 (slimmer shape — `(from_file, from_name, to_file, to_name, hops, truncated)` `WITHOUT ROWID` PK; no separate `chain_path` text). Bounded at 10 hops with cycle detection. `bindings-engine` walks chains for cross-file resolution. **Deferred:** `dynamic_imports` table; `files.{is_barrel, is_entry, has_side_effects}` columns. `files.is_entry` stays gated on the [`c9-plugin-layer.md`](./c9-plugin-layer.md) plan.
 
 **Goal:** Flatten re-export chains; record dynamic imports; mark barrel files.
 
@@ -855,6 +865,8 @@ New recipe candidates: `barrel-cleanup`; `flatten-re-export-chain`; `find-dynami
 ---
 
 ### Tier 7 — CSS richness (rules, at-rules, declarations)
+
+**Ship status (2026-05-15):** Not shipped. `css_rules` / `css_at_rules` / `css_declarations` absent from [`src/db.ts`](../../src/db.ts) (existing `css_classes` / `css_variables` / `css_keyframes` unchanged). Open; parallel-safe per § Sequencing.
 
 **Goal:** Structural CSS — every rule, every at-rule, every declaration with position.
 
@@ -939,6 +951,8 @@ New recipe candidates: `dead-css-rules`; `important-overrides-audit`; `responsiv
 
 ### Tier 8 — Project meta (tsconfig + package.json)
 
+**Ship status (2026-05-15):** Not shipped. `tsconfig_options` / `package_json_meta` absent from [`src/db.ts`](../../src/db.ts). Open; parallel-safe per § Sequencing.
+
 **Goal:** Resolved per-file tsconfig + package.json facts queryable.
 
 **Schema delta:**
@@ -1002,7 +1016,9 @@ New recipe candidates: `strict-mode-audit`; `missing-types-fields`; `monorepo-pa
 
 ---
 
-### Tier 9 — Test-suite metadata
+### Tier 9 — Test-suite metadata — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** `test_suites` shipped — full hierarchy (`parent_suite_id`), kinds (`describe` / `it` / `test` / `suite` / `context`), `is_skipped` / `is_only` / `is_todo` flags, framework detection (`vitest` / `jest` / `bun-test` / `node-test` / `mocha` / `unknown`). Q8's framework detection landed via import-presence + extension hint. **Deferred:** `it.each` / `test.each` parametrised kinds (current CHECK enum doesn't include them); `test_fixtures` (`beforeAll` / `beforeEach` / etc.); `test_assertions` (per-`expect()` matcher rows). Recipes that need fixture / assertion-level JOINs stay open.
 
 **Goal:** Test files become structurally queryable — describe / it / test hierarchy, fixtures, skipped tests, assertion counts.
 
@@ -1084,7 +1100,9 @@ New recipe candidates: `find-skipped-tests`; `find-tests-without-assertions`; `u
 
 ---
 
-### Tier 10 — Lint suppressions + runtime/dev markers
+### Tier 10 — Lint suppressions + runtime/dev markers — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** `runtime_markers` shipped with `kind IN ('console','debugger','throw','process-env')` + `detail` qualifier + `scope_local_id`. The shipped CHECK enum is narrower than the proposed `('console','debugger','throw','assert','process-env','globalThis')` — `assert` / `globalThis` deferred. **Deferred:** `suppressions.{tool, rule_name, reason}` columns (table today carries only `(file_path, line_number, recipe_id)` for codemap-native ignore directives — extending to ESLint / TS-specific suppressions still open); `dev_only_branches` table.
 
 **Goal:** Extend existing `markers` + `suppressions` tables to cover `eslint-disable-*`, `ts-expect-error`, `ts-ignore`, `// @ts-nocheck`, `console.*`, `debugger`, dev-only branches.
 
@@ -1152,7 +1170,9 @@ New recipe candidates: `find-leftover-console`; `find-debugger-statements`; `env
 
 ---
 
-### Tier 11 — Metrics expansion (per-symbol + per-file)
+### Tier 11 — Metrics expansion (per-symbol + per-file) — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** `file_metrics` table shipped with line counters (`total_lines` / `code_lines` / `blank_lines` / `comment_lines`) + variable-form counters (`let_count` / `const_count` / `var_count`) + symbol-form counters (`function_count` / `arrow_count` / `class_count` / `interface_count` / `export_count`). On `symbols`: `body_line_count` / `param_count` / `nesting_depth` shipped. **Deferred:** `symbols.{body_token_count, local_var_count, early_return_count}`; `file_metrics.{total_tokens, optional_chaining_count, nullish_coalescing_count, default_export_count, named_export_count, top_level_await_count, template_literal_count, tagged_template_count}`. Token-based metrics await Q11.a's tokeniser-source decision.
 
 **Goal:** Cheap-to-compute facts that enable refactor / size / style recipes.
 
@@ -1230,7 +1250,9 @@ New recipe candidates: `refactor-large-functions` (extends `refactor-risk-rankin
 
 ---
 
-### Tier 12 — Module-graph topology
+### Tier 12 — Module-graph topology — **PARTIAL (2026-05-15)**
+
+**Ship status (2026-05-15):** Tarjan SCC pass shipped as `module_cycles` table — `(file_path PK, cycle_id, cycle_size)`. Only cyclic files appear; non-cyclic files have no row. **Deferred (the proposed `module_graph_facts` super-table):** `topological_index` / `depth_from_entry` / `fan_in` / `fan_out` / `is_terminal` / `is_reachable` / `centrality`. Reachability stays gated on Tier 6's `files.is_entry` (which gates on the [`c9-plugin-layer.md`](./c9-plugin-layer.md) plan); fan-in / fan-out are derivable today via `COUNT(*)` over `dependencies` until materialised. `dead-files-by-reachability` recipe stays open.
 
 **Goal:** Strongly-connected components, cycle detection, depth-from-entry, topological order — pre-computed at index time.
 
@@ -1290,6 +1312,8 @@ New recipe candidates: `find-import-cycles`; `dead-files-by-reachability` (subsu
 ---
 
 ### Tier 13 — ORM / SQL string tracking
+
+**Ship status (2026-05-15):** Not shipped. `orm_models` / `sql_strings` / `db_migrations` absent from [`src/db.ts`](../../src/db.ts). Open; `orm` extraction stays default-off per R.15.
 
 **Goal:** Database-schema-aware recipes — find ORM model definitions, SQL template literals, migration files.
 
