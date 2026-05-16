@@ -76,17 +76,40 @@ export function resolveProjectRecipesDir(
  */
 let cachedRegistry: LoadedRecipe[] | undefined;
 let cachedRegistryProjectDir: string | undefined;
+let projectRootOverride: string | undefined;
+
+/**
+ * Resolve the project root for project-recipe discovery without requiring
+ * `initCodemap()`. The CLI parser validates `--recipe <id>` / `--recipes-json`
+ * via `getQueryRecipeSql` / `listQueryRecipeCatalog` BEFORE `bootstrapCodemap`
+ * runs, so `getProjectRoot()` throws and the loader silently falls back to
+ * bundled-only. `main.ts` plumbs the already-resolved `--root` (or
+ * `CODEMAP_ROOT` / `cwd` default from `parseBootstrapArgs`) here right after
+ * argv parse, giving the loader a project root before bootstrap.
+ *
+ * Single source of truth: same `root` value `bootstrapCodemap` resolves to
+ * — no parallel walk-up heuristic. Cache invalidates when root changes.
+ */
+export function setQueryRecipesProjectRoot(root: string | undefined): void {
+  if (projectRootOverride === root) return;
+  projectRootOverride = root;
+  cachedRegistry = undefined;
+  cachedRegistryProjectDir = undefined;
+}
+
+function resolveCurrentProjectRoot(): string | undefined {
+  if (projectRootOverride !== undefined) return projectRootOverride;
+  try {
+    return getProjectRoot();
+  } catch {
+    return undefined;
+  }
+}
 
 function getRegistry(): LoadedRecipe[] {
-  // `getProjectRoot()` throws if `initCodemap()` hasn't run; that only
-  // happens for direct unit tests of this module pre-bootstrap. Treat
-  // that as "no project recipes" — bundled-only registry.
-  let projectDir: string | undefined;
-  try {
-    projectDir = resolveProjectRecipesDir(getProjectRoot());
-  } catch {
-    projectDir = undefined;
-  }
+  const root = resolveCurrentProjectRoot();
+  const projectDir =
+    root !== undefined ? resolveProjectRecipesDir(root) : undefined;
 
   if (cachedRegistry !== undefined && cachedRegistryProjectDir === projectDir) {
     return cachedRegistry;
@@ -106,6 +129,7 @@ function getRegistry(): LoadedRecipe[] {
 export function _resetRecipesCacheForTests(): void {
   cachedRegistry = undefined;
   cachedRegistryProjectDir = undefined;
+  projectRootOverride = undefined;
 }
 
 /**
