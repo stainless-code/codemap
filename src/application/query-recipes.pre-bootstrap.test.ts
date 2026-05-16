@@ -24,12 +24,19 @@ import {
  */
 describe("setQueryRecipesProjectRoot — pre-bootstrap CLI parse-phase path", () => {
   let projectRoot: string;
+  // Per-test unique ids so the assertions can't collide with a future bundled
+  // recipe of the same name.
+  let primaryId: string;
+  let otherId: string;
 
   beforeEach(() => {
+    const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    primaryId = `team-fixture-${suffix}`;
+    otherId = `other-fixture-${suffix}`;
     projectRoot = mkdtempSync(join(tmpdir(), "codemap-pre-bootstrap-"));
     mkdirSync(join(projectRoot, ".codemap", "recipes"), { recursive: true });
     writeFileSync(
-      join(projectRoot, ".codemap", "recipes", "team-fixture.sql"),
+      join(projectRoot, ".codemap", "recipes", `${primaryId}.sql`),
       "SELECT 1 AS ok\n",
     );
     _resetRecipesCacheForTests();
@@ -46,32 +53,32 @@ describe("setQueryRecipesProjectRoot — pre-bootstrap CLI parse-phase path", ()
     const projectIds = catalog
       .filter((c) => c.source === "project")
       .map((c) => c.id);
-    expect(projectIds).toContain("team-fixture");
-    expect(getQueryRecipeSql("team-fixture")).toContain("SELECT 1");
+    expect(projectIds).toContain(primaryId);
+    expect(getQueryRecipeSql(primaryId)).toContain("SELECT 1");
   });
 
   it("clears project recipes when override is reset to undefined", () => {
     setQueryRecipesProjectRoot(projectRoot);
-    expect(listQueryRecipeIds()).toContain("team-fixture");
+    expect(listQueryRecipeIds()).toContain(primaryId);
     setQueryRecipesProjectRoot(undefined);
-    expect(listQueryRecipeIds()).not.toContain("team-fixture");
+    expect(listQueryRecipeIds()).not.toContain(primaryId);
   });
 
   it("re-setting the override to a new root invalidates the cache", () => {
     setQueryRecipesProjectRoot(projectRoot);
-    expect(listQueryRecipeIds()).toContain("team-fixture");
+    expect(listQueryRecipeIds()).toContain(primaryId);
 
     const otherRoot = mkdtempSync(join(tmpdir(), "codemap-pre-bootstrap-"));
     try {
       mkdirSync(join(otherRoot, ".codemap", "recipes"), { recursive: true });
       writeFileSync(
-        join(otherRoot, ".codemap", "recipes", "other-fixture.sql"),
+        join(otherRoot, ".codemap", "recipes", `${otherId}.sql`),
         "SELECT 2\n",
       );
       setQueryRecipesProjectRoot(otherRoot);
       const ids = listQueryRecipeIds();
-      expect(ids).toContain("other-fixture");
-      expect(ids).not.toContain("team-fixture");
+      expect(ids).toContain(otherId);
+      expect(ids).not.toContain(primaryId);
     } finally {
       rmSync(otherRoot, { recursive: true, force: true });
     }
