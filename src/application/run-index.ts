@@ -197,6 +197,7 @@ export async function runCodemapIndex(
         const run = await indexFiles(db, diff.changed, false, indexedPaths, {
           quiet,
           sourceCache: diff.sourceCache,
+          existingHashes: diff.existingHashes,
         });
         return {
           mode: "incremental",

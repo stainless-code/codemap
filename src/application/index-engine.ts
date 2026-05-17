@@ -14,7 +14,7 @@ import {
   getMeta,
   setMeta,
   deleteFileData,
-  deleteSourceFts,
+  deleteSourceFtsBatch,
   insertFile,
   insertSymbols,
   insertImports,
@@ -130,6 +130,8 @@ export function getChangedFiles(db: CodemapDatabase): {
   existingPaths: Set<string>;
   /** Source + hash for every entry in `changed[]`; reused by indexFiles to skip the second read+hash pass. */
   sourceCache: ChangedSourceCache;
+  /** Existing `files.content_hash` map (all indexed paths) — reused by indexFiles to skip its own getAllFileHashes call. */
+  existingHashes: Map<string, string>;
 } | null {
   const lastCommit = getMeta(db, "last_indexed_commit");
   if (!lastCommit) return null;
@@ -206,6 +208,9 @@ export function getChangedFiles(db: CodemapDatabase): {
       deleted,
       existingPaths: new Set(existingHashes.keys()),
       sourceCache,
+      // Exposed so indexFiles can reuse the same Map (~1 SELECT, scale-
+      // dependent — sub-ms on this repo, ~5-50ms on 10k-100k file trees).
+      existingHashes,
     };
   } catch {
     return null;
@@ -363,6 +368,12 @@ export async function indexFiles(
      * Absent or sparse cache falls back to read+hash inline (back-compat).
      */
     sourceCache?: ChangedSourceCache;
+    /**
+     * Pre-loaded `files.path → content_hash` map (e.g. from getChangedFiles).
+     * When provided, indexFiles skips its own `getAllFileHashes(db)` call —
+     * scale-dependent saving (~0.5ms on this repo, more on bigger trees).
+     */
+    existingHashes?: Map<string, string>;
   },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
@@ -419,7 +430,7 @@ export async function indexFiles(
     indexed = insertParsedResults(db, results, indexedPaths);
     insertMs = performance.now() - insertStart;
   } else {
-    const existingHashes = getAllFileHashes(db);
+    const existingHashes = options?.existingHashes ?? getAllFileHashes(db);
     const root = getProjectRoot();
     const sourceCache = options?.sourceCache;
 
@@ -679,7 +690,10 @@ export function deleteFilesFromIndex(
     const placeholders = batch.map(() => "?").join(",");
     db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
     // FK CASCADE doesn't reach `source_fts` (virtual table); mirror manually.
-    for (const path of batch) deleteSourceFts(db, path);
+    // Batched IN-delete instead of one query per path (FTS5 supports
+    // arbitrary `DELETE … WHERE` predicates — only INSERT/UPDATE have
+    // shape constraints).
+    deleteSourceFtsBatch(db, batch);
   }
   if (!quiet) {
     console.log(`  Removed ${deleted.length} deleted files from index`);

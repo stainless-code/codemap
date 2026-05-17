@@ -430,6 +430,23 @@ export function deleteSourceFts(db: CodemapDatabase, filePath: string) {
   db.run("DELETE FROM source_fts WHERE file_path = ?", [filePath]);
 }
 
+/**
+ * Batch-delete FTS5 rows for many paths via `WHERE file_path IN (?, …)`.
+ * FTS5 virtual tables accept arbitrary `DELETE … WHERE` predicates (only
+ * INSERT/UPDATE have shape constraints), so the same IN-list shape used
+ * for the `files` table delete works here. Pre-2026-05 deleteFilesFromIndex
+ * issued one DELETE per path — fine for single edits but stacks up during
+ * `git checkout` watcher events that flush hundreds of paths.
+ */
+export function deleteSourceFtsBatch(db: CodemapDatabase, filePaths: string[]) {
+  if (filePaths.length === 0) return;
+  const placeholders = filePaths.map(() => "?").join(",");
+  db.run(
+    `DELETE FROM source_fts WHERE file_path IN (${placeholders})`,
+    filePaths,
+  );
+}
+
 export function clearSourceFts(db: CodemapDatabase) {
   db.run("DELETE FROM source_fts");
 }
