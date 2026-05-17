@@ -9,6 +9,7 @@
 | **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap/index.db` goes | [§ Indexing another project](#indexing-another-project)                          |
 | **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
 | **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
+| **Guardrail full-rebuild per-phase walls against a committed baseline** (CI regression gate)                                                             | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
 
 ---
 
@@ -196,6 +197,44 @@ The benchmark also measures the cost of keeping the index fresh (3 runs each, sa
 **Full rebuild** uses worker thread parallelism (N workers for file I/O + parsing), deferred index creation, generic `batchInsert` helper, and sorted inserts — see [architecture.md § Full Rebuild Optimizations](./architecture.md#full-rebuild-optimizations).
 
 **Targeted reindex** (`--files`) is the fastest option when the AI knows which files it modified — it skips git diff and filesystem scanning entirely. Incremental uses DB-sourced `indexedPaths` instead of a full `collectFiles()` glob scan, and passes only changed files to the indexer. Both are fast enough to run after every editing step. Full rebuild is appropriate when switching branches or after a rebase.
+
+## Perf baseline (regression guardrail)
+
+Independent of the consumer-facing scenarios above, the repo carries a **per-phase wall guardrail** for the full-rebuild path. Wired during the [perf-architecture triangulation Tier 1.2](./audits/2026-05-17-performance-architecture-triangulation.md).
+
+### Mechanism
+
+1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `total_ms`.
+2. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps that report as JSON to `<path>` after the run (no CLI flag added; env-var only).
+3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians** (less jittery than averages), and compares to `fixtures/benchmark/perf-baseline.json`.
+4. CI job `📈 Perf baseline (self-index)` (in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) invokes the script on every PR. Non-blocking initially while CI variance is characterised.
+
+### Why this is separate from `src/benchmark.ts`
+
+| Surface                                  | Audience                       | Fixture                                            | Gate?                                   |
+| ---------------------------------------- | ------------------------------ | -------------------------------------------------- | --------------------------------------- |
+| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational)                      |
+| `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (~340 files)                             | Yes (`continue-on-error: true` for now) |
+
+The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is only measurable on a tree with real cross-file edges, and (b) the audit triangulation's numbers were captured here.
+
+### Tuning knobs
+
+| Env var                       | Default | Effect                                                             |
+| ----------------------------- | ------- | ------------------------------------------------------------------ |
+| `CODEMAP_PERF_RUNS`           | 3       | How many `--full --performance` runs to take median over           |
+| `CODEMAP_PERF_REGRESSION_PCT` | 25      | Percent over baseline median that fails the check                  |
+| `CODEMAP_PERF_NOISE_FLOOR_MS` | 10      | Baseline phases under this median are not gated (jitter dominates) |
+
+### Updating the baseline
+
+After an intentional perf change (Tier 2-5 of the triangulation, schema bump, dep upgrade), capture a new baseline:
+
+```bash
+bun run check:perf-baseline:update
+```
+
+This rewrites `fixtures/benchmark/perf-baseline.json` with current medians + the HEAD commit. **Commit the baseline change in the same PR** as the intentional perf shift so reviewers see the delta in the diff.
 
 #### Where the index doesn't help
 

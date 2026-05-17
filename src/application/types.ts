@@ -44,9 +44,21 @@ export interface IndexPerformanceReport {
   /** Deferred B-tree build via `CREATE INDEX` (full rebuild only). */
   index_create_ms: number;
   /**
-   * `indexFiles` wall-clock — `parse + insert + index_create + DDL`. Does
-   * **not** include `collect_ms` (collect happens before `indexFiles`); the
-   * end-to-end run wall is `collect_ms + total_ms`.
+   * `resolveBindings` + `persistBindings` wall (full rebuild only; `0` for
+   * incremental / targeted runs). Pre-2026-05 this was rolled into `total_ms`
+   * with no per-phase breakdown — added so the bindings tail (~30% of
+   * `total_ms` on this repo, per triangulation audit) is falsifiable.
+   */
+  bindings_ms: number;
+  /** `persistModuleCycles` wall (full rebuild only; `0` otherwise). */
+  module_cycles_ms: number;
+  /** `persistReExportChains` wall (full rebuild only; `0` otherwise). */
+  re_export_chains_ms: number;
+  /**
+   * `indexFiles` wall-clock — `parse + insert + index_create + DDL + bindings
+   * + module_cycles + re_export_chains`. Does **not** include `collect_ms`
+   * (collect happens before `indexFiles`); the end-to-end run wall is
+   * `collect_ms + total_ms`.
    */
   total_ms: number;
   /** Up to 10 files with the highest per-file parse time, descending. */

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 
 import { LANG_MAP } from "../constants";
@@ -340,6 +340,9 @@ export async function indexFiles(
   let parseMs = 0;
   let insertMs = 0;
   let indexCreateMs = 0;
+  let bindingsMs = 0;
+  let moduleCyclesMs = 0;
+  let reExportChainsMs = 0;
   let slowest: { path: string; parse_ms: number }[] = [];
 
   if (fullRebuild) {
@@ -510,10 +513,18 @@ export async function indexFiles(
   // Pass-2 binding resolution per R.12 — full-rebuild only to honor
   // R.10's <100ms targeted contract. Orphan-cleared until next full.
   if (fullRebuild) {
+    const bindingsStart = performance.now();
     const bindings = resolveBindings(db);
     persistBindings(db, bindings);
+    bindingsMs = performance.now() - bindingsStart;
+
+    const cyclesStart = performance.now();
     persistModuleCycles(db);
+    moduleCyclesMs = performance.now() - cyclesStart;
+
+    const reExportStart = performance.now();
     persistReExportChains(db);
+    reExportChainsMs = performance.now() - reExportStart;
   }
 
   const elapsed = Math.round(performance.now() - startTime);
@@ -527,9 +538,24 @@ export async function indexFiles(
       parse_ms: Math.round(parseMs),
       insert_ms: Math.round(insertMs),
       index_create_ms: Math.round(indexCreateMs),
+      bindings_ms: Math.round(bindingsMs),
+      module_cycles_ms: Math.round(moduleCyclesMs),
+      re_export_chains_ms: Math.round(reExportChainsMs),
       total_ms: elapsed,
       slowest_files: slowest,
     };
+    // Env-var JSON dump for CI baseline comparison (scripts/check-perf-baseline.ts).
+    // Avoids adding a CLI flag; absent var = no-op.
+    const perfJsonPath = process.env.CODEMAP_PERFORMANCE_JSON;
+    if (perfJsonPath !== undefined && perfJsonPath !== "") {
+      try {
+        writeFileSync(perfJsonPath, JSON.stringify(perf, null, 2));
+      } catch (err) {
+        console.error(
+          `[performance] failed to write ${perfJsonPath}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
   }
 
   if (fts5WasEmpty && getFts5Enabled()) {
@@ -562,7 +588,16 @@ export async function indexFiles(
         `    index_create:   ${perf.index_create_ms}  (B-tree build)`,
       );
       console.log(
-        `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL)`,
+        `    bindings:       ${perf.bindings_ms}  (resolveBindings + persist, full only)`,
+      );
+      console.log(
+        `    module_cycles:  ${perf.module_cycles_ms}  (persistModuleCycles, full only)`,
+      );
+      console.log(
+        `    re_exports:     ${perf.re_export_chains_ms}  (persistReExportChains, full only)`,
+      );
+      console.log(
+        `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL + bindings + cycles + re_exports)`,
       );
       if (perf.slowest_files.length > 0) {
         console.log(
