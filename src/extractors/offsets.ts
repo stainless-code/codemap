@@ -13,12 +13,7 @@ export function buildLineMap(source: string): number[] {
   return offsets;
 }
 
-/**
- * Count `\n`-delimited lines (1-based — empty source still has line 1).
- * Equivalent to `buildLineMap(source).length` but without allocating the
- * offsets array. Shared between the worker and the incremental indexer
- * branch so both paths perform exactly one O(bytes) newline scan each.
- */
+/** `buildLineMap(source).length` without the array — empty source still returns 1. */
 export function countLines(source: string): number {
   let lineCount = 1;
   for (let i = 0; i < source.length; i++) {

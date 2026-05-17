@@ -99,15 +99,9 @@ export function executeQuery(
 }
 
 /**
- * Run one statement against an already-open, already-`query_only`-enforced
- * DB handle. Extracted from {@link executeQuery} so {@link executeQueryBatch}
- * can amortise connection setup across N statements while preserving the
- * exact per-statement envelope (incl. `{error}` isolation).
- *
- * Caller responsibilities (both honoured by `executeQuery` /
- * `executeQueryBatch`):
- * - Open the DB and set `PRAGMA query_only = 1` BEFORE the first call.
- * - Close the DB AFTER all calls (with `closeDb(db, { readonly: true })`).
+ * One statement on an already-open, already-`query_only`-enforced handle.
+ * Caller owns `openDb()` + `PRAGMA query_only = 1` + `closeDb({readonly:true})`;
+ * try/catch preserves the `{error}` envelope per call so siblings keep running.
  */
 function executeQueryOnDb(
   db: CodemapDatabase,
@@ -166,16 +160,9 @@ function executeQueryOnDb(
 export type BatchStatementResolved = Omit<ExecuteQueryOpts, "root">;
 
 /**
- * Run N statements through ONE read-only DB connection. Returns N
- * envelopes — same per-element shape as single `executeQuery` for the
- * effective flag set on that statement (plan § 5: "per-element shape
- * mirrors single `query`'s output for the effective flag set").
- *
- * Pre-2026-05 this delegated to `executeQuery` per statement, opening and
- * closing a DB connection N times — fine for N=1 but wasted setup for
- * any real batch. Now one `openDb()` + one `PRAGMA query_only = 1` + N
- * statements + one `closeDb({readonly: true})`. Per-statement `{error}`
- * isolation preserved via {@link executeQueryOnDb}'s internal try/catch.
+ * Run N statements through ONE read-only DB connection. Returns N envelopes —
+ * per-element shape mirrors single `executeQuery` for the effective flag set
+ * (plan § 5). Per-statement `{error}` isolation via {@link executeQueryOnDb}.
  */
 export function executeQueryBatch(opts: {
   statements: BatchStatementResolved[];

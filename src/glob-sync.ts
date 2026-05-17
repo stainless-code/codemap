@@ -6,14 +6,9 @@ export interface GlobOptions {
 }
 
 /**
- * Glob files relative to `cwd` (dotfiles included). Supports a single pattern
- * or an array; `ignore` patterns prune matching subtrees up-front (~12× faster
- * than walking + post-filtering on big trees with `node_modules` etc.).
- *
- * Uses `tinyglobby` on both Bun and Node — pre-2026-05 Bun went through
- * `Bun.Glob` for native speed, but `Bun.Glob` has no `ignore` option (per
- * <https://bun.sh/docs/api/glob>) so the post-filter walked excluded trees
- * anyway. tinyglobby with `ignore` is faster than `Bun.Glob` without it.
+ * Glob files relative to `cwd` (dotfiles included). `ignore` patterns prune
+ * subtrees up-front (~12× vs walk + post-filter on `node_modules` etc.).
+ * tinyglobby on both runtimes — `Bun.Glob` has no `ignore` option.
  */
 export function globSync(
   pattern: string | readonly string[],
@@ -25,9 +20,8 @@ export function globSync(
     dot: true,
     absolute: false,
     expandDirectories: false,
-    // Preserves pre-2026-05 Bun.Glob behavior — symlinks (e.g. .cursor/rules/*
-    // → .agents/rules/*) would otherwise get indexed twice. node:fs.globSync
-    // and Bun.Glob both skip-by-default; tinyglobby follows-by-default.
+    // tinyglobby follows-by-default (Bun.Glob + node:fs.globSync skip);
+    // without this `.cursor/rules/*` → `.agents/rules/*` get indexed twice.
     followSymbolicLinks: false,
     ignore: options?.ignore as string[] | undefined,
   });

@@ -4,15 +4,9 @@ import { join, resolve } from "node:path";
 
 import type { IndexPerformanceReport } from "../src/application/types";
 
-// Phases under PRAGMA-noise threshold are skipped — sub-10ms wall is
-// dominated by run-to-run variance. Tune via CODEMAP_PERF_NOISE_FLOOR_MS.
+// 25% threshold + 10ms noise floor gate real regressions, not jitter; docs/benchmark.md § Perf baseline.
 const NOISE_FLOOR_MS = Number(process.env.CODEMAP_PERF_NOISE_FLOOR_MS ?? 10);
-
-// Default regression threshold: 25%. The audits noted run-to-run variance
-// on small trees; this gates real regressions, not jitter. Tune via
-// CODEMAP_PERF_REGRESSION_PCT.
 const REGRESSION_PCT = Number(process.env.CODEMAP_PERF_REGRESSION_PCT ?? 25);
-
 const RUNS = Number(process.env.CODEMAP_PERF_RUNS ?? 3);
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -101,15 +95,12 @@ async function collectStats(): Promise<Record<Phase, PhaseStats>> {
 }
 
 interface BaselineFile {
-  /** ISO 8601 capture timestamp. */
   captured_at: string;
-  /** Repo commit at capture time. */
   commit: string;
-  /** Per-phase median wall (ms) from the capture run. */
   phases: Record<Phase, number>;
-  /** Threshold above the baseline median that triggers a regression (percent). */
+  /** Percent above baseline median that triggers a regression. */
   regression_pct: number;
-  /** Phases under this median (ms) are not gated (noise floor). */
+  /** Phases under this median (ms) skip gating — jitter dominates. */
   noise_floor_ms: number;
 }
 

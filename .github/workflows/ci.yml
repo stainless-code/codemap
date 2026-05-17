@@ -152,12 +152,8 @@ jobs:
           bun run benchmark
 
   perf-baseline:
-    # Per-phase regression guardrail for the perf-triangulation tiers
-    # (docs/audits/2026-05-17-performance-architecture-triangulation.md Tier 1.2).
-    # Runs `bun src/index.ts --full --performance` 3× against this repo, takes
-    # per-phase medians, compares against fixtures/benchmark/perf-baseline.json.
-    # Non-blocking initially while CI variance is characterised; promote to a
-    # hard gate once a few runs have established a stable noise envelope.
+    # Regression guardrail per docs/audits/2026-05-17-performance-architecture-triangulation.md Tier 1.2.
+    # `continue-on-error: true` until CI variance is characterised; promote to hard gate after.
     name: 📈 Perf baseline (self-index)
     needs: skip-ci
     if: needs['skip-ci'].outputs.skip != 'true'

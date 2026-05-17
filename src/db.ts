@@ -431,12 +431,8 @@ export function deleteSourceFts(db: CodemapDatabase, filePath: string) {
 }
 
 /**
- * Batch-delete FTS5 rows for many paths via `WHERE file_path IN (?, …)`.
- * FTS5 virtual tables accept arbitrary `DELETE … WHERE` predicates (only
- * INSERT/UPDATE have shape constraints), so the same IN-list shape used
- * for the `files` table delete works here. Pre-2026-05 deleteFilesFromIndex
- * issued one DELETE per path — fine for single edits but stacks up during
- * `git checkout` watcher events that flush hundreds of paths.
+ * Batch-delete FTS5 rows via `WHERE file_path IN (?, …)` — FTS5 accepts
+ * arbitrary `DELETE … WHERE` predicates (only INSERT/UPDATE have shape constraints).
  */
 export function deleteSourceFtsBatch(db: CodemapDatabase, filePaths: string[]) {
   if (filePaths.length === 0) return;
@@ -742,14 +738,8 @@ export interface SymbolRow {
 
 const BATCH_SIZE = 500;
 
-/**
- * Memo placeholder strings per `(one, count)` tuple. Pre-2026-05 the FULL
- * batch placeholder was precomputed per call but every TAIL batch with
- * `count < BATCH_SIZE` paid an `Array(count).fill(one).join(",")` allocation
- * on every batchInsert invocation; on watcher / incremental processes this
- * grew the stmtCache with one new SQL string per unique tail length per
- * table. Memo collapses those rebuilds to O(1) cache hits.
- */
+// Memo per (one, count) tuple — collapses tail-batch placeholder rebuilds (and the
+// resulting unique SQL strings hitting stmtCache) to O(1) cache hits.
 const placeholderCache = new Map<string, Map<number, string>>();
 
 function getPlaceholders(one: string, count: number): string {

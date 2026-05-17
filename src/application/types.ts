@@ -43,12 +43,7 @@ export interface IndexPerformanceReport {
   insert_ms: number;
   /** Deferred B-tree build via `CREATE INDEX` (full rebuild only). */
   index_create_ms: number;
-  /**
-   * `resolveBindings` + `persistBindings` wall (full rebuild only; `0` for
-   * incremental / targeted runs). Pre-2026-05 this was rolled into `total_ms`
-   * with no per-phase breakdown — added so the bindings tail (~30% of
-   * `total_ms` on this repo, per triangulation audit) is falsifiable.
-   */
+  /** `resolveBindings` + `persistBindings` wall (full rebuild only; `0` otherwise). */
   bindings_ms: number;
   /** `persistModuleCycles` wall (full rebuild only; `0` otherwise). */
   module_cycles_ms: number;

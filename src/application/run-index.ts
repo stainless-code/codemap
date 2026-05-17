@@ -178,11 +178,7 @@ export async function runCodemapIndex(
       };
     }
 
-    // Incremental path reads `meta` via getChangedFiles — schema must exist
-    // first. The up-front createSchema(db) call above (before the toggle
-    // check) already covers this on every code path; pre-2026-05 we called
-    // it twice (once before the toggle, once here) which was harmless but
-    // wasted ~22 IF-NOT-EXISTS DDL roundtrips per incremental run.
+    // getChangedFiles reads `meta`; the up-front createSchema above (before the toggle check) covers it.
     const diff = getChangedFiles(db);
     if (diff) {
       if (!quiet) {

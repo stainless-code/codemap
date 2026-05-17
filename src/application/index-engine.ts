@@ -112,12 +112,7 @@ export function collectFiles(): string[] {
   return [...new Set(files)].sort();
 }
 
-/**
- * Per-changed-file cache populated by {@link getChangedFiles} and consumed
- * by {@link indexFiles} so the incremental path doesn't re-read or re-hash
- * the same file twice (pre-2026-05 every changed file paid two `readFileSync`
- * + two SHA-256 hashes between detection and reindex).
- */
+/** Reused between {@link getChangedFiles} and {@link indexFiles} so the incremental path reads + hashes each file once, not twice. */
 export type ChangedSourceCache = Map<string, { source: string; hash: string }>;
 
 // Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
@@ -208,8 +203,6 @@ export function getChangedFiles(db: CodemapDatabase): {
       deleted,
       existingPaths: new Set(existingHashes.keys()),
       sourceCache,
-      // Exposed so indexFiles can reuse the same Map (~1 SELECT, scale-
-      // dependent — sub-ms on this repo, ~5-50ms on 10k-100k file trees).
       existingHashes,
     };
   } catch {
@@ -361,18 +354,9 @@ export async function indexFiles(
     collectMs?: number;
     /** Skip `git rev-parse HEAD` and stamp this sha. See `RunIndexOptions.commit`. */
     commit?: string;
-    /**
-     * Pre-read source + hash per relPath (e.g. populated by getChangedFiles).
-     * When present in the incremental branch, indexFiles reuses the cached
-     * source string and skips the second readFileSync + hashContent pass.
-     * Absent or sparse cache falls back to read+hash inline (back-compat).
-     */
+    /** When set, incremental branch skips the second readFileSync + hashContent per entry. Absent / sparse → inline read+hash. */
     sourceCache?: ChangedSourceCache;
-    /**
-     * Pre-loaded `files.path → content_hash` map (e.g. from getChangedFiles).
-     * When provided, indexFiles skips its own `getAllFileHashes(db)` call —
-     * scale-dependent saving (~0.5ms on this repo, more on bigger trees).
-     */
+    /** When set, incremental branch skips its own `getAllFileHashes(db)` call. */
     existingHashes?: Map<string, string>;
   },
 ): Promise<IndexRunStats> {
@@ -411,11 +395,8 @@ export async function indexFiles(
     const parseStart = performance.now();
     const results = await parseFilesParallel(filePaths);
     parseMs = performance.now() - parseStart;
-    // Byte-order vs localeCompare: relPath is always POSIX-normalized ASCII
-    // (toRelativePosix / toProjectRelative upstream), so the Intl-collator
-    // tax on every comparison is wasted work. B-tree-locality (per
-    // architecture.md § Sorted inserts) only needs ANY monotonic total
-    // order — byte-order gives that 3-10× cheaper.
+    // relPath is always POSIX-normalized ASCII (toRelativePosix upstream); byte order suffices
+    // for architecture.md § Sorted inserts' B-tree locality and skips the Intl-collator tax.
     results.sort((a, b) =>
       a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0,
     );
@@ -439,10 +420,7 @@ export async function indexFiles(
         const absPath = join(root, relPath);
         let source: string;
         let hash: string;
-        // Reuse the source + hash getChangedFiles already computed when
-        // detecting this file as changed. Falls back to inline read+hash
-        // when the cache is absent or the entry is missing (e.g. `--files`
-        // targeted reindex, or cache-less callers).
+        // `--files` targeted reindex + cache-less callers fall through to read+hash.
         const cached = sourceCache?.get(relPath);
         if (cached !== undefined) {
           source = cached.source;
@@ -601,8 +579,7 @@ export async function indexFiles(
       total_ms: elapsed,
       slowest_files: slowest,
     };
-    // Env-var JSON dump for CI baseline comparison (scripts/check-perf-baseline.ts).
-    // Avoids adding a CLI flag; absent var = no-op.
+    // Env-var output for scripts/check-perf-baseline.ts; absent var = no-op.
     const perfJsonPath = process.env.CODEMAP_PERFORMANCE_JSON;
     if (perfJsonPath !== undefined && perfJsonPath !== "") {
       try {
@@ -690,9 +667,6 @@ export function deleteFilesFromIndex(
     const placeholders = batch.map(() => "?").join(",");
     db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
     // FK CASCADE doesn't reach `source_fts` (virtual table); mirror manually.
-    // Batched IN-delete instead of one query per path (FTS5 supports
-    // arbitrary `DELETE … WHERE` predicates — only INSERT/UPDATE have
-    // shape constraints).
     deleteSourceFtsBatch(db, batch);
   }
   if (!quiet) {
@@ -821,11 +795,8 @@ function enrichQueryError(message: string): string {
 
 /**
  * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
- * Sets `PRAGMA query_only = 1` to mirror {@link executeQuery}'s read-only
- * enforcement — any DML / DDL slipping through `Codemap.query` (programmatic),
- * `bun run test:golden`, `codemap apply`'s recipe SQL execution, or the
- * `cmd-query` print/grouped paths now errors at the SQLite layer instead of
- * mutating the DB. Connection-scoped pragma; discarded on `closeDb()`.
+ * Sets `PRAGMA query_only = 1` so DML/DDL slipping through programmatic `Codemap.query`,
+ * `codemap apply` recipe SQL, the `cmd-query` paths, or `test:golden` errors at SQLite instead of mutating.
  * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
 export function queryRows(

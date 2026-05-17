@@ -20,11 +20,7 @@ const WORKER_URL_NODE = new URL(
   import.meta.url,
 );
 
-// Default formula: floor 2, ceiling 6, CPU-bounded. Override via env
-// `CODEMAP_PARSE_WORKERS` (clamped to [1, 32] — sub-1 is meaningless,
-// >32 wastes startup on most boxes). Defaults preserve pre-2026-05
-// behavior; only changes when explicitly set (e.g. CI with vCPU limits
-// or local boxes with > 6 cores wanting to use them).
+// Override via `CODEMAP_PARSE_WORKERS` (clamped [1, 32]); default formula unchanged when unset.
 function resolveWorkerCount(): number {
   const env = process.env.CODEMAP_PARSE_WORKERS;
   if (env !== undefined && env !== "") {

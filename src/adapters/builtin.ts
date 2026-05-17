@@ -87,11 +87,8 @@ export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
   },
 ];
 
-// O(1) Map lookup per `adapters` array, built once per array reference.
-// Pre-2026-05 every parse call did a linear scan (~17 ops worst-case for
-// the built-in 3-adapter set); per-file × 100k files = ~1.7M ops on big
-// trees. WeakMap-keying covers future plugin-registered adapter arrays
-// (per c9-plugin-layer.md) without leaking memory when arrays get GC'd.
+// WeakMap-keyed so future plugin-registered adapter arrays (c9-plugin-layer.md)
+// also memoise without leaking refs to GC'd arrays.
 const adapterIndexCache = new WeakMap<
   readonly LanguageAdapter[],
   Map<string, LanguageAdapter>
@@ -101,8 +98,7 @@ function buildAdapterIndex(
   adapters: readonly LanguageAdapter[],
 ): Map<string, LanguageAdapter> {
   const index = new Map<string, LanguageAdapter>();
-  // First-match-wins semantics preserved: iterate adapters in order,
-  // skip if an earlier adapter already claimed the extension.
+  // First-match-wins: skip ext if an earlier adapter already claimed it.
   for (const a of adapters) {
     for (const ext of a.extensions) {
       if (!index.has(ext)) index.set(ext, a);
