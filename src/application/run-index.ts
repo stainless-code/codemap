@@ -178,9 +178,7 @@ export async function runCodemapIndex(
       };
     }
 
-    // Incremental path reads `meta` via getChangedFiles — schema must exist first
-    // (indexFiles / targetedReindex call createSchema later; fresh DB had none).
-    createSchema(db);
+    // getChangedFiles reads `meta`; the up-front createSchema above (before the toggle check) covers it.
     const diff = getChangedFiles(db);
     if (diff) {
       if (!quiet) {
@@ -194,6 +192,8 @@ export async function runCodemapIndex(
         for (const f of diff.changed) indexedPaths.add(f);
         const run = await indexFiles(db, diff.changed, false, indexedPaths, {
           quiet,
+          sourceCache: diff.sourceCache,
+          existingHashes: diff.existingHashes,
         });
         return {
           mode: "incremental",

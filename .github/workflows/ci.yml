@@ -151,6 +151,24 @@ jobs:
           bun run dev --full
           bun run benchmark
 
+  perf-baseline:
+    # Regression guardrail per docs/audits/2026-05-17-performance-architecture-triangulation.md Tier 1.2.
+    # `continue-on-error: true` until CI variance is characterised; promote to hard gate after.
+    name: 📈 Perf baseline (self-index)
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Compare per-phase wall vs baseline
+        run: bun run check:perf-baseline
+
   audit:
     # Non-blocking — visibility into transitive-dep CVEs without gating PRs.
     # Promote to a hard gate once the team agrees on a vulnerability budget.

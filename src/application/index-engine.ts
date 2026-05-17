@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 
 import { LANG_MAP } from "../constants";
@@ -14,7 +14,7 @@ import {
   getMeta,
   setMeta,
   deleteFileData,
-  deleteSourceFts,
+  deleteSourceFtsBatch,
   insertFile,
   insertSymbols,
   insertImports,
@@ -41,6 +41,7 @@ import {
   SCHEMA_VERSION,
 } from "../db";
 import type { CodemapDatabase, FileRow } from "../db";
+import { countLines } from "../extractors/offsets";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
@@ -49,6 +50,7 @@ import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
 import {
+  getExcludeDirNames,
   getFts5Enabled,
   getIncludePatterns,
   getProjectRoot,
@@ -94,17 +96,24 @@ function fileCategory(path: string): "ts" | "css" | "text" {
 }
 
 export function collectFiles(): string[] {
-  const files: string[] = [];
   const root = getProjectRoot();
-  for (const pattern of getIncludePatterns()) {
-    const matches = globSync(pattern, root);
-    for (const path of matches) {
-      if (isPathExcluded(path)) continue;
-      files.push(path);
-    }
+  // Route excludeDirNames into the glob layer as `**/<name>/**` ignores —
+  // tinyglobby prunes those subtrees up-front instead of walking + post-
+  // filtering. isPathExcluded stays as defense-in-depth for paths that
+  // somehow slip through (e.g. a future glob backend that ignores `ignore`).
+  const ignore: string[] = [];
+  for (const name of getExcludeDirNames()) ignore.push(`**/${name}/**`);
+  const matches = globSync([...getIncludePatterns()], root, { ignore });
+  const files: string[] = [];
+  for (const path of matches) {
+    if (isPathExcluded(path)) continue;
+    files.push(path);
   }
   return [...new Set(files)].sort();
 }
+
+/** Reused between {@link getChangedFiles} and {@link indexFiles} so the incremental path reads + hashes each file once, not twice. */
+export type ChangedSourceCache = Map<string, { source: string; hash: string }>;
 
 // Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
 // history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
@@ -114,6 +123,10 @@ export function getChangedFiles(db: CodemapDatabase): {
   changed: string[];
   deleted: string[];
   existingPaths: Set<string>;
+  /** Source + hash for every entry in `changed[]`; reused by indexFiles to skip the second read+hash pass. */
+  sourceCache: ChangedSourceCache;
+  /** Existing `files.content_hash` map (all indexed paths) — reused by indexFiles to skip its own getAllFileHashes call. */
+  existingHashes: Map<string, string>;
 } | null {
   const lastCommit = getMeta(db, "last_indexed_commit");
   if (!lastCommit) return null;
@@ -167,6 +180,7 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const changed: string[] = [];
     const deleted: string[] = [];
+    const sourceCache: ChangedSourceCache = new Map();
 
     for (const f of allCandidates) {
       const absPath = join(root, f);
@@ -177,12 +191,20 @@ export function getChangedFiles(db: CodemapDatabase): {
         deleted.push(f);
         continue;
       }
-      if (existingHashes.get(f) !== hashContent(source)) {
+      const hash = hashContent(source);
+      if (existingHashes.get(f) !== hash) {
         changed.push(f);
+        sourceCache.set(f, { source, hash });
       }
     }
 
-    return { changed, deleted, existingPaths: new Set(existingHashes.keys()) };
+    return {
+      changed,
+      deleted,
+      existingPaths: new Set(existingHashes.keys()),
+      sourceCache,
+      existingHashes,
+    };
   } catch {
     return null;
   }
@@ -332,6 +354,10 @@ export async function indexFiles(
     collectMs?: number;
     /** Skip `git rev-parse HEAD` and stamp this sha. See `RunIndexOptions.commit`. */
     commit?: string;
+    /** When set, incremental branch skips the second readFileSync + hashContent per entry. Absent / sparse → inline read+hash. */
+    sourceCache?: ChangedSourceCache;
+    /** When set, incremental branch skips its own `getAllFileHashes(db)` call. */
+    existingHashes?: Map<string, string>;
   },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
@@ -340,6 +366,9 @@ export async function indexFiles(
   let parseMs = 0;
   let insertMs = 0;
   let indexCreateMs = 0;
+  let bindingsMs = 0;
+  let moduleCyclesMs = 0;
+  let reExportChainsMs = 0;
   let slowest: { path: string; parse_ms: number }[] = [];
 
   if (fullRebuild) {
@@ -366,7 +395,11 @@ export async function indexFiles(
     const parseStart = performance.now();
     const results = await parseFilesParallel(filePaths);
     parseMs = performance.now() - parseStart;
-    results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    // relPath is always POSIX-normalized ASCII (toRelativePosix upstream); byte order suffices
+    // for architecture.md § Sorted inserts' B-tree locality and skips the Intl-collator tax.
+    results.sort((a, b) =>
+      a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0,
+    );
     if (wantPerformance) {
       slowest = results
         .filter((r) => typeof r.parseMs === "number")
@@ -378,21 +411,29 @@ export async function indexFiles(
     indexed = insertParsedResults(db, results, indexedPaths);
     insertMs = performance.now() - insertStart;
   } else {
-    const existingHashes = getAllFileHashes(db);
+    const existingHashes = options?.existingHashes ?? getAllFileHashes(db);
     const root = getProjectRoot();
+    const sourceCache = options?.sourceCache;
 
     const transaction = db.transaction(() => {
       for (const relPath of filePaths) {
         const absPath = join(root, relPath);
         let source: string;
-        try {
-          source = readFileSync(absPath, "utf-8");
-        } catch {
-          deleteFileData(db, relPath);
-          continue;
+        let hash: string;
+        // `--files` targeted reindex + cache-less callers fall through to read+hash.
+        const cached = sourceCache?.get(relPath);
+        if (cached !== undefined) {
+          source = cached.source;
+          hash = cached.hash;
+        } else {
+          try {
+            source = readFileSync(absPath, "utf-8");
+          } catch {
+            deleteFileData(db, relPath);
+            continue;
+          }
+          hash = hashContent(source);
         }
-
-        const hash = hashContent(source);
 
         if (existingHashes.get(relPath) === hash) {
           skipped++;
@@ -402,10 +443,7 @@ export async function indexFiles(
         deleteFileData(db, relPath);
 
         const stat = statSync(absPath);
-        let lineCount = 1;
-        for (let i = 0; i < source.length; i++) {
-          if (source.charCodeAt(i) === 10) lineCount++;
-        }
+        const lineCount = countLines(source);
 
         const fileRow: FileRow = {
           path: relPath,
@@ -494,8 +532,10 @@ export async function indexFiles(
     const idxStart = performance.now();
     createIndexes(db);
     indexCreateMs = performance.now() - idxStart;
-    db.run("PRAGMA synchronous = NORMAL");
-    db.run("PRAGMA foreign_keys = ON");
+    // PRAGMAs stay OFF through the bindings / cycles / re-exports phase
+    // below — those steps insert another N rows per ref (~243k on a 2k-file
+    // tree) and FK validation + fsync per row dominated bindings_ms by ~83%
+    // pre-2026-05. Restored after the phase ends.
     setMeta(db, "schema_version", String(SCHEMA_VERSION));
   }
 
@@ -510,10 +550,21 @@ export async function indexFiles(
   // Pass-2 binding resolution per R.12 — full-rebuild only to honor
   // R.10's <100ms targeted contract. Orphan-cleared until next full.
   if (fullRebuild) {
+    const bindingsStart = performance.now();
     const bindings = resolveBindings(db);
     persistBindings(db, bindings);
+    bindingsMs = performance.now() - bindingsStart;
+
+    const cyclesStart = performance.now();
     persistModuleCycles(db);
+    moduleCyclesMs = performance.now() - cyclesStart;
+
+    const reExportStart = performance.now();
     persistReExportChains(db);
+    reExportChainsMs = performance.now() - reExportStart;
+
+    db.run("PRAGMA synchronous = NORMAL");
+    db.run("PRAGMA foreign_keys = ON");
   }
 
   const elapsed = Math.round(performance.now() - startTime);
@@ -527,9 +578,23 @@ export async function indexFiles(
       parse_ms: Math.round(parseMs),
       insert_ms: Math.round(insertMs),
       index_create_ms: Math.round(indexCreateMs),
+      bindings_ms: Math.round(bindingsMs),
+      module_cycles_ms: Math.round(moduleCyclesMs),
+      re_export_chains_ms: Math.round(reExportChainsMs),
       total_ms: elapsed,
       slowest_files: slowest,
     };
+    // Env-var output for scripts/check-perf-baseline.ts; absent var = no-op.
+    const perfJsonPath = process.env.CODEMAP_PERFORMANCE_JSON;
+    if (perfJsonPath !== undefined && perfJsonPath !== "") {
+      try {
+        writeFileSync(perfJsonPath, JSON.stringify(perf, null, 2));
+      } catch (err) {
+        console.error(
+          `[performance] failed to write ${perfJsonPath}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
   }
 
   if (fts5WasEmpty && getFts5Enabled()) {
@@ -562,7 +627,16 @@ export async function indexFiles(
         `    index_create:   ${perf.index_create_ms}  (B-tree build)`,
       );
       console.log(
-        `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL)`,
+        `    bindings:       ${perf.bindings_ms}  (resolveBindings + persist, full only)`,
+      );
+      console.log(
+        `    module_cycles:  ${perf.module_cycles_ms}  (persistModuleCycles, full only)`,
+      );
+      console.log(
+        `    re_exports:     ${perf.re_export_chains_ms}  (persistReExportChains, full only)`,
+      );
+      console.log(
+        `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL + bindings + cycles + re_exports)`,
       );
       if (perf.slowest_files.length > 0) {
         console.log(
@@ -598,7 +672,7 @@ export function deleteFilesFromIndex(
     const placeholders = batch.map(() => "?").join(",");
     db.run(`DELETE FROM files WHERE path IN (${placeholders})`, batch);
     // FK CASCADE doesn't reach `source_fts` (virtual table); mirror manually.
-    for (const path of batch) deleteSourceFts(db, path);
+    deleteSourceFtsBatch(db, batch);
   }
   if (!quiet) {
     console.log(`  Removed ${deleted.length} deleted files from index`);
@@ -726,6 +800,8 @@ function enrichQueryError(message: string): string {
 
 /**
  * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
+ * Sets `PRAGMA query_only = 1` so DML/DDL slipping through programmatic `Codemap.query`,
+ * `codemap apply` recipe SQL, the `cmd-query` paths, or `test:golden` errors at SQLite instead of mutating.
  * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
 export function queryRows(
@@ -734,6 +810,7 @@ export function queryRows(
 ): unknown[] {
   const db = openDb();
   try {
+    db.run("PRAGMA query_only = 1");
     return db.query(sql).all(...(bindValues ?? []));
   } finally {
     closeDb(db, { readonly: true });

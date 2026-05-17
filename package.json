@@ -48,6 +48,8 @@
     "changeset": "changeset",
     "check": "bun run build && bun run --parallel format:check lint:ci test typecheck && bun run test:golden",
     "check-updates": "bun update -i --latest",
+    "check:perf-baseline": "bun scripts/check-perf-baseline.ts",
+    "check:perf-baseline:update": "bun scripts/check-perf-baseline.ts --update",
     "clean": "git clean -xdf -e .env -e .codemap.db -e .codemap.db-wal -e .codemap.db-shm",
     "dev": "bun src/index.ts",
     "fix": "bun run lint:fix && bun run format",

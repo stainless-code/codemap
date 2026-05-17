@@ -13,6 +13,15 @@ export function buildLineMap(source: string): number[] {
   return offsets;
 }
 
+/** `buildLineMap(source).length` without the array — empty source still returns 1. */
+export function countLines(source: string): number {
+  let lineCount = 1;
+  for (let i = 0; i < source.length; i++) {
+    if (source.charCodeAt(i) === 10) lineCount++;
+  }
+  return lineCount;
+}
+
 export function offsetToLine(lineMap: number[], offset: number): number {
   let lo = 0;
   let hi = lineMap.length - 1;

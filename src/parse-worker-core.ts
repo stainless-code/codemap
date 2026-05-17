@@ -5,6 +5,7 @@ import { getAdapterForExtension } from "./adapters/builtin";
 import type { ParseContext } from "./adapters/types";
 import { LANG_MAP } from "./constants";
 import type { FileRow } from "./db";
+import { countLines } from "./extractors/offsets";
 import { hashContent } from "./hash";
 import { extractMarkers, extractSuppressions } from "./markers";
 import type { ParsedFile } from "./parsed-types";
@@ -54,10 +55,7 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
 
     const hash = hashContent(source);
     const stat = statSync(absPath);
-    let lineCount = 1;
-    for (let i = 0; i < source.length; i++) {
-      if (source.charCodeAt(i) === 10) lineCount++;
-    }
+    const lineCount = countLines(source);
 
     const ext = extname(relPath);
     const language = LANG_MAP[ext] ?? "text";
