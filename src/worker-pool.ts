@@ -20,7 +20,26 @@ const WORKER_URL_NODE = new URL(
   import.meta.url,
 );
 
-const WORKER_COUNT = Math.max(2, Math.min(cpus().length || 4, 6));
+// Default formula: floor 2, ceiling 6, CPU-bounded. Override via env
+// `CODEMAP_PARSE_WORKERS` (clamped to [1, 32] — sub-1 is meaningless,
+// >32 wastes startup on most boxes). Defaults preserve pre-2026-05
+// behavior; only changes when explicitly set (e.g. CI with vCPU limits
+// or local boxes with > 6 cores wanting to use them).
+function resolveWorkerCount(): number {
+  const env = process.env.CODEMAP_PARSE_WORKERS;
+  if (env !== undefined && env !== "") {
+    const parsed = Number.parseInt(env, 10);
+    if (Number.isFinite(parsed) && parsed >= 1) {
+      return Math.min(parsed, 32);
+    }
+    console.error(
+      `[worker-pool] ignoring invalid CODEMAP_PARSE_WORKERS=${JSON.stringify(env)} (expected positive integer ≤32)`,
+    );
+  }
+  return Math.max(2, Math.min(cpus().length || 4, 6));
+}
+
+const WORKER_COUNT = resolveWorkerCount();
 const IS_BUN = typeof Bun !== "undefined";
 const NODE_WORKER_PATH = IS_BUN ? "" : fileURLToPath(WORKER_URL_NODE);
 

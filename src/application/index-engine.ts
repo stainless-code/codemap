@@ -41,6 +41,7 @@ import {
   SCHEMA_VERSION,
 } from "../db";
 import type { CodemapDatabase, FileRow } from "../db";
+import { countLines } from "../extractors/offsets";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
@@ -446,10 +447,7 @@ export async function indexFiles(
         deleteFileData(db, relPath);
 
         const stat = statSync(absPath);
-        let lineCount = 1;
-        for (let i = 0; i < source.length; i++) {
-          if (source.charCodeAt(i) === 10) lineCount++;
-        }
+        const lineCount = countLines(source);
 
         const fileRow: FileRow = {
           path: relPath,
@@ -802,6 +800,11 @@ function enrichQueryError(message: string): string {
 
 /**
  * Open the index, run SQL, return all rows, then close. Used by the public **`Codemap.query`** method.
+ * Sets `PRAGMA query_only = 1` to mirror {@link executeQuery}'s read-only
+ * enforcement — any DML / DDL slipping through `Codemap.query` (programmatic),
+ * `bun run test:golden`, `codemap apply`'s recipe SQL execution, or the
+ * `cmd-query` print/grouped paths now errors at the SQLite layer instead of
+ * mutating the DB. Connection-scoped pragma; discarded on `closeDb()`.
  * @throws On invalid SQL or database errors (same as `better-sqlite3`-style `.all()`).
  */
 export function queryRows(
@@ -810,6 +813,7 @@ export function queryRows(
 ): unknown[] {
   const db = openDb();
   try {
+    db.run("PRAGMA query_only = 1");
     return db.query(sql).all(...(bindValues ?? []));
   } finally {
     closeDb(db, { readonly: true });

@@ -725,6 +725,30 @@ export interface SymbolRow {
 
 const BATCH_SIZE = 500;
 
+/**
+ * Memo placeholder strings per `(one, count)` tuple. Pre-2026-05 the FULL
+ * batch placeholder was precomputed per call but every TAIL batch with
+ * `count < BATCH_SIZE` paid an `Array(count).fill(one).join(",")` allocation
+ * on every batchInsert invocation; on watcher / incremental processes this
+ * grew the stmtCache with one new SQL string per unique tail length per
+ * table. Memo collapses those rebuilds to O(1) cache hits.
+ */
+const placeholderCache = new Map<string, Map<number, string>>();
+
+function getPlaceholders(one: string, count: number): string {
+  let perOne = placeholderCache.get(one);
+  if (perOne === undefined) {
+    perOne = new Map();
+    placeholderCache.set(one, perOne);
+  }
+  let s = perOne.get(count);
+  if (s === undefined) {
+    s = Array(count).fill(one).join(",");
+    perOne.set(count, s);
+  }
+  return s;
+}
+
 function batchInsert<T>(
   db: CodemapDatabase,
   items: T[],
@@ -733,14 +757,10 @@ function batchInsert<T>(
   extract: (item: T, out: BindValues) => void,
 ) {
   if (items.length === 0) return;
-  const fullPlaceholders = Array(BATCH_SIZE).fill(one).join(",");
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const end = Math.min(i + BATCH_SIZE, items.length);
     const batchLen = end - i;
-    const placeholders =
-      batchLen === BATCH_SIZE
-        ? fullPlaceholders
-        : Array(batchLen).fill(one).join(",");
+    const placeholders = getPlaceholders(one, batchLen);
     const values: BindValues = [];
     for (let j = i; j < end; j++) {
       extract(items[j], values);
