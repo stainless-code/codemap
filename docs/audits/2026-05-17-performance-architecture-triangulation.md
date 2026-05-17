@@ -84,6 +84,9 @@ Synthesised from consensus weight × measured leverage × risk. Each tier should
 ### Tier 5 — Hypothesis-stage or scale-dependent (gate on Tier 1 instrumentation)
 
 1. **Bindings resolver hoist / no-imports fast-path** (rows 4 + 23). Three audits agree on the existence; act only after `bindings_ms` confirms the wall cost on this repo and one larger corpus.
+   - **Empirical update (PR #96 commit `3f9f377`):** the audit's predicted optimisation (per-file `Map.get` hoist saving the ~38ms it estimated from ~1.26M skipped lookups × ~30ns each) was **wrong** — tested both `ORDER BY file_path, id` SQL and JS-side `Map<file, Ref[]>` grouping variants on this repo (340 files) and a 2.1k-file external corpus; both showed 0 to slight regression. V8 already optimises hot `Map.get`; JS-side grouping overhead exceeded any savings.
+   - **Profile-driven actual win:** `CODEMAP_BINDINGS_PROFILE` instrumentation revealed `bindings_ms` decomposes as `resolveBindings ≈ 17%` + `persistBindings.insert ≈ 83%` on a 2k-file corpus — the bottleneck was 243k row INSERTs with `foreign_keys=ON` + `synchronous=NORMAL` per row, NOT the resolver loop. Extending the existing bulk-INSERT PRAGMA-OFF window (already used during parallel parse+insert) through the bindings/cycles/re-exports phase saved **-33% `bindings_ms`** on the 2k-file corpus and **-27% here**. Behavior-preserved (stable-snapshot SHA bit-identical on both corpora).
+   - **Lesson for future audits:** the audit's cost model was estimated, not measured. The "deeper optimisations (TypedArrays, no-imports fast-path)" the audit gated on a larger corpus are still untested and may be similarly off. Next audit: include a `performance.now()`-instrumented profile pass on a representative corpus before recommending micro-optimisations.
 2. **Main-thread / IPC encoding spike** (row 1). All five audits touch this; none agree on the action. GPT-5.5's framing wins: instrument first (split `parse_ms` into pure-worker vs IPC), then choose between FTS-payload reduction (Codex), streaming inserts (Kimi/Composer), or CBOR-transferred batches (Claude hypothesis).
 3. **FTS5 batched delete** (row 21). Watcher-only path; payoff scales with `git checkout` event size.
 4. **`extractMarkers` lineMap reuse** (row 22). Small win; depends on TS/JS path having the lineMap already.
@@ -108,6 +111,11 @@ Synthesised from consensus weight × measured leverage × risk. Each tier should
 | **IPC encoding (CBOR / transferables)** | Claude P2 hypothesis; Composer + Kimi P2 (streaming inserts); GPT-5.5 P2 (defer to instrumentation)                              | All converge on "instrument before acting". No action without Tier 1 instrumentation showing IPC is a non-negligible fraction of `parse_ms`.                  |
 
 ---
+
+## Methodology gaps (lessons surfaced by execution)
+
+- **Audit cost models should be falsifiable, not estimated.** The Tier 5.1 deferral predicted a `Map.get` hoist win that didn't materialise; the actual win came from a PRAGMA-window analysis that wasn't in any of the five audits. Next audit pass: ship `performance.now()` instrumentation around suspected hot spots BEFORE recommending refactors, gated by an env var so it stays opt-in (e.g. `CODEMAP_<phase>_PROFILE=1`).
+- **Profile reveals where time goes; estimates reveal where authors think time goes.** All five audits assumed `bindings_ms` was dominated by `resolveBindings` (the loop). It's dominated by `persistBindings` (the INSERT). One profile-instrumented run would have caught this.
 
 ## Coverage gaps (next-audit fodder)
 
