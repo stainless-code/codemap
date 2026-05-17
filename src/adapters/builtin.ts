@@ -87,6 +87,30 @@ export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
   },
 ];
 
+// O(1) Map lookup per `adapters` array, built once per array reference.
+// Pre-2026-05 every parse call did a linear scan (~17 ops worst-case for
+// the built-in 3-adapter set); per-file × 100k files = ~1.7M ops on big
+// trees. WeakMap-keying covers future plugin-registered adapter arrays
+// (per c9-plugin-layer.md) without leaking memory when arrays get GC'd.
+const adapterIndexCache = new WeakMap<
+  readonly LanguageAdapter[],
+  Map<string, LanguageAdapter>
+>();
+
+function buildAdapterIndex(
+  adapters: readonly LanguageAdapter[],
+): Map<string, LanguageAdapter> {
+  const index = new Map<string, LanguageAdapter>();
+  // First-match-wins semantics preserved: iterate adapters in order,
+  // skip if an earlier adapter already claimed the extension.
+  for (const a of adapters) {
+    for (const ext of a.extensions) {
+      if (!index.has(ext)) index.set(ext, a);
+    }
+  }
+  return index;
+}
+
 /**
  * First-match adapter lookup by file extension. `ext` must include the
  * leading dot (`.tsx`); returns `undefined` when nothing matches (the
@@ -96,8 +120,10 @@ export function getAdapterForExtension(
   ext: string,
   adapters: readonly LanguageAdapter[] = BUILTIN_ADAPTERS,
 ): LanguageAdapter | undefined {
-  for (const a of adapters) {
-    if (a.extensions.includes(ext)) return a;
+  let index = adapterIndexCache.get(adapters);
+  if (index === undefined) {
+    index = buildAdapterIndex(adapters);
+    adapterIndexCache.set(adapters, index);
   }
-  return undefined;
+  return index.get(ext);
 }

@@ -149,6 +149,12 @@ export function openCodemapDatabase(path?: string): CodemapDatabase {
   db.run("PRAGMA temp_store = MEMORY");
   db.run("PRAGMA mmap_size = 268435456");
   db.run("PRAGMA cache_size = -16384");
+  // 100ms is short enough to feel instant under transient contention
+  // (WAL checkpoint, parallel recipe-recency writes) yet long enough to
+  // absorb the typical write critical section. Surfaced as `[recency]
+  // write failed: database is locked` warnings during the audit run; this
+  // makes those benign and rare instead of common.
+  db.run("PRAGMA busy_timeout = 100");
 
   return db;
 }

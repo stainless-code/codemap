@@ -400,7 +400,14 @@ export async function indexFiles(
     const parseStart = performance.now();
     const results = await parseFilesParallel(filePaths);
     parseMs = performance.now() - parseStart;
-    results.sort((a, b) => a.relPath.localeCompare(b.relPath));
+    // Byte-order vs localeCompare: relPath is always POSIX-normalized ASCII
+    // (toRelativePosix / toProjectRelative upstream), so the Intl-collator
+    // tax on every comparison is wasted work. B-tree-locality (per
+    // architecture.md § Sorted inserts) only needs ANY monotonic total
+    // order — byte-order gives that 3-10× cheaper.
+    results.sort((a, b) =>
+      a.relPath < b.relPath ? -1 : a.relPath > b.relPath ? 1 : 0,
+    );
     if (wantPerformance) {
       slowest = results
         .filter((r) => typeof r.parseMs === "number")
