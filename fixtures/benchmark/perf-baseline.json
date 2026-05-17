@@ -1,13 +1,13 @@
 {
-  "captured_at": "2026-05-17T17:45:53.278Z",
-  "commit": "d299ddf73cb7db133f53a40b21ee1a1690a22a3c",
+  "captured_at": "2026-05-17T19:13:10.113Z",
+  "commit": "afc500f96d812c4e7898c7f70c47e7495d365948",
   "phases": {
-    "collect_ms": 109,
-    "parse_ms": 117,
-    "insert_ms": 139,
-    "index_create_ms": 69,
-    "bindings_ms": 101,
-    "total_ms": 450
+    "collect_ms": 8,
+    "parse_ms": 109,
+    "insert_ms": 127,
+    "index_create_ms": 70,
+    "bindings_ms": 79,
+    "total_ms": 406
   },
   "regression_pct": 25,
   "noise_floor_ms": 10

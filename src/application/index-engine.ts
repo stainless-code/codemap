@@ -532,8 +532,10 @@ export async function indexFiles(
     const idxStart = performance.now();
     createIndexes(db);
     indexCreateMs = performance.now() - idxStart;
-    db.run("PRAGMA synchronous = NORMAL");
-    db.run("PRAGMA foreign_keys = ON");
+    // PRAGMAs stay OFF through the bindings / cycles / re-exports phase
+    // below — those steps insert another N rows per ref (~243k on a 2k-file
+    // tree) and FK validation + fsync per row dominated bindings_ms by ~83%
+    // pre-2026-05. Restored after the phase ends.
     setMeta(db, "schema_version", String(SCHEMA_VERSION));
   }
 
@@ -560,6 +562,9 @@ export async function indexFiles(
     const reExportStart = performance.now();
     persistReExportChains(db);
     reExportChainsMs = performance.now() - reExportStart;
+
+    db.run("PRAGMA synchronous = NORMAL");
+    db.run("PRAGMA foreign_keys = ON");
   }
 
   const elapsed = Math.round(performance.now() - startTime);
