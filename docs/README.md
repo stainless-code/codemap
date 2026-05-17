@@ -22,6 +22,7 @@ Each topic has exactly one canonical file. Other files cross-reference by relati
 | [packaging.md](./packaging.md)                | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets; **`bun run version`** + oxfmt **`CHANGELOG.md`**).                                                                                                                                                                                                                                                                               |
 | [roadmap.md](./roadmap.md)                    | Forward-looking [**Backlog**](./roadmap.md#backlog) and [**Non-goals**](./roadmap.md#non-goals-v1) (not a `src/` inventory).                                                                                                                                                                                                                                                                                                                                                                          |
 | [plans/](./plans/)                            | One `<feature-name>.md` per in-flight plan. Created on demand — don't add the `-plan` suffix; the folder provides context. In flight: [`c9-plugin-layer.md`](./plans/c9-plugin-layer.md), [`lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md).                                                                                                                                                                                                                                                 |
+| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. Open findings stay here until resolved; closed audits follow the audit lifecycle in the docs-governance skill.                                                                                                                                                                                                                                                                                                                                |
 | [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans, non-goals reassessments). Each note links shipped items back to canonical homes — see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md).                                                                                                                                                                                                                                                                |
 
 ---
@@ -69,7 +70,7 @@ Cross-cutting topics that span multiple files. Each has exactly one canonical ho
 
 ## Document Lifecycle
 
-Every doc here falls into one of four types. New content fits an existing type, or absorbs into an existing file — it does not spawn a new top-level doc by default.
+Every doc here falls into one of five types. New content fits an existing type, or absorbs into an existing file — it does not spawn a new top-level doc by default.
 
 ### Types
 
@@ -78,9 +79,10 @@ Every doc here falls into one of four types. New content fits an existing type, 
 | **Reference** | root (`architecture.md`, `agents.md`, `benchmark.md`, `golden-queries.md`, `packaging.md`, `glossary.md`, `why-codemap.md`) | Lives forever. Kept current per Rules 4, 7, 9.                                                            |
 | **Roadmap**   | root (`roadmap.md`, single file)                                                                                            | Lives forever. Items move in (new findings) and out (per Rule 2).                                         |
 | **Plan**      | `plans/<name>.md`                                                                                                           | Created when work commits. Deleted when work ships (per Rule 3).                                          |
+| **Audit**     | `audits/<topic>.md`                                                                                                         | Created at audit time. Closed per the docs-governance skill's audit lifecycle.                            |
 | **Research**  | `research/<topic>.md`                                                                                                       | Created on demand for a third-party scan or evaluation. Closed per [Closing research](#closing-research). |
 
-Backlogs, frameworks, and decisions don't get their own top-level file. They fold into one of the four:
+Backlogs, frameworks, and decisions don't get their own top-level file. They fold into one of the five:
 
 - **Backlogs** of open items → a section in `roadmap.md`.
 - **Frameworks / playbooks** → `architecture.md` if Codemap-internal, or `.agents/rules/` / `.agents/skills/` if project-wide policy.
