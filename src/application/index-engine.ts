@@ -49,6 +49,7 @@ import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
 import { resolveImports } from "../resolver";
 import {
+  getExcludeDirNames,
   getFts5Enabled,
   getIncludePatterns,
   getProjectRoot,
@@ -94,17 +95,29 @@ function fileCategory(path: string): "ts" | "css" | "text" {
 }
 
 export function collectFiles(): string[] {
-  const files: string[] = [];
   const root = getProjectRoot();
-  for (const pattern of getIncludePatterns()) {
-    const matches = globSync(pattern, root);
-    for (const path of matches) {
-      if (isPathExcluded(path)) continue;
-      files.push(path);
-    }
+  // Route excludeDirNames into the glob layer as `**/<name>/**` ignores —
+  // tinyglobby prunes those subtrees up-front instead of walking + post-
+  // filtering. isPathExcluded stays as defense-in-depth for paths that
+  // somehow slip through (e.g. a future glob backend that ignores `ignore`).
+  const ignore: string[] = [];
+  for (const name of getExcludeDirNames()) ignore.push(`**/${name}/**`);
+  const matches = globSync([...getIncludePatterns()], root, { ignore });
+  const files: string[] = [];
+  for (const path of matches) {
+    if (isPathExcluded(path)) continue;
+    files.push(path);
   }
   return [...new Set(files)].sort();
 }
+
+/**
+ * Per-changed-file cache populated by {@link getChangedFiles} and consumed
+ * by {@link indexFiles} so the incremental path doesn't re-read or re-hash
+ * the same file twice (pre-2026-05 every changed file paid two `readFileSync`
+ * + two SHA-256 hashes between detection and reindex).
+ */
+export type ChangedSourceCache = Map<string, { source: string; hash: string }>;
 
 // Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
 // history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
@@ -114,6 +127,8 @@ export function getChangedFiles(db: CodemapDatabase): {
   changed: string[];
   deleted: string[];
   existingPaths: Set<string>;
+  /** Source + hash for every entry in `changed[]`; reused by indexFiles to skip the second read+hash pass. */
+  sourceCache: ChangedSourceCache;
 } | null {
   const lastCommit = getMeta(db, "last_indexed_commit");
   if (!lastCommit) return null;
@@ -167,6 +182,7 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const changed: string[] = [];
     const deleted: string[] = [];
+    const sourceCache: ChangedSourceCache = new Map();
 
     for (const f of allCandidates) {
       const absPath = join(root, f);
@@ -177,12 +193,19 @@ export function getChangedFiles(db: CodemapDatabase): {
         deleted.push(f);
         continue;
       }
-      if (existingHashes.get(f) !== hashContent(source)) {
+      const hash = hashContent(source);
+      if (existingHashes.get(f) !== hash) {
         changed.push(f);
+        sourceCache.set(f, { source, hash });
       }
     }
 
-    return { changed, deleted, existingPaths: new Set(existingHashes.keys()) };
+    return {
+      changed,
+      deleted,
+      existingPaths: new Set(existingHashes.keys()),
+      sourceCache,
+    };
   } catch {
     return null;
   }
@@ -332,6 +355,13 @@ export async function indexFiles(
     collectMs?: number;
     /** Skip `git rev-parse HEAD` and stamp this sha. See `RunIndexOptions.commit`. */
     commit?: string;
+    /**
+     * Pre-read source + hash per relPath (e.g. populated by getChangedFiles).
+     * When present in the incremental branch, indexFiles reuses the cached
+     * source string and skips the second readFileSync + hashContent pass.
+     * Absent or sparse cache falls back to read+hash inline (back-compat).
+     */
+    sourceCache?: ChangedSourceCache;
   },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
@@ -383,19 +413,30 @@ export async function indexFiles(
   } else {
     const existingHashes = getAllFileHashes(db);
     const root = getProjectRoot();
+    const sourceCache = options?.sourceCache;
 
     const transaction = db.transaction(() => {
       for (const relPath of filePaths) {
         const absPath = join(root, relPath);
         let source: string;
-        try {
-          source = readFileSync(absPath, "utf-8");
-        } catch {
-          deleteFileData(db, relPath);
-          continue;
+        let hash: string;
+        // Reuse the source + hash getChangedFiles already computed when
+        // detecting this file as changed. Falls back to inline read+hash
+        // when the cache is absent or the entry is missing (e.g. `--files`
+        // targeted reindex, or cache-less callers).
+        const cached = sourceCache?.get(relPath);
+        if (cached !== undefined) {
+          source = cached.source;
+          hash = cached.hash;
+        } else {
+          try {
+            source = readFileSync(absPath, "utf-8");
+          } catch {
+            deleteFileData(db, relPath);
+            continue;
+          }
+          hash = hashContent(source);
         }
-
-        const hash = hashContent(source);
 
         if (existingHashes.get(relPath) === hash) {
           skipped++;

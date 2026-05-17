@@ -8,6 +8,7 @@ import {
   makePackageBucketizer,
 } from "../group-by";
 import type { Bucketizer, GroupByMode } from "../group-by";
+import type { CodemapDatabase } from "../sqlite-db";
 
 /**
  * SQLite bind value — the union accepted by `db.query(sql).all(...values)`.
@@ -91,6 +92,28 @@ export function executeQuery(
     // proof boundary. Doesn't bleed across calls — `closeDb()` discards the
     // connection.
     db.run("PRAGMA query_only = 1");
+    return executeQueryOnDb(db, opts);
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+}
+
+/**
+ * Run one statement against an already-open, already-`query_only`-enforced
+ * DB handle. Extracted from {@link executeQuery} so {@link executeQueryBatch}
+ * can amortise connection setup across N statements while preserving the
+ * exact per-statement envelope (incl. `{error}` isolation).
+ *
+ * Caller responsibilities (both honoured by `executeQuery` /
+ * `executeQueryBatch`):
+ * - Open the DB and set `PRAGMA query_only = 1` BEFORE the first call.
+ * - Close the DB AFTER all calls (with `closeDb(db, { readonly: true })`).
+ */
+function executeQueryOnDb(
+  db: CodemapDatabase,
+  opts: ExecuteQueryOpts,
+): QueryResultPayload | ExecuteQueryError {
+  try {
     let rows = db.query(opts.sql).all(...(opts.bindValues ?? [])) as unknown[];
 
     if (opts.changedFiles !== undefined) {
@@ -130,8 +153,6 @@ export function executeQuery(
     return {
       error: err instanceof Error ? err.message : String(err),
     };
-  } finally {
-    closeDb(db, { readonly: true });
   }
 }
 
@@ -145,20 +166,30 @@ export function executeQuery(
 export type BatchStatementResolved = Omit<ExecuteQueryOpts, "root">;
 
 /**
- * Run N statements; one DB connection per call (cheap with `bun:sqlite`).
- * Returns N envelopes — same per-element shape as single `executeQuery`
- * for the effective flag set on that statement (plan § 5: "per-element
- * shape mirrors single `query`'s output for the effective flag set").
+ * Run N statements through ONE read-only DB connection. Returns N
+ * envelopes — same per-element shape as single `executeQuery` for the
+ * effective flag set on that statement (plan § 5: "per-element shape
+ * mirrors single `query`'s output for the effective flag set").
  *
- * Errors are per-statement: a failed statement returns `{error}` in its
- * slot; sibling statements still execute. Matches the "partial success"
- * semantic the agent expects when batching independent reads.
+ * Pre-2026-05 this delegated to `executeQuery` per statement, opening and
+ * closing a DB connection N times — fine for N=1 but wasted setup for
+ * any real batch. Now one `openDb()` + one `PRAGMA query_only = 1` + N
+ * statements + one `closeDb({readonly: true})`. Per-statement `{error}`
+ * isolation preserved via {@link executeQueryOnDb}'s internal try/catch.
  */
 export function executeQueryBatch(opts: {
   statements: BatchStatementResolved[];
   root: string;
 }): Array<QueryResultPayload | ExecuteQueryError> {
-  return opts.statements.map((s) => executeQuery({ ...s, root: opts.root }));
+  const db = openDb();
+  try {
+    db.run("PRAGMA query_only = 1");
+    return opts.statements.map((s) =>
+      executeQueryOnDb(db, { ...s, root: opts.root }),
+    );
+  } finally {
+    closeDb(db, { readonly: true });
+  }
 }
 
 function resolveBucketizer(
