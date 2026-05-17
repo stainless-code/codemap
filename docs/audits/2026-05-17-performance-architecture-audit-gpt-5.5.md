@@ -9,7 +9,7 @@ Scope: performance improvements without intentional functionality change
 - Tracked repo inventory: 415 paths from `git ls-files`.
 - File modes: 390 regular tracked files, 3 executable tracked files, 22 tracked symlinks.
 - Explicit doc/agent surfaces: all `.agents/` and `docs/` paths were enumerated; central governance, architecture, benchmark, roadmap, glossary, plans, and research docs were read directly or through scoped review.
-- Existing untracked audit notes read as context only: `codex-5.3-performance-architecture-audit.md`, `docs/research/claude-opus-4-7-performance-architecture-audit.md`, `docs/research/composer-performance-architecture-audit.md`, `kimi-k2.5-architecture-performance-audit.md`.
+- Existing untracked audit notes read as context only (all four were later moved to `docs/audits/` as part of the triangulation PR; original-author paths preserved here for provenance): `codex-5.3-performance-architecture-audit.md` (root), `docs/research/claude-opus-4-7-performance-architecture-audit.md`, `docs/research/composer-performance-architecture-audit.md`, `kimi-k2.5-architecture-performance-audit.md` (root).
 - Fresh index evidence: `bun src/index.ts --full --performance` on this repo indexed 340 files, 6,593 symbols, 42,598 references, 32,144 bindings, and 393 dependencies.
 
 Official docs checked: SQLite WAL / PRAGMA / `busy_timeout` / `WITHOUT ROWID`, Bun SQLite and Workers docs, Oxc parser docs, Lightning CSS docs, and Chokidar project docs. Codebase facts below were checked against `src/`, `docs/architecture.md`, `docs/benchmark.md`, `docs/roadmap.md`, and live Codemap SQL.
