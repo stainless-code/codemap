@@ -10,23 +10,23 @@
 
 ---
 
-## What shipped (2026-05-15) — appendix per § 9 lifecycle
+## What shipped (fact-checked 2026-05-18) — appendix per § 9 lifecycle
 
 The substrate-growth half of this synthesis lifted to a dedicated plan PR — [`plans/substrate-extraction.md`](../plans/substrate-extraction.md) — which generalised § 4.1 / § 4.2 / § 5.3 items 1, 3 into a 13-tier sequenced plan. Per § 9's discipline ("when the synthesis path ships any step, add a 'What shipped' appendix; slim duplicated prose"), the canonical live status is **the substrate plan's per-tier headings**, not this note.
 
-**Shipped via the substrate plan (2026-05-15, PR #79):**
+**Shipped via the substrate plan:**
 
-- **Synthesis Step 5** (`calls.{line_start, column_start, column_end}`) — shipped as substrate plan **Tier 1 Slice 1.A**.
+- **Synthesis Step 5** (`calls.{line_start, column_start, column_end}`) — shipped as substrate plan **Tier 1 Slice 1.A**. Proposed call metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) is not in the live schema.
 - **Synthesis Step 7** (`exports.{line_start, line_end, column_start, column_end, is_re_export}`) — shipped as substrate plan **Tier 1 Slice 1.B**.
 - **§ 4.1 column anchoring on `symbols` / `imports` / `markers`** ("Deferred (incremental)") — shipped as substrate plan **Tier 1 Slices 1.C / 1.D**.
-- **§ 4.2 `import_specifiers` child table** — shipped as substrate plan **Tier 1 Slice 1.D**.
-- **§ 4.2 generalised `references` + `scopes` + `bindings` + `symbol_namespace`** ("Deferred — defer until ≥3 narrower position tables prove demand") — the trigger fired with Tier 1 landing four position-precise surfaces; lifted to substrate plan **Tier 2** and shipped (Tiers 2.1 / 2.2 / 2.3 / 2.4 closed). Bindings reach 1.3% unresolved on the codemap-self fixture.
+- **§ 4.2 `import_specifiers` child table** — shipped as substrate plan **Tier 1 Slice 1.D**, with the live schema keyed by `file_path`/`source` rather than the originally proposed `import_id` FK.
+- **§ 4.2 generalised `references` + `scopes` + `bindings` + `symbol_namespace`** ("Deferred — defer until ≥3 narrower position tables prove demand") — the trigger fired with Tier 1 landing four position-precise surfaces; lifted to substrate plan **Tier 2** and shipped in narrowed form. Live schema has `references.kind IN ('value','type','jsx','member')` and `bindings.resolution_kind IN ('same-file','imported','global','unresolved')`; richer namespaces / re-export resolution kinds remain deferred.
 - **§ 5.3 leverage-ranked items 1 + 3** — shipped via Tiers 1 + 2.
 - **Partial ship** of substrate plan Tiers 4 / 6 / 9 / 10 / 11 / 12 — foundation tables landed (`function_params` / `re_export_chains` / `test_suites` / `runtime_markers` / `file_metrics` / `module_cycles`); deferred bits stay tracked under each tier's heading.
 
 **Still open (the apply-engine half of this synthesis):**
 
-- **§ 6 Steps 1–4, 6, 8–12** — none shipped. The 12-step path still drives the apply-engine direction (write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
+- **§ 6 Steps 2–4, 6, 8–12** — not shipped. Step 1's doc reframe is effectively lifted into `roadmap.md` / `why-codemap.md`; the remaining 12-step path still drives the apply-engine direction (new diff-shape recipes, write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
 - **§ 4.4 engine extensions** (`apply --rows -`, `apply --diff-input`, `--until-empty`, etc.) — none shipped; still tracked as the agent-in-the-loop unlock per [§ 5.4 agent-angle gap analysis](#54-agent-angle-gap-analysis-from-a4).
 - **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
 

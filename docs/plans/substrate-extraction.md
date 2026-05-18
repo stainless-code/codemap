@@ -2,7 +2,7 @@
 
 > **Status:** open · plan iterating in parallel with the broader [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) write-engine direction.
 >
-> **Per-tier ship status (2026-05-15, PR #79):** Tiers **1** and **2** fully shipped. Tiers **4 / 6 / 9 / 10 / 11 / 12** partially shipped — their foundation tables landed in [`src/db.ts`](../../src/db.ts) but with narrowed shape vs the proposals below; remaining columns / sibling tables stay deferred under their tier headings. Tiers **3 (JSX) / 5 (Behavioral) / 7 (CSS rich) / 8 (Project meta) / 13 (ORM/SQL)** not shipped. Each tier's "Ship status" line below is the canonical per-tier verdict; the schema deltas in each tier preserve the originally-proposed shape so deferred bits stay grep-able.
+> **Per-tier ship status (fact-checked 2026-05-18):** Tiers **1** and **2** shipped in narrowed form. Tiers **4 / 6 / 9 / 10 / 11 / 12** partially shipped — their foundation tables landed in [`src/db.ts`](../../src/db.ts) but not the full proposed shapes. Tiers **3 (JSX) / 5 (Behavioral) / 7 (CSS rich) / 8 (Project meta) / 13 (ORM/SQL)** are not shipped. Current live schema confirms rows for `calls`, `exports`, `import_specifiers`, `references`, `scopes`, `bindings`, `function_params`, `re_export_chains`, `test_suites`, `runtime_markers`, `file_metrics`, and `module_cycles`; absent tables include `jsx_elements`, `jsx_attributes`, `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`, `css_rules`, `css_at_rules`, `css_declarations`, `tsconfig_options`, `package_json_meta`, `orm_models`, `sql_strings`, and `db_migrations`.
 >
 > **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Today the schema captures symbols + imports + exports + calls + components + markers + type*members + css*{variables,classes,keyframes} + suppressions. The AST contains roughly 4× more queryable structure that we discard at parse time. This plan enumerates the entire extraction surface — ~13 tiers spanning identifier references, scope graph, binding resolution, JSX, type-system depth, behavioral facts, module-graph topology, CSS rule structure, test-suite metadata, runtime/dev markers, metrics expansion, and ORM/SQL tracking — and sequences them as independent tracer-bullet PRs that compound into a maximal substrate. Once landed, every recipe / write capability discussed in the synthesis doc (and many more) lights up via SQL JOINs alone, with zero engine work.
 >
@@ -193,11 +193,11 @@ Each tier is one tracer-bullet PR: parser visitor change + schema migration + 1-
 
 **Goal:** Make `calls` / `exports` / `symbols` / `markers` column-precise; split `imports.specifiers` JSON blob into a typed child table.
 
-**Ship status:** 4 slices landed; SCHEMA_VERSION 10 → 14; 4 flagship recipes; 4 golden fixtures. Slices A–D summarised below.
+**Ship status (fact-checked 2026-05-18):** 4 slices landed, but the live schema is narrower than this tier's original proposal. Present today: `calls.{line_start,column_start,column_end}`, `exports.{line_start,line_end,column_start,column_end,is_re_export}`, `symbols.{name_column_start,name_column_end}`, `markers.{column_start,column_end}`, and `import_specifiers`. Deferred from the proposal: `calls.{args_count,is_method_call,is_constructor_call,is_optional_chain}`, `import_specifiers.import_id`, and side-effect import rows.
 
 | Slice | Substrate                                                                                                                              | Flagship recipe                                  | Schema bump |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------- |
-| 1.A   | `calls.{line_start, column_start, column_end}` + `idx_calls_position`                                                                  | `find-call-sites` (`--params callee=…`)          | 10 → 11     |
+| 1.A   | `calls.{line_start, column_start, column_end}` + `idx_calls_position`; proposed call flags deferred                                    | `find-call-sites` (`--params callee=…`)          | 10 → 11     |
 | 1.B   | `exports.{line_start, line_end, column_start, column_end, is_re_export}` + 2 indexes                                                   | `find-export-sites` (`--params name=…`)          | 11 → 12     |
 | 1.C   | `symbols.{name_column_start, name_column_end}` + `markers.{column_start, column_end}`                                                  | `find-symbol-definitions` (`--params name=…`)    | 12 → 13     |
 | 1.D   | `import_specifiers` child table (file_path, source, line, column_start/end, imported_name, local_name, kind, is_type_only) + 4 indexes | `find-import-sites` (`--params imported_name=…`) | 13 → 14     |
@@ -278,7 +278,7 @@ New recipe candidates: `dedupe-imports`, `consolidate-type-only-imports`, `stale
 
 ### Tier 2 — `references` + `scopes` + `bindings` (the load-bearing tier) — **SHIPPED 2026-05-15**
 
-**Status (2026-05-15):** Tier 2 closed. Scopes + references shipped 2026-05-15; bindings shipped 2026-05-15 (Tier 2.1); params + type params + re-export chains shipped 2026-05-15 (Tier 2.2); member-access + destructuring + type globals shipped 2026-05-15 (Tier 2.3). See ship reports below.
+**Status (fact-checked 2026-05-18):** Tier 2 shipped in narrowed form. `references`, `scopes`, and `bindings` exist and are populated in the live self-index. Current schema uses parser-local scope IDs (`scopes.local_id`, `references.scope_local_id`) and a compact `references.kind IN ('value','type','jsx','member')`; the richer proposed kind taxonomy (`decorator`, `shorthand-*`, `computed-member`, etc.), `bindings.namespace`, and `resolution_kind='re-exported'` remain deferred. Params and re-export chains shipped as separate foundation tables (`function_params`, `re_export_chains`) rather than the exact Tier 2 DDL below.
 
 **Goal:** Every identifier _use_ — call, type position, JSX, decorator, shorthand, member access, spread — becomes a queryable row. Plus a lexical scope graph and per-reference binding resolution to the originating symbol.
 
@@ -1359,8 +1359,8 @@ CREATE TABLE db_migrations (
 
 **Visitor strategy:**
 
-- **ORM detection:** look for known patterns — Prisma model file (`schema.prisma` — separate parser); Drizzle `sqliteTable('foo', { ... })` / `pgTable('foo', { ... })` calls; TypeORM `@Entity` decorator (links to Tier 5 decorators); Mongoose `mongoose.Schema(...)` calls.
-- **SQL strings:** tagged template literals like `sql\`SELECT ...\``; raw string literals containing SQL-keyword sequences (`SELECT`, `INSERT`, `UPDATE`, `DELETE` followed by known SQL constructs). Heuristic — false positives ok; recipes can filter.
+- **ORM detection:** look for known patterns — Prisma model file (`schema.prisma` — separate parser); Drizzle `sqliteTable('foo', {...})` / `pgTable('foo', {...})` calls; TypeORM `@Entity` decorator (links to Tier 5 decorators); Mongoose `mongoose.Schema(...)` calls.
+- **SQL strings:** tagged template literals like `` sql`SELECT ...` ``; raw string literals containing SQL-keyword sequences (`SELECT`, `INSERT`, `UPDATE`, `DELETE` followed by known SQL constructs). Heuristic — false positives ok; recipes can filter.
 - **Migration files:** filename patterns (`migrations/<n>-<name>.{sql,ts}`); known frameworks (Knex, Drizzle Kit, Prisma Migrate).
 
 **Recipes unlocked:**
@@ -1561,7 +1561,9 @@ export default defineConfig({
 });
 ```
 
-Defaults to all-on. Each tier's extractor checks its flag at parse-worker startup and no-ops if disabled.
+**Status (fact-checked 2026-05-18):** proposed, not implemented. Current config has feature toggles such as `fts5`, `recipeRecency`, and `boundaries`, but not the `extraction` object below; extractors in `parser.ts` run unconditionally today.
+
+Defaults to all-on once implemented. Each tier's extractor checks its flag at parse-worker startup and no-ops if disabled.
 
 ### Worker-thread shape
 
@@ -1583,7 +1585,7 @@ Expected pass-2 cost: ~30% of total reindex time on large projects.
 
 Two genuinely-unindexable categories. Worth naming so the strategy is explicit.
 
-1. **Runtime / dynamic behavior.** `obj[computedName]` member access; `Function` constructor; `eval`; runtime-computed import paths (`import(\`./modules/\${name}\`)`); macros / build-time codegen output. The index captures the AST shape; resolution happens at runtime. Recipes touching these stay conservative — same caveat as `rename-preview`'s "What v1 does not cover" section.
+1. **Runtime / dynamic behavior.** `obj[computedName]` member access; `Function` constructor; `eval`; runtime-computed import paths (``import(`./modules/${name}`)``); macros / build-time codegen output. The index captures the AST shape; resolution happens at runtime. Recipes touching these stay conservative — same caveat as `rename-preview`'s "What v1 does not cover" section.
 
 2. **Cross-tree type resolution.** `tsserver`-grade type evaluation — what does this type resolve to after all conditional/mapped/inferred type operators? We extract type-text as written, not as resolved. For type-level queries (`is this generic instantiated with X?`; `does this satisfy that interface?`), Path B adapter via `ts-morph` is the answer — same as for AST-shape rewrites. The substrate gives recipes the structural facts; type-level semantics belong to the language service.
 
