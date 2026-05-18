@@ -8,19 +8,17 @@ Post-merge sequencing for the perf-architecture triangulation work in PRs #95 (a
 
 ## Phase 0 — pre-merge housekeeping
 
-- [ ] **Changeset** for PR #96 covering (a) the perf-wall improvements, (b) `IndexPerformanceReport` new fields (`bindings_ms`, `module_cycles_ms`, `re_export_chains_ms`), (c) `queryRows` `PRAGMA query_only = 1` hardening (the only user-visible behavior change). Format per the [`project-recipes-cli-pre-bootstrap`](https://github.com/stainless-code/codemap/blob/main/CHANGELOG.md) precedent.
-- [ ] **PR #95** ready for review.
-- [ ] **PR #96** ready for review.
-
-Recommend reviewers go commit-by-commit (Tier 1 → 5 → 5.1) since later tiers depend on earlier instrumentation.
+- [x] **Changeset** for PR #96 covering (a) the perf-wall improvements, (b) `IndexPerformanceReport` new fields (`bindings_ms`, `module_cycles_ms`, `re_export_chains_ms`), (c) `queryRows` `PRAGMA query_only = 1` hardening (the only user-visible behavior change). Shipped in [#96](https://github.com/stainless-code/codemap/pull/96).
+- [x] **PR #95** ready for review → merged.
+- [x] **PR #96** ready for review → merged.
 
 ## Phase 1 — merge + CI variance characterisation
 
-- [ ] Merge PR #95 (audit docs, zero functionality change).
-- [ ] Merge PR #96 (Tier 1–5 perf code).
-- [ ] **Watch the `📈 Perf baseline (self-index)` CI job** for the first ~10 runs on `main` post-merge. Job is currently `continue-on-error: true`.
-- [ ] If GitHub-runner variance stays under 25% of baseline → promote to hard gate in a one-line CI PR (drop `continue-on-error: true`). If runners are noisier, bump `CODEMAP_PERF_REGRESSION_PCT` to 35-40% first.
-- [ ] If anyone lands an unrelated perf-affecting change between #96 merge and the gate flip, refresh `fixtures/benchmark/perf-baseline.json` via `bun run check:perf-baseline:update`.
+- [x] Merge [PR #95](https://github.com/stainless-code/codemap/pull/95) (audit docs, zero functionality change).
+- [x] Merge [PR #96](https://github.com/stainless-code/codemap/pull/96) (Tier 1–5 perf code).
+- [x] **CI variance characterised on first run** — within-run variance ~5% (882/838/866 ms total across 3 internal samples), well inside the 25% threshold. Issue was systematic CI-slowness (2-4× vs local), not noise.
+- [x] **Re-baselined from CI runner medians** in [#99](https://github.com/stainless-code/codemap/pull/99) (`ebb862e`) — local was the wrong baseline source; GitHub's Ubuntu runners are systematically slower on parse + insert phases.
+- [x] **Promoted `📈 Perf baseline (self-index)` to hard gate** in [#100](https://github.com/stainless-code/codemap/pull/100) (`c0cdf0e`) — dropped `continue-on-error: true`, added to `ci-complete`'s required-jobs list, and added to branch protection's `required_status_checks.contexts` via `gh api`.
 
 ## Phase 2 — quick PRAGMA + INSERT tuning follow-up
 
