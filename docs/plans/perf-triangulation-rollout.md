@@ -75,8 +75,8 @@ These ship when their respective trigger fires, not proactively. The triangulati
 
 Per [`docs-governance` § Closing an audit](../../.agents/skills/docs-governance/SKILL.md#closing-an-audit), the triangulation audit closes when Tier 1 + Tier 2 ship (done at Phase 1) AND surviving deferred items either ship or lift to `roadmap.md`.
 
-- [ ] Add one `roadmap.md` backlog line consolidating Phase 4 deferrals: `**Perf-triangulation deferrals (trigger-gated)** — Tier 5.2/5.4/5.6/5.7/6.1/6.2 from audit 2026-05-17; each ships when its trigger fires (see audit doc for triggers).`
-- [ ] Apply the re-derivable test from the closing-audit substrate variants: does a fresh audit today re-derive every finding from current code? If yes AND no source cites the audit doc by name → **delete** (no tombstones). If the methodology section (instrument before estimating) is unique policy → slim to that + add `Status: Closed` header.
+- [x] Added one `roadmap.md` backlog line consolidating Phase 4 deferrals: `**Perf-triangulation deferrals (trigger-gated)** — Tier 5.2/5.4/5.6/5.7/6.1/6.2 from audit 2026-05-17`; each item has explicit trigger conditions inline. Shipped in [#102](https://github.com/stainless-code/codemap/pull/102) (`76174dd`).
+- [x] Applied the re-derivable test → **slim + keep with `Status: Closed`**. Audit doc has unique synthesis (consensus matrix can't be reconstructed from the source audits without re-reading all five), decisions of record (Tier 5.1 empirical update saves the next agent from re-running the dead-end Map.get hoist), and unique methodology policy (profile-before-estimate; all 5 audits mis-located the bindings bottleneck). Verified via codemap (`SELECT … FROM symbols WHERE doc_comment LIKE '%performance-architecture-triangulation%'` → 0 rows) that no source file has a JSDoc anchor on the audit, so slimming was anchor-safe. Per-model source audits untouched as historical snapshots.
 
 ## Methodology learnings (already in audit doc, recapped here)
 
