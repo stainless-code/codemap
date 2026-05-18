@@ -736,7 +736,12 @@ export interface SymbolRow {
   nesting_depth?: number | null;
 }
 
-const BATCH_SIZE = 500;
+// SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 12.x both ship
+// with newer SQLite. Older builds default to 999.
+const SQLITE_MAX_VARS = 32766;
+// Cap rows per batch even when col_count would allow more — keeps per-batch
+// JS allocations bounded and avoids pathologically long SQL strings.
+const MAX_ROWS_PER_BATCH = 5000;
 
 // Memo per (one, count) tuple — collapses tail-batch placeholder rebuilds (and the
 // resulting unique SQL strings hitting stmtCache) to O(1) cache hits.
@@ -756,6 +761,24 @@ function getPlaceholders(one: string, count: number): string {
   return s;
 }
 
+// Memo per `one` (placeholder shape per table) so col-count + batch-size
+// math runs once per table, not per call.
+const batchSizeCache = new Map<string, number>();
+
+function batchSizeForTuple(one: string): number {
+  let n = batchSizeCache.get(one);
+  if (n !== undefined) return n;
+  let cols = 0;
+  // Count `?` chars — placeholder shape is "(?,?,?,...)"; one row's params.
+  for (let i = 0; i < one.length; i++) if (one.charCodeAt(i) === 63) cols++;
+  n = Math.min(
+    MAX_ROWS_PER_BATCH,
+    Math.floor(SQLITE_MAX_VARS / Math.max(cols, 1)),
+  );
+  batchSizeCache.set(one, n);
+  return n;
+}
+
 function batchInsert<T>(
   db: CodemapDatabase,
   items: T[],
@@ -764,8 +787,13 @@ function batchInsert<T>(
   extract: (item: T, out: BindValues) => void,
 ) {
   if (items.length === 0) return;
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const end = Math.min(i + BATCH_SIZE, items.length);
+  // Per-table cap: narrow tables (4-col bindings) batch up to 5000 rows;
+  // wide tables (20-col symbols) batch up to floor(32766/20) = 1638. Both
+  // are much higher than the pre-2026-05 fixed 500 → fewer round-trips
+  // through the bun:sqlite / better-sqlite3 binding boundary.
+  const batchSize = batchSizeForTuple(one);
+  for (let i = 0; i < items.length; i += batchSize) {
+    const end = Math.min(i + batchSize, items.length);
     const batchLen = end - i;
     const placeholders = getPlaceholders(one, batchLen);
     const values: BindValues = [];
@@ -1163,7 +1191,9 @@ export function insertBindings(db: CodemapDatabase, rows: BindingRow[]) {
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
+    // persistBindings DELETEs orphans first + bindings only runs on full
+    // rebuild (table empty after dropAll). No conflicts → plain INSERT.
+    "INSERT INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
     "(?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1199,7 +1229,10 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
+    // Incremental path: deleteFileData(relPath) deletes from `files`, which
+    // CASCADEs through file_metrics' FK before insertFileMetrics runs.
+    // Full rebuild: table empty after dropAll. No conflicts → plain INSERT.
+    "INSERT INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
     "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1372,7 +1405,8 @@ export function insertReExportChains(
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
+    // persistReExportChains DELETEs all rows first. No conflicts → plain INSERT.
+    "INSERT INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
     "(?,?,?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1400,7 +1434,8 @@ export function insertModuleCycles(
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO module_cycles (file_path, cycle_id, cycle_size)",
+    // persistModuleCycles DELETEs all rows first. No conflicts → plain INSERT.
+    "INSERT INTO module_cycles (file_path, cycle_id, cycle_size)",
     "(?,?,?)",
     (r, v) => v.push(r.file_path, r.cycle_id, r.cycle_size),
   );

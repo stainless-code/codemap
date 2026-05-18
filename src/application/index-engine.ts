@@ -376,6 +376,9 @@ export async function indexFiles(
     createTables(db);
     db.run("PRAGMA synchronous = OFF");
     db.run("PRAGMA foreign_keys = OFF");
+    // WAL is pure overhead during full rebuild — recovery is "rerun --full"
+    // (rebuild starts with another dropAll). Restored post-bindings phase.
+    db.run("PRAGMA journal_mode = OFF");
     // dropAll wiped meta; re-seed `fts5_enabled` + `schema_version` so the
     // next run's toggle-change detection has a reference point.
     setMeta(db, META_FTS5_ENABLED_KEY, getFts5Enabled() ? "1" : "0");
@@ -565,6 +568,7 @@ export async function indexFiles(
 
     db.run("PRAGMA synchronous = NORMAL");
     db.run("PRAGMA foreign_keys = ON");
+    db.run("PRAGMA journal_mode = WAL");
   }
 
   const elapsed = Math.round(performance.now() - startTime);
