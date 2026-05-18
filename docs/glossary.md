@@ -249,7 +249,7 @@ Read/write helpers for the `meta` key-value table. Stores `schema_version`, `las
 
 ### glob
 
-Include patterns (relative to project root) used to find indexable files. Defaults in `DEFAULT_INCLUDE_PATTERNS`. Implemented via `tinyglobby` on Node and `Bun.Glob` on Bun (both emit POSIX paths).
+Include patterns (relative to project root) used to find indexable files. Defaults in `DEFAULT_INCLUDE_PATTERNS`. Implemented via `tinyglobby` on both Node and Bun (POSIX paths). Pre-2026-05 used `Bun.Glob` on Bun; switched to tinyglobby everywhere when the `collectFiles` refactor needed glob-side `ignore` (which `Bun.Glob` doesn't support) — see [packaging.md § Node vs Bun](./packaging.md#node-vs-bun).
 
 ### golden test
 
@@ -301,7 +301,7 @@ TS shape for one row of the `imports` table.
 
 ### `IndexPerformanceReport`
 
-TS shape emitted under `IndexRunStats.performance` when `--performance` is set. Per-phase timing + top-10 slowest files. Note: `total_ms` is `indexFiles` wall-clock and excludes `collect_ms`.
+TS shape emitted under `IndexRunStats.performance` when `--performance` is set. Seven per-phase timings (`collect_ms`, `parse_ms`, `insert_ms`, `index_create_ms`, `bindings_ms`, `module_cycles_ms`, `re_export_chains_ms`) + `total_ms` + top-10 slowest files. Note: `total_ms` is `indexFiles` wall-clock (parse + insert + DDL + bindings + cycles + re_exports) and excludes `collect_ms`; end-to-end run wall is `collect_ms + total_ms`. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps the report as JSON post-run.
 
 ### `IndexResult`
 
@@ -548,7 +548,7 @@ The `templates/agents/` directory shipped with the npm package. Source for `code
 
 ### tinyglobby
 
-The Node-side glob implementation. Returns POSIX-separated paths regardless of OS — same as `Bun.Glob` and `git`. Why `cmd-validate.ts` normalizes its inputs to POSIX.
+The glob implementation used on both Bun and Node (since the `collectFiles` refactor in PR #96 — `Bun.Glob` has no `ignore` option so the post-filter walked `node_modules` etc.; tinyglobby with `ignore` is ~12× faster). Returns POSIX-separated paths regardless of OS — why `cmd-validate.ts` normalises its inputs to POSIX.
 
 ### tracer bullet
 
