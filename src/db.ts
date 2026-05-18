@@ -1163,7 +1163,9 @@ export function insertBindings(db: CodemapDatabase, rows: BindingRow[]) {
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
+    // persistBindings DELETEs orphans first + bindings only runs on full
+    // rebuild (table empty after dropAll). No conflicts → plain INSERT.
+    "INSERT INTO bindings (reference_id, resolved_symbol_id, resolution_kind, is_external)",
     "(?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1199,7 +1201,10 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
+    // Incremental path: deleteFileData(relPath) deletes from `files`, which
+    // CASCADEs through file_metrics' FK before insertFileMetrics runs.
+    // Full rebuild: table empty after dropAll. No conflicts → plain INSERT.
+    "INSERT INTO file_metrics (file_path, total_lines, code_lines, blank_lines, comment_lines, let_count, const_count, var_count, function_count, arrow_count, class_count, interface_count, export_count)",
     "(?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1372,7 +1377,8 @@ export function insertReExportChains(
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
+    // persistReExportChains DELETEs all rows first. No conflicts → plain INSERT.
+    "INSERT INTO re_export_chains (from_file, from_name, to_file, to_name, hops, truncated)",
     "(?,?,?,?,?,?)",
     (r, v) =>
       v.push(
@@ -1400,7 +1406,8 @@ export function insertModuleCycles(
   batchInsert(
     db,
     rows,
-    "INSERT OR REPLACE INTO module_cycles (file_path, cycle_id, cycle_size)",
+    // persistModuleCycles DELETEs all rows first. No conflicts → plain INSERT.
+    "INSERT INTO module_cycles (file_path, cycle_id, cycle_size)",
     "(?,?,?)",
     (r, v) => v.push(r.file_path, r.cycle_id, r.cycle_size),
   );
