@@ -153,12 +153,13 @@ jobs:
 
   perf-baseline:
     # Regression guardrail per docs/audits/2026-05-17-performance-architecture-triangulation.md Tier 1.2.
-    # `continue-on-error: true` until CI variance is characterised; promote to hard gate after.
+    # Hard gate since #99 re-baselined from CI runner medians (~5% within-run
+    # variance, well inside the 25% threshold). Add to branch protection's
+    # required_status_checks list for true merge-blocking enforcement.
     name: 📈 Perf baseline (self-index)
     needs: skip-ci
     if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -218,7 +219,8 @@ jobs:
 
   ci-complete:
     name: CI complete
-    needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
+    needs:
+      [skip-ci, format, lint, typecheck, test, build, benchmark, perf-baseline]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -230,7 +232,8 @@ jobs:
             needs.typecheck.result != 'success' ||
             needs.test.result != 'success' ||
             needs.build.result != 'success' ||
-            needs.benchmark.result != 'success'
+            needs.benchmark.result != 'success' ||
+            needs['perf-baseline'].result != 'success'
           )
         run: exit 1
 

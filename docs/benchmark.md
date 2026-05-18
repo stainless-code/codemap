@@ -207,14 +207,14 @@ Independent of the consumer-facing scenarios above, the repo carries a **per-pha
 1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `total_ms`.
 2. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps that report as JSON to `<path>` after the run (no CLI flag added; env-var only).
 3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares to `fixtures/benchmark/perf-baseline.json`.
-4. CI job `📈 Perf baseline (self-index)` (in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) invokes the script on every PR. Non-blocking initially while CI variance is characterised.
+4. CI job `📈 Perf baseline (self-index)` (in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) invokes the script on every PR. Hard gate (merge-blocking) since the baseline was re-captured from CI runner medians.
 
 ### Why this is separate from `src/benchmark.ts`
 
-| Surface                                  | Audience                       | Fixture                                            | Gate?                                   |
-| ---------------------------------------- | ------------------------------ | -------------------------------------------------- | --------------------------------------- |
-| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational)                      |
-| `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (self-index)                             | Yes (`continue-on-error: true` for now) |
+| Surface                                  | Audience                       | Fixture                                            | Gate?                           |
+| ---------------------------------------- | ------------------------------ | -------------------------------------------------- | ------------------------------- |
+| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational)              |
+| `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (self-index)                             | Yes (hard gate; merge-blocking) |
 
 The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is only measurable on a tree with real cross-file edges, and (b) the audit triangulation's numbers were captured here.
 
