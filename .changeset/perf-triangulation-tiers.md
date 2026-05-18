@@ -10,4 +10,4 @@
 
 **Behavior change (correctness hardening):** `queryRows` (the implementation behind `Codemap.query()`, `codemap apply` recipe SQL execution, `bun run test:golden`, and the `cmd-query` print/grouped paths) now sets `PRAGMA query_only = 1` to mirror `executeQuery`'s read-only enforcement. DML / DDL slipping through these paths now errors at SQLite instead of mutating the database. All these call sites are contractually read-only; this turns a contract into an enforceable boundary. Existing tests pass unchanged. Anyone who relied on undocumented mutation through `Codemap.query("DELETE FROM ...")` would now get an error — but that was always API abuse.
 
-Full design context: `docs/audits/2026-05-17-performance-architecture-triangulation.md` (synthesis of 5 independent perf/architecture audits).
+Full design context: `docs/plans/perf-triangulation-rollout.md` (synthesis + execution rollout of 5 independent perf/architecture audits authored 2026-05-17).
