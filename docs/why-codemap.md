@@ -4,11 +4,11 @@
 
 ## The Problem
 
-AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning files at runtime — globbing directories, reading file contents, grepping for patterns, then reading more files to follow leads. For a codebase of this size, every discovery question triggers:
+AI coding agents (Cursor, Copilot, Windsurf, etc.) discover code by scanning files at runtime — globbing directories, reading file contents, grepping for patterns, then reading more files to follow leads. On medium-to-large TypeScript trees, broad discovery questions often trigger:
 
 - **3-5 tool calls** (Glob → Read → Grep → Read → ...) per question
-- **9+ MB of source** loaded into context per scan
-- **~2.3 million tokens** consumed per full-codebase read (at ~4 bytes/token)
+- **Multi-MB source reads** loaded into context per broad scan
+- **Large token churn** from repeated full-file reads (roughly bytes / 4, before tool-call overhead)
 - **False positives** from regex that require additional reads to disambiguate
 
 This burns context window, wastes tokens, slows response time, and produces less accurate results.
@@ -52,7 +52,7 @@ This is the real value for AI agents. Speed matters, but token waste is the domi
 
 ### Per-Question Savings
 
-Traditional cost **depends on the question**: scanning all `app/**/*.{ts,tsx}` is ~9 MB (~2.3M tokens at ~4 bytes/token). A full benchmark pass on a **large** tree can read tens of megabytes on the traditional side — see the script’s “Token impact estimate” footer. Indexed queries return only result rows (typically a few KB at most).
+Traditional cost **depends on the question**: scanning broad `app/**/*.{ts,tsx}`-style globs can read multi-MB source sets. A full benchmark pass on a **large** tree can read tens of megabytes on the traditional side — see the script’s “Token impact estimate” footer. Indexed queries return only result rows (typically a few KB at most).
 
 **Order-of-magnitude**: indexed discovery is vastly cheaper in tokens than “read every matching file” workflows for large trees.
 

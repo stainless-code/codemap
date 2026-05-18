@@ -566,7 +566,7 @@ Flip the existing `actions[].auto_fixable` flag from advisory to enforcing. `app
 
 ### Step 5 — `calls.{line_start, column_start}` substrate column (S) — ✓ Shipped 2026-05-15
 
-**What shipped:** [`substrate-extraction.md` Tier 1 Slice 1.A](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `calls.{line_start, column_start, column_end}` + `args_count` + `is_method_call` / `is_constructor_call` / `is_optional_chain` flags + `idx_calls_position` index. Bundled `find-call-sites` recipe.
+**What shipped:** [`substrate-extraction.md` Tier 1 Slice 1.A](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `calls.{line_start, column_start, column_end}` + bundled `find-call-sites` recipe. Proposed call metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) did not ship in the live schema.
 
 Single oxc visitor extension reusing existing `buildLineMap` / `offsetToLine` from `parser.ts`; schema bump triggers one-shot reindex.
 

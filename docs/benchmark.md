@@ -248,7 +248,7 @@ Implication for local devs:
 
 #### Where the index doesn't help
 
-- **Full-text search** — the index doesn't store source code, so you still need grep/read for content-level queries (e.g. "find all usages of `console.log`")
+- **Full-text search by default** — the normal index does not store source text. Use grep/read for raw body searches, or opt in to FTS5 (`--with-fts` / `fts5: true`) when you need body matches joinable with structural tables.
 - **Questions about code logic** — the index captures structure (names, types, locations), not semantics (what the code does)
 
 ### Fixtures
