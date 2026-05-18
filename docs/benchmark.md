@@ -228,13 +228,23 @@ The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is on
 
 ### Updating the baseline
 
-After an intentional perf change (Tier 2-5 of the triangulation, schema bump, dep upgrade), capture a new baseline:
+After an intentional perf change (e.g. Tier 2-5 of the triangulation, schema bump, dep upgrade), capture a new baseline:
 
 ```bash
 bun run check:perf-baseline:update
 ```
 
 This rewrites `fixtures/benchmark/perf-baseline.json` with current medians + the HEAD commit. **Commit the baseline change in the same PR** as the intentional perf shift so reviewers see the delta in the diff.
+
+### Baseline provenance: CI runner, not local
+
+The committed baseline is **captured from a GitHub Actions Ubuntu runner**, not from local dev hardware. GitHub runners are systematically 2-4× slower than typical dev machines on the parse + insert phases (fewer vCPUs, slower disk). Setting the baseline from local would cause every CI run to spuriously fail.
+
+Implication for local devs:
+
+- Local `bun run check:perf-baseline` should show **wide negative deltas** (you're faster than CI). That's expected — passes the check.
+- Local `bun run check:perf-baseline:update` will write **dev-machine** numbers. **Do not commit those.** If you need to refresh the baseline because of an intentional perf change, let CI capture the numbers and copy them in, OR open a PR with the baseline update and trust CI to validate it.
+- Future improvement: a `workflow_dispatch` job that re-captures + commits the baseline from CI itself, removing the manual copy step.
 
 #### Where the index doesn't help
 
