@@ -87,6 +87,26 @@ export const BUILTIN_ADAPTERS: readonly LanguageAdapter[] = [
   },
 ];
 
+// WeakMap-keyed so future plugin-registered adapter arrays (c9-plugin-layer.md)
+// also memoise without leaking refs to GC'd arrays.
+const adapterIndexCache = new WeakMap<
+  readonly LanguageAdapter[],
+  Map<string, LanguageAdapter>
+>();
+
+function buildAdapterIndex(
+  adapters: readonly LanguageAdapter[],
+): Map<string, LanguageAdapter> {
+  const index = new Map<string, LanguageAdapter>();
+  // First-match-wins: skip ext if an earlier adapter already claimed it.
+  for (const a of adapters) {
+    for (const ext of a.extensions) {
+      if (!index.has(ext)) index.set(ext, a);
+    }
+  }
+  return index;
+}
+
 /**
  * First-match adapter lookup by file extension. `ext` must include the
  * leading dot (`.tsx`); returns `undefined` when nothing matches (the
@@ -96,8 +116,10 @@ export function getAdapterForExtension(
   ext: string,
   adapters: readonly LanguageAdapter[] = BUILTIN_ADAPTERS,
 ): LanguageAdapter | undefined {
-  for (const a of adapters) {
-    if (a.extensions.includes(ext)) return a;
+  let index = adapterIndexCache.get(adapters);
+  if (index === undefined) {
+    index = buildAdapterIndex(adapters);
+    adapterIndexCache.set(adapters, index);
   }
-  return undefined;
+  return index.get(ext);
 }

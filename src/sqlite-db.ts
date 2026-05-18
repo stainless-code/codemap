@@ -149,6 +149,9 @@ export function openCodemapDatabase(path?: string): CodemapDatabase {
   db.run("PRAGMA temp_store = MEMORY");
   db.run("PRAGMA mmap_size = 268435456");
   db.run("PRAGMA cache_size = -16384");
+  // Absorbs WAL-checkpoint / parallel-recipe-recency-writer collisions
+  // without user-perceptible latency under no-contention.
+  db.run("PRAGMA busy_timeout = 100");
 
   return db;
 }

@@ -20,7 +20,22 @@ const WORKER_URL_NODE = new URL(
   import.meta.url,
 );
 
-const WORKER_COUNT = Math.max(2, Math.min(cpus().length || 4, 6));
+// Override via `CODEMAP_PARSE_WORKERS` (clamped [1, 32]); default formula unchanged when unset.
+function resolveWorkerCount(): number {
+  const env = process.env.CODEMAP_PARSE_WORKERS;
+  if (env !== undefined && env !== "") {
+    const parsed = Number.parseInt(env, 10);
+    if (Number.isFinite(parsed) && parsed >= 1) {
+      return Math.min(parsed, 32);
+    }
+    console.error(
+      `[worker-pool] ignoring invalid CODEMAP_PARSE_WORKERS=${JSON.stringify(env)} (expected positive integer ≤32)`,
+    );
+  }
+  return Math.max(2, Math.min(cpus().length || 4, 6));
+}
+
+const WORKER_COUNT = resolveWorkerCount();
 const IS_BUN = typeof Bun !== "undefined";
 const NODE_WORKER_PATH = IS_BUN ? "" : fileURLToPath(WORKER_URL_NODE);
 
