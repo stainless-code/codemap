@@ -200,7 +200,7 @@ The benchmark also measures the cost of keeping the index fresh (3 runs each, sa
 
 ## Perf baseline (regression guardrail)
 
-Independent of the consumer-facing scenarios above, the repo carries a **per-phase wall guardrail** for the full-rebuild path. Wired during the [perf-architecture triangulation Tier 1.2](./audits/2026-05-17-performance-architecture-triangulation.md).
+Independent of the consumer-facing scenarios above, the repo carries a **per-phase wall guardrail** for the full-rebuild path. Wired during the [perf-architecture triangulation Tier 1.2](./plans/perf-triangulation-rollout.md).
 
 ### Mechanism
 

@@ -152,7 +152,7 @@ jobs:
           bun run benchmark
 
   perf-baseline:
-    # Regression guardrail per docs/audits/2026-05-17-performance-architecture-triangulation.md Tier 1.2.
+    # Regression guardrail per docs/plans/perf-triangulation-rollout.md Tier 1.2.
     # Hard gate since #99 re-baselined from CI runner medians (~5% within-run
     # variance, well inside the 25% threshold). Add to branch protection's
     # required_status_checks list for true merge-blocking enforcement.
