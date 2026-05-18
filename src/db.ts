@@ -736,7 +736,12 @@ export interface SymbolRow {
   nesting_depth?: number | null;
 }
 
-const BATCH_SIZE = 500;
+// SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 12.x both ship
+// with newer SQLite. Older builds default to 999.
+const SQLITE_MAX_VARS = 32766;
+// Cap rows per batch even when col_count would allow more — keeps per-batch
+// JS allocations bounded and avoids pathologically long SQL strings.
+const MAX_ROWS_PER_BATCH = 5000;
 
 // Memo per (one, count) tuple — collapses tail-batch placeholder rebuilds (and the
 // resulting unique SQL strings hitting stmtCache) to O(1) cache hits.
@@ -756,6 +761,24 @@ function getPlaceholders(one: string, count: number): string {
   return s;
 }
 
+// Memo per `one` (placeholder shape per table) so col-count + batch-size
+// math runs once per table, not per call.
+const batchSizeCache = new Map<string, number>();
+
+function batchSizeForTuple(one: string): number {
+  let n = batchSizeCache.get(one);
+  if (n !== undefined) return n;
+  let cols = 0;
+  // Count `?` chars — placeholder shape is "(?,?,?,...)"; one row's params.
+  for (let i = 0; i < one.length; i++) if (one.charCodeAt(i) === 63) cols++;
+  n = Math.min(
+    MAX_ROWS_PER_BATCH,
+    Math.floor(SQLITE_MAX_VARS / Math.max(cols, 1)),
+  );
+  batchSizeCache.set(one, n);
+  return n;
+}
+
 function batchInsert<T>(
   db: CodemapDatabase,
   items: T[],
@@ -764,8 +787,13 @@ function batchInsert<T>(
   extract: (item: T, out: BindValues) => void,
 ) {
   if (items.length === 0) return;
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const end = Math.min(i + BATCH_SIZE, items.length);
+  // Per-table cap: narrow tables (4-col bindings) batch up to 5000 rows;
+  // wide tables (20-col symbols) batch up to floor(32766/20) = 1638. Both
+  // are much higher than the pre-2026-05 fixed 500 → fewer round-trips
+  // through the bun:sqlite / better-sqlite3 binding boundary.
+  const batchSize = batchSizeForTuple(one);
+  for (let i = 0; i < items.length; i += batchSize) {
+    const end = Math.min(i + batchSize, items.length);
     const batchLen = end - i;
     const placeholders = getPlaceholders(one, batchLen);
     const values: BindValues = [];
