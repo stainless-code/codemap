@@ -35,12 +35,13 @@ import {
   insertCssKeyframes,
   insertTypeMembers,
   insertCalls,
+  insertDynamicImports,
   getAllFileHashes,
   upsertSourceFts,
   META_FTS5_ENABLED_KEY,
   SCHEMA_VERSION,
 } from "../db";
-import type { CodemapDatabase, FileRow } from "../db";
+import type { CodemapDatabase, DynamicImportRow, FileRow } from "../db";
 import { countLines } from "../extractors/offsets";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
@@ -48,7 +49,7 @@ import { hashContent } from "../hash";
 import { extractMarkers, extractSuppressions } from "../markers";
 import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
-import { resolveImports } from "../resolver";
+import { resolveImports, resolveModuleSpecifier } from "../resolver";
 import {
   getExcludeDirNames,
   getFts5Enabled,
@@ -114,6 +115,20 @@ export function collectFiles(): string[] {
 
 /** Reused between {@link getChangedFiles} and {@link indexFiles} so the incremental path reads + hashes each file once, not twice. */
 export type ChangedSourceCache = Map<string, { source: string; hash: string }>;
+
+function persistDynamicImports(
+  db: CodemapDatabase,
+  absPath: string,
+  rows: DynamicImportRow[] | undefined,
+): void {
+  if (!rows?.length) return;
+  for (const row of rows) {
+    if (row.source_kind === "literal" && row.source_text) {
+      row.resolved_path = resolveModuleSpecifier(absPath, row.source_text);
+    }
+  }
+  insertDynamicImports(db, rows);
+}
 
 // Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
 // history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
@@ -264,10 +279,10 @@ function insertParsedResults(
             );
           }
         } else {
+          const absPath = join(root, parsed.relPath);
           if (parsed.symbols?.length) insertSymbols(db, parsed.symbols);
 
           if (parsed.imports?.length) {
-            const absPath = join(root, parsed.relPath);
             const deps = resolveImports(absPath, parsed.imports, indexedPaths);
             insertImports(db, parsed.imports);
             if (deps.length) insertDependencies(db, deps);
@@ -295,6 +310,7 @@ function insertParsedResults(
             insertTypeMembers(db, parsed.typeMembers);
           }
           if (parsed.calls?.length) insertCalls(db, parsed.calls);
+          persistDynamicImports(db, absPath, parsed.dynamicImports);
         }
         if (parsed.suppressions?.length)
           insertSuppressions(db, parsed.suppressions);
@@ -337,6 +353,7 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM test_suites) as test_suites,
         (SELECT COUNT(*) FROM re_export_chains) as re_export_chains,
         (SELECT COUNT(*) FROM module_cycles) as module_cycles,
+        (SELECT COUNT(*) FROM dynamic_imports) as dynamic_imports,
         (SELECT COUNT(*) FROM file_metrics) as file_metrics`,
     )
     .get()!;
@@ -514,6 +531,7 @@ export async function indexFiles(
             if (data.typeMembers.length)
               insertTypeMembers(db, data.typeMembers);
             if (data.calls.length) insertCalls(db, data.calls);
+            persistDynamicImports(db, absPath, data.dynamicImports);
           }
           // Category-agnostic: one regex pass over raw source, no AST needed.
           const suppressions = extractSuppressions(source, relPath);

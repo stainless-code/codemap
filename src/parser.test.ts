@@ -540,6 +540,41 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("dynamic import extraction", () => {
+    it("records literal, template, and expression specifiers with async context", () => {
+      const src = [
+        "async function load() {",
+        "  await import('./foo');",
+        "  import('./bar');",
+        "}",
+        "const x = import(`./${n}.js`);",
+        "const y = import(getPath());",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.dynamicImports).toHaveLength(4);
+
+      const foo = d.dynamicImports.find((r) => r.source_text === "./foo");
+      expect(foo).toMatchObject({
+        source_kind: "literal",
+        in_async_fn: 1,
+      });
+
+      const bar = d.dynamicImports.find((r) => r.source_text === "./bar");
+      expect(bar).toMatchObject({
+        source_kind: "literal",
+        in_async_fn: 1,
+      });
+
+      const tmpl = d.dynamicImports.find((r) => r.source_kind === "template");
+      expect(tmpl?.source_text).toContain("${n}");
+      expect(tmpl?.in_async_fn).toBe(0);
+
+      const expr = d.dynamicImports.find((r) => r.source_kind === "expression");
+      expect(expr?.source_text).toBe("getPath()");
+      expect(expr?.in_async_fn).toBe(0);
+    });
+  });
+
   describe("call graph extraction", () => {
     it("extracts function-to-function calls", () => {
       const src = `function foo() { bar(); baz(); }\nfunction bar() {}\nfunction baz() {}\n`;

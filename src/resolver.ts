@@ -86,3 +86,21 @@ export function resolveImports(
 
   return deps;
 }
+
+/** Resolve a string module specifier from `absoluteFilePath`; null when external/unresolvable. */
+export function resolveModuleSpecifier(
+  absoluteFilePath: string,
+  source: string,
+): string | null {
+  const root = _projectRoot!;
+  const resolver = getResolver();
+  try {
+    const result = resolver.resolveFileSync(absoluteFilePath, source);
+    if (!result.path) return null;
+    return result.path.startsWith(root)
+      ? result.path.slice(root.length + 1)
+      : result.path;
+  } catch {
+    return null;
+  }
+}

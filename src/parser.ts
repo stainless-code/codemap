@@ -24,6 +24,7 @@ import type {
   FunctionParamRow,
   RuntimeMarkerRow,
   TestSuiteRow,
+  DynamicImportRow,
 } from "./db";
 import { callsExtractor } from "./extractors/calls";
 import {
@@ -34,6 +35,7 @@ import {
   componentsExtractor,
   createComponentDetector,
 } from "./extractors/components";
+import { dynamicImportsExtractor } from "./extractors/dynamic-imports";
 import { extractVisibility } from "./extractors/jsdoc";
 import { markersExtractor } from "./extractors/markers";
 import { buildLineMap, offsetToLine } from "./extractors/offsets";
@@ -62,6 +64,7 @@ interface ExtractedData {
   functionParams: FunctionParamRow[];
   runtimeMarkers: RuntimeMarkerRow[];
   testSuites: TestSuiteRow[];
+  dynamicImports: DynamicImportRow[];
 }
 
 /**
@@ -105,6 +108,7 @@ const EXTRACTORS: readonly TierExtractor[] = [
   callsExtractor,
   componentsExtractor,
   referencesExtractor,
+  dynamicImportsExtractor,
   runtimeMarkersExtractor,
   testsExtractor,
   markersExtractor,
@@ -143,6 +147,7 @@ export function extractFileData(
   const functionParams: FunctionParamRow[] = [];
   const runtimeMarkers: RuntimeMarkerRow[] = [];
   const testSuites: TestSuiteRow[] = [];
+  const dynamicImports: DynamicImportRow[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -194,6 +199,7 @@ export function extractFileData(
     functionParams,
     runtimeMarkers,
     testSuites,
+    dynamicImports,
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
@@ -228,6 +234,7 @@ export function extractFileData(
     functionParams,
     runtimeMarkers,
     testSuites,
+    dynamicImports,
   };
 }
 

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -304,6 +304,18 @@ export function createTables(db: CodemapDatabase) {
       cycle_size INTEGER NOT NULL
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS dynamic_imports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      source_kind TEXT NOT NULL CHECK (source_kind IN ('literal','template','expression')),
+      source_text TEXT,
+      resolved_path TEXT,
+      in_async_fn INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
     -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
     -- want specifier-precise rewrites (rename specifier, dedupe, type-only
     -- migrate) JOIN this table. The original imports.specifiers JSON stays
@@ -517,6 +529,10 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_module_cycles_cid ON module_cycles(cycle_id);
     CREATE INDEX IF NOT EXISTS idx_module_cycles_size ON module_cycles(cycle_size);
 
+    CREATE INDEX IF NOT EXISTS idx_dynamic_imports_file ON dynamic_imports(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_dynamic_imports_resolved ON dynamic_imports(resolved_path, file_path)
+      WHERE resolved_path IS NOT NULL;
+
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
 
@@ -582,6 +598,7 @@ export function createSchema(db: CodemapDatabase) {
 export function dropAll(db: CodemapDatabase) {
   db.run(`
     DROP TABLE IF EXISTS module_cycles;
+    DROP TABLE IF EXISTS dynamic_imports;
     DROP TABLE IF EXISTS re_export_chains;
     DROP TABLE IF EXISTS function_params;
     DROP TABLE IF EXISTS runtime_markers;
@@ -1145,6 +1162,40 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
         c.is_method_call ?? 0,
         c.is_constructor_call ?? 0,
         c.is_optional_chain ?? 0,
+      ),
+  );
+}
+
+export interface DynamicImportRow {
+  file_path: string;
+  line_start: number;
+  column_start: number;
+  source_kind: "literal" | "template" | "expression";
+  source_text: string | null;
+  resolved_path: string | null;
+  in_async_fn: number;
+  scope_local_id: number;
+}
+
+export function insertDynamicImports(
+  db: CodemapDatabase,
+  rows: DynamicImportRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO dynamic_imports (file_path, line_start, column_start, source_kind, source_text, resolved_path, in_async_fn, scope_local_id)",
+    "(?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.line_start,
+        r.column_start,
+        r.source_kind,
+        r.source_text,
+        r.resolved_path,
+        r.in_async_fn,
+        r.scope_local_id,
       ),
   );
 }

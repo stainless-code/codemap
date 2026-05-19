@@ -66,6 +66,7 @@ function emptyStats(): IndexTableStats {
     test_suites: 0,
     re_export_chains: 0,
     module_cycles: 0,
+    dynamic_imports: 0,
     file_metrics: 0,
   };
 }

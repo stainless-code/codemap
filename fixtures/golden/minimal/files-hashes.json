@@ -49,9 +49,9 @@
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "c3a9b5d818c52584925072550641e7c559048b4952bc8d328df45e3c3cc14b79",
+    "content_hash": "382aa555ecc0857d53dc71235731e5f37b3d4fea210e228e3d3c2154a74ee0e3",
     "language": "ts",
-    "line_count": 23
+    "line_count": 24
   },
   {
     "path": "src/lib/cache.ts",

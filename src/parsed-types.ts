@@ -18,6 +18,7 @@ import type {
   FunctionParamRow,
   RuntimeMarkerRow,
   TestSuiteRow,
+  DynamicImportRow,
 } from "./db";
 
 /**
@@ -51,6 +52,7 @@ export interface ParsedFile {
   functionParams?: FunctionParamRow[];
   runtimeMarkers?: RuntimeMarkerRow[];
   testSuites?: TestSuiteRow[];
+  dynamicImports?: DynamicImportRow[];
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

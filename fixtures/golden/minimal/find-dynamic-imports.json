@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 11,
+    "column_start": 15,
+    "source_kind": "literal",
+    "source_text": "./lib/cache",
+    "resolved_path": "src/lib/cache.ts",
+    "in_async_fn": 1
+  }
+]

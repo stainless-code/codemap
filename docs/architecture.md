@@ -428,6 +428,20 @@ SCCs of size ≥ 2 from `dependencies`, plus size-1 SCCs with a self-edge. Compu
 | cycle_id   | INTEGER | Per-PR auto-numbered cycle id (shared across cycle members) |
 | cycle_size | INTEGER | Number of files in the cycle                                |
 
+### `dynamic_imports` — Dynamic `import()` sites (`STRICT`)
+
+| Column         | Type       | Description                                                           |
+| -------------- | ---------- | --------------------------------------------------------------------- |
+| id             | INTEGER PK | Auto-increment row id                                                 |
+| file_path      | TEXT FK    | Containing file                                                       |
+| line_start     | INTEGER    | 1-based line of the module specifier token                            |
+| column_start   | INTEGER    | 0-based column of the specifier start                                 |
+| source_kind    | TEXT       | `literal` / `template` / `expression`                                 |
+| source_text    | TEXT       | Specifier text (literal value, template source, or expression source) |
+| resolved_path  | TEXT       | Project-relative path when `source_kind = 'literal'` and resolvable   |
+| in_async_fn    | INTEGER    | 1 when the import sits inside an async function body                  |
+| scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id`; `0` = module)               |
+
 ### `runtime_markers` — Operational signals (`STRICT`)
 
 Every `console.*` call, `debugger` statement, `throw` statement, and `process.env.X` access. Powers `find-leftover-console` + `env-var-audit`.

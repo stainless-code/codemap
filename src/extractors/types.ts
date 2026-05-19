@@ -3,6 +3,7 @@ import type { Comment, VisitorObject } from "oxc-parser";
 import type {
   CallRow,
   ComponentRow,
+  DynamicImportRow,
   ExportRow,
   FunctionParamRow,
   ImportRow,
@@ -125,6 +126,7 @@ export interface ExtractContext {
   readonly functionParams: FunctionParamRow[];
   readonly runtimeMarkers: RuntimeMarkerRow[];
   readonly testSuites: TestSuiteRow[];
+  readonly dynamicImports: DynamicImportRow[];
 
   readonly scopes: ScopeTracker;
   readonly complexity: ComplexityTracker;
