@@ -1,0 +1,9 @@
+[
+  {
+    "file_path": "src/consumer.ts",
+    "name": "prefetch",
+    "kind": "function",
+    "return_type": "Promise<void>",
+    "is_generator": 0
+  }
+]

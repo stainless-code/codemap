@@ -150,6 +150,21 @@ export function buildFunctionSignature(name: string, node: any): string {
   return sig;
 }
 
+/** Structured function-shape columns for Tier 4 (`symbols.return_type`, etc.). */
+export function functionShapeColumns(node: any): {
+  return_type: string | null;
+  is_async: number;
+  is_generator: number;
+} {
+  const returnType = node?.returnType?.typeAnnotation;
+  const rt = returnType ? stringifyTypeNode(returnType) : null;
+  return {
+    return_type: rt,
+    is_async: node?.async ? 1 : 0,
+    is_generator: node?.generator ? 1 : 0,
+  };
+}
+
 /**
  * Literal initialiser → string for `symbols.value`. Unwraps
  * `TSAsExpression` / `TSSatisfiesExpression`; handles unary `-N` and

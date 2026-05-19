@@ -66,8 +66,28 @@ describe("extractFileData", () => {
     it("includes return type on arrow functions", () => {
       const src = `export const add = (a: number, b: number): number => a + b;\n`;
       const d = extractFileData("/proj/x.ts", src, "x.ts");
-      const sig = d.symbols.find((s) => s.name === "add")?.signature;
-      expect(sig).toBe("add(a, b): number");
+      const sym = d.symbols.find((s) => s.name === "add");
+      expect(sym?.signature).toBe("add(a, b): number");
+      expect(sym?.return_type).toBe("number");
+      expect(sym?.is_async).toBe(0);
+    });
+
+    it("records async and generator shape columns", () => {
+      const src = [
+        "async function load(): Promise<void> {}",
+        "function* gen(): Generator<number> {}",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "load")).toMatchObject({
+        return_type: "Promise<void>",
+        is_async: 1,
+        is_generator: 0,
+      });
+      expect(d.symbols.find((s) => s.name === "gen")).toMatchObject({
+        return_type: "Generator<number>",
+        is_async: 0,
+        is_generator: 1,
+      });
     });
 
     it("includes generics on arrow functions", () => {

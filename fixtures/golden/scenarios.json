@@ -101,6 +101,11 @@
       "params": { "callee": "createClient" }
     },
     {
+      "id": "find-async-functions",
+      "prompt": "Parametrised recipe: list async function-shaped symbols with return_type",
+      "recipe": "find-async-functions"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",

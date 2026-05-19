@@ -36,9 +36,15 @@
     "coverage_pct": 0
   },
   {
-    "name": "run",
+    "name": "prefetch",
     "file_path": "src/consumer.ts",
     "line_start": 10,
+    "coverage_pct": 0
+  },
+  {
+    "name": "run",
+    "file_path": "src/consumer.ts",
+    "line_start": 14,
     "coverage_pct": 0
   },
   {
@@ -111,12 +117,6 @@
     "name": "now",
     "file_path": "src/utils/date.ts",
     "line_start": 5,
-    "coverage_pct": 100
-  },
-  {
-    "name": "nowIso",
-    "file_path": "src/utils/format.ts",
-    "line_start": 13,
     "coverage_pct": 100
   }
 ]

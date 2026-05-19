@@ -7,6 +7,10 @@ import { epochMs } from "./utils/format";
 
 // FIXME: handle errors
 // HACK: short-circuit shouldn't ship to prod
+export async function prefetch(): Promise<void> {
+  get("warm");
+}
+
 export function run() {
   const config: ClientConfig = { baseUrl: "https://api.example.com" };
   createClient(config);
