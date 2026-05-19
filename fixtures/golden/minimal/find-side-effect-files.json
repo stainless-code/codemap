@@ -1,0 +1,8 @@
+[
+  {
+    "path": "src/consumer.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  }
+]

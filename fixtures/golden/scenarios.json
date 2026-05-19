@@ -111,6 +111,16 @@
       "recipe": "find-dynamic-imports"
     },
     {
+      "id": "find-barrel-files",
+      "prompt": "Recipe: barrel files (re-exports only, no local value symbols)",
+      "recipe": "find-barrel-files"
+    },
+    {
+      "id": "find-side-effect-files",
+      "prompt": "Recipe: files with module-level side effects",
+      "recipe": "find-side-effect-files"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",

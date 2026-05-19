@@ -53,6 +53,7 @@ export interface ParsedFile {
   runtimeMarkers?: RuntimeMarkerRow[];
   testSuites?: TestSuiteRow[];
   dynamicImports?: DynamicImportRow[];
+  hasSideEffects?: number;
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

@@ -34,6 +34,7 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     runtimeMarkers: data.runtimeMarkers,
     testSuites: data.testSuites,
     dynamicImports: data.dynamicImports,
+    hasSideEffects: data.hasSideEffects,
   };
 }
 

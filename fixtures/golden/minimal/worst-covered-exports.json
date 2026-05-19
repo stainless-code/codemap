@@ -38,13 +38,13 @@
   {
     "name": "prefetch",
     "file_path": "src/consumer.ts",
-    "line_start": 10,
+    "line_start": 12,
     "coverage_pct": 0
   },
   {
     "name": "run",
     "file_path": "src/consumer.ts",
-    "line_start": 15,
+    "line_start": 17,
     "coverage_pct": 0
   },
   {

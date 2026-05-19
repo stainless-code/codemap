@@ -5,6 +5,8 @@ import { get } from "./lib/cache";
 import { now } from "./utils/date";
 import { epochMs } from "./utils/format";
 
+get("bootstrap");
+
 // FIXME: handle errors
 // HACK: short-circuit shouldn't ship to prod
 export async function prefetch(): Promise<void> {

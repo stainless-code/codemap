@@ -573,6 +573,12 @@ describe("extractFileData", () => {
       expect(expr?.source_text).toBe("getPath()");
       expect(expr?.in_async_fn).toBe(0);
     });
+
+    it("flags module-level side effects", () => {
+      const src = `import { x } from "./m";\nx();\nfunction f() { y(); }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.hasSideEffects).toBe(1);
+    });
   });
 
   describe("call graph extraction", () => {

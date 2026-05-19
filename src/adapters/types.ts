@@ -38,6 +38,7 @@ export type ParsedFilePayload = Pick<
   | "runtimeMarkers"
   | "testSuites"
   | "dynamicImports"
+  | "hasSideEffects"
   | "cssVariables"
   | "cssClasses"
   | "cssKeyframes"

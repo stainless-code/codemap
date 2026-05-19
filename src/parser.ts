@@ -38,6 +38,7 @@ import {
 import { dynamicImportsExtractor } from "./extractors/dynamic-imports";
 import { extractVisibility } from "./extractors/jsdoc";
 import { markersExtractor } from "./extractors/markers";
+import { moduleSideEffectsExtractor } from "./extractors/module-side-effects";
 import { buildLineMap, offsetToLine } from "./extractors/offsets";
 import { referencesExtractor } from "./extractors/references";
 import { runtimeMarkersExtractor } from "./extractors/runtime-markers";
@@ -65,6 +66,7 @@ interface ExtractedData {
   runtimeMarkers: RuntimeMarkerRow[];
   testSuites: TestSuiteRow[];
   dynamicImports: DynamicImportRow[];
+  hasSideEffects: number;
 }
 
 /**
@@ -109,6 +111,7 @@ const EXTRACTORS: readonly TierExtractor[] = [
   componentsExtractor,
   referencesExtractor,
   dynamicImportsExtractor,
+  moduleSideEffectsExtractor,
   runtimeMarkersExtractor,
   testsExtractor,
   markersExtractor,
@@ -204,6 +207,7 @@ export function extractFileData(
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
     claimedScopeNodes: new WeakSet(),
+    moduleHasSideEffects: false,
   };
 
   const multiplexedVisitor = new Visitor(
@@ -235,6 +239,7 @@ export function extractFileData(
     runtimeMarkers,
     testSuites,
     dynamicImports,
+    hasSideEffects: ctx.moduleHasSideEffects ? 1 : 0,
   };
 }
 

@@ -64,6 +64,7 @@ import {
   resolveBindings,
 } from "./bindings-engine";
 import { persistModuleCycles } from "./cycles-engine";
+import { persistFileBarrelFlags } from "./file-graph-flags";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -243,6 +244,10 @@ function insertParsedResults(
   const transaction = db.transaction(() => {
     for (const parsed of results) {
       if (parsed.error) continue;
+
+      if (parsed.hasSideEffects) {
+        parsed.fileRow.has_side_effects = parsed.hasSideEffects;
+      }
 
       insertFile(db, parsed.fileRow);
 
@@ -532,6 +537,11 @@ export async function indexFiles(
               insertTypeMembers(db, data.typeMembers);
             if (data.calls.length) insertCalls(db, data.calls);
             persistDynamicImports(db, absPath, data.dynamicImports);
+            if (data.hasSideEffects) {
+              db.run("UPDATE files SET has_side_effects = 1 WHERE path = ?", [
+                relPath,
+              ]);
+            }
           }
           // Category-agnostic: one regex pass over raw source, no AST needed.
           const suppressions = extractSuppressions(source, relPath);
@@ -567,6 +577,8 @@ export async function indexFiles(
     .get()!.c;
   setMeta(db, "file_count", String(fileCount));
   setMeta(db, "project_root", getProjectRoot());
+
+  persistFileBarrelFlags(db);
 
   // Pass-2 binding resolution per R.12 — full-rebuild only to honor
   // R.10's <100ms targeted contract. Orphan-cleared until next full.

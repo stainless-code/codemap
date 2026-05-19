@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -38,7 +38,9 @@ export function createTables(db: CodemapDatabase) {
       line_count INTEGER NOT NULL,
       language TEXT NOT NULL,
       last_modified INTEGER NOT NULL,
-      indexed_at INTEGER NOT NULL
+      indexed_at INTEGER NOT NULL,
+      is_barrel INTEGER NOT NULL DEFAULT 0,
+      has_side_effects INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS symbols (
@@ -697,12 +699,14 @@ export interface FileRow {
   language: string;
   last_modified: number;
   indexed_at: number;
+  is_barrel?: number;
+  has_side_effects?: number;
 }
 
 export function insertFile(db: CodemapDatabase, file: FileRow) {
   db.run(
-    `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at, is_barrel, has_side_effects)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       file.path,
       file.content_hash,
@@ -711,6 +715,8 @@ export function insertFile(db: CodemapDatabase, file: FileRow) {
       file.language,
       file.last_modified,
       file.indexed_at,
+      file.is_barrel ?? 0,
+      file.has_side_effects ?? 0,
     ],
   );
 }

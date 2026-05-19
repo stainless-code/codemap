@@ -23,7 +23,7 @@
   },
   {
     "file_path": "src/consumer.ts",
-    "line_start": 17,
+    "line_start": 19,
     "column_start": 2,
     "column_end": 14,
     "kind": "value",

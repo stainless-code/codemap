@@ -193,15 +193,17 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `files` — Every indexed file (`STRICT`)
 
-| Column        | Type    | Description                                    |
-| ------------- | ------- | ---------------------------------------------- |
-| path          | TEXT PK | Relative path from project root                |
-| content_hash  | TEXT    | SHA-256 hex — see **Fingerprints** at § Schema |
-| size          | INTEGER | File size in bytes                             |
-| line_count    | INTEGER | Total lines                                    |
-| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                 |
-| last_modified | INTEGER | File mtime (epoch ms)                          |
-| indexed_at    | INTEGER | When this row was written                      |
+| Column           | Type    | Description                                                          |
+| ---------------- | ------- | -------------------------------------------------------------------- |
+| path             | TEXT PK | Relative path from project root                                      |
+| content_hash     | TEXT    | SHA-256 hex — see **Fingerprints** at § Schema                       |
+| size             | INTEGER | File size in bytes                                                   |
+| line_count       | INTEGER | Total lines                                                          |
+| language         | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                                       |
+| last_modified    | INTEGER | File mtime (epoch ms)                                                |
+| indexed_at       | INTEGER | When this row was written                                            |
+| is_barrel        | INTEGER | 1 when every export is a re-export and no local value symbols exist  |
+| has_side_effects | INTEGER | 1 when module-level calls or assignments were detected at parse time |
 
 ### `symbols` — Functions, constants, classes, interfaces, types, enums (`STRICT`)
 

@@ -128,6 +128,9 @@ export interface ExtractContext {
   readonly testSuites: TestSuiteRow[];
   readonly dynamicImports: DynamicImportRow[];
 
+  /** When true, module-level CallExpression / AssignmentExpression seen. */
+  moduleHasSideEffects: boolean;
+
   readonly scopes: ScopeTracker;
   readonly complexity: ComplexityTracker;
   // Named `componentDetector` (not `components`) to avoid clashing with
