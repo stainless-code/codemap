@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -164,7 +164,11 @@ export function createTables(db: CodemapDatabase) {
       callee_name TEXT NOT NULL,
       line_start INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
-      column_end INTEGER NOT NULL
+      column_end INTEGER NOT NULL,
+      args_count INTEGER,
+      is_method_call INTEGER NOT NULL DEFAULT 0,
+      is_constructor_call INTEGER NOT NULL DEFAULT 0,
+      is_optional_chain INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS type_members (
@@ -1101,14 +1105,19 @@ export interface CallRow {
   column_start: number;
   /** 0-based byte column one past the callee identifier end. */
   column_end: number;
+  /** NULL when the call includes a spread argument. */
+  args_count?: number | null;
+  is_method_call?: number;
+  is_constructor_call?: number;
+  is_optional_chain?: number;
 }
 
 export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)",
-    "(?,?,?,?,?,?,?)",
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end, args_count, is_method_call, is_constructor_call, is_optional_chain)",
+    "(?,?,?,?,?,?,?,?,?,?,?)",
     (c, v) =>
       v.push(
         c.file_path,
@@ -1118,6 +1127,10 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
         c.line_start,
         c.column_start,
         c.column_end,
+        c.args_count ?? null,
+        c.is_method_call ?? 0,
+        c.is_constructor_call ?? 0,
+        c.is_optional_chain ?? 0,
       ),
   );
 }

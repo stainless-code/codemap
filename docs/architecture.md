@@ -231,18 +231,22 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 
 ### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
 
-| Column       | Type       | Description                                                                                                                       |
-| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| id           | INTEGER PK | Auto-increment row id                                                                                                             |
-| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
-| caller_name  | TEXT       | Name of the calling function/method                                                                                               |
-| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
-| callee_name  | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
-| line_start   | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
-| column_start | INTEGER    | 0-based byte column of the callee token                                                                                           |
-| column_end   | INTEGER    | One-past-last column                                                                                                              |
+| Column              | Type       | Description                                                                                                                       |
+| ------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment row id                                                                                                             |
+| file_path           | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
+| caller_name         | TEXT       | Name of the calling function/method                                                                                               |
+| caller_scope        | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
+| callee_name         | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
+| line_start          | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
+| column_start        | INTEGER    | 0-based byte column of the callee token                                                                                           |
+| column_end          | INTEGER    | One-past-last column                                                                                                              |
+| args_count          | INTEGER    | Argument count; NULL when a spread argument is present                                                                            |
+| is_method_call      | INTEGER    | 1 when callee is a member expression (`obj.method()`)                                                                             |
+| is_constructor_call | INTEGER    | 1 for `new Foo()` (`NewExpression`)                                                                                               |
+| is_optional_chain   | INTEGER    | 1 when the call uses optional chaining (`?.`)                                                                                     |
 
-Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` three times in the same file, only one row is stored. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
+Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `foo` calls `bar` three times in the same file, only one row is stored. `foo()` and `new Foo()` with the same callee name remain distinct rows. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
 ### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
 

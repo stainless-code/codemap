@@ -591,6 +591,52 @@ describe("extractFileData", () => {
       expect(scopes).toContain("A.run");
       expect(scopes).toContain("B.run");
     });
+
+    it("records call-shape metadata", () => {
+      const src = [
+        "function f() {",
+        "  foo(1, 2);",
+        "  obj.bar();",
+        "  obj?.baz();",
+        "  qux?.();",
+        "  new Date();",
+        "  new Map();",
+        "  spread(...args);",
+        "}",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const byCallee = Object.fromEntries(
+        d.calls.map((c) => [c.callee_name, c]),
+      );
+
+      expect(byCallee.foo).toMatchObject({
+        args_count: 2,
+        is_method_call: 0,
+        is_constructor_call: 0,
+        is_optional_chain: 0,
+      });
+      expect(byCallee["obj.bar"]).toMatchObject({
+        args_count: 0,
+        is_method_call: 1,
+        is_constructor_call: 0,
+        is_optional_chain: 0,
+      });
+      expect(byCallee["obj.baz"]).toMatchObject({
+        is_method_call: 1,
+        is_optional_chain: 1,
+      });
+      expect(byCallee.qux).toMatchObject({
+        is_optional_chain: 1,
+      });
+      expect(byCallee.Date).toMatchObject({
+        is_constructor_call: 1,
+        is_method_call: 0,
+      });
+      expect(byCallee.Map).toMatchObject({ is_constructor_call: 1 });
+      expect(byCallee.spread).toMatchObject({ args_count: null });
+      expect(d.calls.filter((c) => c.callee_name === "Date")).toHaveLength(1);
+      expect(d.calls.filter((c) => c.callee_name === "Map")).toHaveLength(1);
+    });
   });
 
   describe("component detection heuristic", () => {
