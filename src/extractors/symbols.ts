@@ -188,10 +188,18 @@ function registerSymbolHandlers(
           ...(isArrowOrFn ? functionShapeColumns(init) : {}),
         });
 
-        if (isArrowOrFn) {
-          scopes.push(name, "arrow", lineStart, lineEnd);
+        if (init?.type === "ArrowFunctionExpression") {
+          ctx.declaratorArrowScopes.set(init, {
+            name,
+            lineStart,
+            lineEnd,
+          });
           ctx.claimedScopeNodes.add(init);
-          if (init) complexity.markArrowSymbol(init, symbolIndex);
+          complexity.markArrowSymbol(init, symbolIndex);
+        } else if (init?.type === "FunctionExpression") {
+          scopes.push(name, "function", lineStart, lineEnd);
+          ctx.claimedScopeNodes.add(init);
+          complexity.markArrowSymbol(init, symbolIndex);
           pushTypeParams(
             init.typeParameters,
             scopes.currentLocalId(),
@@ -219,10 +227,7 @@ function registerSymbolHandlers(
         const name = decl.id?.name;
         if (!name) continue;
         const init = decl.init;
-        const isArrowOrFn =
-          init?.type === "ArrowFunctionExpression" ||
-          init?.type === "FunctionExpression";
-        if (isArrowOrFn && scopes.top() === name) {
+        if (init?.type === "FunctionExpression" && scopes.top() === name) {
           scopes.pop();
         }
       }

@@ -54,7 +54,18 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
     }
 
     const hash = hashContent(source);
-    const stat = statSync(absPath);
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(absPath);
+    } catch {
+      results.push({
+        relPath,
+        error: true,
+        fileRow: {} as FileRow,
+        category: "text",
+      });
+      continue;
+    }
     const lineCount = countLines(source);
 
     const ext = extname(relPath);

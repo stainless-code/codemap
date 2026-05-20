@@ -190,7 +190,7 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const diffResult = spawnSync(
       "git",
-      ["diff", "--name-only", `${lastCommit}..HEAD`],
+      ["diff", "--name-status", "--no-renames", `${lastCommit}..HEAD`],
       {
         cwd: root,
       },
@@ -203,11 +203,20 @@ export function getChangedFiles(db: CodemapDatabase): {
       },
     );
 
-    const diffFiles = diffResult.stdout
+    const diffDeletedFromCommit: string[] = [];
+    const diffFiles: string[] = [];
+    for (const line of diffResult.stdout
       .toString()
       .trim()
       .split("\n")
-      .filter(Boolean);
+      .filter(Boolean)) {
+      const tab = line.indexOf("\t");
+      if (tab === -1) continue;
+      const status = line.slice(0, tab);
+      const path = line.slice(tab + 1);
+      if (status === "D") diffDeletedFromCommit.push(path);
+      else diffFiles.push(path);
+    }
     // Porcelain lines are `XY path` (two status chars + space); skip the prefix to get the path.
     const statusFiles = statusResult.stdout
       .toString()
@@ -244,9 +253,11 @@ export function getChangedFiles(db: CodemapDatabase): {
       }
     }
 
+    const deletedAll = [...new Set([...deleted, ...diffDeletedFromCommit])];
+
     return {
       changed,
-      deleted,
+      deleted: deletedAll,
       existingPaths: new Set(existingHashes.keys()),
       sourceCache,
       existingHashes,

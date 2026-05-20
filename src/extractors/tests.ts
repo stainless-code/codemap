@@ -101,7 +101,30 @@ export const testsExtractor: TierExtractor = {
 
     Object.assign(visitor, {
       CallExpression(node: any) {
-        const parsed = parseTestCallee(node.callee);
+        let parsed = parseTestCallee(node.callee);
+        if (!parsed && node.callee?.type === "CallExpression") {
+          parsed = parseTestCallee(node.callee.callee);
+          if (!parsed) return;
+          const name = extractName(node.arguments?.[0]);
+          if (name === null) return;
+          const lineStart = offsetToLine(ctx.lineMap, node.start);
+          const lineEnd = offsetToLine(ctx.lineMap, node.end);
+          const idx = rows.length;
+          rows.push({
+            file_path: ctx.relPath,
+            name,
+            kind: parsed.kind,
+            line_start: lineStart,
+            line_end: lineEnd,
+            parent_index: parentStack[parentStack.length - 1] ?? null,
+            is_skipped: parsed.modifier === "skip" ? 1 : 0,
+            is_only: parsed.modifier === "only" ? 1 : 0,
+            is_todo: parsed.modifier === "todo" ? 1 : 0,
+            framework,
+          });
+          if (parsed.kind === "describe") parentStack.push(idx);
+          return;
+        }
         if (!parsed) return;
         const name = extractName(node.arguments?.[0]);
         if (name === null) return; // skip anonymous / dynamic

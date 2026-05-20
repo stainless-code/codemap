@@ -340,6 +340,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   // boot would skip the incremental-index prelude and read whatever
   // was in `.codemap.db` from the prior run (potentially stale by N
   // commits). CodeRabbit raised the freshness race on PR #47.
+  let stopped = false;
   let primingDone: Promise<void>;
   if (opts.onPrime === undefined) {
     watchActive = true;
@@ -348,7 +349,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
     primingDone = (async () => {
       try {
         await opts.onPrime!();
-        watchActive = true;
+        if (!stopped) watchActive = true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console -- intentional: prime errors must surface
@@ -367,6 +368,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       // Stop early so handleAudit doesn't keep skipping prelude while
       // we're shutting down (any in-flight audit reads a "stale"
       // signal which is the correct conservative behavior).
+      stopped = true;
       watchActive = false;
       // Wait for the priming pass to finish (if still running) so we
       // don't tear down its DB connection out from under it.
@@ -377,6 +379,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       // ones still re-indexing).
       await inFlight;
       await backend.stop();
+      watchActive = false;
     },
   };
 }

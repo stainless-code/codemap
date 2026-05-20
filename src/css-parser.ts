@@ -252,12 +252,17 @@ function extractCssKeyframesRegex(
   }
 }
 
-const IMPORT_RE = /@import\s+(?:url\()?['"]([^'"]+)['"]\)?/g;
+const IMPORT_QUOTED_RE = /@import\s+(?:url\()?['"]([^'"]+)['"]\)?/g;
+const IMPORT_URL_UNQUOTED_RE = /@import\s+url\(\s*([^'")][^)]*)\s*\)/g;
 
 function extractImportSources(source: string, importSources: string[]) {
   let match: RegExpExecArray | null;
-  IMPORT_RE.lastIndex = 0;
-  while ((match = IMPORT_RE.exec(source)) !== null) {
+  IMPORT_QUOTED_RE.lastIndex = 0;
+  while ((match = IMPORT_QUOTED_RE.exec(source)) !== null) {
     importSources.push(match[1]);
+  }
+  IMPORT_URL_UNQUOTED_RE.lastIndex = 0;
+  while ((match = IMPORT_URL_UNQUOTED_RE.exec(source)) !== null) {
+    importSources.push(match[1].trim());
   }
 }

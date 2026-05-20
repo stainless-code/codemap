@@ -295,6 +295,30 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     expect(isWatchActive()).toBe(false);
   });
 
+  it("isWatchActive stays false when stop() runs before onPrime resolves", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let resolvePrime: (() => void) | undefined;
+    const primeGate = new Promise<void>((resolve) => {
+      resolvePrime = resolve;
+    });
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: () => undefined,
+      debounceMs: 20,
+      backend,
+      onPrime: async () => {
+        await primeGate;
+      },
+    });
+    expect(isWatchActive()).toBe(false);
+    const stopDone = handle.stop();
+    resolvePrime!();
+    await stopDone;
+    expect(isWatchActive()).toBe(false);
+  });
+
   it("isWatchActive stays false until onPrime resolves (CodeRabbit on #47)", async () => {
     _resetWatchStateForTests();
     const backend = fakeBackend();
