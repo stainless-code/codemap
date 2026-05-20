@@ -579,14 +579,19 @@ describe("http-server — CSRF + DNS-rebinding guard", () => {
     expect(body.error).toContain("Origin");
   });
 
-  it("allows Origin: null (file:// pages, sandboxed iframes — non-attack vector)", async () => {
+  it("rejects Origin: null (opaque browser contexts)", async () => {
     serverHandle = await startServer();
-    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: "null" },
-      body: JSON.stringify({ sql: "SELECT 1" }),
-    });
-    expect(r.status).toBe(200);
+    const r = await fetch(
+      `http://127.0.0.1:${serverHandle.port}/tool/save_baseline`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: "null" },
+        body: JSON.stringify({ name: "csrf-test", sql: "SELECT 1" }),
+      },
+    );
+    expect(r.status).toBe(403);
+    const body = (await r.json()) as { error: string };
+    expect(body.error).toContain("Origin: null");
   });
 
   it("rejects POST with mismatched Host header (DNS rebinding)", async () => {

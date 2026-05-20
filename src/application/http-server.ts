@@ -571,7 +571,8 @@ function validate<T extends ZodRawShape>(
  *    that interface.
  * 3. **`Origin`** — fallback for older browsers that don't send
  *    `Sec-Fetch-Site`. Browsers send `Origin` on every non-GET request
- *    (and most GETs); non-browser clients don't. Reject if present.
+ *    (and most GETs); non-browser clients don't. Reject if present,
+ *    including the opaque value `null` (file://, sandboxed contexts).
  *
  * Returns a reason string (becomes the 403 body) or `undefined` to allow.
  */
@@ -601,7 +602,7 @@ function csrfCheck(
   }
 
   const origin = req.headers.origin;
-  if (origin !== undefined && origin !== "" && origin !== "null") {
+  if (origin !== undefined && origin !== "") {
     return `cross-origin request rejected (Origin: ${origin}). codemap serve does not accept browser-driven cross-origin requests.`;
   }
 
