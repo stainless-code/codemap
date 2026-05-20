@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { loadScenariosFromConfigFile } from "./benchmark-config";
 import { getDefaultScenarios } from "./benchmark-default-scenarios";
 import type { Scenario } from "./benchmark-default-scenarios";
+import { runBenchmarkReindex } from "./benchmark-reindex";
 import { loadUserConfig, resolveCodemapConfig } from "./config";
 import { closeDb, openDb } from "./db";
 import { configureResolver } from "./resolver";
@@ -37,14 +38,6 @@ configureResolver(getProjectRoot(), getTsconfigPath());
 function timeMs(fn: () => unknown): { result: unknown; ms: number } {
   const start = performance.now();
   const result = fn();
-  return { result, ms: performance.now() - start };
-}
-
-async function timeMsAsync(
-  fn: () => Promise<unknown>,
-): Promise<{ result: unknown; ms: number }> {
-  const start = performance.now();
-  const result = await fn();
   return { result, ms: performance.now() - start };
 }
 
@@ -182,25 +175,22 @@ console.log(
 
 const INDEXER_PATH = join(import.meta.dirname, "index.ts");
 
-async function benchmarkReindex(label: string, args: string[]) {
-  const runs = 3;
-  const times: number[] = [];
-  for (let i = 0; i < runs; i++) {
-    const t = await timeMsAsync(async () => {
-      const proc = Bun.spawn(["bun", INDEXER_PATH, ...args], {
-        cwd: getProjectRoot(),
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      await proc.exited;
-      return proc.exitCode;
-    });
-    times.push(t.ms);
-  }
-  const avg = times.reduce((a, b) => a + b, 0) / runs;
-  const min = Math.min(...times);
-  const max = Math.max(...times);
-  return { label, avg, min, max, runs };
+async function spawnIndexer(args: string[]) {
+  const proc = Bun.spawn(["bun", INDEXER_PATH, ...args], {
+    cwd: getProjectRoot(),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.exited;
+  return {
+    exitCode: proc.exitCode,
+    stderr: await new Response(proc.stderr).text(),
+    stdout: await new Response(proc.stdout).text(),
+  };
+}
+
+function benchmarkReindex(label: string, args: string[]) {
+  return runBenchmarkReindex(label, args, { spawnIndexer });
 }
 
 console.log("  ─── Reindex Benchmarks ───\n");
