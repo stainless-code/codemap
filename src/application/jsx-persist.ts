@@ -1,3 +1,4 @@
+import { insertJsxAttributes } from "../db";
 import type { CodemapDatabase } from "../db";
 import type { ParsedJsxAttribute, ParsedJsxElement } from "../extractors/jsx";
 
@@ -46,22 +47,19 @@ export function persistJsxElementsAndAttributes(
       ]);
     }
   }
+  const attrRows = [];
   for (const attr of attributes) {
     const elementId = idMap.get(attr.element_local_id);
     if (elementId == null) continue;
-    db.run(
-      `INSERT INTO jsx_attributes (
-        element_id, name, line, column_start, column_end, value_kind, value_text
-      ) VALUES (?,?,?,?,?,?,?)`,
-      [
-        elementId,
-        attr.name,
-        attr.line,
-        attr.column_start,
-        attr.column_end,
-        attr.value_kind,
-        attr.value_text,
-      ],
-    );
+    attrRows.push({
+      element_id: elementId,
+      name: attr.name,
+      line: attr.line,
+      column_start: attr.column_start,
+      column_end: attr.column_end,
+      value_kind: attr.value_kind,
+      value_text: attr.value_text,
+    });
   }
+  if (attrRows.length) insertJsxAttributes(db, attrRows);
 }

@@ -1370,6 +1370,38 @@ export function insertTryCatchRows(db: CodemapDatabase, rows: TryCatchRow[]) {
   );
 }
 
+export interface JsxAttributeRow {
+  element_id: number;
+  name: string;
+  line: number;
+  column_start: number;
+  column_end: number;
+  value_kind: "string" | "expression" | "boolean" | "spread" | "element";
+  value_text: string | null;
+}
+
+export function insertJsxAttributes(
+  db: CodemapDatabase,
+  rows: JsxAttributeRow[],
+): void {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO jsx_attributes (element_id, name, line, column_start, column_end, value_kind, value_text)",
+    "(?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.element_id,
+        r.name,
+        r.line,
+        r.column_start,
+        r.column_end,
+        r.value_kind,
+        r.value_text,
+      ),
+  );
+}
+
 /**
  * Lexical scope row per [R.11]. `parent_local_id` is `null` for the
  * module scope; `owner_symbol_name` is `null` for module + arrow scopes.
