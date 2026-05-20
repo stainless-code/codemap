@@ -2,7 +2,7 @@
 
 > **Status:** open · plan iterating in parallel with the broader [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) write-engine direction.
 >
-> **Per-tier ship status (fact-checked 2026-05-19):** Tiers **1–6** (remainder without C.9) landed on branch `feat/substrate-tiers-1-6` — `SCHEMA_VERSION` **34**. Tier **1** now includes call-shape columns, side-effect `import_specifiers` + `import_id` FK. Tier **2** adds `bindings.resolution_kind='re-exported'`. Tier **3** (`jsx_elements` / `jsx_attributes`) and Tier **5** (`async_calls` / `try_catch` / `decorators` / `jsdoc_tags`) shipped. Tier **4** partial — `symbols.{return_type,is_async,is_generator}` shipped; `generic_params` / `type_predicates` deferred. Tier **6** partial — `dynamic_imports`, `files.{is_barrel,has_side_effects}` shipped; `files.is_entry` stays gated on [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **7–13** remain open.
+> **Per-tier ship status (fact-checked 2026-05-19):** Tiers **1–6** remainder shipped (`SCHEMA_VERSION` **34**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **7–13** open.
 >
 > **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Today the schema captures symbols + imports + exports + calls + components + markers + type*members + css*{variables,classes,keyframes} + suppressions. The AST contains roughly 4× more queryable structure that we discard at parse time. This plan enumerates the entire extraction surface — ~13 tiers spanning identifier references, scope graph, binding resolution, JSX, type-system depth, behavioral facts, module-graph topology, CSS rule structure, test-suite metadata, runtime/dev markers, metrics expansion, and ORM/SQL tracking — and sequences them as independent tracer-bullet PRs that compound into a maximal substrate. Once landed, every recipe / write capability discussed in the synthesis doc (and many more) lights up via SQL JOINs alone, with zero engine work.
 >
@@ -193,7 +193,7 @@ Each tier is one tracer-bullet PR: parser visitor change + schema migration + 1-
 
 **Goal:** Make `calls` / `exports` / `symbols` / `markers` column-precise; split `imports.specifiers` JSON blob into a typed child table.
 
-**Ship status (fact-checked 2026-05-19):** Tier 1 remainder shipped on `feat/substrate-tiers-1-6` — `calls.{args_count,is_method_call,is_constructor_call,is_optional_chain}`, side-effect `import_specifiers` rows, and `import_id` FK. Position columns from 2026-05-14 remain.
+**Ship status (fact-checked 2026-05-19):** Tier 1 remainder shipped — `calls.{args_count,is_method_call,is_constructor_call,is_optional_chain}`, side-effect `import_specifiers` rows, and `import_id` FK. Position columns from 2026-05-14 remain.
 
 | Slice | Substrate                                                                                                                              | Flagship recipe                                  | Schema bump |
 | ----- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------- |
@@ -526,7 +526,7 @@ Deferred to a future slice (out of Tier 2 scope):
 
 ### Tier 3 — JSX elements + attributes
 
-**Ship status (2026-05-19):** Shipped on `feat/substrate-tiers-1-6`. `jsx_elements` / `jsx_attributes` in [`src/db.ts`](../../src/db.ts); extractor [`src/extractors/jsx.ts`](../../src/extractors/jsx.ts); recipe `find-jsx-usages`.
+**Ship status (2026-05-19):** Shipped. `jsx_elements` / `jsx_attributes` in [`src/db.ts`](../../src/db.ts); extractor [`src/extractors/jsx.ts`](../../src/extractors/jsx.ts); recipe `find-jsx-usages`.
 
 **Goal:** Every JSX element + every JSX attribute becomes a queryable row with column-precise positions.
 
@@ -684,7 +684,7 @@ New recipe candidates: `swap-positional-to-named-args` (extends `rename-preview`
 
 ### Tier 5 — Behavioral facts (async, try/catch, decorators, structured JSDoc)
 
-**Ship status (2026-05-19):** Shipped on `feat/substrate-tiers-1-6`. Tables + [`src/extractors/behavioral.ts`](../../src/extractors/behavioral.ts); recipes `find-await-in-loop`, `find-swallowed-errors`, `find-decorator-usage`, `find-throws-jsdoc`.
+**Ship status (2026-05-19):** Shipped. Tables + [`src/extractors/behavioral.ts`](../../src/extractors/behavioral.ts); recipes `find-await-in-loop`, `find-swallowed-errors`, `find-decorator-usage`, `find-throws-jsdoc`.
 
 **Goal:** Capture runtime-shape behavioral facts the AST encodes but today's index discards.
 
@@ -789,7 +789,7 @@ New recipe candidates: `find-awaits-in-loops`; `find-empty-catches`; `find-depre
 
 ### Tier 6 — Module-graph enrichment — **PARTIAL (2026-05-19)**
 
-**Ship status (2026-05-19):** `re_export_chains`, `dynamic_imports`, `files.{is_barrel,has_side_effects}` shipped on `feat/substrate-tiers-1-6`. **Deferred:** `files.is_entry` (C.9 / [`c9-plugin-layer.md`](./c9-plugin-layer.md)).
+**Ship status (2026-05-19):** `re_export_chains`, `dynamic_imports`, `files.{is_barrel,has_side_effects}` shipped. **Deferred:** `files.is_entry` ([`c9-plugin-layer.md`](./c9-plugin-layer.md)).
 
 **Goal:** Flatten re-export chains; record dynamic imports; mark barrel files.
 
