@@ -14,7 +14,7 @@ bun test
 bun run test:golden   # golden SQL vs fixtures/minimal (also runs at end of `bun run check`)
 bun run test:golden:external   # Tier B: local tree via CODEMAP_ROOT / --root (not in CI)
 bun run check   # format + lint + tests + typecheck + build + test:golden
-bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap.db*`)
+bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap/`)
 bun run check-updates   # interactive dependency updates (`bun update -i --latest`)
 ```
 

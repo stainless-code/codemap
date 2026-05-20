@@ -29,8 +29,15 @@ Validate (compare on-disk SHA-256 to indexed hash):
 Context (project snapshot envelope for any agent):
   codemap context [--compact] [--for "<intent>"]
 
+Audit (structural drift — baseline snapshots or git ref):
+  codemap audit [--baseline <prefix>] [--base <ref>] [--json] [--ci] ...
+
 Agents:
   codemap agents init [--force] [--interactive|-i]
+  codemap skill · codemap rule              # live full markdown (pointer protocol)
+
+PR comment renderer (audit/SARIF → markdown summary):
+  codemap pr-comment <file> [--shape audit|sarif] [--json]   # - for stdin
 
 MCP server (Model Context Protocol — for agent hosts):
   codemap mcp                                        # stdio JSON-RPC, one tool per CLI verb

@@ -55,6 +55,7 @@ codemap context --compact --for "refactor auth"              # JSON envelope + i
 codemap ingest-coverage coverage/coverage-final.json --json  # Istanbul / LCOV (auto-detected) → coverage table; joins with symbols
 NODE_V8_COVERAGE=.cov bun test && codemap ingest-coverage .cov --runtime --json  # V8 protocol (per-process dumps); local-only
 codemap agents init                                          # scaffold .agents/ rules + skills
+codemap apply rename-preview --params old=foo,new=bar --dry-run  # preview recipe-driven edits (substrate executor)
 ```
 
 **Version-matched agent guidance:** `codemap agents init` writes **thin pointer files** to `.agents/` (~16-line SKILL.md + ~22-line rule). The full content is served live by **`codemap skill`** / **`codemap rule`** (CLI) and **`codemap://skill`** / **`codemap://rule`** (MCP / HTTP) — so `bun update @stainless-code/codemap` auto-refreshes the content agents see, no re-init needed. See [docs/agents.md](docs/agents.md).
@@ -197,11 +198,23 @@ codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fa
 # (default 3, --depth 0 = unbounded), limit-capped (default 500). Result envelope:
 # {target, matches: [{depth, edge, kind, name?, file_path}], summary: {nodes, terminated_by}}.
 
+# Apply — substrate-shaped fix executor (recipe SQL describes hunks; codemap validates + writes)
+codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
+codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
+# Consumes the --format diff-json row contract ({file_path, line_start, before_pattern, after_pattern}).
+# All-or-nothing: any conflict aborts before any file is written. Pair with --format diff-json preview first.
+
+# Live agent content (pointer protocol — full body served from installed package version)
+codemap skill                                                   # full codemap SKILL markdown to stdout
+codemap rule                                                    # full codemap rule markdown to stdout
+
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
-#        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact
-# Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached); codemap://recipes, codemap://recipes/{id} (live read-per-call — keep recency fresh)
+#        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact, apply
+# Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
+#            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
+#            codemap://files/{path}, codemap://symbols/{name} (live per-file / per-symbol roll-ups)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
 # Another project

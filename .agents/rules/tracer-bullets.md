@@ -22,8 +22,8 @@ AI agents tend to produce complete solutions in one leap — all parsers, all sc
 
 A typical vertical slice for Codemap touches these layers top-to-bottom:
 
-1. **CLI / orchestration** — `src/index.ts` (args, incremental vs full, `query` subcommand)
-2. **Workers / parsing** — `src/parse-worker.ts`, `src/parser.ts`, `src/css-parser.ts`
+1. **CLI / orchestration** — `src/cli/` (`bootstrap.ts`, `main.ts`, lazy `cmd-*` chunks; entry `src/index.ts`)
+2. **Workers / parsing** — `src/parse-worker.ts` / `parse-worker-node.ts`, `parse-worker-core.ts`, `src/parser.ts`, `src/css-parser.ts`, `src/adapters/`
 3. **Persistence** — `src/db.ts` (schema, inserts, `SCHEMA_VERSION`)
 4. **Config / runtime** — `src/config.ts`, `src/runtime.ts`, resolver
 5. **Tests** — `src/*.test.ts`
@@ -38,7 +38,7 @@ Bad — building in layers:
 
 Good — tracer bullet:
 
-1. **`constants` + parser language** — `LANG_MAP` + `extractFileData` / worker `TS_EXTENSIONS` — commit, `bun run check`, small test parsing a one-line file
+1. **`constants` + adapter** — `LANG_MAP` + builtin adapter extensions + `extractFileData` — commit, `bun run check`, small test parsing a one-line file
 2. **Resolver** — `resolver` extensions if needed — commit, validate
 3. **Docs** — `docs/architecture.md` table row — commit, validate
 

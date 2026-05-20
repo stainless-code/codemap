@@ -165,7 +165,7 @@ These come up repeatedly with LLM reviewers and warrant extra scrutiny. The code
 7. **Memory-leak / resource-leak claims with no concrete trigger** — "this could leak the SQLite handle" without a scenario is speculation; ask for the path. Codemap closes DB handles via the `using` pattern in most call sites — verify before accepting.
 8. **Type-safety alarms** — if `tsgo --noEmit` (`bun run typecheck`) passes, the claim is almost always wrong (or about runtime behaviour the type system can't see, in which case the reviewer should justify with the runtime case).
 9. **Convention citations that don't exist** — "This breaks our API conventions" — grep `.agents/` and `docs/` for the convention. If it's not codified, it's preference, not rule.
-10. **Schema-bump / changeset alarms** — "this needs a minor changeset" — check [`.agents/lessons.md`](../../lessons.md) ("changesets bump policy"): pre-v1, default is patch unless the schema actually breaks the `.codemap.db` (new tables/columns/SCHEMA_VERSION bump). Don't accept "minor for new CLI commands or public types".
+10. **Schema-bump / changeset alarms** — "this needs a minor changeset" — check [`.agents/lessons.md`](../../lessons.md) ("changesets bump policy"): pre-v1, default is patch unless the schema actually breaks `.codemap/index.db` (new tables/columns/`SCHEMA_VERSION` bump). Don't accept "minor for new CLI commands or public types".
 
 ## Anti-patterns
 

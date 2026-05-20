@@ -19,7 +19,7 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 
 1. **Failing test** at whatever seam reaches the bug — unit, integration, e2e. Codemap convention: `src/**/<name>.test.ts` for unit + integration; `fixtures/golden/` for query-shape regressions; `bun test <file>` runs them.
 2. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot. Examples: `bun src/index.ts query --json …` against `fixtures/minimal/`, golden runner under `scripts/query-golden.ts`.
-3. **Replay a captured trace.** Save a real `.codemap.db` / config / fixture file to disk; replay it through the code path in isolation.
+3. **Replay a captured trace.** Save a real `.codemap/index.db` / config / fixture file to disk; replay it through the code path in isolation.
 4. **Throwaway harness.** Spin up a minimal subset (one parser, one DB connection) that exercises the bug code path with a single function call.
 5. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
 6. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it.
@@ -44,7 +44,7 @@ The goal is not a clean repro but a **higher reproduction rate**. Loop the trigg
 
 ### When you genuinely cannot build a loop
 
-Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps, broken `.codemap.db`), or (c) permission to add temporary instrumentation. Do **not** proceed to hypothesise without a loop.
+Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps, broken `.codemap/index.db`), or (c) permission to add temporary instrumentation. Do **not** proceed to hypothesise without a loop.
 
 Do not proceed to Phase 2 until you have a loop you believe in.
 
