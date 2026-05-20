@@ -34,50 +34,59 @@ afterEach(() => {
 describe("printQueryResult", () => {
   it("rejects DML — read-only enforcement via PRAGMA query_only", () => {
     const log = spyOn(console, "log").mockImplementation(() => {});
-    const code = printQueryResult(
-      "DELETE FROM files WHERE language='markdown'",
-      { json: true },
-    );
-    expect(code).toBe(1);
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
-      error: expect.any(String),
-    });
-    log.mockRestore();
+    try {
+      const code = printQueryResult(
+        "DELETE FROM files WHERE language='markdown'",
+        { json: true },
+      );
+      expect(code).toBe(1);
+      expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+        error: expect.any(String),
+      });
 
-    const after = executeQuery({
-      sql: "SELECT COUNT(*) AS n FROM files WHERE language='markdown'",
-      root: benchDir,
-    });
-    expect(after).toEqual([{ n: 1 }]);
+      const after = executeQuery({
+        sql: "SELECT COUNT(*) AS n FROM files WHERE language='markdown'",
+        root: benchDir,
+      });
+      expect(after).toEqual([{ n: 1 }]);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("rejects DDL — DROP TABLE blocked by query_only", () => {
     const log = spyOn(console, "log").mockImplementation(() => {});
-    const code = printQueryResult("DROP TABLE files", { json: true });
-    expect(code).toBe(1);
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
-      error: expect.any(String),
-    });
-    log.mockRestore();
+    try {
+      const code = printQueryResult("DROP TABLE files", { json: true });
+      expect(code).toBe(1);
+      expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
+        error: expect.any(String),
+      });
 
-    const after = executeQuery({
-      sql: "SELECT COUNT(*) AS n FROM files",
-      root: benchDir,
-    });
-    expect(after).toEqual([{ n: 3 }]);
+      const after = executeQuery({
+        sql: "SELECT COUNT(*) AS n FROM files",
+        root: benchDir,
+      });
+      expect(after).toEqual([{ n: 3 }]);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("returns SELECT rows on success", () => {
     const log = spyOn(console, "log").mockImplementation(() => {});
-    const code = printQueryResult("SELECT path FROM files ORDER BY path", {
-      json: true,
-    });
-    expect(code).toBe(0);
-    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual([
-      { path: "docs/c.md" },
-      { path: "src/a.ts" },
-      { path: "src/b.ts" },
-    ]);
-    log.mockRestore();
+    try {
+      const code = printQueryResult("SELECT path FROM files ORDER BY path", {
+        json: true,
+      });
+      expect(code).toBe(0);
+      expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual([
+        { path: "docs/c.md" },
+        { path: "src/a.ts" },
+        { path: "src/b.ts" },
+      ]);
+    } finally {
+      log.mockRestore();
+    }
   });
 });
