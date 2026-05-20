@@ -131,6 +131,32 @@
       "recipe": "find-side-effect-imports"
     },
     {
+      "id": "find-jsx-usages",
+      "prompt": "Recipe: JSX element usages",
+      "recipe": "find-jsx-usages",
+      "params": { "component_name": "article" }
+    },
+    {
+      "id": "find-await-in-loop",
+      "prompt": "Recipe: await expressions inside loops",
+      "recipe": "find-await-in-loop"
+    },
+    {
+      "id": "find-swallowed-errors",
+      "prompt": "Recipe: catch blocks that only log",
+      "recipe": "find-swallowed-errors"
+    },
+    {
+      "id": "find-decorator-usage",
+      "prompt": "Recipe: decorator sites",
+      "recipe": "find-decorator-usage"
+    },
+    {
+      "id": "find-throws-jsdoc",
+      "prompt": "Recipe: @throws JSDoc tags",
+      "recipe": "find-throws-jsdoc"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",

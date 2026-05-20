@@ -32,6 +32,10 @@
     "exports": 2
   },
   {
+    "file_path": "src/api/decorated.ts",
+    "exports": 1
+  },
+  {
     "file_path": "src/components/shop/ProductCard.tsx",
     "exports": 1
   },

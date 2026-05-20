@@ -11,7 +11,9 @@ get("bootstrap");
 // FIXME: handle errors
 // HACK: short-circuit shouldn't ship to prod
 export async function prefetch(): Promise<void> {
-  await import("./lib/cache");
+  for (const _key of ["warm"] as const) {
+    await import("./lib/cache");
+  }
   get("warm");
 }
 

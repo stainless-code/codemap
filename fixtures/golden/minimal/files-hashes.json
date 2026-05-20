@@ -19,9 +19,15 @@
   },
   {
     "path": "src/api/client.ts",
-    "content_hash": "625df0a0f197f2233506c028f5a4b2022567587de2ecc5e81863c2cb2654e507",
+    "content_hash": "2035094c31ce72ef9b723e4b47ebb1d65bc8d9a381ca7f98bd43164adcd2757f",
     "language": "ts",
-    "line_count": 44
+    "line_count": 45
+  },
+  {
+    "path": "src/api/decorated.ts",
+    "content_hash": "96bd631cc642f270589cba89e4fbfea8555b375aba66be53fed657f4b2de8d9c",
+    "language": "ts",
+    "line_count": 5
   },
   {
     "path": "src/components/shop/ProductCard.tsx",
@@ -49,15 +55,15 @@
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "8fa6942382a4a9980bd7f0835cfcdc820db68559660097f559d839efe60a8446",
+    "content_hash": "2698fbba58a1ae47e9cb3a2297b5677a21d9ecfa64a62c8a4ee072dab3ef185f",
     "language": "ts",
-    "line_count": 27
+    "line_count": 29
   },
   {
     "path": "src/lib/cache.ts",
-    "content_hash": "a185908afc6dca9552783847c0726686378dcf60e9d5714bfdb0aa24c479a4c1",
+    "content_hash": "964f6d3ddb8a7782b1273a38ed0bbde8cd886eb672c1f20466f0aa88ff49205f",
     "language": "ts",
-    "line_count": 21
+    "line_count": 27
   },
   {
     "path": "src/lib/store.ts",
@@ -109,8 +115,8 @@
   },
   {
     "path": "tsconfig.json",
-    "content_hash": "6b8ead4b09e6885483c805937a35fa0df3cbc47de346abb2d0ed8b73dc7f9e92",
+    "content_hash": "4bbd0839e5e2edc79d5432dff495b709edc6f281cf0b09f35d1155ff38f9def0",
     "language": "json",
-    "line_count": 17
+    "line_count": 18
   }
 ]

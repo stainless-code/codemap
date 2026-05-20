@@ -34,6 +34,12 @@ function parseTsJs(ctx: ParseContext): ParsedFilePayload {
     runtimeMarkers: data.runtimeMarkers,
     testSuites: data.testSuites,
     dynamicImports: data.dynamicImports,
+    jsxElements: data.jsxElements,
+    jsxAttributes: data.jsxAttributes,
+    asyncCalls: data.asyncCalls,
+    tryCatchRows: data.tryCatchRows,
+    decorators: data.decorators,
+    jsdocTags: data.jsdocTags,
     hasSideEffects: data.hasSideEffects,
   };
 }

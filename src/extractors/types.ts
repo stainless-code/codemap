@@ -14,6 +14,13 @@ import type {
   TestSuiteRow,
   TypeMemberRow,
 } from "../db";
+import type {
+  ParsedAsyncCall,
+  ParsedDecorator,
+  ParsedJsdocTag,
+  ParsedTryCatch,
+} from "./behavioral";
+import type { ParsedJsxAttribute, ParsedJsxElement } from "./jsx";
 
 /**
  * Tier opt-out config key per [R.15](../../docs/plans/substrate-extraction.md).
@@ -127,6 +134,13 @@ export interface ExtractContext {
   readonly runtimeMarkers: RuntimeMarkerRow[];
   readonly testSuites: TestSuiteRow[];
   readonly dynamicImports: DynamicImportRow[];
+
+  readonly jsxElements: ParsedJsxElement[];
+  readonly jsxAttributes: ParsedJsxAttribute[];
+  readonly asyncCalls: ParsedAsyncCall[];
+  readonly tryCatchRows: ParsedTryCatch[];
+  readonly decorators: ParsedDecorator[];
+  readonly jsdocTags: ParsedJsdocTag[];
 
   /** When true, module-level CallExpression / AssignmentExpression seen. */
   moduleHasSideEffects: boolean;

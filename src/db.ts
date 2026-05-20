@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -318,6 +318,79 @@ export function createTables(db: CodemapDatabase) {
       scope_local_id INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS jsx_elements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      component_name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      is_self_closing INTEGER NOT NULL DEFAULT 0,
+      is_fragment INTEGER NOT NULL DEFAULT 0,
+      namespace_prefix TEXT,
+      parent_element_id INTEGER REFERENCES jsx_elements(id),
+      children_count INTEGER NOT NULL DEFAULT 0,
+      is_lowercase INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS jsx_attributes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      element_id INTEGER NOT NULL REFERENCES jsx_elements(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      value_kind TEXT NOT NULL CHECK (value_kind IN ('string','expression','boolean','spread','element')),
+      value_text TEXT
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS async_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      caller_scope TEXT NOT NULL,
+      awaited_expression TEXT,
+      awaited_callee_name TEXT,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      in_loop INTEGER NOT NULL DEFAULT 0,
+      in_try INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS try_catch (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      containing_scope_local_id INTEGER NOT NULL DEFAULT 0,
+      try_line_start INTEGER NOT NULL,
+      try_line_end INTEGER NOT NULL,
+      has_catch INTEGER NOT NULL DEFAULT 0,
+      catch_param TEXT,
+      catch_rethrows INTEGER NOT NULL DEFAULT 0,
+      catch_logs_only INTEGER NOT NULL DEFAULT 0,
+      has_finally INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS decorators (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      target_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('class','method','property','parameter','accessor')),
+      name TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      args_text TEXT
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS jsdoc_tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol_id INTEGER NOT NULL REFERENCES symbols(id) ON DELETE CASCADE,
+      tag TEXT NOT NULL,
+      name TEXT,
+      type_text TEXT,
+      description TEXT
+    ) STRICT;
+
     -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
     -- want specifier-precise rewrites (rename specifier, dedupe, type-only
     -- migrate) JOIN this table. The original imports.specifiers JSON stays
@@ -536,6 +609,24 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_dynamic_imports_resolved ON dynamic_imports(resolved_path, file_path)
       WHERE resolved_path IS NOT NULL;
 
+    CREATE INDEX IF NOT EXISTS idx_jsx_elements_name ON jsx_elements(component_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_jsx_elements_file ON jsx_elements(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_jsx_attrs_name ON jsx_attributes(name);
+    CREATE INDEX IF NOT EXISTS idx_jsx_attrs_element ON jsx_attributes(element_id);
+
+    CREATE INDEX IF NOT EXISTS idx_async_calls_callee ON async_calls(awaited_callee_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_async_calls_file ON async_calls(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_async_calls_loop ON async_calls(in_loop) WHERE in_loop = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_try_catch_file ON try_catch(file_path, try_line_start);
+    CREATE INDEX IF NOT EXISTS idx_try_catch_logs ON try_catch(catch_logs_only) WHERE catch_logs_only = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_decorators_name ON decorators(name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_decorators_target ON decorators(target_symbol_id);
+
+    CREATE INDEX IF NOT EXISTS idx_jsdoc_tags_symbol ON jsdoc_tags(symbol_id);
+    CREATE INDEX IF NOT EXISTS idx_jsdoc_tags_tag ON jsdoc_tags(tag);
+
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
 
@@ -602,6 +693,12 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS jsdoc_tags;
+    DROP TABLE IF EXISTS decorators;
+    DROP TABLE IF EXISTS try_catch;
+    DROP TABLE IF EXISTS async_calls;
+    DROP TABLE IF EXISTS jsx_attributes;
+    DROP TABLE IF EXISTS jsx_elements;
     DROP TABLE IF EXISTS module_cycles;
     DROP TABLE IF EXISTS dynamic_imports;
     DROP TABLE IF EXISTS re_export_chains;

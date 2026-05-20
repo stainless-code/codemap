@@ -59,12 +59,19 @@ import {
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
 import {
+  insertAsyncCalls,
+  insertDecorators,
+  insertJsdocTags,
+  insertTryCatchRows,
+} from "./behavioral-persist";
+import {
   persistBindings,
   persistReExportChains,
   resolveBindings,
 } from "./bindings-engine";
 import { persistModuleCycles } from "./cycles-engine";
 import { persistFileBarrelFlags } from "./file-graph-flags";
+import { persistJsxElementsAndAttributes } from "./jsx-persist";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -95,6 +102,32 @@ function fileCategory(path: string): "ts" | "css" | "text" {
   if (TS_EXTENSIONS.has(ext)) return "ts";
   if (CSS_EXTENSIONS.has(ext)) return "css";
   return "text";
+}
+
+function persistTierSubstrate(
+  db: CodemapDatabase,
+  relPath: string,
+  data: Pick<
+    ParsedFile,
+    | "jsxElements"
+    | "jsxAttributes"
+    | "asyncCalls"
+    | "tryCatchRows"
+    | "decorators"
+    | "jsdocTags"
+  >,
+) {
+  if (data.jsxElements?.length || data.jsxAttributes?.length) {
+    persistJsxElementsAndAttributes(
+      db,
+      data.jsxElements ?? [],
+      data.jsxAttributes ?? [],
+    );
+  }
+  if (data.asyncCalls?.length) insertAsyncCalls(db, data.asyncCalls);
+  if (data.tryCatchRows?.length) insertTryCatchRows(db, data.tryCatchRows);
+  if (data.decorators?.length) insertDecorators(db, relPath, data.decorators);
+  if (data.jsdocTags?.length) insertJsdocTags(db, relPath, data.jsdocTags);
 }
 
 export function collectFiles(): string[] {
@@ -319,6 +352,7 @@ function insertParsedResults(
           }
           if (parsed.calls?.length) insertCalls(db, parsed.calls);
           persistDynamicImports(db, absPath, parsed.dynamicImports);
+          persistTierSubstrate(db, parsed.relPath, parsed);
         }
         if (parsed.suppressions?.length)
           insertSuppressions(db, parsed.suppressions);
@@ -542,6 +576,7 @@ export async function indexFiles(
               insertTypeMembers(db, data.typeMembers);
             if (data.calls.length) insertCalls(db, data.calls);
             persistDynamicImports(db, absPath, data.dynamicImports);
+            persistTierSubstrate(db, relPath, data);
             if (data.hasSideEffects) {
               db.run("UPDATE files SET has_side_effects = 1 WHERE path = ?", [
                 relPath,

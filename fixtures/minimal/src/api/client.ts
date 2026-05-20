@@ -12,6 +12,7 @@ export interface Transport {
   readonly handshakeMs: number;
 }
 
+/** @throws {Error} when config is invalid */
 export function createClient(config?: ClientConfig) {
   const transport = setupTransport(
     config?.baseUrl ?? "https://api.example.com",

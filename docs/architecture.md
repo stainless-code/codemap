@@ -445,6 +445,33 @@ SCCs of size ≥ 2 from `dependencies`, plus size-1 SCCs with a self-edge. Compu
 | in_async_fn    | INTEGER    | 1 when the import sits inside an async function body                  |
 | scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id`; `0` = module)               |
 
+### `jsx_elements` / `jsx_attributes` — JSX substrate (`STRICT`)
+
+Every JSX element and attribute in `.tsx`/`.jsx` files. `parent_element_id` is filled in a post-insert pass within the file. Fragments use `is_fragment = 1` and empty `component_name`.
+
+| Column (elements) | Type       | Description                            |
+| ----------------- | ---------- | -------------------------------------- |
+| component_name    | TEXT       | Tag name (`ProductCard`, `article`, …) |
+| is_self_closing   | INTEGER    | 1 for `<Foo />`                        |
+| is_fragment       | INTEGER    | 1 for `<>…</>`                         |
+| is_lowercase      | INTEGER    | 1 for native HTML tags                 |
+| parent_element_id | INTEGER FK | Parent element row                     |
+| children_count    | INTEGER    | Direct JSX child element count         |
+
+| Column (attributes) | Type | Description                                                |
+| ------------------- | ---- | ---------------------------------------------------------- |
+| element_id          | FK   | Owning `jsx_elements.id`                                   |
+| value_kind          | TEXT | `string` / `expression` / `boolean` / `spread` / `element` |
+
+### `async_calls` / `try_catch` / `decorators` / `jsdoc_tags` — Behavioral substrate (`STRICT`)
+
+| Table         | Flagship signal                                                        |
+| ------------- | ---------------------------------------------------------------------- |
+| `async_calls` | `AwaitExpression` sites with `in_loop` / `in_try` context stack        |
+| `try_catch`   | `TryStatement` shape + `catch_logs_only` / `catch_rethrows` heuristics |
+| `decorators`  | Decorator name + `target_kind`; `target_symbol_id` linked post-insert  |
+| `jsdoc_tags`  | Structured tags (`@param`, `@throws`, …) per symbol from `doc_comment` |
+
 ### `runtime_markers` — Operational signals (`STRICT`)
 
 Every `console.*` call, `debugger` statement, `throw` statement, and `process.env.X` access. Powers `find-leftover-console` + `env-var-audit`.

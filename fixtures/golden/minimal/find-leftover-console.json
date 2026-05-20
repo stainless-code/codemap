@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "file_path": "src/lib/cache.ts",
+    "line_start": 23,
+    "column_start": 6,
+    "method": "error"
+  }
+]

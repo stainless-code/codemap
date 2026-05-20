@@ -26,6 +26,7 @@ import type {
   TestSuiteRow,
   DynamicImportRow,
 } from "./db";
+import { behavioralExtractor } from "./extractors/behavioral";
 import { callsExtractor } from "./extractors/calls";
 import {
   complexityExtractor,
@@ -37,6 +38,7 @@ import {
 } from "./extractors/components";
 import { dynamicImportsExtractor } from "./extractors/dynamic-imports";
 import { extractVisibility } from "./extractors/jsdoc";
+import { jsxExtractor } from "./extractors/jsx";
 import { markersExtractor } from "./extractors/markers";
 import { moduleSideEffectsExtractor } from "./extractors/module-side-effects";
 import { buildLineMap, offsetToLine } from "./extractors/offsets";
@@ -66,6 +68,12 @@ interface ExtractedData {
   runtimeMarkers: RuntimeMarkerRow[];
   testSuites: TestSuiteRow[];
   dynamicImports: DynamicImportRow[];
+  jsxElements: import("./extractors/jsx").ParsedJsxElement[];
+  jsxAttributes: import("./extractors/jsx").ParsedJsxAttribute[];
+  asyncCalls: import("./extractors/behavioral").ParsedAsyncCall[];
+  tryCatchRows: import("./extractors/behavioral").ParsedTryCatch[];
+  decorators: import("./extractors/behavioral").ParsedDecorator[];
+  jsdocTags: import("./extractors/behavioral").ParsedJsdocTag[];
   hasSideEffects: number;
 }
 
@@ -110,7 +118,9 @@ const EXTRACTORS: readonly TierExtractor[] = [
   callsExtractor,
   componentsExtractor,
   referencesExtractor,
+  jsxExtractor,
   dynamicImportsExtractor,
+  behavioralExtractor,
   moduleSideEffectsExtractor,
   runtimeMarkersExtractor,
   testsExtractor,
@@ -151,6 +161,12 @@ export function extractFileData(
   const runtimeMarkers: RuntimeMarkerRow[] = [];
   const testSuites: TestSuiteRow[] = [];
   const dynamicImports: DynamicImportRow[] = [];
+  const jsxElements: import("./extractors/jsx").ParsedJsxElement[] = [];
+  const jsxAttributes: import("./extractors/jsx").ParsedJsxAttribute[] = [];
+  const asyncCalls: import("./extractors/behavioral").ParsedAsyncCall[] = [];
+  const tryCatchRows: import("./extractors/behavioral").ParsedTryCatch[] = [];
+  const decorators: import("./extractors/behavioral").ParsedDecorator[] = [];
+  const jsdocTags: import("./extractors/behavioral").ParsedJsdocTag[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -206,6 +222,12 @@ export function extractFileData(
     runtimeMarkers,
     testSuites,
     dynamicImports,
+    jsxElements,
+    jsxAttributes,
+    asyncCalls,
+    tryCatchRows,
+    decorators,
+    jsdocTags,
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
@@ -242,6 +264,12 @@ export function extractFileData(
     runtimeMarkers,
     testSuites,
     dynamicImports,
+    jsxElements,
+    jsxAttributes,
+    asyncCalls,
+    tryCatchRows,
+    decorators,
+    jsdocTags,
     hasSideEffects: ctx.moduleHasSideEffects ? 1 : 0,
   };
 }
