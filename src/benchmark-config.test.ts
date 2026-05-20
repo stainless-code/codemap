@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import { assertReadOnlyIndexedSql } from "./benchmark-config";
+import {
+  assertReadOnlyIndexedSql,
+  collectGlobalRegexMatches,
+} from "./benchmark-config";
 
 describe("assertReadOnlyIndexedSql", () => {
   it("allows SELECT", () => {
@@ -29,5 +32,21 @@ describe("assertReadOnlyIndexedSql", () => {
     expect(() => assertReadOnlyIndexedSql("SELECT 1 RETURNING 2")).toThrow(
       /RETURNING/,
     );
+  });
+});
+
+describe("collectGlobalRegexMatches", () => {
+  it("advances past zero-length matches instead of hanging", () => {
+    const started = Date.now();
+    const matches = collectGlobalRegexMatches("hello", "(a|)");
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.length).toBeLessThan(20);
+  });
+
+  it("collects normal matches", () => {
+    expect(collectGlobalRegexMatches("import foo\n", "^import")).toEqual([
+      "import",
+    ]);
   });
 });
