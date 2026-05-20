@@ -1,6 +1,6 @@
 # Substrate tiers 1–6 rollout (without C.9)
 
-> **Status:** In flight — branch `feat/substrate-tiers-1-6`.  
+> **Status:** Complete — implemented on `feat/substrate-tiers-1-6` (8 commits, `SCHEMA_VERSION` 27→**34**). C.9 explicitly excluded. Push + draft PR when ready (body below).
 > **Parent plan:** [`substrate-extraction.md`](./substrate-extraction.md) (tiers 7–13 out of scope here).  
 > **Explicit exclusion:** C.9 plugin layer — no `files.is_entry`, no reachability-from-entry, no framework entry hints. See [`c9-plugin-layer.md`](./c9-plugin-layer.md).
 
@@ -8,13 +8,13 @@
 
 Reindexed self (`bun src/index.ts --full`); `validate --json` → `[]`.
 
-| Fact                       | Value                                                                                                                                                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SCHEMA_VERSION`           | **27** ([`src/db.ts`](../../src/db.ts))                                                                                                                                                                                                                       |
-| Extractor orchestration    | [`src/parser.ts`](../../src/parser.ts) `EXTRACTORS[]` — `symbolsExtractor` → `scopesExtractor` → `complexityExtractor` → `callsExtractor` → `componentsExtractor` → `referencesExtractor` → `runtimeMarkersExtractor` → `testsExtractor` → `markersExtractor` |
-| Post-passes (index-engine) | bindings ([`resolveBindings`](../../src/application/bindings-engine.ts)), re-export chains + module cycles (full index only)                                                                                                                                  |
-| Live substrate tables      | `calls`, `exports`, `import_specifiers`, `references`, `scopes`, `bindings`, `function_params`, `re_export_chains`, `module_cycles`, …                                                                                                                        |
-| Absent (in-scope gaps)     | `jsx_*`, `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`, `dynamic_imports`; `calls` call-shape flags; `symbols.{return_type,is_async,is_generator}`; `files.{is_barrel,has_side_effects}`; `bindings.resolution_kind='re-exported'`                   |
+| Fact                       | Value                                                                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SCHEMA_VERSION`           | **34** ([`src/db.ts`](../../src/db.ts))                                                                                                                                                     |
+| Extractor orchestration    | [`src/parser.ts`](../../src/parser.ts) `EXTRACTORS[]` — … `referencesExtractor` → `jsxExtractor` → `dynamicImportsExtractor` → `behavioralExtractor` → `moduleSideEffectsExtractor` → …     |
+| Post-passes (index-engine) | bindings, re-export chains, module cycles, JSX parent links (per-file insert), decorator/jsdoc symbol linking                                                                               |
+| Live substrate tables      | All tier 1–6 rollout tables including `jsx_*`, `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`, `dynamic_imports`, enriched `calls`/`symbols`/`import_specifiers`/`bindings`/`files` |
+| Absent (in-scope gaps)     | C.9 only (`files.is_entry`, reachability). Tiers 7–13 out of scope.                                                                                                                         |
 
 Codemap impact on call extraction touch chain: `src/extractors/calls.ts` → `src/parser.ts` → `src/application/index-engine.ts` → `src/db.ts`.
 
