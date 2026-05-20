@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
   chmodSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -596,6 +598,38 @@ describe("applyDiffPayload", () => {
       });
 
       expect(result.conflicts[0]?.reason).toBe("path escapes project root");
+    });
+
+    it("rejects symlinked file_path and leaves the symlink intact", () => {
+      const root = tmpProject();
+      writeSource(root, "real.ts", "const foo = 1;\n");
+      symlinkSync(join(root, "real.ts"), join(root, "link.ts"));
+
+      const result = applyDiffPayload({
+        rows: [
+          {
+            file_path: "link.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+        projectRoot: root,
+        dryRun: false,
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.conflicts).toEqual([
+        {
+          file_path: "link.ts",
+          line_start: 1,
+          before_pattern: "foo",
+          actual_at_line: "",
+          reason: "path is a symlink",
+        },
+      ]);
+      expect(lstatSync(join(root, "link.ts")).isSymbolicLink()).toBe(true);
+      expect(readSource(root, "real.ts")).toBe("const foo = 1;\n");
     });
   });
 
