@@ -74,8 +74,13 @@ export const runtimeMarkersExtractor: TierExtractor = {
       // process.env.X — emit the MemberExpression's outer (process.env.X),
       // detail is X. `process.env` bare without `.X` is a less common
       // pattern (object iteration) — caught by the inner check.
+      VariableDeclarator(node: any) {
+        const init = node.init;
+        if (init && isProcessEnv(init)) {
+          emit("process-env", init.start, init.end, null);
+        }
+      },
       MemberExpression(node: any) {
-        // outer: (process.env).X — node.object is `process.env`, node.property is X.
         if (
           isProcessEnv(node.object) &&
           !node.computed &&
@@ -86,6 +91,20 @@ export const runtimeMarkersExtractor: TierExtractor = {
             node.object.start,
             node.property.end,
             node.property.name,
+          );
+          return;
+        }
+        if (
+          isProcessEnv(node.object) &&
+          node.computed &&
+          node.property?.type === "Literal" &&
+          typeof node.property.value === "string"
+        ) {
+          emit(
+            "process-env",
+            node.object.start,
+            node.property.end,
+            node.property.value,
           );
         }
       },

@@ -188,44 +188,29 @@ function registerSymbolHandlers(
           ...(isArrowOrFn ? functionShapeColumns(init) : {}),
         });
 
-        if (isArrowOrFn) {
-          scopes.push(name, "arrow", lineStart, lineEnd);
+        if (init?.type === "ArrowFunctionExpression") {
+          ctx.declaratorArrowScopes.set(init, {
+            name,
+            lineStart,
+            lineEnd,
+          });
           ctx.claimedScopeNodes.add(init);
-          if (init) complexity.markArrowSymbol(init, symbolIndex);
-          pushTypeParams(
-            init.typeParameters,
-            scopes.currentLocalId(),
+          complexity.markArrowSymbol(init, symbolIndex);
+        } else if (init?.type === "FunctionExpression") {
+          ctx.declaratorArrowScopes.set(init, {
             name,
-            ctx,
-          );
-          pushParams(
-            init.params,
-            scopes.currentLocalId(),
-            name,
-            ctx,
-            jsDocComments,
-            source,
-          );
+            lineStart,
+            lineEnd,
+          });
+          ctx.claimedScopeNodes.add(init);
+          complexity.markArrowSymbol(init, symbolIndex);
         }
         if (isArrowOrFn && isComponentCandidate(name, isTsx)) {
           componentDetector.enter(name);
         }
       }
     },
-    "VariableDeclaration:exit"(node: any) {
-      const decls = node.declarations;
-      for (let i = decls.length - 1; i >= 0; i--) {
-        const decl = decls[i];
-        const name = decl.id?.name;
-        if (!name) continue;
-        const init = decl.init;
-        const isArrowOrFn =
-          init?.type === "ArrowFunctionExpression" ||
-          init?.type === "FunctionExpression";
-        if (isArrowOrFn && scopes.top() === name) {
-          scopes.pop();
-        }
-      }
+    "VariableDeclaration:exit"() {
       // ComponentRow push happens in `componentsExtractor` exit (chained).
     },
 

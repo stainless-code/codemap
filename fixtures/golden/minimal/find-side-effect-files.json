@@ -12,6 +12,18 @@
     "has_side_effects": 1
   },
   {
+    "path": "src/lib/cache.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  },
+  {
+    "path": "src/lib/store.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  },
+  {
     "path": "src/polyfill.ts",
     "language": "ts",
     "is_barrel": 0,

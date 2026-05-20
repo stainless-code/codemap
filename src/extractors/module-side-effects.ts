@@ -16,6 +16,12 @@ export const moduleSideEffectsExtractor: TierExtractor = {
       AssignmentExpression() {
         if (!scopes.currentParent()) ctx.moduleHasSideEffects = true;
       },
+      NewExpression() {
+        if (!scopes.currentParent()) ctx.moduleHasSideEffects = true;
+      },
+      UpdateExpression() {
+        if (!scopes.currentParent()) ctx.moduleHasSideEffects = true;
+      },
     });
   },
 };

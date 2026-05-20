@@ -232,6 +232,7 @@ export function extractFileData(
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
     claimedScopeNodes: new WeakSet(),
+    declaratorArrowScopes: new WeakMap(),
     moduleHasSideEffects: false,
   };
 

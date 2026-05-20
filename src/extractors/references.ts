@@ -100,19 +100,38 @@ export const referencesExtractor: TierExtractor = {
         }
       },
       VariableDeclarator(node: any) {
-        if (node.id?.type === "Identifier" && node.init) {
-          // Declaration position lives in `symbols`; emit write only.
-          writePositions.add(node.id.start);
-          suppressedReads.add(node.id.start);
+        if (node.id?.type === "Identifier") {
+          if (node.init) {
+            writePositions.add(node.id.start);
+            suppressedReads.add(node.id.start);
+          } else {
+            suppressedReads.add(node.id.start);
+          }
+        } else if (node.init) {
+          markPatternWrites(node.id, true);
+        } else {
+          markPatternWrites(node.id, false);
         }
       },
       ForOfStatement(node: any) {
-        if (node.left?.type === "Identifier") {
+        if (node.left?.type === "VariableDeclaration") {
+          for (const decl of node.left.declarations ?? []) {
+            if (decl.init) markPatternWrites(decl.id, true);
+            else if (decl.id?.type === "Identifier")
+              suppressedReads.add(decl.id.start);
+          }
+        } else if (node.left?.type === "Identifier") {
           writePositions.add(node.left.start);
         }
       },
       ForInStatement(node: any) {
-        if (node.left?.type === "Identifier") {
+        if (node.left?.type === "VariableDeclaration") {
+          for (const decl of node.left.declarations ?? []) {
+            if (decl.init) markPatternWrites(decl.id, true);
+            else if (decl.id?.type === "Identifier")
+              suppressedReads.add(decl.id.start);
+          }
+        } else if (node.left?.type === "Identifier") {
           writePositions.add(node.left.start);
         }
       },

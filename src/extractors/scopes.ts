@@ -125,6 +125,30 @@ export const scopesExtractor: TierExtractor = {
       // VariableDeclaration / MethodDefinition / FunctionDeclaration
       // claim their arrows in `claimedScopeNodes` so we don't double-push.
       ArrowFunctionExpression(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator !== undefined) {
+          scopes.push(
+            declarator.name,
+            "arrow",
+            declarator.lineStart,
+            declarator.lineEnd,
+          );
+          pushTypeParams(
+            node.typeParameters,
+            scopes.currentLocalId(),
+            declarator.name,
+            ctx,
+          );
+          pushParams(
+            node.params,
+            scopes.currentLocalId(),
+            declarator.name,
+            ctx,
+            jsDocComments,
+            source,
+          );
+          return;
+        }
         if (ctx.claimedScopeNodes.has(node)) return;
         const lineStart = node.loc?.start?.line ?? 0;
         const lineEnd = node.loc?.end?.line ?? 0;
@@ -141,8 +165,43 @@ export const scopesExtractor: TierExtractor = {
         }
       },
       "ArrowFunctionExpression:exit"(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator !== undefined) {
+          if (scopes.top() === declarator.name) scopes.pop();
+          return;
+        }
         if (ctx.claimedScopeNodes.has(node)) return;
         if (scopes.top() === "") scopes.pop();
+      },
+      FunctionExpression(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator === undefined) return;
+        scopes.push(
+          declarator.name,
+          "function",
+          declarator.lineStart,
+          declarator.lineEnd,
+        );
+        pushTypeParams(
+          node.typeParameters,
+          scopes.currentLocalId(),
+          declarator.name,
+          ctx,
+        );
+        pushParams(
+          node.params,
+          scopes.currentLocalId(),
+          declarator.name,
+          ctx,
+          jsDocComments,
+          source,
+        );
+      },
+      "FunctionExpression:exit"(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator !== undefined && scopes.top() === declarator.name) {
+          scopes.pop();
+        }
       },
       // `try { … } catch (err) { … }` — `err` is bound in the catch
       // body's own scope. Bindingless `catch { … }` (TS 4.4+) has no

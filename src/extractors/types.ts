@@ -157,6 +157,11 @@ export interface ExtractContext {
    * callback arrows that still need a scope.
    */
   readonly claimedScopeNodes: WeakSet<object>;
+  /** Variable-declarator arrow/function inits: scope pushes on enter, not at declaration. */
+  readonly declaratorArrowScopes: WeakMap<
+    object,
+    { name: string; lineStart: number; lineEnd: number }
+  >;
 }
 
 /**
