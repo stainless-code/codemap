@@ -1750,23 +1750,30 @@ export function insertImportsWithSpecifiers(
     }
     return;
   }
-  const importIds: number[] = [];
-  for (const imp of imports) {
-    db.run(
-      "INSERT INTO imports (file_path, source, resolved_path, specifiers, is_type_only, line_number) VALUES (?,?,?,?,?,?)",
-      [
+  const maxBefore = db
+    .query<{ m: number }>("SELECT COALESCE(MAX(id), 0) AS m FROM imports")
+    .get()!.m;
+  batchInsert(
+    db,
+    imports,
+    "INSERT INTO imports (file_path, source, resolved_path, specifiers, is_type_only, line_number)",
+    "(?,?,?,?,?,?)",
+    (imp, v) =>
+      v.push(
         imp.file_path,
         imp.source,
         imp.resolved_path,
         imp.specifiers,
         imp.is_type_only,
         imp.line_number,
-      ],
-    );
-    importIds.push(
-      db.query<{ id: number }>("SELECT last_insert_rowid() AS id").get()!.id,
-    );
-  }
+      ),
+  );
+  const importIds = db
+    .query<{ id: number }>(
+      "SELECT id FROM imports WHERE id > ? ORDER BY id ASC",
+    )
+    .all(maxBefore)
+    .map((r) => r.id);
   if (!specifiers.length) return;
   const linked = specifiers.map((row) => ({
     ...row,
