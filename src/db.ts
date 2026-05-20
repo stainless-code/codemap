@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -222,7 +222,7 @@ export function createTables(db: CodemapDatabase) {
       reference_id INTEGER PRIMARY KEY REFERENCES "references"(id) ON DELETE CASCADE,
       resolved_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
       resolution_kind TEXT NOT NULL CHECK (resolution_kind IN (
-        'same-file','imported','global','unresolved'
+        'same-file','imported','re-exported','global','unresolved'
       )),
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
@@ -1267,7 +1267,12 @@ export function insertReferences(db: CodemapDatabase, rows: ReferenceRow[]) {
 export interface BindingRow {
   reference_id: number;
   resolved_symbol_id: number | null;
-  resolution_kind: "same-file" | "imported" | "global" | "unresolved";
+  resolution_kind:
+    | "same-file"
+    | "imported"
+    | "re-exported"
+    | "global"
+    | "unresolved";
   is_external: number;
 }
 

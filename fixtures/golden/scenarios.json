@@ -121,6 +121,11 @@
       "recipe": "find-side-effect-files"
     },
     {
+      "id": "find-re-exported-bindings",
+      "prompt": "Recipe: bindings resolved via re-export chains",
+      "recipe": "find-re-exported-bindings"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",
