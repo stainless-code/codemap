@@ -1,18 +1,18 @@
 [
   {
     "kind": "FIXME",
-    "n": 2
+    "count": 2
   },
   {
     "kind": "HACK",
-    "n": 2
+    "count": 2
   },
   {
     "kind": "NOTE",
-    "n": 2
+    "count": 2
   },
   {
     "kind": "TODO",
-    "n": 1
+    "count": 1
   }
 ]

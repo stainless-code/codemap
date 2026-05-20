@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "file_path": "src/__tests__/smoke.test.ts",
+    "line_start": 10,
+    "kind": "it",
+    "name": "focused example",
+    "status": "only",
+    "framework": "vitest"
+  },
+  {
+    "file_path": "src/__tests__/smoke.test.ts",
+    "line_start": 6,
+    "kind": "it",
+    "name": "skipped example",
+    "status": "skipped",
+    "framework": "vitest"
+  },
+  {
+    "file_path": "src/__tests__/smoke.test.ts",
+    "line_start": 14,
+    "kind": "it",
+    "name": "todo example",
+    "status": "todo",
+    "framework": "vitest"
+  }
+]

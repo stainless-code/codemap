@@ -1,0 +1,9 @@
+[
+  {
+    "component": "ShopButton",
+    "component_file": "src/components/shop/ShopButton.tsx",
+    "deprecated_symbol": "now",
+    "deprecated_file": "src/utils/date.ts",
+    "via": "call"
+  }
+]

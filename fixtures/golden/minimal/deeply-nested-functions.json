@@ -1,1 +1,20 @@
-[]
+[
+  {
+    "name": "labyrinth",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 22,
+    "body_line_count": 62,
+    "complexity": 19,
+    "nesting_depth": 5
+  },
+  {
+    "name": "deeplyNested",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 6,
+    "body_line_count": 15,
+    "complexity": 5,
+    "nesting_depth": 4
+  }
+]

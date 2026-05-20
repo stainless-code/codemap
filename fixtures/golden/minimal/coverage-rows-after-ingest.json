@@ -1,12 +1,5 @@
 [
   {
-    "file_path": "src/api/client.ts",
-    "name": "legacyClient",
-    "hit_statements": 0,
-    "total_statements": 1,
-    "coverage_pct": 0
-  },
-  {
     "file_path": "src/components/shop/ProductCard.tsx",
     "name": "ProductCard",
     "hit_statements": 3,
@@ -15,16 +8,23 @@
   },
   {
     "file_path": "src/components/shop/ShopButton.tsx",
-    "name": "FormatPrice",
+    "name": "cents",
     "hit_statements": 0,
     "total_statements": 1,
     "coverage_pct": 0
   },
   {
     "file_path": "src/components/shop/ShopButton.tsx",
-    "name": "ShopButton",
-    "hit_statements": 2,
-    "total_statements": 2,
+    "name": "perms",
+    "hit_statements": 1,
+    "total_statements": 1,
+    "coverage_pct": 100
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "name": "_stamp",
+    "hit_statements": 1,
+    "total_statements": 1,
     "coverage_pct": 100
   },
   {

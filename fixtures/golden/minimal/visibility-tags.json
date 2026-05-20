@@ -31,7 +31,7 @@
     "kind": "function",
     "visibility": "beta",
     "file_path": "src/utils/format.ts",
-    "line_start": 13,
+    "line_start": 14,
     "signature": "nowIso(): string",
     "doc_comment": "@beta Fixture for the `visibility-tags` recipe — lock-in for the four-tag\ncoverage (alongside `@internal`, `@alpha`, `@private`)."
   }

@@ -4,7 +4,7 @@
     "caller_scope": "prefetch.$anon_2",
     "awaited_expression": "await import(\"./lib/cache\")",
     "awaited_callee_name": null,
-    "line_start": 15,
+    "line_start": 17,
     "in_loop": 1,
     "in_try": 0
   }

@@ -3,7 +3,7 @@
     "name": "legacyClient",
     "kind": "function",
     "file_path": "src/api/client.ts",
-    "line_start": 42,
+    "line_start": 46,
     "signature": "legacyClient()",
     "doc_comment": "@deprecated Use `createClient({ baseUrl })` directly. Kept as a fixture for\n`deprecated-symbols` + `--format sarif` / `--format annotations` recipes."
   },

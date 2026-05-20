@@ -20,11 +20,23 @@
     "exports": 2
   },
   {
+    "file_path": "src/env.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/lib/cache.ts",
     "exports": 2
   },
   {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/lib/store.ts",
+    "exports": 2
+  },
+  {
+    "file_path": "src/orphan.ts",
     "exports": 2
   },
   {
@@ -36,11 +48,19 @@
     "exports": 1
   },
   {
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "exports": 1
+  },
+  {
     "file_path": "src/components/shop/ProductCard.tsx",
     "exports": 1
   },
   {
     "file_path": "src/components/shop/ShopButton.default.ts",
+    "exports": 1
+  },
+  {
+    "file_path": "src/types/status.ts",
     "exports": 1
   },
   {

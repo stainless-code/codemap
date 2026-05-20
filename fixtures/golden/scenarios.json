@@ -285,6 +285,81 @@
       "id": "unused-type-members",
       "prompt": "Members of exported types whose owning type has no detectable importer (advisory; field-level enumeration of `unimported-exports`)",
       "recipe": "unused-type-members"
+    },
+    {
+      "id": "boundary-violations",
+      "prompt": "Config-driven architecture boundary violations (ui-no-api)",
+      "recipe": "boundary-violations"
+    },
+    {
+      "id": "unimported-exports",
+      "prompt": "Exports with no direct importer (orphanHelper)",
+      "recipe": "unimported-exports"
+    },
+    {
+      "id": "components-by-hooks",
+      "prompt": "Components ranked by hooks_used count",
+      "recipe": "components-by-hooks"
+    },
+    {
+      "id": "components-touching-deprecated",
+      "prompt": "Components calling or hooking @deprecated symbols",
+      "recipe": "components-touching-deprecated"
+    },
+    {
+      "id": "files-largest",
+      "prompt": "Largest indexed files by line_count",
+      "recipe": "files-largest"
+    },
+    {
+      "id": "fan-in",
+      "prompt": "Top files by import fan-in",
+      "recipe": "fan-in"
+    },
+    {
+      "id": "fan-out",
+      "prompt": "Top files by import fan-out",
+      "recipe": "fan-out"
+    },
+    {
+      "id": "refactor-risk-ranking",
+      "prompt": "Per-file refactor risk (fan-in × coverage gap)",
+      "recipe": "refactor-risk-ranking"
+    },
+    {
+      "id": "high-complexity-untested",
+      "prompt": "High cyclomatic complexity + low coverage",
+      "recipe": "high-complexity-untested"
+    },
+    {
+      "id": "text-in-deprecated-functions",
+      "prompt": "FTS TODO/FIXME/HACK in @deprecated functions with low coverage (requires fts5)",
+      "recipe": "text-in-deprecated-functions"
+    },
+    {
+      "id": "markers-by-kind",
+      "prompt": "Marker inventory by kind (recipe form of markers-all-kinds)",
+      "recipe": "markers-by-kind"
+    },
+    {
+      "id": "suppressions-orphan",
+      "prompt": "codemap-ignore suppressions registered at index time",
+      "sql": "SELECT file_path, line_number, recipe_id FROM suppressions ORDER BY file_path, line_number"
+    },
+    {
+      "id": "enum-order-status",
+      "prompt": "Enum symbol extraction",
+      "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'OrderStatus'"
+    },
+    {
+      "id": "jsdoc-tags-createClient",
+      "prompt": "Structured JSDoc tags on createClient",
+      "sql": "SELECT j.tag, j.name, j.type_text FROM jsdoc_tags j JOIN symbols s ON s.id = j.symbol_id WHERE s.name = 'createClient' AND s.file_path = 'src/api/client.ts' ORDER BY j.tag, j.name"
+    },
+    {
+      "id": "jsx-attributes-product-card",
+      "prompt": "JSX attribute substrate on ProductCard",
+      "sql": "SELECT a.name, a.value_kind FROM jsx_attributes a JOIN jsx_elements e ON e.id = a.element_id WHERE e.file_path = 'src/components/shop/ProductCard.tsx' ORDER BY a.name"
     }
   ]
 }

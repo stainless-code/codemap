@@ -1,9 +1,9 @@
 [
   {
-    "files": 20,
-    "symbols": 51,
-    "imports": 12,
+    "files": 27,
+    "symbols": 70,
+    "imports": 19,
     "components": 2,
-    "dependencies": 11
+    "dependencies": 17
   }
 ]

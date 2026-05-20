@@ -1,0 +1,7 @@
+[
+  {
+    "name": "OrderStatus",
+    "kind": "enum",
+    "file_path": "src/types/status.ts"
+  }
+]

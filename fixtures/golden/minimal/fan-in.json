@@ -1,0 +1,46 @@
+[
+  {
+    "to_path": "src/utils/date.ts",
+    "fan_in": 3
+  },
+  {
+    "to_path": "src/api/client.ts",
+    "fan_in": 2
+  },
+  {
+    "to_path": "src/lib/cache.ts",
+    "fan_in": 2
+  },
+  {
+    "to_path": "src/lib/complexity-fixture.ts",
+    "fan_in": 2
+  },
+  {
+    "to_path": "src/usePermissions.ts",
+    "fan_in": 2
+  },
+  {
+    "to_path": "src/api/decorated.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/components/shop/ShopButton.tsx",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/components/shop/index.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/lib/store.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/polyfill.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/utils/format.ts",
+    "fan_in": 1
+  }
+]

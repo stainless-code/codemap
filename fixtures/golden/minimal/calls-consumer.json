@@ -1,5 +1,8 @@
 [
   {
+    "callee_name": "ApiCache"
+  },
+  {
     "callee_name": "createClient"
   },
   {
@@ -9,6 +12,15 @@
     "callee_name": "get"
   },
   {
+    "callee_name": "labyrinth"
+  },
+  {
     "callee_name": "now"
+  },
+  {
+    "callee_name": "optionalPing"
+  },
+  {
+    "callee_name": "spreadLog"
   }
 ]

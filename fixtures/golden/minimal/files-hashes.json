@@ -1,5 +1,11 @@
 [
   {
+    "path": ".codemap/config.json",
+    "content_hash": "336aef86f425c7227027d30a696382314825c37d6c7a6b65b13d354d5980f111",
+    "language": "json",
+    "line_count": 11
+  },
+  {
     "path": ".codemap/recipes/shop-symbols.md",
     "content_hash": "0ef26e4291fd1dbfb60887d79251bfd9eb1af71675811ba40a1932368e6b112c",
     "language": "md",
@@ -7,9 +13,9 @@
   },
   {
     "path": "README.md",
-    "content_hash": "05f60d056b6a09c6d2024be74cd45e17f40b1126c408b67a42bc098f5159d13e",
+    "content_hash": "d6a63cfa7cb8f176151054235c84819b9af51979b482793def5d8569c50979c2",
     "language": "md",
-    "line_count": 50
+    "line_count": 52
   },
   {
     "path": "package.json",
@@ -18,10 +24,16 @@
     "line_count": 11
   },
   {
-    "path": "src/api/client.ts",
-    "content_hash": "2035094c31ce72ef9b723e4b47ebb1d65bc8d9a381ca7f98bd43164adcd2757f",
+    "path": "src/__tests__/smoke.test.ts",
+    "content_hash": "2fa9fff351d4f0181db6a2edac133ab3d90ee227934a599b122ad8dcbf7ba13c",
     "language": "ts",
-    "line_count": 45
+    "line_count": 26
+  },
+  {
+    "path": "src/api/client.ts",
+    "content_hash": "7d313fff06443ff9e7ca3d13f44a8c601ce65baa3d8aa1a8263f3e85090afe0b",
+    "language": "ts",
+    "line_count": 49
   },
   {
     "path": "src/api/decorated.ts",
@@ -30,10 +42,16 @@
     "line_count": 5
   },
   {
-    "path": "src/components/shop/ProductCard.tsx",
-    "content_hash": "4cdd3d8376da664789c075bfdb3eab49adc3460fcd0810eedc1ad456e7c5be9a",
+    "path": "src/components/shop/ApiBridge.tsx",
+    "content_hash": "825a69353a860b7a4f0bb562b71ca12fad3f6a2b38cd7f28b91a17562ac5d8d5",
     "language": "tsx",
-    "line_count": 20
+    "line_count": 8
+  },
+  {
+    "path": "src/components/shop/ProductCard.tsx",
+    "content_hash": "27b25a905655574a3002adc140b36e91b95f8f1a5db0758ba172115595134122",
+    "language": "tsx",
+    "line_count": 23
   },
   {
     "path": "src/components/shop/ShopButton.default.ts",
@@ -43,9 +61,9 @@
   },
   {
     "path": "src/components/shop/ShopButton.tsx",
-    "content_hash": "cbc7939a134240c0076f76f6499fa893309f131dda53eaef4d946470f42c54af",
+    "content_hash": "abc37ff9c611c7259b63bde0727216c8e1848f279f142d1ce276564bcb34aed8",
     "language": "tsx",
-    "line_count": 15
+    "line_count": 17
   },
   {
     "path": "src/components/shop/index.ts",
@@ -55,15 +73,27 @@
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "2698fbba58a1ae47e9cb3a2297b5677a21d9ecfa64a62c8a4ee072dab3ef185f",
+    "content_hash": "ce739e8bbfd30a8ef46a82f6eb9760227ca8b8369162df3b819747b81b7a57cc",
     "language": "ts",
-    "line_count": 29
+    "line_count": 40
+  },
+  {
+    "path": "src/env.ts",
+    "content_hash": "5d5828d36203762f7aae84b4bc3672285ee9e335fbbba95e29c01393095440b6",
+    "language": "ts",
+    "line_count": 4
   },
   {
     "path": "src/lib/cache.ts",
     "content_hash": "964f6d3ddb8a7782b1273a38ed0bbde8cd886eb672c1f20466f0aa88ff49205f",
     "language": "ts",
     "line_count": 27
+  },
+  {
+    "path": "src/lib/complexity-fixture.ts",
+    "content_hash": "ba844b9262adbb407030708f7fc3432bde780ba88a07066ad383e66a6f3851d8",
+    "language": "ts",
+    "line_count": 84
   },
   {
     "path": "src/lib/store.ts",
@@ -76,6 +106,12 @@
     "content_hash": "03ab92544e475626defcaafec97e1169d7940532ca3eeb4a25d28b4816c1ca9a",
     "language": "md",
     "line_count": 11
+  },
+  {
+    "path": "src/orphan.ts",
+    "content_hash": "2c1516b82d9ad1c65f3827701f6adf6c9a246bc71b9b8eab486717e40e6e0e58",
+    "language": "ts",
+    "line_count": 10
   },
   {
     "path": "src/polyfill.ts",
@@ -96,6 +132,12 @@
     "line_count": 9
   },
   {
+    "path": "src/types/status.ts",
+    "content_hash": "85a4d68b1bcffdd9b00c25293b5b81be1ce690a7525b444c6315dcf2b8876b7b",
+    "language": "ts",
+    "line_count": 5
+  },
+  {
     "path": "src/usePermissions.ts",
     "content_hash": "8758cc9ba2756e08198f11fca9ff58a0612fc9219173d06784e0b7e2f2ca1e1f",
     "language": "ts",
@@ -109,9 +151,9 @@
   },
   {
     "path": "src/utils/format.ts",
-    "content_hash": "8f4e1b729d1a69f1457a57c0a6ce61740ff27f2119976d2183ca053bf50b2ad6",
+    "content_hash": "670e458b068c63994b027d3200cc74e1a2c1bf5472ae2dc5e5508653178c506d",
     "language": "ts",
-    "line_count": 16
+    "line_count": 17
   },
   {
     "path": "tsconfig.json",
