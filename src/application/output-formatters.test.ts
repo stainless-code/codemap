@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -563,6 +569,30 @@ describe("formatDiff / formatDiffJson", () => {
     );
     expect(payload.files[0].warnings).toHaveLength(2);
     expect(payload.summary.skipped).toBe(1);
+  });
+
+  it("does not read files outside project root", () => {
+    const outsidePath = join(workDir, "..", "outside.ts");
+    writeFileSync(outsidePath, "const foo = 1;\n");
+    const before = readFileSync(outsidePath, "utf8");
+
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "../outside.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "PWNED",
+          },
+        ],
+      }),
+    );
+
+    expect(payload.files[0].missing).toBe(true);
+    expect(payload.warnings[0]).toContain("path escapes project root");
+    expect(readFileSync(outsidePath, "utf8")).toBe(before);
   });
 
   it("marks missing rows when source file is gone", () => {
