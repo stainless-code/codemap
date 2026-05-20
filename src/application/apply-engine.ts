@@ -31,7 +31,12 @@
 
 import { randomBytes } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
-import { isAbsolute, resolve, sep } from "node:path";
+import { isAbsolute, resolve } from "node:path";
+
+import {
+  canonicalizeProjectFilePath,
+  isWithinProjectRoot,
+} from "./path-containment";
 
 /** Required input columns on every recipe row. */
 export interface ApplyInputRow extends Record<string, unknown> {
@@ -148,7 +153,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
 
     // Path-containment guard — without it `file_path: "../escape.ts"` would
     // write sibling-of-root files (CLI + MCP + HTTP all share this engine).
-    if (isAbsolute(filePath) || !isWithinRoot(resolvedRoot, filePath)) {
+    if (isAbsolute(filePath) || !isWithinProjectRoot(resolvedRoot, filePath)) {
       conflicts.push({
         file_path: filePath,
         line_start: lineStart,
@@ -163,7 +168,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     // all dedup into the same cache + pending entry. Without this, two
     // rows naming the same disk file via different spellings would race in
     // phase 2 — second writeFileSync clobbers the first edit.
-    const canonicalPath = canonicalizeFilePath(resolvedRoot, filePath);
+    const canonicalPath = canonicalizeProjectFilePath(resolvedRoot, filePath);
 
     let source = sourceCache.get(canonicalPath);
     if (source === undefined) {
@@ -246,10 +251,12 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
     if (filePath === undefined) continue;
     // Count distinct disk targets, not distinct spellings — same as the
     // dedup applied to the cache + pending keys.
-    if (isAbsolute(filePath) || !isWithinRoot(resolvedRoot, filePath)) {
+    if (isAbsolute(filePath) || !isWithinProjectRoot(resolvedRoot, filePath)) {
       distinctInputFiles.add(filePath);
     } else {
-      distinctInputFiles.add(canonicalizeFilePath(resolvedRoot, filePath));
+      distinctInputFiles.add(
+        canonicalizeProjectFilePath(resolvedRoot, filePath),
+      );
     }
   }
 
@@ -357,25 +364,4 @@ function readPositiveInt(
   return Number.isInteger(value) && typeof value === "number" && value > 0
     ? value
     : undefined;
-}
-
-/** `true` iff `resolve(resolvedRoot, candidate)` lands inside `resolvedRoot`. */
-function isWithinRoot(resolvedRoot: string, candidate: string): boolean {
-  const resolved = resolve(resolvedRoot, candidate);
-  if (resolved === resolvedRoot) return true;
-  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
-  return resolved.startsWith(prefix);
-}
-
-/**
- * Canonical project-relative form for the `pending` / `sourceCache` /
- * `seenLines` keys. `a.ts`, `./a.ts`, `src/../a.ts` all collapse to `a.ts`.
- * Caller has already verified `isWithinRoot(resolvedRoot, candidate)` so
- * the result is guaranteed in-tree.
- */
-function canonicalizeFilePath(resolvedRoot: string, candidate: string): string {
-  const absolute = resolve(resolvedRoot, candidate);
-  if (absolute === resolvedRoot) return "";
-  const prefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
-  return absolute.slice(prefix.length);
 }

@@ -16,9 +16,13 @@
  */
 
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { CODEMAP_VERSION } from "../version";
+import {
+  canonicalizeProjectFilePath,
+  pathEscapesProjectRoot,
+} from "./path-containment";
 
 /** Priority-ordered column names that name a file path (D1). */
 const LOCATION_COLUMNS = ["file_path", "path", "to_path", "from_path"] as const;
@@ -428,6 +432,7 @@ export function formatMermaid(opts: MermaidOpts): string {
 export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
   const files = new Map<string, DiffFile>();
   const warnings: string[] = [];
+  const resolvedRoot = resolve(opts.projectRoot);
 
   for (const row of opts.rows) {
     const filePath = readString(row, "file_path");
@@ -443,16 +448,28 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
       continue;
     }
 
-    const file = ensureDiffFile(files, filePath);
+    if (pathEscapesProjectRoot(resolvedRoot, filePath)) {
+      const file = ensureDiffFile(files, filePath);
+      markSkipped(
+        file,
+        warnings,
+        "missing",
+        `${filePath}: path escapes project root`,
+      );
+      continue;
+    }
+
+    const canonicalPath = canonicalizeProjectFilePath(resolvedRoot, filePath);
+    const file = ensureDiffFile(files, canonicalPath);
     let source: string;
     try {
-      source = readFileSync(join(opts.projectRoot, filePath), "utf8");
+      source = readFileSync(join(resolvedRoot, canonicalPath), "utf8");
     } catch {
       markSkipped(
         file,
         warnings,
         "missing",
-        `${filePath}: missing or unreadable`,
+        `${canonicalPath}: missing or unreadable`,
       );
       continue;
     }
@@ -463,7 +480,7 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
         file,
         warnings,
         "stale",
-        `${filePath}:${lineStart}: stale line range`,
+        `${canonicalPath}:${lineStart}: stale line range`,
       );
       continue;
     }
