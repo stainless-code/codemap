@@ -61,7 +61,7 @@
     "lint:fix": "oxlint --fix",
     "pack": "bun run build && npm pack",
     "prepare": "husky || true",
-    "prepublishOnly": "bun run build",
+    "prepublishOnly": "bun run check",
     "qa:external": "bun scripts/qa-external-repo.ts",
     "release": "changeset publish",
     "test": "bun test ./src",
