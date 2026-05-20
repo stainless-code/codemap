@@ -8,7 +8,7 @@ import { createTables } from "../db";
 import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
 import { openCodemapDatabase } from "../sqlite-db";
-import { parseSnippetRest } from "./cmd-snippet";
+import { parseSnippetRest, renderSnippetTerminal } from "./cmd-snippet";
 
 describe("parseSnippetRest", () => {
   it("returns help on --help / -h", () => {
@@ -66,6 +66,43 @@ describe("parseSnippetRest", () => {
 
   it("throws if rest[0] is not 'snippet'", () => {
     expect(() => parseSnippetRest(["query"])).toThrow();
+  });
+});
+
+describe("renderSnippetTerminal", () => {
+  it("prints signature between location and source", () => {
+    const lines: string[] = [];
+    const origLog = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+    };
+    try {
+      renderSnippetTerminal({
+        matches: [
+          {
+            name: "foo",
+            kind: "function",
+            file_path: "src/a.ts",
+            line_start: 1,
+            line_end: 2,
+            signature: "function foo(): void",
+            is_exported: 1,
+            parent_name: null,
+            visibility: null,
+            source: "line1\nline2",
+            stale: false,
+            missing: false,
+          },
+        ],
+      });
+    } finally {
+      console.log = origLog;
+    }
+    expect(lines[0]).toBe("src/a.ts:1-2");
+    expect(lines[1]).toBe("  function foo(): void");
+    expect(lines[2]).toBe("line1\nline2");
   });
 });
 

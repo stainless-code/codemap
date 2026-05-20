@@ -180,7 +180,7 @@ export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
       console.log(JSON.stringify(result));
       return;
     }
-    renderTerminal(result);
+    renderSnippetTerminal(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
@@ -197,7 +197,7 @@ function describeFilter(
   return parts.length === 0 ? "" : ` (filters: ${parts.join(", ")})`;
 }
 
-function renderTerminal(result: SnippetResult): void {
+export function renderSnippetTerminal(result: SnippetResult): void {
   let anyStale = false;
   for (let i = 0; i < result.matches.length; i++) {
     const m = result.matches[i]!;
@@ -207,6 +207,7 @@ function renderTerminal(result: SnippetResult): void {
     console.log(
       `${m.file_path}:${m.line_start}-${m.line_end}${stalePrefix}${missingPrefix}`,
     );
+    console.log(`  ${m.signature}`);
     if (m.source !== undefined) console.log(m.source);
     if (m.stale) anyStale = true;
   }
