@@ -75,11 +75,40 @@ export function printVersion(): void {
 }
 
 /**
+ * Paths for `codemap --files <paths...>` when `rest[0] === "--files"`; otherwise `null`.
+ * Exits 1 on missing paths or flags where operands are required.
+ */
+export function parseIndexFilesArgs(rest: string[]): string[] | null {
+  if (rest[0] !== "--files") return null;
+  const files: string[] = [];
+  for (let i = 1; i < rest.length; i++) {
+    const a = rest[i];
+    if (a.startsWith("-")) {
+      console.error(`codemap: unexpected option "${a}" after --files`);
+      console.error("Run codemap --help for usage.");
+      process.exit(1);
+    }
+    files.push(a);
+  }
+  if (files.length === 0) {
+    console.error("codemap: --files requires at least one path");
+    console.error("Run codemap --help for usage.");
+    process.exit(1);
+  }
+  return files;
+}
+
+/**
  * Reject unknown flags/args for index mode before config or DB access.
- * Prevents typos like `--versiond` from falling through to incremental index.
+ * Enforces `--files` as the first index option with at least one path.
  */
 export function validateIndexModeArgs(rest: string[]): void {
   if (rest.length === 0) return;
+  if (rest.includes("--files") && rest[0] !== "--files") {
+    console.error("codemap: --files must be the first index option");
+    console.error("Run codemap --help for usage.");
+    process.exit(1);
+  }
   if (rest[0] === "query") return;
   if (rest[0] === "validate") return;
   if (rest[0] === "context") return;
@@ -111,7 +140,13 @@ export function validateIndexModeArgs(rest: string[]): void {
     }
     if (a === "--files") {
       i++;
+      const start = i;
       while (i < rest.length && !rest[i].startsWith("-")) i++;
+      if (i === start) {
+        console.error("codemap: --files requires at least one path");
+        console.error("Run codemap --help for usage.");
+        process.exit(1);
+      }
       continue;
     }
     if (a.startsWith("-")) {
