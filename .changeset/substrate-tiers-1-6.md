@@ -27,7 +27,9 @@ Substrate tiers 1–6 remainder (excludes C.9 / `files.is_entry`). **Schema bump
 - `dynamic_imports` table + extractor
 - Post-pass `files.is_barrel` and parse-time `files.has_side_effects`
 
-**Recipes + goldens:** `find-call-sites` (extended), `find-async-functions`, `find-dynamic-imports`, `find-barrel-files`, `find-side-effect-files`, `find-re-exported-bindings`, `find-side-effect-imports`, `find-jsx-usages`, `find-await-in-loop`, `find-swallowed-errors`, `find-decorator-usage`, `find-throws-jsdoc`.
+**Recipes + goldens:** `find-call-sites` (extended), `find-async-functions`, `find-dynamic-imports`, `find-barrel-files`, `find-side-effect-files`, `find-re-exported-bindings`, `find-side-effect-imports`, `find-jsx-usages`, `find-await-in-loop`, `find-swallowed-errors`, `find-decorator-usage`, `find-throws-jsdoc`, plus golden coverage for `fan-out-sample` / `fan-out-sample-json` and substrate regression tests.
+
+**Read-only CLI hardening:** `printQueryResult` (ad-hoc `codemap query "<SQL>"`) now sets `PRAGMA query_only = 1`, closing the last gap vs `queryRows` / `executeQuery` (#107).
 
 **Out of scope:** C.9 plugin layer (`files.is_entry`, reachability-from-entry); tiers 7–13.
 
