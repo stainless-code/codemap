@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  DEFAULT_EXCLUDE_DIR_NAMES,
   DEFAULT_INCLUDE_PATTERNS,
   defineConfig,
   loadUserConfig,
@@ -103,6 +104,18 @@ describe("resolveCodemapConfig", () => {
     const r2 = resolveCodemapConfig(dir, { excludeDirNames: ["custom"] });
     expect(r2.excludeDirNames.has("custom")).toBe(true);
     expect(r2.excludeDirNames.has("node_modules")).toBe(false);
+  });
+
+  it("honors explicit empty include (no default patterns)", () => {
+    const r = resolveCodemapConfig(dir, { include: [] });
+    expect(r.include).toEqual([]);
+    expect(r.include).not.toEqual(DEFAULT_INCLUDE_PATTERNS);
+  });
+
+  it("honors explicit empty excludeDirNames (no default exclusions)", () => {
+    const r = resolveCodemapConfig(dir, { excludeDirNames: [] });
+    expect([...r.excludeDirNames]).toEqual([]);
+    expect(r.excludeDirNames).not.toEqual(DEFAULT_EXCLUDE_DIR_NAMES);
   });
 
   it("defaults boundaries to []", () => {

@@ -33,3 +33,18 @@ export function pathEscapesProjectRoot(
   const resolvedRoot = resolve(projectRoot);
   return isAbsolute(filePath) || !isWithinProjectRoot(resolvedRoot, filePath);
 }
+
+/**
+ * Map an absolute resolved path to a project-relative path, or `null` when the
+ * target is outside the root (rejects string-prefix siblings like
+ * `/repo/app` vs `/repo/application`).
+ */
+export function projectRelativePathFromResolved(
+  projectRoot: string,
+  resolvedAbsolute: string,
+): string | null {
+  const resolvedRoot = resolve(projectRoot);
+  const abs = resolve(resolvedAbsolute);
+  if (!isWithinProjectRoot(resolvedRoot, abs)) return null;
+  return canonicalizeProjectFilePath(resolvedRoot, abs);
+}

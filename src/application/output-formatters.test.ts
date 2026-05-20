@@ -595,6 +595,38 @@ describe("formatDiff / formatDiffJson", () => {
     expect(readFileSync(outsidePath, "utf8")).toBe(before);
   });
 
+  it("includes deletion rows with empty after_pattern", () => {
+    writeFileSync(join(workDir, "src/a.ts"), "FIXME(team): todo\n");
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/a.ts",
+            line_start: 1,
+            before_pattern: "FIXME(team): ",
+            after_pattern: "",
+          },
+        ],
+      }),
+    );
+    expect(payload.summary.hunks).toBe(1);
+    expect(payload.files[0].hunks).toHaveLength(1);
+    const out = formatDiff({
+      projectRoot: workDir,
+      rows: [
+        {
+          file_path: "src/a.ts",
+          line_start: 1,
+          before_pattern: "FIXME(team): ",
+          after_pattern: "",
+        },
+      ],
+    });
+    expect(out).toContain("-FIXME(team): todo");
+    expect(out).toContain("+todo");
+  });
+
   it("marks missing rows when source file is gone", () => {
     const payload = JSON.parse(
       formatDiffJson({

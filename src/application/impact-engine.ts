@@ -299,10 +299,16 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
       WHERE walk.depth < ?
         AND instr(walk.path, ',' || c.${joinToCol} || ',') = 0
     )
-    SELECT node, MIN(depth) AS depth, file_path
-    FROM walk
-    WHERE depth > 0
-    GROUP BY node
+    SELECT node, depth, file_path
+    FROM (
+      SELECT node, depth, file_path,
+        ROW_NUMBER() OVER (
+          PARTITION BY node ORDER BY depth ASC, file_path ASC
+        ) AS rn
+      FROM walk
+      WHERE depth > 0
+    )
+    WHERE rn = 1
     ORDER BY depth ASC, node ASC
     LIMIT ?
   `;
