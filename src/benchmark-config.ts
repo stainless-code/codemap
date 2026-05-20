@@ -67,6 +67,24 @@ function isBuiltin(t: TraditionalSpec): t is TraditionalBuiltinSpec {
   return "builtin" in t && t.builtin === "fanoutImportLines";
 }
 
+/**
+ * All global matches for `regex` in `content`. Advances `lastIndex` after zero-length
+ * hits so patterns like `(a|)` cannot stall the benchmark runner.
+ */
+export function collectGlobalRegexMatches(
+  content: string,
+  regex: string,
+): string[] {
+  const re = new RegExp(regex, "g");
+  const matches: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    matches.push(m[0]);
+    if (m[0].length === 0) re.lastIndex += 1;
+  }
+  return matches;
+}
+
 function traditionalFromSpec(spec: TraditionalSpec): () => {
   results: unknown[];
   filesRead: number;
@@ -87,12 +105,9 @@ function traditionalFromSpec(spec: TraditionalSpec): () => {
     const { totalBytes, contents } = readAll(files, cwd);
     const results: unknown[] = [];
     if (mode === "matches") {
-      const re = new RegExp(regex, "g");
       for (const [path, content] of contents) {
-        re.lastIndex = 0;
-        let m;
-        while ((m = re.exec(content)) !== null) {
-          results.push({ file_path: path, match: m[0] });
+        for (const match of collectGlobalRegexMatches(content, regex)) {
+          results.push({ file_path: path, match });
         }
       }
     } else {
