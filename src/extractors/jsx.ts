@@ -168,7 +168,7 @@ export const jsxExtractor: TierExtractor = {
         ? (node.openingFragment?.start ?? node.start)
         : (opening.name?.start ?? opening.start);
       const tokenEnd = isFragment
-        ? (node.closingFragment?.end ?? node.end)
+        ? (node.openingFragment?.end ?? node.end)
         : (opening.name?.end ?? opening.end);
       const lineStart = offsetToLine(lineMap, node.start);
       const lineEnd = offsetToLine(lineMap, node.end);

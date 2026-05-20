@@ -10,7 +10,7 @@
 
 ---
 
-## What shipped (fact-checked 2026-05-18) — appendix per § 9 lifecycle
+## What shipped (fact-checked 2026-05-19) — appendix per § 9 lifecycle
 
 The substrate-growth half of this synthesis lifted to a dedicated plan PR — [`plans/substrate-extraction.md`](../plans/substrate-extraction.md) — which generalised § 4.1 / § 4.2 / § 5.3 items 1, 3 into a 13-tier sequenced plan. Per § 9's discipline ("when the synthesis path ships any step, add a 'What shipped' appendix; slim duplicated prose"), the canonical live status is **the substrate plan's per-tier headings**, not this note.
 

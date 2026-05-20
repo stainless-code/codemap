@@ -93,6 +93,15 @@ function bodyHasThrow(body: any, catchParam: string | null): boolean {
   while (stack.length) {
     const node = stack.pop();
     if (!node) continue;
+    if (
+      node.type === "FunctionDeclaration" ||
+      node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression" ||
+      node.type === "ClassDeclaration" ||
+      node.type === "ClassExpression"
+    ) {
+      continue;
+    }
     if (node.type === "ThrowStatement") {
       const arg = node.argument;
       if (!arg) return true;
@@ -170,7 +179,7 @@ export function parseJsDocTags(doc: string): Array<{
       });
       continue;
     }
-    m = /^@returns?\s+(?:\{([^}]*)\}\s+)?(.*)$/.exec(line);
+    m = /^@returns?(?:\s+(?:\{([^}]*)\}\s*)?(.*))?$/.exec(line);
     if (m) {
       out.push({
         tag: "@returns",
@@ -180,7 +189,7 @@ export function parseJsDocTags(doc: string): Array<{
       });
       continue;
     }
-    m = /^@throws\s+(?:\{([^}]*)\}\s+)?(.*)$/.exec(line);
+    m = /^@throws(?:\s+(?:\{([^}]*)\}\s*)?(.*))?$/.exec(line);
     if (m) {
       out.push({
         tag: "@throws",
@@ -190,7 +199,7 @@ export function parseJsDocTags(doc: string): Array<{
       });
       continue;
     }
-    m = /^@(\w+)\s+(.*)$/.exec(line);
+    m = /^@(\w+)(?:\s+(.*))?$/.exec(line);
     if (m) {
       out.push({
         tag: `@${m[1]}`,
