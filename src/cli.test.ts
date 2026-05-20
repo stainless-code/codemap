@@ -91,14 +91,11 @@ describe("CLI version", () => {
 });
 
 describe("validateIndexModeArgs", () => {
-  test("allows empty, --full, --files paths, and combinations", () => {
+  test("allows empty, --full, and --files with paths", () => {
     expect(() => validateIndexModeArgs([])).not.toThrow();
     expect(() => validateIndexModeArgs(["--full"])).not.toThrow();
     expect(() =>
       validateIndexModeArgs(["--files", "a.ts", "b.tsx"]),
-    ).not.toThrow();
-    expect(() =>
-      validateIndexModeArgs(["--full", "--files", "src/x.ts"]),
     ).not.toThrow();
   });
 });
@@ -123,5 +120,25 @@ describe("CLI unknown / invalid args", () => {
     expect(exitCode).toBe(1);
     expect(err).toContain("unexpected argument");
     expect(err).toContain("interactive");
+  });
+
+  test("--files without paths exits 1 before DB", async () => {
+    const { exitCode, err } = await runCli(["--files"]);
+    expect(exitCode).toBe(1);
+    expect(err).toContain("--files requires at least one path");
+  });
+
+  test("--files with only a following flag exits 1", async () => {
+    const { exitCode, err } = await runCli(["--files", "--full"]);
+    expect(exitCode).toBe(1);
+    expect(err).toMatch(
+      /--files requires at least one path|unexpected option "--full" after --files/,
+    );
+  });
+
+  test("--files after --full exits 1", async () => {
+    const { exitCode, err } = await runCli(["--full", "--files", "src/x.ts"]);
+    expect(exitCode).toBe(1);
+    expect(err).toContain("--files must be the first index option");
   });
 });

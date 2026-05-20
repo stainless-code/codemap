@@ -4,7 +4,9 @@ import { VALID_EXTENSIONS } from "../application/index-engine";
 import { runCodemapIndex } from "../application/run-index";
 import { closeDb, openDb } from "../db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { parseIndexFilesArgs } from "./bootstrap.js";
 
+/** Incremental/full index, or targeted `--files` via `parseIndexFilesArgs`. */
 export async function runIndexCmd(opts: {
   root: string;
   configFile: string | undefined;
@@ -15,21 +17,19 @@ export async function runIndexCmd(opts: {
   await bootstrapCodemap(opts);
 
   const args = opts.rest;
+  const targetFiles = parseIndexFilesArgs(args);
   const db = openDb();
   try {
-    if (args[0] === "--files" && args.length > 1) {
-      const targetFiles = args.slice(1);
+    if (targetFiles !== null) {
       for (const f of targetFiles) {
         if (!VALID_EXTENSIONS.has(extname(f))) {
           console.warn(`  ${f}: non-standard extension, indexing as text`);
         }
       }
-      if (targetFiles.length > 0) {
-        await runCodemapIndex(db, {
-          mode: "files",
-          files: targetFiles,
-        });
-      }
+      await runCodemapIndex(db, {
+        mode: "files",
+        files: targetFiles,
+      });
     } else {
       const fullRebuild = args.includes("--full");
       const reportPerformance = args.includes("--performance");
