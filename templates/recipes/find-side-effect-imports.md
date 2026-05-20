@@ -1,3 +1,10 @@
+---
+params: []
+actions:
+  - type: navigate-to-definition
+    description: "Each row is a side-effect-only import occurrence."
+---
+
 # find-side-effect-imports
 
 Side-effect-only import statements (`import "./mod"` with no bindings).
