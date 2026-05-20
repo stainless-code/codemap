@@ -173,6 +173,36 @@ export const scopesExtractor: TierExtractor = {
         if (ctx.claimedScopeNodes.has(node)) return;
         if (scopes.top() === "") scopes.pop();
       },
+      FunctionExpression(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator === undefined) return;
+        scopes.push(
+          declarator.name,
+          "function",
+          declarator.lineStart,
+          declarator.lineEnd,
+        );
+        pushTypeParams(
+          node.typeParameters,
+          scopes.currentLocalId(),
+          declarator.name,
+          ctx,
+        );
+        pushParams(
+          node.params,
+          scopes.currentLocalId(),
+          declarator.name,
+          ctx,
+          jsDocComments,
+          source,
+        );
+      },
+      "FunctionExpression:exit"(node: any) {
+        const declarator = ctx.declaratorArrowScopes.get(node);
+        if (declarator !== undefined && scopes.top() === declarator.name) {
+          scopes.pop();
+        }
+      },
       // `try { … } catch (err) { … }` — `err` is bound in the catch
       // body's own scope. Bindingless `catch { … }` (TS 4.4+) has no
       // param, no symbol needed.

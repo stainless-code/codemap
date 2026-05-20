@@ -197,40 +197,20 @@ function registerSymbolHandlers(
           ctx.claimedScopeNodes.add(init);
           complexity.markArrowSymbol(init, symbolIndex);
         } else if (init?.type === "FunctionExpression") {
-          scopes.push(name, "function", lineStart, lineEnd);
+          ctx.declaratorArrowScopes.set(init, {
+            name,
+            lineStart,
+            lineEnd,
+          });
           ctx.claimedScopeNodes.add(init);
           complexity.markArrowSymbol(init, symbolIndex);
-          pushTypeParams(
-            init.typeParameters,
-            scopes.currentLocalId(),
-            name,
-            ctx,
-          );
-          pushParams(
-            init.params,
-            scopes.currentLocalId(),
-            name,
-            ctx,
-            jsDocComments,
-            source,
-          );
         }
         if (isArrowOrFn && isComponentCandidate(name, isTsx)) {
           componentDetector.enter(name);
         }
       }
     },
-    "VariableDeclaration:exit"(node: any) {
-      const decls = node.declarations;
-      for (let i = decls.length - 1; i >= 0; i--) {
-        const decl = decls[i];
-        const name = decl.id?.name;
-        if (!name) continue;
-        const init = decl.init;
-        if (init?.type === "FunctionExpression" && scopes.top() === name) {
-          scopes.pop();
-        }
-      }
+    "VariableDeclaration:exit"() {
       // ComponentRow push happens in `componentsExtractor` exit (chained).
     },
 

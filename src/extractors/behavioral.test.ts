@@ -82,10 +82,20 @@ export function directRethrow(): never {
   });
 });
 
-describe("multi-declarator arrow scopes", () => {
+describe("multi-declarator function scopes", () => {
   it("keeps distinct scope_local_id for sibling arrow declarators", () => {
     const src = `
 const a = () => { console.log('a'); }, b = () => { console.log('b'); };
+`;
+    const data = extractFileData("/proj/scopes.ts", src, "scopes.ts");
+    const markers = data.runtimeMarkers.filter((m) => m.kind === "console");
+    const scopeIds = new Set(markers.map((m) => m.scope_local_id));
+    expect(scopeIds.size).toBe(2);
+  });
+
+  it("keeps distinct scope_local_id for sibling function declarators", () => {
+    const src = `
+const a = function () { console.log('a'); }, b = function () { console.log('b'); };
 `;
     const data = extractFileData("/proj/scopes.ts", src, "scopes.ts");
     const markers = data.runtimeMarkers.filter((m) => m.kind === "console");
