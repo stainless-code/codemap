@@ -36,6 +36,18 @@
     "coverage_pct": 0
   },
   {
+    "name": "catchInnerArrowRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 86,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchDirectRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 98,
+    "coverage_pct": 0
+  },
+  {
     "name": "ignoredExport",
     "file_path": "src/orphan.ts",
     "line_start": 2,

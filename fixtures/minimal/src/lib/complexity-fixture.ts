@@ -81,3 +81,24 @@ export function labyrinth(seed: number): number {
 
   return acc;
 }
+
+/** catch_rethrows=0 — nested arrow throw must not count as catch rethrow (QA 9fe9c11). */
+export function catchInnerArrowRethrow(): void {
+  try {
+    JSON.parse("not-json");
+  } catch (err) {
+    const relay = () => {
+      throw err;
+    };
+    relay();
+  }
+}
+
+/** catch_rethrows=1 — direct rethrow of catch param. */
+export function catchDirectRethrow(): never {
+  try {
+    JSON.parse("!");
+  } catch (err) {
+    throw err;
+  }
+}

@@ -84,6 +84,20 @@
     "re_export_source": null
   },
   {
+    "name": "catchDirectRethrow",
+    "kind": "value",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "kind": "value",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "deeplyNested",
     "kind": "value",
     "file_path": "src/lib/complexity-fixture.ts",

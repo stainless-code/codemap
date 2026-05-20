@@ -786,6 +786,7 @@ export async function targetedReindex(
  * When `opts.recipeActions` is provided AND `opts.json` is true, each row gets an `actions`
  * key set to the same template (recipe-only feature; ad-hoc SQL never carries actions).
  * Rows that already define their own `actions` column are not overwritten.
+ * Sets `PRAGMA query_only = 1` so ad-hoc CLI SQL cannot mutate the index (mirrors `queryRows`).
  * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
@@ -805,6 +806,7 @@ export function printQueryResult(
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
+    db.run("PRAGMA query_only = 1");
     let rows = db.query(sql).all(...(opts?.bindValues ?? []));
     if (changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, changedFiles);

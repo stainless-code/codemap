@@ -1,0 +1,42 @@
+[
+  {
+    "from_path": "src/consumer.ts",
+    "deps": 8,
+    "sample_targets": "src/api/client.ts | src/api/decorated.ts | src/components/shop/index.ts | src/lib/cache.ts | src/lib/complexity-fixture.ts"
+  },
+  {
+    "from_path": "src/components/shop/ProductCard.tsx",
+    "deps": 2,
+    "sample_targets": "src/usePermissions.ts | src/utils/date.ts"
+  },
+  {
+    "from_path": "src/components/shop/ShopButton.tsx",
+    "deps": 2,
+    "sample_targets": "src/usePermissions.ts | src/utils/date.ts"
+  },
+  {
+    "from_path": "src/__tests__/smoke.test.ts",
+    "deps": 1,
+    "sample_targets": "src/lib/complexity-fixture.ts"
+  },
+  {
+    "from_path": "src/components/shop/ApiBridge.tsx",
+    "deps": 1,
+    "sample_targets": "src/api/client.ts"
+  },
+  {
+    "from_path": "src/components/shop/ShopButton.default.ts",
+    "deps": 1,
+    "sample_targets": "src/components/shop/ShopButton.tsx"
+  },
+  {
+    "from_path": "src/lib/cache.ts",
+    "deps": 1,
+    "sample_targets": "src/lib/store.ts"
+  },
+  {
+    "from_path": "src/lib/store.ts",
+    "deps": 1,
+    "sample_targets": "src/lib/cache.ts"
+  }
+]

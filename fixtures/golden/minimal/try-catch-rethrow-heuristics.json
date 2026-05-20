@@ -1,0 +1,10 @@
+[
+  {
+    "name": "catchDirectRethrow",
+    "catch_rethrows": 1
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "catch_rethrows": 0
+  }
+]

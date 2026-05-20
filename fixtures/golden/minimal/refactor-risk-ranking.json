@@ -17,7 +17,7 @@
   },
   {
     "file_path": "src/lib/complexity-fixture.ts",
-    "exported_count": 2,
+    "exported_count": 4,
     "fan_in": 2,
     "avg_coverage_pct": 0,
     "measured_symbols": 0,

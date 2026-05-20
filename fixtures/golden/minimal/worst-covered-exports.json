@@ -84,6 +84,18 @@
     "coverage_pct": 0
   },
   {
+    "name": "catchInnerArrowRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 86,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchDirectRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 98,
+    "coverage_pct": 0
+  },
+  {
     "name": "read",
     "file_path": "src/lib/store.ts",
     "line_start": 7,
@@ -105,18 +117,6 @@
     "name": "orphanHelper",
     "file_path": "src/orphan.ts",
     "line_start": 7,
-    "coverage_pct": 0
-  },
-  {
-    "name": "_epochSeconds",
-    "file_path": "src/utils/date.ts",
-    "line_start": 12,
-    "coverage_pct": 0
-  },
-  {
-    "name": "nanoseconds",
-    "file_path": "src/utils/date.ts",
-    "line_start": 19,
     "coverage_pct": 0
   }
 ]

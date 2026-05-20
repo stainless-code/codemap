@@ -13,7 +13,7 @@
   },
   {
     "path": "README.md",
-    "content_hash": "d6a63cfa7cb8f176151054235c84819b9af51979b482793def5d8569c50979c2",
+    "content_hash": "390688dd7d6a7fd10daf9ec36acf4562e1a29859bfce78ca88ba4d5abd2eb0ab",
     "language": "md",
     "line_count": 52
   },
@@ -91,9 +91,9 @@
   },
   {
     "path": "src/lib/complexity-fixture.ts",
-    "content_hash": "ba844b9262adbb407030708f7fc3432bde780ba88a07066ad383e66a6f3851d8",
+    "content_hash": "6002e60fb440df4dbaeb5840e6090bcdc1a0c6416bd3c2aebfaa6661c51cc16f",
     "language": "ts",
-    "line_count": 84
+    "line_count": 105
   },
   {
     "path": "src/lib/store.ts",

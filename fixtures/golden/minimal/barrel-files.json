@@ -8,6 +8,10 @@
     "exports": 4
   },
   {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "exports": 4
+  },
+  {
     "file_path": "src/utils/date.ts",
     "exports": 4
   },
@@ -25,10 +29,6 @@
   },
   {
     "file_path": "src/lib/cache.ts",
-    "exports": 2
-  },
-  {
-    "file_path": "src/lib/complexity-fixture.ts",
     "exports": 2
   },
   {

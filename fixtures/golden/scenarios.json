@@ -322,6 +322,16 @@
       "recipe": "fan-out"
     },
     {
+      "id": "fan-out-sample",
+      "prompt": "Top fan-out files with GROUP_CONCAT sample targets",
+      "recipe": "fan-out-sample"
+    },
+    {
+      "id": "fan-out-sample-json",
+      "prompt": "Top fan-out files with json_group_array sample targets (JSON1)",
+      "recipe": "fan-out-sample-json"
+    },
+    {
       "id": "refactor-risk-ranking",
       "prompt": "Per-file refactor risk (fan-in × coverage gap)",
       "recipe": "refactor-risk-ranking"
@@ -360,6 +370,11 @@
       "id": "jsx-attributes-product-card",
       "prompt": "JSX attribute substrate on ProductCard",
       "sql": "SELECT a.name, a.value_kind FROM jsx_attributes a JOIN jsx_elements e ON e.id = a.element_id WHERE e.file_path = 'src/components/shop/ProductCard.tsx' ORDER BY a.name"
+    },
+    {
+      "id": "try-catch-rethrow-heuristics",
+      "prompt": "catch_rethrows: nested arrow throw vs direct rethrow (complexity-fixture)",
+      "sql": "SELECT s.name, t.catch_rethrows FROM try_catch t JOIN symbols s ON s.file_path = t.file_path AND s.kind = 'function' AND t.try_line_start >= s.line_start AND t.try_line_start <= s.line_end WHERE t.file_path = 'src/lib/complexity-fixture.ts' AND s.name IN ('catchInnerArrowRethrow', 'catchDirectRethrow') ORDER BY s.name"
     }
   ]
 }
