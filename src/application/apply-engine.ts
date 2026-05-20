@@ -30,7 +30,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 import {
@@ -82,6 +82,7 @@ export type ConflictReason =
   | "line out of range"
   | "line content drifted"
   | "path escapes project root"
+  | "path is a symlink"
   | "duplicate edit on same line";
 
 /** Q5 envelope shape — single shape across `dry-run` and `apply` modes. */
@@ -172,8 +173,23 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
 
     let source = sourceCache.get(canonicalPath);
     if (source === undefined) {
+      const absPath = resolve(resolvedRoot, canonicalPath);
       try {
-        source = readFileSync(resolve(resolvedRoot, canonicalPath), "utf8");
+        if (lstatSync(absPath).isSymbolicLink()) {
+          conflicts.push({
+            file_path: canonicalPath,
+            line_start: lineStart,
+            before_pattern: before,
+            actual_at_line: "",
+            reason: "path is a symlink",
+          });
+          continue;
+        }
+      } catch {
+        // Missing path — readFileSync below reports "file missing".
+      }
+      try {
+        source = readFileSync(absPath, "utf8");
       } catch {
         conflicts.push({
           file_path: canonicalPath,
