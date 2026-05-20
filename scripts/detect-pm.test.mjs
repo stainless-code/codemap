@@ -10,7 +10,7 @@
 
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -53,6 +53,13 @@ function runDetect(env) {
     out[line.slice(0, eq)] = line.slice(eq + 1);
   }
   return out;
+}
+
+function runDetectFail(env) {
+  return spawnSync("node", [SCRIPT], {
+    env: { ...process.env, GITHUB_OUTPUT: "", ...env },
+    encoding: "utf8",
+  });
 }
 
 describe("scripts/detect-pm.mjs", () => {
@@ -132,6 +139,50 @@ describe("scripts/detect-pm.mjs", () => {
     });
     const out = runDetect({ WORKING_DIRECTORY: dir, PACKAGE_MANAGER: "yarn" });
     expect(out.agent).toBe("yarn");
+  });
+
+  it("rejects VERSION with shell metacharacters", () => {
+    const dir = makeFixture("bad-version-semicolon", { "package.json": "{}" });
+    const result = runDetectFail({
+      WORKING_DIRECTORY: dir,
+      VERSION: "1.0;id",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("invalid characters");
+  });
+
+  it("rejects VERSION with embedded newline", () => {
+    const dir = makeFixture("bad-version-newline", { "package.json": "{}" });
+    const result = runDetectFail({
+      WORKING_DIRECTORY: dir,
+      VERSION: "1.0\nexec=evil",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/line breaks|invalid characters/);
+  });
+
+  it("writes GITHUB_OUTPUT as single-line keys for a pinned VERSION", () => {
+    const dir = makeFixture("github-output-fixture", {
+      "package.json": "{}",
+      "package-lock.json": "{}",
+    });
+    const outputPath = join(workRoot, "github-output.txt");
+    writeFileSync(outputPath, "");
+    const result = spawnSync("node", [SCRIPT], {
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: outputPath,
+        WORKING_DIRECTORY: dir,
+        VERSION: "1.2.3",
+      },
+      encoding: "utf8",
+    });
+    expect(result.status).toBe(0);
+    const content = readFileSync(outputPath, "utf8");
+    expect(content).toContain("exec=");
+    expect(content).toContain("@stainless-code/codemap@1.2.3");
+    expect(content).not.toContain("exec=evil");
+    expect(content.match(/^agent=/gm)?.length).toBe(1);
   });
 
   it("rejects unknown PACKAGE_MANAGER values", () => {

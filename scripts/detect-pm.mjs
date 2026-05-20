@@ -22,9 +22,25 @@ import { detect } from "package-manager-detector/detect";
 
 const VALID_AGENTS = new Set(["npm", "pnpm", "yarn", "yarn@berry", "bun"]);
 
+/** Semver pin or dist-tag for `@stainless-code/codemap@<version>` — no whitespace or shell metacharacters. */
+const SAFE_VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._+^-]*$/;
+
+function validateVersionInput(version) {
+  if (version === "") return;
+  if (version.includes("\n") || version.includes("\r")) {
+    fail("VERSION must not contain line breaks.");
+  }
+  if (!SAFE_VERSION_RE.test(version)) {
+    fail(
+      `VERSION "${version}" contains invalid characters. Use a semver pin or dist-tag (e.g. 1.2.3, latest).`,
+    );
+  }
+}
+
 async function main() {
   const explicitAgent = (process.env["PACKAGE_MANAGER"] ?? "").trim();
   const versionInput = (process.env["VERSION"] ?? "").trim();
+  validateVersionInput(versionInput);
   const workingDir =
     (process.env["WORKING_DIRECTORY"] ?? "").trim() || process.cwd();
 
@@ -80,8 +96,25 @@ async function main() {
   }
   appendFileSync(
     outputFile,
-    `agent=${agent}\nexec=${exec}\ninstall_method=${installMethod}\n`,
+    formatGithubOutput({
+      agent,
+      exec,
+      install_method: installMethod,
+    }),
   );
+}
+
+/** One `key=value` line per entry; multiline values use Actions heredoc syntax. */
+function formatGithubOutput(entries) {
+  let block = "";
+  for (const [key, value] of Object.entries(entries)) {
+    if (/[\n\r]/.test(value)) {
+      block += `${key}<<EOF\n${value}\nEOF\n`;
+    } else {
+      block += `${key}=${value}\n`;
+    }
+  }
+  return block;
 }
 
 // Scoped published name + bare bin name (workspace aliases use the latter).
