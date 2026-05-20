@@ -13,6 +13,37 @@ import type { AgentContentKind } from "../application/agent-content";
  */
 export type { AgentContentKind };
 
+export type AgentContentRest =
+  | { kind: "help"; verb: AgentContentKind }
+  | { kind: "run"; verb: AgentContentKind }
+  | { kind: "error"; message: string };
+
+/** Parse `codemap skill` / `codemap rule` argv after bootstrap strips global flags. */
+export function parseAgentContentRest(rest: string[]): AgentContentRest {
+  const verb = rest[0];
+  if (verb !== "skill" && verb !== "rule") {
+    throw new Error(
+      `parseAgentContentRest: expected first token skill|rule, got ${String(verb)}`,
+    );
+  }
+  const args = rest.slice(1);
+  if (args.length === 0) return { kind: "run", verb };
+  if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
+    return { kind: "help", verb };
+  }
+  const bad = args.find((a) => a !== "--help" && a !== "-h");
+  if (bad !== undefined) {
+    return {
+      kind: "error",
+      message: `codemap ${verb}: unexpected argument "${bad}". Run \`codemap ${verb} --help\` for usage.`,
+    };
+  }
+  return {
+    kind: "error",
+    message: `codemap ${verb}: unexpected extra arguments. Run \`codemap ${verb} --help\` for usage.`,
+  };
+}
+
 export function printAgentContentCmdHelp(kind: AgentContentKind): void {
   const verb = kind;
   const source = `templates/agent-content/${kind}/*.md (assembled)`;

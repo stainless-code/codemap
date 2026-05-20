@@ -8,6 +8,38 @@ import {
   checkConsumerPointers,
   EXPECTED_POINTER_VERSION,
 } from "../application/agent-content";
+import { parseAgentContentRest } from "./cmd-skill";
+
+describe("parseAgentContentRest", () => {
+  it("returns help on --help / -h", () => {
+    expect(parseAgentContentRest(["skill", "--help"]).kind).toBe("help");
+    expect(parseAgentContentRest(["rule", "-h"]).kind).toBe("help");
+  });
+
+  it("runs with no extra arguments", () => {
+    expect(parseAgentContentRest(["skill"])).toEqual({
+      kind: "run",
+      verb: "skill",
+    });
+    expect(parseAgentContentRest(["rule"])).toEqual({
+      kind: "run",
+      verb: "rule",
+    });
+  });
+
+  it("errors on unexpected flags or positionals", () => {
+    const skillJson = parseAgentContentRest(["skill", "--json"]);
+    expect(skillJson.kind).toBe("error");
+    if (skillJson.kind === "error") {
+      expect(skillJson.message).toContain("unexpected argument");
+    }
+    const ruleExtra = parseAgentContentRest(["rule", "extra"]);
+    expect(ruleExtra.kind).toBe("error");
+    if (ruleExtra.kind === "error") {
+      expect(ruleExtra.message).toContain("unexpected argument");
+    }
+  });
+});
 
 describe("agent content fetch surfaces", () => {
   it("assembles the skill from section files", () => {

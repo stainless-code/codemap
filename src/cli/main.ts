@@ -98,14 +98,21 @@ Copies bundled agent templates into .agents/ under the project root.
   }
 
   if (rest[0] === "skill" || rest[0] === "rule") {
-    const kind = rest[0];
-    const { printAgentContentCmdHelp, runAgentContentCmd } =
-      await import("./cmd-skill.js");
-    if (rest.includes("--help") || rest.includes("-h")) {
-      printAgentContentCmdHelp(kind);
+    const {
+      parseAgentContentRest,
+      printAgentContentCmdHelp,
+      runAgentContentCmd,
+    } = await import("./cmd-skill.js");
+    const parsed = parseAgentContentRest(rest);
+    if (parsed.kind === "help") {
+      printAgentContentCmdHelp(parsed.verb);
       return;
     }
-    runAgentContentCmd(kind);
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    runAgentContentCmd(parsed.verb);
     return;
   }
 
