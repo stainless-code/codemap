@@ -177,8 +177,11 @@ export function extractFileData(
   }
 
   for (const imp of mod.staticImports) {
+    const importIndex = imports.length;
     imports.push(staticImportToRow(relPath, imp, lineMap));
-    importSpecifiers.push(...staticImportSpecifierRows(relPath, imp, lineMap));
+    importSpecifiers.push(
+      ...staticImportSpecifierRows(relPath, imp, lineMap, importIndex),
+    );
   }
 
   const ctx: ExtractContext = {
@@ -348,9 +351,28 @@ function staticImportSpecifierRows(
   filePath: string,
   imp: StaticImport,
   lineMap: number[],
+  importIndex: number,
 ): ImportSpecifierRow[] {
-  // Side-effect imports (`import "mod"`) have zero entries — produce no rows.
-  if (imp.entries.length === 0) return [];
+  if (imp.entries.length === 0) {
+    const line = offsetToLine(lineMap, imp.start);
+    const lineStartOffset = lineMap[line - 1] ?? 0;
+    const tokenStart = imp.moduleRequest.start;
+    const tokenEnd = imp.moduleRequest.end;
+    return [
+      {
+        file_path: filePath,
+        source: imp.moduleRequest.value,
+        line,
+        column_start: tokenStart - lineStartOffset,
+        column_end: tokenEnd - lineStartOffset,
+        imported_name: "",
+        local_name: "",
+        kind: "side-effect",
+        is_type_only: 0,
+        import_index: importIndex,
+      },
+    ];
+  }
   const rows: ImportSpecifierRow[] = [];
   for (const entry of imp.entries) {
     const importKind = entry.importName.kind;
@@ -387,6 +409,7 @@ function staticImportSpecifierRows(
       local_name: localName,
       kind,
       is_type_only: entry.isType ? 1 : 0,
+      import_index: importIndex,
     });
   }
   return rows;

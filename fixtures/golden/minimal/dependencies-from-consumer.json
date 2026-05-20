@@ -13,6 +13,10 @@
   },
   {
     "from_path": "src/consumer.ts",
+    "to_path": "src/polyfill.ts"
+  },
+  {
+    "from_path": "src/consumer.ts",
     "to_path": "src/utils/date.ts"
   },
   {

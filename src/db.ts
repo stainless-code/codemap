@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -325,13 +325,14 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS import_specifiers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      import_id INTEGER REFERENCES imports(id) ON DELETE CASCADE,
       source TEXT NOT NULL,
       line INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
       column_end INTEGER NOT NULL,
       imported_name TEXT NOT NULL,
       local_name TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace')),
+      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace','side-effect')),
       is_type_only INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
@@ -555,6 +556,8 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_source ON import_specifiers(source, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_import ON import_specifiers(import_id) WHERE import_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_kind ON import_specifiers(kind, file_path);
 
     CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
@@ -1566,22 +1569,68 @@ export interface ImportSpecifierRow {
   imported_name: string;
   /** Name as bound locally (`bar` in `import { foo as bar }`); equals `imported_name` when no alias. For default + namespace imports, this is the binding name. */
   local_name: string;
-  kind: "named" | "default" | "namespace";
+  kind: "named" | "default" | "namespace" | "side-effect";
   is_type_only: number;
+  /** Index into the parallel `imports[]` array for this file; resolved to `import_id` at insert. */
+  import_index: number;
+}
+
+export function insertImportsWithSpecifiers(
+  db: CodemapDatabase,
+  imports: ImportRow[],
+  specifiers: ImportSpecifierRow[],
+) {
+  if (!imports.length) {
+    if (specifiers.length) {
+      insertImportSpecifiers(
+        db,
+        specifiers.map((row) => ({ ...row, import_id: null })),
+      );
+    }
+    return;
+  }
+  const importIds: number[] = [];
+  for (const imp of imports) {
+    db.run(
+      "INSERT INTO imports (file_path, source, resolved_path, specifiers, is_type_only, line_number) VALUES (?,?,?,?,?,?)",
+      [
+        imp.file_path,
+        imp.source,
+        imp.resolved_path,
+        imp.specifiers,
+        imp.is_type_only,
+        imp.line_number,
+      ],
+    );
+    importIds.push(
+      db.query<{ id: number }>("SELECT last_insert_rowid() AS id").get()!.id,
+    );
+  }
+  if (!specifiers.length) return;
+  const linked = specifiers.map((row) => ({
+    ...row,
+    import_id: importIds[row.import_index] ?? null,
+  }));
+  insertImportSpecifiers(db, linked);
+}
+
+export interface ImportSpecifierInsertRow extends ImportSpecifierRow {
+  import_id: number | null;
 }
 
 export function insertImportSpecifiers(
   db: CodemapDatabase,
-  rows: ImportSpecifierRow[],
+  rows: ImportSpecifierInsertRow[],
 ) {
   batchInsert(
     db,
     rows,
-    "INSERT INTO import_specifiers (file_path, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
-    "(?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO import_specifiers (file_path, import_id, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
+    "(?,?,?,?,?,?,?,?,?,?)",
     (r, v) =>
       v.push(
         r.file_path,
+        r.import_id,
         r.source,
         r.line,
         r.column_start,

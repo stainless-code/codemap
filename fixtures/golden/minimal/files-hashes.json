@@ -49,9 +49,9 @@
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "34693df2ea065083f8492f65d715e56b4473eee8205e90c85a1eff2ce63ba64b",
+    "content_hash": "8fa6942382a4a9980bd7f0835cfcdc820db68559660097f559d839efe60a8446",
     "language": "ts",
-    "line_count": 26
+    "line_count": 27
   },
   {
     "path": "src/lib/cache.ts",
@@ -70,6 +70,12 @@
     "content_hash": "03ab92544e475626defcaafec97e1169d7940532ca3eeb4a25d28b4816c1ca9a",
     "language": "md",
     "line_count": 11
+  },
+  {
+    "path": "src/polyfill.ts",
+    "content_hash": "f9c2f0d0224aef67b737ce225be1c3797d50fa0ab05fcd8c2fd129dc5bad6914",
+    "language": "ts",
+    "line_count": 3
   },
   {
     "path": "src/styles/button.module.css",

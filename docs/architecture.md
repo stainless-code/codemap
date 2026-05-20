@@ -323,8 +323,9 @@ Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `
 | column_end    | INTEGER    | One-past-last column                                                            |
 | imported_name | TEXT       | Original exported name (or `default` / `*`)                                     |
 | local_name    | TEXT       | Local binding name (different from `imported_name` for `import { foo as bar }`) |
-| kind          | TEXT       | `named` / `default` / `namespace`                                               |
+| kind          | TEXT       | `named` / `default` / `namespace` / `side-effect`                               |
 | is_type_only  | INTEGER    | 1 if this specifier is `type`-only                                              |
+| import_id     | INTEGER FK | Parent `imports.id`; populated for all specifier rows including side-effect     |
 
 ### `scopes` — Lexical scope graph (`STRICT, WITHOUT ROWID`)
 
@@ -364,7 +365,7 @@ Per [R.12]. One row per non-`member`-kind `references` row. Resolved in a single
 | ------------------ | ------- | ------------------------------------------------------------------------------- |
 | reference_id       | INTEGER | PK + FK → `references(id)` CASCADE                                              |
 | resolved_symbol_id | INTEGER | FK → `symbols(id)` SET NULL. NULL for `is_external=1` / `global` / `unresolved` |
-| resolution_kind    | TEXT    | `same-file` / `imported` / `global` / `unresolved`                              |
+| resolution_kind    | TEXT    | `same-file` / `imported` / `re-exported` / `global` / `unresolved`              |
 | is_external        | INTEGER | 1 when the import target isn't in the indexed set (e.g. `react`, `lodash`)      |
 
 ### `function_params` — Typed parameters per function/method (`STRICT`)

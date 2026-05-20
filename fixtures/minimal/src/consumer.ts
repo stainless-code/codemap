@@ -1,6 +1,7 @@
 import { createClient, type ClientConfig } from "~/api/client";
 import { ProductCard, ShopButton } from "~/components/shop";
 
+import "./polyfill";
 import { get } from "./lib/cache";
 import { now } from "./utils/date";
 import { epochMs } from "./utils/format";

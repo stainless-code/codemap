@@ -126,6 +126,11 @@
       "recipe": "find-re-exported-bindings"
     },
     {
+      "id": "find-side-effect-imports",
+      "prompt": "Recipe: side-effect-only import statements",
+      "recipe": "find-side-effect-imports"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",

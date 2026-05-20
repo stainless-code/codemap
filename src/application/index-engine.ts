@@ -18,7 +18,7 @@ import {
   insertFile,
   insertSymbols,
   insertImports,
-  insertImportSpecifiers,
+  insertImportsWithSpecifiers,
   insertScopes,
   insertReferences,
   insertFileMetrics,
@@ -287,13 +287,16 @@ function insertParsedResults(
           const absPath = join(root, parsed.relPath);
           if (parsed.symbols?.length) insertSymbols(db, parsed.symbols);
 
-          if (parsed.imports?.length) {
-            const deps = resolveImports(absPath, parsed.imports, indexedPaths);
-            insertImports(db, parsed.imports);
+          if (parsed.imports?.length || parsed.importSpecifiers?.length) {
+            const deps = parsed.imports?.length
+              ? resolveImports(absPath, parsed.imports, indexedPaths)
+              : [];
+            insertImportsWithSpecifiers(
+              db,
+              parsed.imports ?? [],
+              parsed.importSpecifiers ?? [],
+            );
             if (deps.length) insertDependencies(db, deps);
-          }
-          if (parsed.importSpecifiers?.length) {
-            insertImportSpecifiers(db, parsed.importSpecifiers);
           }
           if (parsed.scopes?.length) insertScopes(db, parsed.scopes);
           if (parsed.references?.length)
@@ -518,9 +521,11 @@ export async function indexFiles(
             const data = extractFileData(absPath, source, relPath);
             if (data.symbols.length) insertSymbols(db, data.symbols);
             const deps = resolveImports(absPath, data.imports, indexedPaths);
-            if (data.imports.length) insertImports(db, data.imports);
-            if (data.importSpecifiers.length)
-              insertImportSpecifiers(db, data.importSpecifiers);
+            insertImportsWithSpecifiers(
+              db,
+              data.imports,
+              data.importSpecifiers,
+            );
             if (data.scopes.length) insertScopes(db, data.scopes);
             if (data.references.length) insertReferences(db, data.references);
             if (data.fileMetrics) insertFileMetrics(db, [data.fileMetrics]);
