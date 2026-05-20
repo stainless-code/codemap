@@ -439,20 +439,18 @@ export function ingestV8(opts: V8ParserOpts): IngestResult {
       const scriptHits: (number | undefined)[] = new Array(
         lineOffsets.length + 1,
       );
-      for (const fn of script.functions ?? []) {
-        const sorted = (fn.ranges ?? [])
-          .slice()
-          .sort(
-            (a, b) =>
-              b.endOffset - b.startOffset - (a.endOffset - a.startOffset),
-          );
-        for (const range of sorted) {
-          const startLine = offsetToLine(lineOffsets, range.startOffset);
-          const endLine = offsetToLine(lineOffsets, range.endOffset);
-          for (let line = startLine; line <= endLine; line++) {
-            // Innermost-wins within this script: last write is the smallest range.
-            scriptHits[line] = range.count;
-          }
+      // V8 may emit nested functions as separate entries; innermost-wins must be
+      // global across all ranges, not per FunctionCoverage iteration order.
+      const ranges = (script.functions ?? []).flatMap((fn) => fn.ranges ?? []);
+      ranges.sort(
+        (a, b) => b.endOffset - b.startOffset - (a.endOffset - a.startOffset),
+      );
+      for (const range of ranges) {
+        const startLine = offsetToLine(lineOffsets, range.startOffset);
+        const endLine = offsetToLine(lineOffsets, range.endOffset);
+        for (let line = startLine; line <= endLine; line++) {
+          // Innermost-wins: last write is the smallest range.
+          scriptHits[line] = range.count;
         }
       }
       for (let line = 1; line < scriptHits.length; line++) {

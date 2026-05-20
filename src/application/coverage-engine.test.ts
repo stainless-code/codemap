@@ -673,6 +673,65 @@ describe("coverage-engine", () => {
       }
     });
 
+    it("innermost-wins across separate FunctionCoverage entries (inner before outer)", () => {
+      const source = [
+        "function outer() {",
+        "  function inner() { return 1; }",
+        "  inner();",
+        "}",
+      ].join("\n");
+      const { root, url } = makeTempProject(source);
+      const innerStart = source.indexOf("function inner");
+      const innerEnd = source.indexOf("}", source.indexOf("inner"));
+
+      const db = setupDb();
+      try {
+        insertFile(db, { ...indexedFile("src/a.ts"), language: "ts" });
+        insertSymbols(db, [
+          fnSym("src/a.ts", "outer", 1, 4),
+          fnSym("src/a.ts", "inner", 2, 2),
+        ]);
+
+        const scripts: V8ScriptCoverage[] = [
+          {
+            scriptId: "1",
+            url,
+            functions: [
+              {
+                functionName: "inner",
+                isBlockCoverage: true,
+                ranges: [
+                  { startOffset: innerStart, endOffset: innerEnd, count: 0 },
+                ],
+              },
+              {
+                functionName: "outer",
+                isBlockCoverage: true,
+                ranges: [
+                  { startOffset: 0, endOffset: source.length, count: 2 },
+                ],
+              },
+            ],
+          },
+        ];
+
+        const result = ingestV8({
+          db,
+          projectRoot: root,
+          scripts,
+          sourcePath: join(root, ".cov"),
+        });
+        expect(result.ingested.symbols).toBe(2);
+
+        const rows = db
+          .query("SELECT name, hit_statements FROM coverage ORDER BY name")
+          .all() as Array<{ name: string; hit_statements: number }>;
+        expect(rows.find((r) => r.name === "inner")!.hit_statements).toBe(0);
+      } finally {
+        closeDb(db);
+      }
+    });
+
     it("skips scripts whose url isn't a file:// URL (Node internals, eval)", () => {
       const db = setupDb();
       try {
