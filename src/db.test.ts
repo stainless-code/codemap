@@ -7,6 +7,7 @@ import {
   createIndexes,
   createSchema,
   createTables,
+  deleteFileData,
   deleteQueryBaseline,
   dropAll,
   getMeta,
@@ -18,6 +19,7 @@ import {
   SCHEMA_VERSION,
   setMeta,
   upsertQueryBaseline,
+  upsertSourceFts,
 } from "./db";
 import { openCodemapDatabase } from "./sqlite-db";
 
@@ -63,6 +65,36 @@ describe("SQLite layer (in-memory)", () => {
     try {
       createTables(db);
       expect(getAllFileHashes(db).size).toBe(0);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("deleteFileData removes matching source_fts rows", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "abc",
+        size: 1,
+        line_count: 1,
+        language: "ts",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      upsertSourceFts(db, "src/a.ts", "export const a = 1;");
+      deleteFileData(db, "src/a.ts");
+      expect(
+        db
+          .query("SELECT COUNT(*) AS n FROM files WHERE path = ?")
+          .get("src/a.ts") as { n: number },
+      ).toEqual({ n: 0 });
+      expect(
+        db
+          .query("SELECT COUNT(*) AS n FROM source_fts WHERE file_path = ?")
+          .get("src/a.ts") as { n: number },
+      ).toEqual({ n: 0 });
     } finally {
       closeDb(db);
     }

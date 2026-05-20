@@ -263,11 +263,12 @@ export function resolveCodemapConfig(
   const databasePath = parsed?.databasePath
     ? resolve(absRoot, parsed.databasePath)
     : join(stateDir, STATE_DB_NAME);
-  const include = parsed?.include?.length
-    ? [...parsed.include]
-    : [...DEFAULT_INCLUDE_PATTERNS];
+  const include =
+    parsed?.include !== undefined
+      ? [...parsed.include]
+      : [...DEFAULT_INCLUDE_PATTERNS];
   const excludeDirNames = new Set<string>(
-    parsed?.excludeDirNames?.length
+    parsed?.excludeDirNames !== undefined
       ? parsed.excludeDirNames
       : DEFAULT_EXCLUDE_DIR_NAMES,
   );

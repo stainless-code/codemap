@@ -783,6 +783,7 @@ export function reconcileBoundaryRules(
 }
 
 export function deleteFileData(db: CodemapDatabase, filePath: string) {
+  deleteSourceFts(db, filePath);
   db.run("DELETE FROM files WHERE path = ?", [filePath]);
 }
 

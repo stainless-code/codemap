@@ -70,6 +70,24 @@ describe("findImpact — symbol target via calls graph", () => {
     seedCall("src/c.ts", "c", "d");
   });
 
+  it("picks a deterministic call-site file when the same callee has multiple callers at the same depth", () => {
+    seedFile("src/z.ts");
+    seedFile("src/x.ts");
+    seedSymbol("x", "src/x.ts");
+    seedSymbol("z", "src/z.ts");
+    seedCall("src/z.ts", "z", "x");
+    seedCall("src/a.ts", "a", "x");
+    const r = findImpact(db, { target: "x", direction: "up" });
+    const callers = r.matches
+      .filter((m) => m.depth === 1)
+      .map((m) => ({ name: m.name, file_path: m.file_path }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    expect(callers).toEqual([
+      { name: "a", file_path: "src/a.ts" },
+      { name: "z", file_path: "src/z.ts" },
+    ]);
+  });
+
   it("walks down (callees) from `a` reaches b, c, d", () => {
     const r = findImpact(db, { target: "a", direction: "down" });
     const names = r.matches.map((m) => m.name).sort();

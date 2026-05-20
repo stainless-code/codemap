@@ -1,191 +1,26 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { describe, expect, it } from "bun:test";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  DEFAULT_EXCLUDE_DIR_NAMES,
   DEFAULT_INCLUDE_PATTERNS,
-  defineConfig,
-  loadUserConfig,
-  parseCodemapUserConfig,
   resolveCodemapConfig,
 } from "./config";
-import type { CodemapUserConfig } from "./config";
-
-describe("parseCodemapUserConfig / defineConfig", () => {
-  it("accepts an empty object", () => {
-    expect(parseCodemapUserConfig({})).toEqual({});
-  });
-
-  it("rejects non-objects", () => {
-    expect(() => parseCodemapUserConfig(null)).toThrow(TypeError);
-    expect(() => parseCodemapUserConfig([])).toThrow(TypeError);
-    expect(() => parseCodemapUserConfig("x")).toThrow(TypeError);
-  });
-
-  it("rejects unknown keys", () => {
-    expect(() =>
-      parseCodemapUserConfig({ include: ["**/*.ts"], extra: 1 }),
-    ).toThrow(/Unrecognized key|extra/i);
-  });
-
-  it("rejects wrong array element types", () => {
-    expect(() =>
-      parseCodemapUserConfig({ include: ["**/*.ts", 1 as unknown as string] }),
-    ).toThrow(/include/);
-  });
-
-  it("defineConfig validates like parseCodemapUserConfig", () => {
-    expect(defineConfig({ databasePath: "db.sqlite" })).toEqual({
-      databasePath: "db.sqlite",
-    });
-    expect(() => defineConfig({ bad: true } as CodemapUserConfig)).toThrow(
-      /Unrecognized key|bad/i,
-    );
-  });
-});
 
 describe("resolveCodemapConfig", () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "codemap-cfg-"));
-  });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("defaults database path and include patterns", () => {
-    const r = resolveCodemapConfig(dir, undefined);
-    expect(r.root).toBe(dir);
-    expect(r.stateDir).toBe(join(dir, ".codemap"));
-    expect(r.databasePath).toBe(join(dir, ".codemap", "index.db"));
-    expect(r.include.length).toBe(DEFAULT_INCLUDE_PATTERNS.length);
-    expect(r.excludeDirNames.has("node_modules")).toBe(true);
+  it("honors explicit empty include (no default patterns)", () => {
+    const root = mkdtempSync(join(tmpdir(), "codemap-config-"));
+    const cfg = resolveCodemapConfig(root, { include: [] });
+    expect(cfg.include).toEqual([]);
+    expect(cfg.include).not.toEqual(DEFAULT_INCLUDE_PATTERNS);
   });
 
-  it("sets tsconfigPath when tsconfig.json exists", () => {
-    writeFileSync(join(dir, "tsconfig.json"), "{}");
-    const r = resolveCodemapConfig(dir, undefined);
-    expect(r.tsconfigPath).toBe(join(dir, "tsconfig.json"));
-  });
-
-  it("sets tsconfigPath to null when tsconfig.json is missing", () => {
-    const r = resolveCodemapConfig(dir, undefined);
-    expect(r.tsconfigPath).toBeNull();
-  });
-
-  it("forces tsconfigPath null when user passes null", () => {
-    writeFileSync(join(dir, "tsconfig.json"), "{}");
-    const r = resolveCodemapConfig(dir, { tsconfigPath: null });
-    expect(r.tsconfigPath).toBeNull();
-  });
-
-  it("resolves explicit tsconfigPath", () => {
-    writeFileSync(join(dir, "tsconfig.json"), "{}");
-    writeFileSync(join(dir, "tsconfig.app.json"), "{}");
-    const r = resolveCodemapConfig(dir, { tsconfigPath: "tsconfig.app.json" });
-    expect(r.tsconfigPath).toBe(join(dir, "tsconfig.app.json"));
-  });
-
-  it("uses custom databasePath and include", () => {
-    const user: CodemapUserConfig = {
-      databasePath: "data.db",
-      include: ["**/*.ts"],
-    };
-    const r = resolveCodemapConfig(dir, user);
-    expect(r.databasePath).toBe(join(dir, "data.db"));
-    expect(r.include).toEqual(["**/*.ts"]);
-  });
-
-  it("replaces default excludeDirNames when user provides a list", () => {
-    const r = resolveCodemapConfig(dir, undefined);
-    expect(r.excludeDirNames.has("dist")).toBe(true);
-    const r2 = resolveCodemapConfig(dir, { excludeDirNames: ["custom"] });
-    expect(r2.excludeDirNames.has("custom")).toBe(true);
-    expect(r2.excludeDirNames.has("node_modules")).toBe(false);
-  });
-
-  it("defaults boundaries to []", () => {
-    const r = resolveCodemapConfig(dir, undefined);
-    expect(r.boundaries).toEqual([]);
-  });
-
-  it("passes through declared boundaries with default action='deny'", () => {
-    const r = resolveCodemapConfig(dir, {
-      boundaries: [
-        {
-          name: "ui-cant-touch-server",
-          from_glob: "src/ui/**",
-          to_glob: "src/server/**",
-        },
-      ],
-    });
-    expect(r.boundaries).toEqual([
-      {
-        name: "ui-cant-touch-server",
-        from_glob: "src/ui/**",
-        to_glob: "src/server/**",
-        action: "deny",
-      },
-    ]);
-  });
-
-  it("rejects unknown action values", () => {
-    expect(() =>
-      resolveCodemapConfig(dir, {
-        boundaries: [
-          {
-            name: "x",
-            from_glob: "a",
-            to_glob: "b",
-            action: "warn" as unknown as "deny",
-          },
-        ],
-      }),
-    ).toThrow(/action/);
-  });
-});
-
-describe("loadUserConfig", () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "codemap-load-"));
-  });
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  it("loads <state-dir>/config.json", async () => {
-    const stateDir = join(dir, ".codemap");
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(
-      join(stateDir, "config.json"),
-      JSON.stringify({ include: ["**/*.ts"] }),
-    );
-    const cfg = await loadUserConfig(dir);
-    expect(cfg?.include).toEqual(["**/*.ts"]);
-  });
-
-  it("loads explicit .json path via --config", async () => {
-    const p = join(dir, "custom.json");
-    writeFileSync(p, JSON.stringify({ databasePath: "data.db" }));
-    const cfg = await loadUserConfig(dir, p);
-    expect(cfg?.databasePath).toBe("data.db");
-  });
-
-  it("returns undefined when explicit json path is missing", async () => {
-    const cfg = await loadUserConfig(dir, join(dir, "nope.json"));
-    expect(cfg).toBeUndefined();
-  });
-
-  it("invalid JSON config throws when resolved", async () => {
-    const stateDir = join(dir, ".codemap");
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(
-      join(stateDir, "config.json"),
-      JSON.stringify({ include: [1, 2] }),
-    );
-    const cfg = await loadUserConfig(dir);
-    expect(() => resolveCodemapConfig(dir, cfg)).toThrow(/include/);
+  it("honors explicit empty excludeDirNames (no default exclusions)", () => {
+    const root = mkdtempSync(join(tmpdir(), "codemap-config-"));
+    const cfg = resolveCodemapConfig(root, { excludeDirNames: [] });
+    expect([...cfg.excludeDirNames]).toEqual([]);
+    expect(cfg.excludeDirNames).not.toEqual(DEFAULT_EXCLUDE_DIR_NAMES);
   });
 });

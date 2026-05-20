@@ -438,7 +438,7 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
     const filePath = readString(row, "file_path");
     const lineStart = readPositiveInt(row, "line_start");
     const before = readString(row, "before_pattern");
-    const after = readString(row, "after_pattern");
+    const after = readDiffAfterPattern(row, "after_pattern");
     if (
       filePath === undefined ||
       lineStart === undefined ||
@@ -597,6 +597,15 @@ function readString(
 ): string | undefined {
   const value = row[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+/** `after_pattern` may be `""` for deletions; other diff fields stay non-empty. */
+function readDiffAfterPattern(
+  row: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = row[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 function readPositiveInt(

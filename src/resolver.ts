@@ -1,5 +1,6 @@
 import { ResolverFactory } from "oxc-resolver";
 
+import { projectRelativePathFromResolved } from "./application/path-containment";
 import type { ImportRow, DependencyRow } from "./db";
 
 let _projectRoot: string | null = null;
@@ -67,10 +68,8 @@ export function resolveImports(
     try {
       const result = resolver.resolveFileSync(absoluteFilePath, imp.source);
       if (result.path) {
-        const resolved = result.path;
-        const relResolved = resolved.startsWith(root)
-          ? resolved.slice(root.length + 1)
-          : resolved;
+        const relResolved = projectRelativePathFromResolved(root, result.path);
+        if (relResolved === null) continue;
 
         imp.resolved_path = relResolved;
 
@@ -97,9 +96,7 @@ export function resolveModuleSpecifier(
   try {
     const result = resolver.resolveFileSync(absoluteFilePath, source);
     if (!result.path) return null;
-    return result.path.startsWith(root)
-      ? result.path.slice(root.length + 1)
-      : result.path;
+    return projectRelativePathFromResolved(root, result.path);
   } catch {
     return null;
   }
