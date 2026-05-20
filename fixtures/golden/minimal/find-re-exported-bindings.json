@@ -1,0 +1,30 @@
+[
+  {
+    "file_path": "src/consumer.ts",
+    "name": "ProductCard",
+    "line_start": 3,
+    "column_start": 9,
+    "resolution_kind": "re-exported"
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "name": "ShopButton",
+    "line_start": 3,
+    "column_start": 22,
+    "resolution_kind": "re-exported"
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "name": "ShopButton",
+    "line_start": 26,
+    "column_start": 23,
+    "resolution_kind": "re-exported"
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "name": "ProductCard",
+    "line_start": 26,
+    "column_start": 35,
+    "resolution_kind": "re-exported"
+  }
+]

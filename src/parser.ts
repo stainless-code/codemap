@@ -24,7 +24,9 @@ import type {
   FunctionParamRow,
   RuntimeMarkerRow,
   TestSuiteRow,
+  DynamicImportRow,
 } from "./db";
+import { behavioralExtractor } from "./extractors/behavioral";
 import { callsExtractor } from "./extractors/calls";
 import {
   complexityExtractor,
@@ -34,8 +36,11 @@ import {
   componentsExtractor,
   createComponentDetector,
 } from "./extractors/components";
+import { dynamicImportsExtractor } from "./extractors/dynamic-imports";
 import { extractVisibility } from "./extractors/jsdoc";
+import { jsxExtractor } from "./extractors/jsx";
 import { markersExtractor } from "./extractors/markers";
+import { moduleSideEffectsExtractor } from "./extractors/module-side-effects";
 import { buildLineMap, offsetToLine } from "./extractors/offsets";
 import { referencesExtractor } from "./extractors/references";
 import { runtimeMarkersExtractor } from "./extractors/runtime-markers";
@@ -62,6 +67,14 @@ interface ExtractedData {
   functionParams: FunctionParamRow[];
   runtimeMarkers: RuntimeMarkerRow[];
   testSuites: TestSuiteRow[];
+  dynamicImports: DynamicImportRow[];
+  jsxElements: import("./extractors/jsx").ParsedJsxElement[];
+  jsxAttributes: import("./extractors/jsx").ParsedJsxAttribute[];
+  asyncCalls: import("./extractors/behavioral").ParsedAsyncCall[];
+  tryCatchRows: import("./extractors/behavioral").ParsedTryCatch[];
+  decorators: import("./extractors/behavioral").ParsedDecorator[];
+  jsdocTags: import("./extractors/behavioral").ParsedJsdocTag[];
+  hasSideEffects: number;
 }
 
 /**
@@ -105,6 +118,10 @@ const EXTRACTORS: readonly TierExtractor[] = [
   callsExtractor,
   componentsExtractor,
   referencesExtractor,
+  jsxExtractor,
+  dynamicImportsExtractor,
+  behavioralExtractor,
+  moduleSideEffectsExtractor,
   runtimeMarkersExtractor,
   testsExtractor,
   markersExtractor,
@@ -143,6 +160,13 @@ export function extractFileData(
   const functionParams: FunctionParamRow[] = [];
   const runtimeMarkers: RuntimeMarkerRow[] = [];
   const testSuites: TestSuiteRow[] = [];
+  const dynamicImports: DynamicImportRow[] = [];
+  const jsxElements: import("./extractors/jsx").ParsedJsxElement[] = [];
+  const jsxAttributes: import("./extractors/jsx").ParsedJsxAttribute[] = [];
+  const asyncCalls: import("./extractors/behavioral").ParsedAsyncCall[] = [];
+  const tryCatchRows: import("./extractors/behavioral").ParsedTryCatch[] = [];
+  const decorators: import("./extractors/behavioral").ParsedDecorator[] = [];
+  const jsdocTags: import("./extractors/behavioral").ParsedJsdocTag[] = [];
 
   const exportedNames = new Set<string>();
   const defaultExportedNames = new Set<string>();
@@ -169,8 +193,11 @@ export function extractFileData(
   }
 
   for (const imp of mod.staticImports) {
+    const importIndex = imports.length;
     imports.push(staticImportToRow(relPath, imp, lineMap));
-    importSpecifiers.push(...staticImportSpecifierRows(relPath, imp, lineMap));
+    importSpecifiers.push(
+      ...staticImportSpecifierRows(relPath, imp, lineMap, importIndex),
+    );
   }
 
   const ctx: ExtractContext = {
@@ -194,10 +221,18 @@ export function extractFileData(
     functionParams,
     runtimeMarkers,
     testSuites,
+    dynamicImports,
+    jsxElements,
+    jsxAttributes,
+    asyncCalls,
+    tryCatchRows,
+    decorators,
+    jsdocTags,
     scopes: createScopeTracker(relPath),
     complexity: createComplexityTracker(symbols),
     componentDetector: createComponentDetector(),
     claimedScopeNodes: new WeakSet(),
+    moduleHasSideEffects: false,
   };
 
   const multiplexedVisitor = new Visitor(
@@ -228,6 +263,14 @@ export function extractFileData(
     functionParams,
     runtimeMarkers,
     testSuites,
+    dynamicImports,
+    jsxElements,
+    jsxAttributes,
+    asyncCalls,
+    tryCatchRows,
+    decorators,
+    jsdocTags,
+    hasSideEffects: ctx.moduleHasSideEffects ? 1 : 0,
   };
 }
 
@@ -336,9 +379,28 @@ function staticImportSpecifierRows(
   filePath: string,
   imp: StaticImport,
   lineMap: number[],
+  importIndex: number,
 ): ImportSpecifierRow[] {
-  // Side-effect imports (`import "mod"`) have zero entries — produce no rows.
-  if (imp.entries.length === 0) return [];
+  if (imp.entries.length === 0) {
+    const line = offsetToLine(lineMap, imp.start);
+    const lineStartOffset = lineMap[line - 1] ?? 0;
+    const tokenStart = imp.moduleRequest.start;
+    const tokenEnd = imp.moduleRequest.end;
+    return [
+      {
+        file_path: filePath,
+        source: imp.moduleRequest.value,
+        line,
+        column_start: tokenStart - lineStartOffset,
+        column_end: tokenEnd - lineStartOffset,
+        imported_name: "",
+        local_name: "",
+        kind: "side-effect",
+        is_type_only: 0,
+        import_index: importIndex,
+      },
+    ];
+  }
   const rows: ImportSpecifierRow[] = [];
   for (const entry of imp.entries) {
     const importKind = entry.importName.kind;
@@ -375,6 +437,7 @@ function staticImportSpecifierRows(
       local_name: localName,
       kind,
       is_type_only: entry.isType ? 1 : 0,
+      import_index: importIndex,
     });
   }
   return rows;

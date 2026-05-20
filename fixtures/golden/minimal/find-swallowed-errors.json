@@ -1,0 +1,10 @@
+[
+  {
+    "file_path": "src/lib/cache.ts",
+    "try_line_start": 20,
+    "try_line_end": 22,
+    "catch_param": "err",
+    "catch_logs_only": 1,
+    "catch_rethrows": 0
+  }
+]

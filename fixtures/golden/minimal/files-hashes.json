@@ -1,5 +1,11 @@
 [
   {
+    "path": ".codemap/config.json",
+    "content_hash": "336aef86f425c7227027d30a696382314825c37d6c7a6b65b13d354d5980f111",
+    "language": "json",
+    "line_count": 11
+  },
+  {
     "path": ".codemap/recipes/shop-symbols.md",
     "content_hash": "0ef26e4291fd1dbfb60887d79251bfd9eb1af71675811ba40a1932368e6b112c",
     "language": "md",
@@ -7,9 +13,9 @@
   },
   {
     "path": "README.md",
-    "content_hash": "05f60d056b6a09c6d2024be74cd45e17f40b1126c408b67a42bc098f5159d13e",
+    "content_hash": "390688dd7d6a7fd10daf9ec36acf4562e1a29859bfce78ca88ba4d5abd2eb0ab",
     "language": "md",
-    "line_count": 50
+    "line_count": 52
   },
   {
     "path": "package.json",
@@ -18,16 +24,34 @@
     "line_count": 11
   },
   {
-    "path": "src/api/client.ts",
-    "content_hash": "625df0a0f197f2233506c028f5a4b2022567587de2ecc5e81863c2cb2654e507",
+    "path": "src/__tests__/smoke.test.ts",
+    "content_hash": "2fa9fff351d4f0181db6a2edac133ab3d90ee227934a599b122ad8dcbf7ba13c",
     "language": "ts",
-    "line_count": 44
+    "line_count": 26
+  },
+  {
+    "path": "src/api/client.ts",
+    "content_hash": "7d313fff06443ff9e7ca3d13f44a8c601ce65baa3d8aa1a8263f3e85090afe0b",
+    "language": "ts",
+    "line_count": 49
+  },
+  {
+    "path": "src/api/decorated.ts",
+    "content_hash": "96bd631cc642f270589cba89e4fbfea8555b375aba66be53fed657f4b2de8d9c",
+    "language": "ts",
+    "line_count": 5
+  },
+  {
+    "path": "src/components/shop/ApiBridge.tsx",
+    "content_hash": "825a69353a860b7a4f0bb562b71ca12fad3f6a2b38cd7f28b91a17562ac5d8d5",
+    "language": "tsx",
+    "line_count": 8
   },
   {
     "path": "src/components/shop/ProductCard.tsx",
-    "content_hash": "4cdd3d8376da664789c075bfdb3eab49adc3460fcd0810eedc1ad456e7c5be9a",
+    "content_hash": "27b25a905655574a3002adc140b36e91b95f8f1a5db0758ba172115595134122",
     "language": "tsx",
-    "line_count": 20
+    "line_count": 23
   },
   {
     "path": "src/components/shop/ShopButton.default.ts",
@@ -37,9 +61,9 @@
   },
   {
     "path": "src/components/shop/ShopButton.tsx",
-    "content_hash": "cbc7939a134240c0076f76f6499fa893309f131dda53eaef4d946470f42c54af",
+    "content_hash": "abc37ff9c611c7259b63bde0727216c8e1848f279f142d1ce276564bcb34aed8",
     "language": "tsx",
-    "line_count": 15
+    "line_count": 17
   },
   {
     "path": "src/components/shop/index.ts",
@@ -49,15 +73,27 @@
   },
   {
     "path": "src/consumer.ts",
-    "content_hash": "ab868f04a0f22a8b132bc7a4ae42b403dad9c20185497f8513c06dd26c848091",
+    "content_hash": "ce739e8bbfd30a8ef46a82f6eb9760227ca8b8369162df3b819747b81b7a57cc",
     "language": "ts",
-    "line_count": 19
+    "line_count": 40
+  },
+  {
+    "path": "src/env.ts",
+    "content_hash": "5d5828d36203762f7aae84b4bc3672285ee9e335fbbba95e29c01393095440b6",
+    "language": "ts",
+    "line_count": 4
   },
   {
     "path": "src/lib/cache.ts",
-    "content_hash": "a185908afc6dca9552783847c0726686378dcf60e9d5714bfdb0aa24c479a4c1",
+    "content_hash": "964f6d3ddb8a7782b1273a38ed0bbde8cd886eb672c1f20466f0aa88ff49205f",
     "language": "ts",
-    "line_count": 21
+    "line_count": 27
+  },
+  {
+    "path": "src/lib/complexity-fixture.ts",
+    "content_hash": "6002e60fb440df4dbaeb5840e6090bcdc1a0c6416bd3c2aebfaa6661c51cc16f",
+    "language": "ts",
+    "line_count": 105
   },
   {
     "path": "src/lib/store.ts",
@@ -72,6 +108,18 @@
     "line_count": 11
   },
   {
+    "path": "src/orphan.ts",
+    "content_hash": "2c1516b82d9ad1c65f3827701f6adf6c9a246bc71b9b8eab486717e40e6e0e58",
+    "language": "ts",
+    "line_count": 10
+  },
+  {
+    "path": "src/polyfill.ts",
+    "content_hash": "f9c2f0d0224aef67b737ce225be1c3797d50fa0ab05fcd8c2fd129dc5bad6914",
+    "language": "ts",
+    "line_count": 3
+  },
+  {
     "path": "src/styles/button.module.css",
     "content_hash": "1c385277a506b2cb1c70c2d2128bbd280bf080796c83ab37f6f3434655c17348",
     "language": "css",
@@ -82,6 +130,12 @@
     "content_hash": "19ff92a0acce67e5a385e8f1b1607f787462626669d3b941ee0fc91030672b67",
     "language": "css",
     "line_count": 9
+  },
+  {
+    "path": "src/types/status.ts",
+    "content_hash": "85a4d68b1bcffdd9b00c25293b5b81be1ce690a7525b444c6315dcf2b8876b7b",
+    "language": "ts",
+    "line_count": 5
   },
   {
     "path": "src/usePermissions.ts",
@@ -97,14 +151,14 @@
   },
   {
     "path": "src/utils/format.ts",
-    "content_hash": "8f4e1b729d1a69f1457a57c0a6ce61740ff27f2119976d2183ca053bf50b2ad6",
+    "content_hash": "670e458b068c63994b027d3200cc74e1a2c1bf5472ae2dc5e5508653178c506d",
     "language": "ts",
-    "line_count": 16
+    "line_count": 17
   },
   {
     "path": "tsconfig.json",
-    "content_hash": "6b8ead4b09e6885483c805937a35fa0df3cbc47de346abb2d0ed8b73dc7f9e92",
+    "content_hash": "4bbd0839e5e2edc79d5432dff495b709edc6f281cf0b09f35d1155ff38f9def0",
     "language": "json",
-    "line_count": 17
+    "line_count": 18
   }
 ]

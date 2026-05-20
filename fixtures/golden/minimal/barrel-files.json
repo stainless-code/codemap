@@ -8,11 +8,23 @@
     "exports": 4
   },
   {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "exports": 4
+  },
+  {
     "file_path": "src/utils/date.ts",
     "exports": 4
   },
   {
     "file_path": "src/components/shop/ShopButton.tsx",
+    "exports": 2
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "exports": 2
+  },
+  {
+    "file_path": "src/env.ts",
     "exports": 2
   },
   {
@@ -24,8 +36,20 @@
     "exports": 2
   },
   {
+    "file_path": "src/orphan.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/utils/format.ts",
     "exports": 2
+  },
+  {
+    "file_path": "src/api/decorated.ts",
+    "exports": 1
+  },
+  {
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "exports": 1
   },
   {
     "file_path": "src/components/shop/ProductCard.tsx",
@@ -36,7 +60,7 @@
     "exports": 1
   },
   {
-    "file_path": "src/consumer.ts",
+    "file_path": "src/types/status.ts",
     "exports": 1
   },
   {

@@ -101,6 +101,62 @@
       "params": { "callee": "createClient" }
     },
     {
+      "id": "find-async-functions",
+      "prompt": "Parametrised recipe: list async function-shaped symbols with return_type",
+      "recipe": "find-async-functions"
+    },
+    {
+      "id": "find-dynamic-imports",
+      "prompt": "Recipe: every dynamic import() site with specifier kind and async-fn context",
+      "recipe": "find-dynamic-imports"
+    },
+    {
+      "id": "find-barrel-files",
+      "prompt": "Recipe: barrel files (re-exports only, no local value symbols)",
+      "recipe": "find-barrel-files"
+    },
+    {
+      "id": "find-side-effect-files",
+      "prompt": "Recipe: files with module-level side effects",
+      "recipe": "find-side-effect-files"
+    },
+    {
+      "id": "find-re-exported-bindings",
+      "prompt": "Recipe: bindings resolved via re-export chains",
+      "recipe": "find-re-exported-bindings"
+    },
+    {
+      "id": "find-side-effect-imports",
+      "prompt": "Recipe: side-effect-only import statements",
+      "recipe": "find-side-effect-imports"
+    },
+    {
+      "id": "find-jsx-usages",
+      "prompt": "Recipe: JSX element usages",
+      "recipe": "find-jsx-usages",
+      "params": { "component_name": "article" }
+    },
+    {
+      "id": "find-await-in-loop",
+      "prompt": "Recipe: await expressions inside loops",
+      "recipe": "find-await-in-loop"
+    },
+    {
+      "id": "find-swallowed-errors",
+      "prompt": "Recipe: catch blocks that only log",
+      "recipe": "find-swallowed-errors"
+    },
+    {
+      "id": "find-decorator-usage",
+      "prompt": "Recipe: decorator sites",
+      "recipe": "find-decorator-usage"
+    },
+    {
+      "id": "find-throws-jsdoc",
+      "prompt": "Recipe: @throws JSDoc tags",
+      "recipe": "find-throws-jsdoc"
+    },
+    {
       "id": "find-export-sites",
       "prompt": "Parametrised recipe: where is ProductCard exported (direct + re-exports)?",
       "recipe": "find-export-sites",
@@ -229,6 +285,96 @@
       "id": "unused-type-members",
       "prompt": "Members of exported types whose owning type has no detectable importer (advisory; field-level enumeration of `unimported-exports`)",
       "recipe": "unused-type-members"
+    },
+    {
+      "id": "boundary-violations",
+      "prompt": "Config-driven architecture boundary violations (ui-no-api)",
+      "recipe": "boundary-violations"
+    },
+    {
+      "id": "unimported-exports",
+      "prompt": "Exports with no direct importer (orphanHelper)",
+      "recipe": "unimported-exports"
+    },
+    {
+      "id": "components-by-hooks",
+      "prompt": "Components ranked by hooks_used count",
+      "recipe": "components-by-hooks"
+    },
+    {
+      "id": "components-touching-deprecated",
+      "prompt": "Components calling or hooking @deprecated symbols",
+      "recipe": "components-touching-deprecated"
+    },
+    {
+      "id": "files-largest",
+      "prompt": "Largest indexed files by line_count",
+      "recipe": "files-largest"
+    },
+    {
+      "id": "fan-in",
+      "prompt": "Top files by import fan-in",
+      "recipe": "fan-in"
+    },
+    {
+      "id": "fan-out",
+      "prompt": "Top files by import fan-out",
+      "recipe": "fan-out"
+    },
+    {
+      "id": "fan-out-sample",
+      "prompt": "Top fan-out files with GROUP_CONCAT sample targets",
+      "recipe": "fan-out-sample"
+    },
+    {
+      "id": "fan-out-sample-json",
+      "prompt": "Top fan-out files with json_group_array sample targets (JSON1)",
+      "recipe": "fan-out-sample-json"
+    },
+    {
+      "id": "refactor-risk-ranking",
+      "prompt": "Per-file refactor risk (fan-in × coverage gap)",
+      "recipe": "refactor-risk-ranking"
+    },
+    {
+      "id": "high-complexity-untested",
+      "prompt": "High cyclomatic complexity + low coverage",
+      "recipe": "high-complexity-untested"
+    },
+    {
+      "id": "text-in-deprecated-functions",
+      "prompt": "FTS TODO/FIXME/HACK in @deprecated functions with low coverage (requires fts5)",
+      "recipe": "text-in-deprecated-functions"
+    },
+    {
+      "id": "markers-by-kind",
+      "prompt": "Marker inventory by kind (recipe form of markers-all-kinds)",
+      "recipe": "markers-by-kind"
+    },
+    {
+      "id": "suppressions-orphan",
+      "prompt": "codemap-ignore suppressions registered at index time",
+      "sql": "SELECT file_path, line_number, recipe_id FROM suppressions ORDER BY file_path, line_number"
+    },
+    {
+      "id": "enum-order-status",
+      "prompt": "Enum symbol extraction",
+      "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'OrderStatus'"
+    },
+    {
+      "id": "jsdoc-tags-createClient",
+      "prompt": "Structured JSDoc tags on createClient",
+      "sql": "SELECT j.tag, j.name, j.type_text FROM jsdoc_tags j JOIN symbols s ON s.id = j.symbol_id WHERE s.name = 'createClient' AND s.file_path = 'src/api/client.ts' ORDER BY j.tag, j.name"
+    },
+    {
+      "id": "jsx-attributes-product-card",
+      "prompt": "JSX attribute substrate on ProductCard",
+      "sql": "SELECT a.name, a.value_kind FROM jsx_attributes a JOIN jsx_elements e ON e.id = a.element_id WHERE e.file_path = 'src/components/shop/ProductCard.tsx' ORDER BY a.name"
+    },
+    {
+      "id": "try-catch-rethrow-heuristics",
+      "prompt": "catch_rethrows: nested arrow throw vs direct rethrow (complexity-fixture)",
+      "sql": "SELECT s.name, t.catch_rethrows FROM try_catch t JOIN symbols s ON s.file_path = t.file_path AND s.kind = 'function' AND t.try_line_start >= s.line_start AND t.try_line_start <= s.line_end WHERE t.file_path = 'src/lib/complexity-fixture.ts' AND s.name IN ('catchInnerArrowRethrow', 'catchDirectRethrow') ORDER BY s.name"
     }
   ]
 }

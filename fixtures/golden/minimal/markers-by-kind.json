@@ -1,0 +1,18 @@
+[
+  {
+    "kind": "FIXME",
+    "count": 2
+  },
+  {
+    "kind": "HACK",
+    "count": 2
+  },
+  {
+    "kind": "NOTE",
+    "count": 2
+  },
+  {
+    "kind": "TODO",
+    "count": 1
+  }
+]

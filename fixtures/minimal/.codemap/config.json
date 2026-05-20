@@ -1,0 +1,10 @@
+{
+  "boundaries": [
+    {
+      "name": "ui-no-api",
+      "from_glob": "src/components/**",
+      "to_glob": "src/api/**"
+    }
+  ],
+  "fts5": true
+}

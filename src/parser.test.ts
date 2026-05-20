@@ -66,8 +66,28 @@ describe("extractFileData", () => {
     it("includes return type on arrow functions", () => {
       const src = `export const add = (a: number, b: number): number => a + b;\n`;
       const d = extractFileData("/proj/x.ts", src, "x.ts");
-      const sig = d.symbols.find((s) => s.name === "add")?.signature;
-      expect(sig).toBe("add(a, b): number");
+      const sym = d.symbols.find((s) => s.name === "add");
+      expect(sym?.signature).toBe("add(a, b): number");
+      expect(sym?.return_type).toBe("number");
+      expect(sym?.is_async).toBe(0);
+    });
+
+    it("records async and generator shape columns", () => {
+      const src = [
+        "async function load(): Promise<void> {}",
+        "function* gen(): Generator<number> {}",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.symbols.find((s) => s.name === "load")).toMatchObject({
+        return_type: "Promise<void>",
+        is_async: 1,
+        is_generator: 0,
+      });
+      expect(d.symbols.find((s) => s.name === "gen")).toMatchObject({
+        return_type: "Generator<number>",
+        is_async: 0,
+        is_generator: 1,
+      });
     });
 
     it("includes generics on arrow functions", () => {
@@ -520,6 +540,47 @@ describe("extractFileData", () => {
     });
   });
 
+  describe("dynamic import extraction", () => {
+    it("records literal, template, and expression specifiers with async context", () => {
+      const src = [
+        "async function load() {",
+        "  await import('./foo');",
+        "  import('./bar');",
+        "}",
+        "const x = import(`./${n}.js`);",
+        "const y = import(getPath());",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.dynamicImports).toHaveLength(4);
+
+      const foo = d.dynamicImports.find((r) => r.source_text === "./foo");
+      expect(foo).toMatchObject({
+        source_kind: "literal",
+        in_async_fn: 1,
+      });
+
+      const bar = d.dynamicImports.find((r) => r.source_text === "./bar");
+      expect(bar).toMatchObject({
+        source_kind: "literal",
+        in_async_fn: 1,
+      });
+
+      const tmpl = d.dynamicImports.find((r) => r.source_kind === "template");
+      expect(tmpl?.source_text).toContain("${n}");
+      expect(tmpl?.in_async_fn).toBe(0);
+
+      const expr = d.dynamicImports.find((r) => r.source_kind === "expression");
+      expect(expr?.source_text).toBe("getPath()");
+      expect(expr?.in_async_fn).toBe(0);
+    });
+
+    it("flags module-level side effects", () => {
+      const src = `import { x } from "./m";\nx();\nfunction f() { y(); }\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      expect(d.hasSideEffects).toBe(1);
+    });
+  });
+
   describe("call graph extraction", () => {
     it("extracts function-to-function calls", () => {
       const src = `function foo() { bar(); baz(); }\nfunction bar() {}\nfunction baz() {}\n`;
@@ -590,6 +651,52 @@ describe("extractFileData", () => {
       const scopes = d.calls.map((c) => c.caller_scope);
       expect(scopes).toContain("A.run");
       expect(scopes).toContain("B.run");
+    });
+
+    it("records call-shape metadata", () => {
+      const src = [
+        "function f() {",
+        "  foo(1, 2);",
+        "  obj.bar();",
+        "  obj?.baz();",
+        "  qux?.();",
+        "  new Date();",
+        "  new Map();",
+        "  spread(...args);",
+        "}",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const byCallee = Object.fromEntries(
+        d.calls.map((c) => [c.callee_name, c]),
+      );
+
+      expect(byCallee.foo).toMatchObject({
+        args_count: 2,
+        is_method_call: 0,
+        is_constructor_call: 0,
+        is_optional_chain: 0,
+      });
+      expect(byCallee["obj.bar"]).toMatchObject({
+        args_count: 0,
+        is_method_call: 1,
+        is_constructor_call: 0,
+        is_optional_chain: 0,
+      });
+      expect(byCallee["obj.baz"]).toMatchObject({
+        is_method_call: 1,
+        is_optional_chain: 1,
+      });
+      expect(byCallee.qux).toMatchObject({
+        is_optional_chain: 1,
+      });
+      expect(byCallee.Date).toMatchObject({
+        is_constructor_call: 1,
+        is_method_call: 0,
+      });
+      expect(byCallee.Map).toMatchObject({ is_constructor_call: 1 });
+      expect(byCallee.spread).toMatchObject({ args_count: null });
+      expect(d.calls.filter((c) => c.callee_name === "Date")).toHaveLength(1);
+      expect(d.calls.filter((c) => c.callee_name === "Map")).toHaveLength(1);
     });
   });
 

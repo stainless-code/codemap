@@ -2,43 +2,61 @@
   {
     "name": "createClient",
     "file_path": "src/api/client.ts",
-    "line_start": 15,
+    "line_start": 20,
     "coverage_pct": 0
   },
   {
     "name": "setupTransport",
     "file_path": "src/api/client.ts",
-    "line_start": 22,
+    "line_start": 27,
     "coverage_pct": 0
   },
   {
     "name": "openSocket",
     "file_path": "src/api/client.ts",
-    "line_start": 28,
+    "line_start": 33,
     "coverage_pct": 0
   },
   {
     "name": "handshake",
     "file_path": "src/api/client.ts",
-    "line_start": 32,
+    "line_start": 37,
     "coverage_pct": 0
   },
   {
     "name": "legacyClient",
     "file_path": "src/api/client.ts",
-    "line_start": 41,
+    "line_start": 46,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ApiBridge",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
     "coverage_pct": 0
   },
   {
     "name": "FormatPrice",
     "file_path": "src/components/shop/ShopButton.tsx",
-    "line_start": 3,
+    "line_start": 4,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ShopButton",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 8,
+    "coverage_pct": 0
+  },
+  {
+    "name": "prefetch",
+    "file_path": "src/consumer.ts",
+    "line_start": 15,
     "coverage_pct": 0
   },
   {
     "name": "run",
     "file_path": "src/consumer.ts",
-    "line_start": 10,
+    "line_start": 22,
     "coverage_pct": 0
   },
   {
@@ -54,6 +72,30 @@
     "coverage_pct": 0
   },
   {
+    "name": "deeplyNested",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 6,
+    "coverage_pct": 0
+  },
+  {
+    "name": "labyrinth",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 22,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 86,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchDirectRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 98,
+    "coverage_pct": 0
+  },
+  {
     "name": "read",
     "file_path": "src/lib/store.ts",
     "line_start": 7,
@@ -66,57 +108,15 @@
     "coverage_pct": 0
   },
   {
-    "name": "_epochSeconds",
-    "file_path": "src/utils/date.ts",
-    "line_start": 12,
+    "name": "ignoredExport",
+    "file_path": "src/orphan.ts",
+    "line_start": 2,
     "coverage_pct": 0
   },
   {
-    "name": "nanoseconds",
-    "file_path": "src/utils/date.ts",
-    "line_start": 19,
-    "coverage_pct": 0
-  },
-  {
-    "name": "_hiResEpoch",
-    "file_path": "src/utils/date.ts",
-    "line_start": 26,
-    "coverage_pct": 0
-  },
-  {
-    "name": "epochMs",
-    "file_path": "src/utils/format.ts",
-    "line_start": 5,
-    "coverage_pct": 0
-  },
-  {
-    "name": "ProductCard",
-    "file_path": "src/components/shop/ProductCard.tsx",
-    "line_start": 11,
-    "coverage_pct": 100
-  },
-  {
-    "name": "ShopButton",
-    "file_path": "src/components/shop/ShopButton.tsx",
+    "name": "orphanHelper",
+    "file_path": "src/orphan.ts",
     "line_start": 7,
-    "coverage_pct": 100
-  },
-  {
-    "name": "usePermissions",
-    "file_path": "src/usePermissions.ts",
-    "line_start": 1,
-    "coverage_pct": 100
-  },
-  {
-    "name": "now",
-    "file_path": "src/utils/date.ts",
-    "line_start": 5,
-    "coverage_pct": 100
-  },
-  {
-    "name": "nowIso",
-    "file_path": "src/utils/format.ts",
-    "line_start": 13,
-    "coverage_pct": 100
+    "coverage_pct": 0
   }
 ]

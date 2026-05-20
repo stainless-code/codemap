@@ -3,6 +3,7 @@
  * Pair with `now()` in `./date.ts` to give recipes >1 row to render.
  */
 export function epochMs(): number {
+  // FIXME: drift detector marker for FTS + deprecated join recipes
   return Date.now();
 }
 

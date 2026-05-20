@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "file_path": "src/__tests__/smoke.test.ts",
+    "framework": "vitest",
+    "describes": 2,
+    "tests": 5,
+    "skipped": 1,
+    "only_marks": 1,
+    "todos": 1
+  }
+]

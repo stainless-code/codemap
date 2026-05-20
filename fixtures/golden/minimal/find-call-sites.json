@@ -3,16 +3,36 @@
     "file_path": "src/api/client.ts",
     "caller_name": "legacyClient",
     "caller_scope": "legacyClient",
-    "line_start": 42,
+    "line_start": 47,
     "column_start": 9,
-    "column_end": 21
+    "column_end": 21,
+    "args_count": 0,
+    "is_method_call": 0,
+    "is_constructor_call": 0,
+    "is_optional_chain": 0
+  },
+  {
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "caller_name": "ApiBridge",
+    "caller_scope": "ApiBridge",
+    "line_start": 5,
+    "column_start": 2,
+    "column_end": 14,
+    "args_count": 0,
+    "is_method_call": 0,
+    "is_constructor_call": 0,
+    "is_optional_chain": 0
   },
   {
     "file_path": "src/consumer.ts",
     "caller_name": "run",
     "caller_scope": "run",
-    "line_start": 12,
+    "line_start": 24,
     "column_start": 2,
-    "column_end": 14
+    "column_end": 14,
+    "args_count": 1,
+    "is_method_call": 0,
+    "is_constructor_call": 0,
+    "is_optional_chain": 0
   }
 ]

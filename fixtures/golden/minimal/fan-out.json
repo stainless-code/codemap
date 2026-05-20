@@ -1,0 +1,34 @@
+[
+  {
+    "from_path": "src/consumer.ts",
+    "deps": 8
+  },
+  {
+    "from_path": "src/components/shop/ProductCard.tsx",
+    "deps": 2
+  },
+  {
+    "from_path": "src/components/shop/ShopButton.tsx",
+    "deps": 2
+  },
+  {
+    "from_path": "src/__tests__/smoke.test.ts",
+    "deps": 1
+  },
+  {
+    "from_path": "src/components/shop/ApiBridge.tsx",
+    "deps": 1
+  },
+  {
+    "from_path": "src/components/shop/ShopButton.default.ts",
+    "deps": 1
+  },
+  {
+    "from_path": "src/lib/cache.ts",
+    "deps": 1
+  },
+  {
+    "from_path": "src/lib/store.ts",
+    "deps": 1
+  }
+]

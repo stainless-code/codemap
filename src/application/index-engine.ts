@@ -18,7 +18,7 @@ import {
   insertFile,
   insertSymbols,
   insertImports,
-  insertImportSpecifiers,
+  insertImportsWithSpecifiers,
   insertScopes,
   insertReferences,
   insertFileMetrics,
@@ -35,12 +35,15 @@ import {
   insertCssKeyframes,
   insertTypeMembers,
   insertCalls,
+  insertDynamicImports,
+  insertAsyncCalls,
+  insertTryCatchRows,
   getAllFileHashes,
   upsertSourceFts,
   META_FTS5_ENABLED_KEY,
   SCHEMA_VERSION,
 } from "../db";
-import type { CodemapDatabase, FileRow } from "../db";
+import type { CodemapDatabase, DynamicImportRow, FileRow } from "../db";
 import { countLines } from "../extractors/offsets";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
@@ -48,7 +51,7 @@ import { hashContent } from "../hash";
 import { extractMarkers, extractSuppressions } from "../markers";
 import type { ParsedFile } from "../parse-worker";
 import { extractFileData } from "../parser";
-import { resolveImports } from "../resolver";
+import { resolveImports, resolveModuleSpecifier } from "../resolver";
 import {
   getExcludeDirNames,
   getFts5Enabled,
@@ -57,12 +60,15 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
+import { insertDecorators, insertJsdocTags } from "./behavioral-persist";
 import {
   persistBindings,
   persistReExportChains,
   resolveBindings,
 } from "./bindings-engine";
 import { persistModuleCycles } from "./cycles-engine";
+import { persistFileBarrelFlags } from "./file-graph-flags";
+import { persistJsxElementsAndAttributes } from "./jsx-persist";
 import type { QueryBindValue } from "./query-engine";
 import type {
   IndexPerformanceReport,
@@ -95,6 +101,32 @@ function fileCategory(path: string): "ts" | "css" | "text" {
   return "text";
 }
 
+function persistTierSubstrate(
+  db: CodemapDatabase,
+  relPath: string,
+  data: Pick<
+    ParsedFile,
+    | "jsxElements"
+    | "jsxAttributes"
+    | "asyncCalls"
+    | "tryCatchRows"
+    | "decorators"
+    | "jsdocTags"
+  >,
+) {
+  if (data.jsxElements?.length || data.jsxAttributes?.length) {
+    persistJsxElementsAndAttributes(
+      db,
+      data.jsxElements ?? [],
+      data.jsxAttributes ?? [],
+    );
+  }
+  if (data.asyncCalls?.length) insertAsyncCalls(db, data.asyncCalls);
+  if (data.tryCatchRows?.length) insertTryCatchRows(db, data.tryCatchRows);
+  if (data.decorators?.length) insertDecorators(db, relPath, data.decorators);
+  if (data.jsdocTags?.length) insertJsdocTags(db, relPath, data.jsdocTags);
+}
+
 export function collectFiles(): string[] {
   const root = getProjectRoot();
   // Route excludeDirNames into the glob layer as `**/<name>/**` ignores —
@@ -114,6 +146,20 @@ export function collectFiles(): string[] {
 
 /** Reused between {@link getChangedFiles} and {@link indexFiles} so the incremental path reads + hashes each file once, not twice. */
 export type ChangedSourceCache = Map<string, { source: string; hash: string }>;
+
+function persistDynamicImports(
+  db: CodemapDatabase,
+  absPath: string,
+  rows: DynamicImportRow[] | undefined,
+): void {
+  if (!rows?.length) return;
+  for (const row of rows) {
+    if (row.source_kind === "literal" && row.source_text) {
+      row.resolved_path = resolveModuleSpecifier(absPath, row.source_text);
+    }
+  }
+  insertDynamicImports(db, rows);
+}
 
 // Incremental indexing: `last_indexed_commit` must still be an ancestor of HEAD (otherwise
 // history was rewritten — caller does a full rebuild). Union `git diff` (committed deltas
@@ -229,6 +275,10 @@ function insertParsedResults(
     for (const parsed of results) {
       if (parsed.error) continue;
 
+      if (parsed.hasSideEffects) {
+        parsed.fileRow.has_side_effects = parsed.hasSideEffects;
+      }
+
       insertFile(db, parsed.fileRow);
 
       if (parsed.content !== undefined) {
@@ -264,16 +314,19 @@ function insertParsedResults(
             );
           }
         } else {
+          const absPath = join(root, parsed.relPath);
           if (parsed.symbols?.length) insertSymbols(db, parsed.symbols);
 
-          if (parsed.imports?.length) {
-            const absPath = join(root, parsed.relPath);
-            const deps = resolveImports(absPath, parsed.imports, indexedPaths);
-            insertImports(db, parsed.imports);
+          if (parsed.imports?.length || parsed.importSpecifiers?.length) {
+            const deps = parsed.imports?.length
+              ? resolveImports(absPath, parsed.imports, indexedPaths)
+              : [];
+            insertImportsWithSpecifiers(
+              db,
+              parsed.imports ?? [],
+              parsed.importSpecifiers ?? [],
+            );
             if (deps.length) insertDependencies(db, deps);
-          }
-          if (parsed.importSpecifiers?.length) {
-            insertImportSpecifiers(db, parsed.importSpecifiers);
           }
           if (parsed.scopes?.length) insertScopes(db, parsed.scopes);
           if (parsed.references?.length)
@@ -295,6 +348,8 @@ function insertParsedResults(
             insertTypeMembers(db, parsed.typeMembers);
           }
           if (parsed.calls?.length) insertCalls(db, parsed.calls);
+          persistDynamicImports(db, absPath, parsed.dynamicImports);
+          persistTierSubstrate(db, parsed.relPath, parsed);
         }
         if (parsed.suppressions?.length)
           insertSuppressions(db, parsed.suppressions);
@@ -337,6 +392,7 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM test_suites) as test_suites,
         (SELECT COUNT(*) FROM re_export_chains) as re_export_chains,
         (SELECT COUNT(*) FROM module_cycles) as module_cycles,
+        (SELECT COUNT(*) FROM dynamic_imports) as dynamic_imports,
         (SELECT COUNT(*) FROM file_metrics) as file_metrics`,
     )
     .get()!;
@@ -496,9 +552,11 @@ export async function indexFiles(
             const data = extractFileData(absPath, source, relPath);
             if (data.symbols.length) insertSymbols(db, data.symbols);
             const deps = resolveImports(absPath, data.imports, indexedPaths);
-            if (data.imports.length) insertImports(db, data.imports);
-            if (data.importSpecifiers.length)
-              insertImportSpecifiers(db, data.importSpecifiers);
+            insertImportsWithSpecifiers(
+              db,
+              data.imports,
+              data.importSpecifiers,
+            );
             if (data.scopes.length) insertScopes(db, data.scopes);
             if (data.references.length) insertReferences(db, data.references);
             if (data.fileMetrics) insertFileMetrics(db, [data.fileMetrics]);
@@ -514,6 +572,13 @@ export async function indexFiles(
             if (data.typeMembers.length)
               insertTypeMembers(db, data.typeMembers);
             if (data.calls.length) insertCalls(db, data.calls);
+            persistDynamicImports(db, absPath, data.dynamicImports);
+            persistTierSubstrate(db, relPath, data);
+            if (data.hasSideEffects) {
+              db.run("UPDATE files SET has_side_effects = 1 WHERE path = ?", [
+                relPath,
+              ]);
+            }
           }
           // Category-agnostic: one regex pass over raw source, no AST needed.
           const suppressions = extractSuppressions(source, relPath);
@@ -549,6 +614,8 @@ export async function indexFiles(
     .get()!.c;
   setMeta(db, "file_count", String(fileCount));
   setMeta(db, "project_root", getProjectRoot());
+
+  persistFileBarrelFlags(db);
 
   // Pass-2 binding resolution per R.12 — full-rebuild only to honor
   // R.10's <100ms targeted contract. Orphan-cleared until next full.
@@ -719,6 +786,7 @@ export async function targetedReindex(
  * When `opts.recipeActions` is provided AND `opts.json` is true, each row gets an `actions`
  * key set to the same template (recipe-only feature; ad-hoc SQL never carries actions).
  * Rows that already define their own `actions` column are not overwritten.
+ * Sets `PRAGMA query_only = 1` so ad-hoc CLI SQL cannot mutate the index (mirrors `queryRows`).
  * @returns **0** on success, **1** on SQL/runtime error.
  */
 export function printQueryResult(
@@ -738,6 +806,7 @@ export function printQueryResult(
   let db: CodemapDatabase | undefined;
   try {
     db = openDb();
+    db.run("PRAGMA query_only = 1");
     let rows = db.query(sql).all(...(opts?.bindValues ?? []));
     if (changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, changedFiles);

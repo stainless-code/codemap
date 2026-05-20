@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   closeDb,
   createIndexes,
+  createSchema,
   createTables,
   deleteQueryBaseline,
   dropAll,
@@ -309,6 +310,94 @@ describe("SQLite layer (in-memory)", () => {
         .query("SELECT file_path FROM coverage ORDER BY file_path, line_start")
         .all() as Array<{ file_path: string }>;
       expect(remaining.map((r) => r.file_path)).toEqual(["a.ts", "a.ts"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("v27 on-disk schema rebuilds to 34 and preserves user-data tables", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      const v27Sql = readFileSync(
+        join(import.meta.dir, "../fixtures/db/schema-v27.sql"),
+        "utf-8",
+      );
+      db.run(v27Sql);
+      setMeta(db, "schema_version", "27");
+
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ["legacy.ts", "v27", 1, 1, "ts", 0, 0],
+      );
+
+      upsertQueryBaseline(db, {
+        name: "fan-out",
+        recipe_id: "fan-out",
+        sql: "SELECT 1",
+        rows_json: "[]",
+        row_count: 0,
+        git_ref: "v27-head",
+        created_at: 1,
+      });
+      db.run(
+        `INSERT INTO coverage (file_path, name, line_start, coverage_pct, hit_statements, total_statements)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        ["legacy.ts", "fn", 1, 100.0, 1, 1],
+      );
+      db.run(
+        "INSERT INTO recipe_recency (recipe_id, last_run_at, run_count) VALUES (?, ?, ?)",
+        ["fan-out", 1_700_000_000_000, 3],
+      );
+
+      expect(
+        db
+          .query<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='jsx_elements'",
+          )
+          .get(),
+      ).toBeNull();
+
+      createSchema(db);
+
+      expect(getMeta(db, "schema_version")).toBe(String(SCHEMA_VERSION));
+      expect(
+        db
+          .query<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='jsx_elements'",
+          )
+          .get()?.name,
+      ).toBe("jsx_elements");
+      expect(
+        (
+          db
+            .query<{ n: number }>(
+              "SELECT COUNT(*) AS n FROM pragma_table_info('files') WHERE name IN ('is_barrel', 'has_side_effects')",
+            )
+            .get() as { n: number }
+        ).n,
+      ).toBe(2);
+
+      expect(listQueryBaselines(db).map((b) => b.name)).toEqual(["fan-out"]);
+      expect(getQueryBaseline(db, "fan-out")?.git_ref).toBe("v27-head");
+      expect(
+        (db.query("SELECT COUNT(*) AS n FROM coverage").get() as { n: number })
+          .n,
+      ).toBe(1);
+      expect(
+        (
+          db
+            .query<{ recipe_id: string; run_count: number }>(
+              "SELECT recipe_id, run_count FROM recipe_recency",
+            )
+            .get() as { recipe_id: string; run_count: number }
+        ).run_count,
+      ).toBe(3);
+
+      // Indexed rows are wiped on rebuild; user re-indexes with --full.
+      expect(
+        (db.query("SELECT COUNT(*) AS n FROM files").get() as { n: number }).n,
+      ).toBe(0);
     } finally {
       closeDb(db);
     }

@@ -2,19 +2,61 @@
   {
     "name": "legacyClient",
     "file_path": "src/api/client.ts",
-    "line_start": 41,
+    "line_start": 46,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ApiBridge",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
     "coverage_pct": 0
   },
   {
     "name": "FormatPrice",
     "file_path": "src/components/shop/ShopButton.tsx",
-    "line_start": 3,
+    "line_start": 4,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ShopButton",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 8,
+    "coverage_pct": 0
+  },
+  {
+    "name": "prefetch",
+    "file_path": "src/consumer.ts",
+    "line_start": 15,
     "coverage_pct": 0
   },
   {
     "name": "run",
     "file_path": "src/consumer.ts",
-    "line_start": 10,
+    "line_start": 22,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 86,
+    "coverage_pct": 0
+  },
+  {
+    "name": "catchDirectRethrow",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 98,
+    "coverage_pct": 0
+  },
+  {
+    "name": "ignoredExport",
+    "file_path": "src/orphan.ts",
+    "line_start": 2,
+    "coverage_pct": 0
+  },
+  {
+    "name": "orphanHelper",
+    "file_path": "src/orphan.ts",
+    "line_start": 7,
     "coverage_pct": 0
   },
   {

@@ -1,0 +1,12 @@
+[
+  {
+    "name": "ProductCard",
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "hook_count": 1
+  },
+  {
+    "name": "ShopButton",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "hook_count": 1
+  }
+]

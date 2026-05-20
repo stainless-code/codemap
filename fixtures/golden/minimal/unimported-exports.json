@@ -1,0 +1,156 @@
+[
+  {
+    "name": "Transport",
+    "kind": "type",
+    "file_path": "src/api/client.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "handshake",
+    "kind": "value",
+    "file_path": "src/api/client.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "legacyClient",
+    "kind": "value",
+    "file_path": "src/api/client.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "openSocket",
+    "kind": "value",
+    "file_path": "src/api/client.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "setupTransport",
+    "kind": "value",
+    "file_path": "src/api/client.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "value",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "ProductCard",
+    "kind": "value",
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "FormatPrice",
+    "kind": "value",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "prefetch",
+    "kind": "value",
+    "file_path": "src/consumer.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "run",
+    "kind": "value",
+    "file_path": "src/consumer.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "fixtureApiKey",
+    "kind": "value",
+    "file_path": "src/env.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "nodeEnv",
+    "kind": "value",
+    "file_path": "src/env.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "catchDirectRethrow",
+    "kind": "value",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "kind": "value",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "deeplyNested",
+    "kind": "value",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "ignoredExport",
+    "kind": "value",
+    "file_path": "src/orphan.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "orphanHelper",
+    "kind": "value",
+    "file_path": "src/orphan.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "OrderStatus",
+    "kind": "value",
+    "file_path": "src/types/status.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "_epochSeconds",
+    "kind": "value",
+    "file_path": "src/utils/date.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "_hiResEpoch",
+    "kind": "value",
+    "file_path": "src/utils/date.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "nanoseconds",
+    "kind": "value",
+    "file_path": "src/utils/date.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "nowIso",
+    "kind": "value",
+    "file_path": "src/utils/format.ts",
+    "is_default": 0,
+    "re_export_source": null
+  }
+]

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 34;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -38,7 +38,9 @@ export function createTables(db: CodemapDatabase) {
       line_count INTEGER NOT NULL,
       language TEXT NOT NULL,
       last_modified INTEGER NOT NULL,
-      indexed_at INTEGER NOT NULL
+      indexed_at INTEGER NOT NULL,
+      is_barrel INTEGER NOT NULL DEFAULT 0,
+      has_side_effects INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS symbols (
@@ -62,7 +64,10 @@ export function createTables(db: CodemapDatabase) {
       scope_local_id INTEGER NOT NULL DEFAULT 0,
       body_line_count INTEGER,
       param_count INTEGER,
-      nesting_depth INTEGER
+      nesting_depth INTEGER,
+      return_type TEXT,
+      is_async INTEGER NOT NULL DEFAULT 0,
+      is_generator INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     -- One row per indexed file. Pure counters from the AST walk.
@@ -164,7 +169,11 @@ export function createTables(db: CodemapDatabase) {
       callee_name TEXT NOT NULL,
       line_start INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
-      column_end INTEGER NOT NULL
+      column_end INTEGER NOT NULL,
+      args_count INTEGER,
+      is_method_call INTEGER NOT NULL DEFAULT 0,
+      is_constructor_call INTEGER NOT NULL DEFAULT 0,
+      is_optional_chain INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS type_members (
@@ -213,7 +222,7 @@ export function createTables(db: CodemapDatabase) {
       reference_id INTEGER PRIMARY KEY REFERENCES "references"(id) ON DELETE CASCADE,
       resolved_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
       resolution_kind TEXT NOT NULL CHECK (resolution_kind IN (
-        'same-file','imported','global','unresolved'
+        'same-file','imported','re-exported','global','unresolved'
       )),
       is_external INTEGER NOT NULL DEFAULT 0
     ) STRICT, WITHOUT ROWID;
@@ -297,6 +306,91 @@ export function createTables(db: CodemapDatabase) {
       cycle_size INTEGER NOT NULL
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS dynamic_imports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      source_kind TEXT NOT NULL CHECK (source_kind IN ('literal','template','expression')),
+      source_text TEXT,
+      resolved_path TEXT,
+      in_async_fn INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS jsx_elements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      component_name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      line_end INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      is_self_closing INTEGER NOT NULL DEFAULT 0,
+      is_fragment INTEGER NOT NULL DEFAULT 0,
+      namespace_prefix TEXT,
+      parent_element_id INTEGER REFERENCES jsx_elements(id),
+      children_count INTEGER NOT NULL DEFAULT 0,
+      is_lowercase INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS jsx_attributes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      element_id INTEGER NOT NULL REFERENCES jsx_elements(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      column_end INTEGER NOT NULL,
+      value_kind TEXT NOT NULL CHECK (value_kind IN ('string','expression','boolean','spread','element')),
+      value_text TEXT
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS async_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      caller_scope TEXT NOT NULL,
+      awaited_expression TEXT,
+      awaited_callee_name TEXT,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      in_loop INTEGER NOT NULL DEFAULT 0,
+      in_try INTEGER NOT NULL DEFAULT 0,
+      scope_local_id INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS try_catch (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      containing_scope_local_id INTEGER NOT NULL DEFAULT 0,
+      try_line_start INTEGER NOT NULL,
+      try_line_end INTEGER NOT NULL,
+      has_catch INTEGER NOT NULL DEFAULT 0,
+      catch_param TEXT,
+      catch_rethrows INTEGER NOT NULL DEFAULT 0,
+      catch_logs_only INTEGER NOT NULL DEFAULT 0,
+      has_finally INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS decorators (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      target_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      target_kind TEXT NOT NULL CHECK (target_kind IN ('class','method','property','parameter','accessor')),
+      name TEXT NOT NULL,
+      line INTEGER NOT NULL,
+      column_start INTEGER NOT NULL,
+      args_text TEXT
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS jsdoc_tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol_id INTEGER NOT NULL REFERENCES symbols(id) ON DELETE CASCADE,
+      tag TEXT NOT NULL,
+      name TEXT,
+      type_text TEXT,
+      description TEXT
+    ) STRICT;
+
     -- Per-specifier breakdown of imports.specifiers JSON blob. Recipes that
     -- want specifier-precise rewrites (rename specifier, dedupe, type-only
     -- migrate) JOIN this table. The original imports.specifiers JSON stays
@@ -304,13 +398,14 @@ export function createTables(db: CodemapDatabase) {
     CREATE TABLE IF NOT EXISTS import_specifiers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      import_id INTEGER REFERENCES imports(id) ON DELETE CASCADE,
       source TEXT NOT NULL,
       line INTEGER NOT NULL,
       column_start INTEGER NOT NULL,
       column_end INTEGER NOT NULL,
       imported_name TEXT NOT NULL,
       local_name TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace')),
+      kind TEXT NOT NULL CHECK (kind IN ('named','default','namespace','side-effect')),
       is_type_only INTEGER NOT NULL DEFAULT 0
     ) STRICT;
 
@@ -461,6 +556,8 @@ export function createIndexes(db: CodemapDatabase) {
       WHERE kind = 'function';
     CREATE INDEX IF NOT EXISTS idx_symbols_visibility ON symbols(visibility, file_path, name, line_start)
       WHERE visibility IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_symbols_async ON symbols(file_path, name, return_type)
+      WHERE is_async = 1;
 
     CREATE INDEX IF NOT EXISTS idx_imports_source ON imports(source, file_path);
     CREATE INDEX IF NOT EXISTS idx_imports_resolved ON imports(resolved_path, file_path);
@@ -508,6 +605,28 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_module_cycles_cid ON module_cycles(cycle_id);
     CREATE INDEX IF NOT EXISTS idx_module_cycles_size ON module_cycles(cycle_size);
 
+    CREATE INDEX IF NOT EXISTS idx_dynamic_imports_file ON dynamic_imports(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_dynamic_imports_resolved ON dynamic_imports(resolved_path, file_path)
+      WHERE resolved_path IS NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_jsx_elements_name ON jsx_elements(component_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_jsx_elements_file ON jsx_elements(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_jsx_attrs_name ON jsx_attributes(name);
+    CREATE INDEX IF NOT EXISTS idx_jsx_attrs_element ON jsx_attributes(element_id);
+
+    CREATE INDEX IF NOT EXISTS idx_async_calls_callee ON async_calls(awaited_callee_name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_async_calls_file ON async_calls(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_async_calls_loop ON async_calls(in_loop) WHERE in_loop = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_try_catch_file ON try_catch(file_path, try_line_start);
+    CREATE INDEX IF NOT EXISTS idx_try_catch_logs ON try_catch(catch_logs_only) WHERE catch_logs_only = 1;
+
+    CREATE INDEX IF NOT EXISTS idx_decorators_name ON decorators(name, file_path);
+    CREATE INDEX IF NOT EXISTS idx_decorators_target ON decorators(target_symbol_id);
+
+    CREATE INDEX IF NOT EXISTS idx_jsdoc_tags_symbol ON jsdoc_tags(symbol_id);
+    CREATE INDEX IF NOT EXISTS idx_jsdoc_tags_tag ON jsdoc_tags(tag);
+
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_to ON re_export_chains(to_file, to_name);
     CREATE INDEX IF NOT EXISTS idx_re_export_chains_truncated ON re_export_chains(truncated) WHERE truncated = 1;
 
@@ -528,6 +647,8 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_local ON import_specifiers(local_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_file ON import_specifiers(file_path, line);
     CREATE INDEX IF NOT EXISTS idx_import_specifiers_source ON import_specifiers(source, file_path);
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_import ON import_specifiers(import_id) WHERE import_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_import_specifiers_kind ON import_specifiers(kind, file_path);
 
     CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_scope ON calls(caller_scope, file_path, callee_name);
@@ -572,7 +693,14 @@ export function createSchema(db: CodemapDatabase) {
 
 export function dropAll(db: CodemapDatabase) {
   db.run(`
+    DROP TABLE IF EXISTS jsdoc_tags;
+    DROP TABLE IF EXISTS decorators;
+    DROP TABLE IF EXISTS try_catch;
+    DROP TABLE IF EXISTS async_calls;
+    DROP TABLE IF EXISTS jsx_attributes;
+    DROP TABLE IF EXISTS jsx_elements;
     DROP TABLE IF EXISTS module_cycles;
+    DROP TABLE IF EXISTS dynamic_imports;
     DROP TABLE IF EXISTS re_export_chains;
     DROP TABLE IF EXISTS function_params;
     DROP TABLE IF EXISTS runtime_markers;
@@ -671,12 +799,14 @@ export interface FileRow {
   language: string;
   last_modified: number;
   indexed_at: number;
+  is_barrel?: number;
+  has_side_effects?: number;
 }
 
 export function insertFile(db: CodemapDatabase, file: FileRow) {
   db.run(
-    `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at, is_barrel, has_side_effects)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       file.path,
       file.content_hash,
@@ -685,6 +815,8 @@ export function insertFile(db: CodemapDatabase, file: FileRow) {
       file.language,
       file.last_modified,
       file.indexed_at,
+      file.is_barrel ?? 0,
+      file.has_side_effects ?? 0,
     ],
   );
 }
@@ -734,6 +866,10 @@ export interface SymbolRow {
   param_count?: number | null;
   /** Max nesting depth (conditionals/loops/ternaries) for function-shaped symbols. NULL otherwise. */
   nesting_depth?: number | null;
+  /** Stringified return type for function-shaped symbols; NULL when unannotated or N/A. */
+  return_type?: string | null;
+  is_async?: number;
+  is_generator?: number;
 }
 
 // SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 12.x both ship
@@ -808,8 +944,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -832,6 +968,9 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.body_line_count ?? null,
         s.param_count ?? null,
         s.nesting_depth ?? null,
+        s.return_type ?? null,
+        s.is_async ?? 0,
+        s.is_generator ?? 0,
       ),
   );
 }
@@ -1101,14 +1240,19 @@ export interface CallRow {
   column_start: number;
   /** 0-based byte column one past the callee identifier end. */
   column_end: number;
+  /** NULL when the call includes a spread argument. */
+  args_count?: number | null;
+  is_method_call?: number;
+  is_constructor_call?: number;
+  is_optional_chain?: number;
 }
 
 export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)",
-    "(?,?,?,?,?,?,?)",
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end, args_count, is_method_call, is_constructor_call, is_optional_chain)",
+    "(?,?,?,?,?,?,?,?,?,?,?)",
     (c, v) =>
       v.push(
         c.file_path,
@@ -1118,6 +1262,142 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
         c.line_start,
         c.column_start,
         c.column_end,
+        c.args_count ?? null,
+        c.is_method_call ?? 0,
+        c.is_constructor_call ?? 0,
+        c.is_optional_chain ?? 0,
+      ),
+  );
+}
+
+export interface DynamicImportRow {
+  file_path: string;
+  line_start: number;
+  column_start: number;
+  source_kind: "literal" | "template" | "expression";
+  source_text: string | null;
+  resolved_path: string | null;
+  in_async_fn: number;
+  scope_local_id: number;
+}
+
+export function insertDynamicImports(
+  db: CodemapDatabase,
+  rows: DynamicImportRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO dynamic_imports (file_path, line_start, column_start, source_kind, source_text, resolved_path, in_async_fn, scope_local_id)",
+    "(?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.line_start,
+        r.column_start,
+        r.source_kind,
+        r.source_text,
+        r.resolved_path,
+        r.in_async_fn,
+        r.scope_local_id,
+      ),
+  );
+}
+
+export interface AsyncCallRow {
+  file_path: string;
+  caller_scope: string;
+  awaited_expression: string;
+  awaited_callee_name: string | null;
+  line_start: number;
+  column_start: number;
+  in_loop: number;
+  in_try: number;
+  scope_local_id: number;
+}
+
+export function insertAsyncCalls(db: CodemapDatabase, rows: AsyncCallRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO async_calls (file_path, caller_scope, awaited_expression, awaited_callee_name, line_start, column_start, in_loop, in_try, scope_local_id)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.caller_scope,
+        r.awaited_expression,
+        r.awaited_callee_name,
+        r.line_start,
+        r.column_start,
+        r.in_loop,
+        r.in_try,
+        r.scope_local_id,
+      ),
+  );
+}
+
+export interface TryCatchRow {
+  file_path: string;
+  containing_scope_local_id: number;
+  try_line_start: number;
+  try_line_end: number;
+  has_catch: number;
+  catch_param: string | null;
+  catch_rethrows: number;
+  catch_logs_only: number;
+  has_finally: number;
+}
+
+export function insertTryCatchRows(db: CodemapDatabase, rows: TryCatchRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO try_catch (file_path, containing_scope_local_id, try_line_start, try_line_end, has_catch, catch_param, catch_rethrows, catch_logs_only, has_finally)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.containing_scope_local_id,
+        r.try_line_start,
+        r.try_line_end,
+        r.has_catch,
+        r.catch_param,
+        r.catch_rethrows,
+        r.catch_logs_only,
+        r.has_finally,
+      ),
+  );
+}
+
+export interface JsxAttributeRow {
+  element_id: number;
+  name: string;
+  line: number;
+  column_start: number;
+  column_end: number;
+  value_kind: "string" | "expression" | "boolean" | "spread" | "element";
+  value_text: string | null;
+}
+
+export function insertJsxAttributes(
+  db: CodemapDatabase,
+  rows: JsxAttributeRow[],
+): void {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO jsx_attributes (element_id, name, line, column_start, column_end, value_kind, value_text)",
+    "(?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.element_id,
+        r.name,
+        r.line,
+        r.column_start,
+        r.column_end,
+        r.value_kind,
+        r.value_text,
       ),
   );
 }
@@ -1183,7 +1463,12 @@ export function insertReferences(db: CodemapDatabase, rows: ReferenceRow[]) {
 export interface BindingRow {
   reference_id: number;
   resolved_symbol_id: number | null;
-  resolution_kind: "same-file" | "imported" | "global" | "unresolved";
+  resolution_kind:
+    | "same-file"
+    | "imported"
+    | "re-exported"
+    | "global"
+    | "unresolved";
   is_external: number;
 }
 
@@ -1462,9 +1747,9 @@ export function insertScopes(db: CodemapDatabase, rows: ScopeRow[]) {
 
 /**
  * Per-specifier row for `import { foo, bar as baz }` / `import foo from 'mod'`
- * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) have
- * no specifiers. JOIN to `imports` by (file_path, line, source) when the
- * import statement's other fields are needed.
+ * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) emit one
+ * `kind='side-effect'` row (no binding names). JOIN to `imports` by
+ * (file_path, line, source) when the import statement's other fields are needed.
  */
 export interface ImportSpecifierRow {
   file_path: string;
@@ -1477,22 +1762,75 @@ export interface ImportSpecifierRow {
   imported_name: string;
   /** Name as bound locally (`bar` in `import { foo as bar }`); equals `imported_name` when no alias. For default + namespace imports, this is the binding name. */
   local_name: string;
-  kind: "named" | "default" | "namespace";
+  kind: "named" | "default" | "namespace" | "side-effect";
   is_type_only: number;
+  /** Index into the parallel `imports[]` array for this file; resolved to `import_id` at insert. */
+  import_index: number;
+}
+
+export function insertImportsWithSpecifiers(
+  db: CodemapDatabase,
+  imports: ImportRow[],
+  specifiers: ImportSpecifierRow[],
+) {
+  if (!imports.length) {
+    if (specifiers.length) {
+      insertImportSpecifiers(
+        db,
+        specifiers.map((row) => ({ ...row, import_id: null })),
+      );
+    }
+    return;
+  }
+  const maxBefore = db
+    .query<{ m: number }>("SELECT COALESCE(MAX(id), 0) AS m FROM imports")
+    .get()!.m;
+  batchInsert(
+    db,
+    imports,
+    "INSERT INTO imports (file_path, source, resolved_path, specifiers, is_type_only, line_number)",
+    "(?,?,?,?,?,?)",
+    (imp, v) =>
+      v.push(
+        imp.file_path,
+        imp.source,
+        imp.resolved_path,
+        imp.specifiers,
+        imp.is_type_only,
+        imp.line_number,
+      ),
+  );
+  const importIds = db
+    .query<{ id: number }>(
+      "SELECT id FROM imports WHERE id > ? ORDER BY id ASC",
+    )
+    .all(maxBefore)
+    .map((r) => r.id);
+  if (!specifiers.length) return;
+  const linked = specifiers.map((row) => ({
+    ...row,
+    import_id: importIds[row.import_index] ?? null,
+  }));
+  insertImportSpecifiers(db, linked);
+}
+
+export interface ImportSpecifierInsertRow extends ImportSpecifierRow {
+  import_id: number | null;
 }
 
 export function insertImportSpecifiers(
   db: CodemapDatabase,
-  rows: ImportSpecifierRow[],
+  rows: ImportSpecifierInsertRow[],
 ) {
   batchInsert(
     db,
     rows,
-    "INSERT INTO import_specifiers (file_path, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
-    "(?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO import_specifiers (file_path, import_id, source, line, column_start, column_end, imported_name, local_name, kind, is_type_only)",
+    "(?,?,?,?,?,?,?,?,?,?)",
     (r, v) =>
       v.push(
         r.file_path,
+        r.import_id,
         r.source,
         r.line,
         r.column_start,

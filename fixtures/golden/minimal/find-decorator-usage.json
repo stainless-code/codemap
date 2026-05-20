@@ -1,0 +1,10 @@
+[
+  {
+    "file_path": "src/api/decorated.ts",
+    "target_kind": "class",
+    "name": "sealed",
+    "line": 3,
+    "column_start": 0,
+    "target_symbol_id": 17
+  }
+]

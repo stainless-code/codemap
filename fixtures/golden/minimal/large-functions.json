@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "name": "labyrinth",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 22,
+    "line_end": 83,
+    "body_line_count": 62,
+    "param_count": 1,
+    "complexity": 19,
+    "nesting_depth": 5
+  }
+]

@@ -19,6 +19,7 @@ import { offsetToLine } from "./offsets";
 import { pushDestructuredVars, pushParams, pushTypeParams } from "./params";
 import {
   buildFunctionSignature,
+  functionShapeColumns,
   extractLiteralValue,
   stringifyTypeNode,
   stringifyTypeParams,
@@ -101,6 +102,7 @@ function registerSymbolHandlers(
         scope_local_id: scopes.currentLocalId(),
         body_line_count: lineEnd - lineStart + 1,
         param_count: node.params?.length ?? 0,
+        ...functionShapeColumns(node),
       });
       complexity.pushFor(symbolIndex);
 
@@ -183,6 +185,7 @@ function registerSymbolHandlers(
           scope_local_id: scopes.currentLocalId(),
           body_line_count: isArrowOrFn ? lineEnd - lineStart + 1 : null,
           param_count: isArrowOrFn ? (init.params?.length ?? 0) : null,
+          ...(isArrowOrFn ? functionShapeColumns(init) : {}),
         });
 
         if (isArrowOrFn) {
@@ -486,6 +489,7 @@ function extractClassMembers(
         scope_local_id: classScopeLocalId,
         body_line_count: methodLineEnd - methodLineStart + 1,
         param_count: fn?.params?.length ?? 0,
+        ...functionShapeColumns(fn),
       });
     } else if (m.type === "PropertyDefinition") {
       let prefix = "";

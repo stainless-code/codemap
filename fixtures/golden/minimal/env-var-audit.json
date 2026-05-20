@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "env_var": "CODEMAP_FIXTURE_API_KEY",
+    "uses": 1,
+    "files": 1
+  },
+  {
+    "env_var": "NODE_ENV",
+    "uses": 1,
+    "files": 1
+  }
+]

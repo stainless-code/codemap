@@ -26,6 +26,7 @@ export interface IndexTableStats extends Record<string, number> {
   test_suites: number;
   re_export_chains: number;
   module_cycles: number;
+  dynamic_imports: number;
   file_metrics: number;
 }
 

@@ -1,0 +1,7 @@
+[
+  {
+    "file_path": "src/orphan.ts",
+    "line_number": 2,
+    "recipe_id": "unimported-exports"
+  }
+]

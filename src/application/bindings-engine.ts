@@ -668,13 +668,15 @@ function resolveOne(
           reExportsByFile,
           indexedPaths,
         ) ?? { file: targetFile, name: exportName };
+        const viaReExport =
+          resolved.file !== targetFile || resolved.name !== exportName;
         const targetSymbols = symbolsByFile.get(resolved.file);
         const symList = targetSymbols?.get(resolved.name);
         const targetSym = symList?.find((s) => s.scope_local_id === 0);
         return {
           reference_id: ref.id,
           resolved_symbol_id: targetSym?.id ?? null,
-          resolution_kind: "imported",
+          resolution_kind: viaReExport ? "re-exported" : "imported",
           is_external: 0,
         };
       }

@@ -1,19 +1,22 @@
 import { usePermissions } from "../../usePermissions";
+import { now } from "../../utils/date";
 
 interface ProductCardProps {
   readonly id: number;
   readonly title: string;
 }
 
-// React component fixture — exercises `components` table fan-in to
-// `usePermissions` (also used by ShopButton.tsx); pair with the barrel
-// re-export in `./index.ts` to surface fan-in via the `dependencies` graph.
+// React component fixture — JSX substrate (fragments, attrs, nesting, lowercase tags).
 export function ProductCard(props: ProductCardProps) {
   const perms = usePermissions();
+  const spread = { className: "card" };
   return (
-    <article>
-      <h3>{props.title}</h3>
-      {perms.canEdit ? <button type="button">Edit</button> : null}
-    </article>
+    <>
+      <article data-id={props.id} {...spread} hidden={false}>
+        <h3>{props.title}</h3>
+        <img src="/placeholder.png" alt="" />
+        {perms.canEdit ? <button type="button">Edit</button> : null}
+      </article>
+    </>
   );
 }

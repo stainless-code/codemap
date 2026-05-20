@@ -1,0 +1,12 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "component_name": "article",
+    "line_start": 15,
+    "line_end": 19,
+    "is_self_closing": 0,
+    "is_fragment": 0,
+    "is_lowercase": 1,
+    "children_count": 2
+  }
+]

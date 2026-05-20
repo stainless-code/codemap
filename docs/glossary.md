@@ -43,13 +43,17 @@ Two-snapshot structural-drift command: `codemap audit` diffs the live `.codemap/
 
 Ad-hoc audit snapshot from any git committish (`origin/main`, `HEAD~5`, `<sha>`, tag, …). `git archive --format=tar <sha>` is piped through `tar -x` into `<projectRoot>/.codemap/audit-cache/<sha>/` — a plain extracted tree with no `.git` artifact and no registered git worktree, so `git clean -xdf` and `rm -rf` both sweep it without flag escalation. Codemap reindexes into the cache's `.codemap/index.db`, then per-delta canonical SQL runs on that DB vs the live one. Cache key is the **resolved sha** (`git rev-parse --verify`), so `--base origin/main` and `--base <sha>` (when they point at the same commit) share one cache entry. **Atomic populate** — per-pid temp dir + POSIX `rename`; concurrent processes resolving the same sha race-safely without lock files. Eviction: hardcoded LRU 5 entries / 500 MiB. Per-delta `base.source` is `"ref"` (vs `"baseline"`) and the delta carries `base.ref` (user-supplied string) + `base.sha` (resolved). Mutually exclusive with `--baseline <prefix>`; composes orthogonally with per-delta `--<delta>-baseline <name>` overrides. Hard error on non-git projects (no graceful fallback — there's no meaningful "ref" without git). Both transports (MCP `audit` tool's `base?` arg, HTTP `POST /tool/audit`) call the same `runAuditFromRef` engine in `application/audit-engine.ts`.
 
+### `async_calls` (table)
+
+One row per `AwaitExpression`. Captures `awaited_expression` source text, optional `awaited_callee_name`, and loop/try context flags (`in_loop`, `in_try`) from a visitor context stack. Joins `scopes.local_id` via `scope_local_id`. Powers `find-await-in-loop`.
+
 ---
 
 ## B
 
 ### barrel file
 
-In Codemap usage: a file with a high number of `exports` rows — typically a public-API hub like `src/index.ts`. Surfaced by the `barrel-files` recipe. Distinct from **hub** below — barrel measures _exports out_, hub measures _imports in_.
+In Codemap usage: a file whose exports are entirely re-exports with no local value symbols — surfaced as `files.is_barrel = 1` (post-pass) and by the `barrel-files` / `find-barrel-files` recipes. Distinct from **hub** below — barrel measures _exports out_, hub measures _imports in_.
 
 ### batch insert
 
@@ -57,7 +61,7 @@ The shared `batchInsert<T>()` helper in `src/db.ts`. Splits inserts into multi-r
 
 ### `bindings` (table) / bindings resolver
 
-Per-reference resolution to the originating symbol per [R.12]. One row per non-`member`-kind `references` row, with `resolution_kind` in `{same-file, imported, global, unresolved}` and a nullable `resolved_symbol_id` joining `symbols(id)`. Resolved in a single in-memory pass (`src/application/bindings-engine.ts`) after files/symbols/imports settle. Full-rebuild only — targeted reindex skips per [R.10]. Powers `find-symbol-references` (bindings-precise rename substrate).
+Per-reference resolution to the originating symbol per [R.12]. One row per non-`member`-kind `references` row, with `resolution_kind` in `{same-file, imported, re-exported, global, unresolved}` and a nullable `resolved_symbol_id` joining `symbols(id)`. Resolved in a single in-memory pass (`src/application/bindings-engine.ts`) after files/symbols/imports settle. Full-rebuild only — targeted reindex skips per [R.10]. Powers `find-symbol-references` and `find-re-exported-bindings`.
 
 ### `boundaries` (config) / `boundary_rules` (table) / `boundary-violations` (recipe)
 
@@ -77,7 +81,7 @@ Synchronous Node.js SQLite binding. The Node-side counterpart to `bun:sqlite`. A
 
 ### `calls` (table)
 
-Function-scoped call edges, deduped per `(caller_scope, callee_name)` per file. **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. See `CallRow` for the TS shape.
+Function-scoped call edges, deduped per `(caller_scope, callee_name, call_kind)` per file (`call` vs `new`). **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. Columns include `args_count` (NULL when a spread argument is present), `is_method_call`, `is_constructor_call`, and `is_optional_chain`. See `CallRow`.
 
 ### `CallRow`
 
@@ -183,6 +187,10 @@ CSS custom properties (`--token: value`). `scope` is `:root`, `@theme` (Tailwind
 
 ## D
 
+### `decorators` (table)
+
+One row per `@decorator` site on classes, methods, properties, or accessors. `target_symbol_id` links to `symbols(id)` post-insert when resolvable. Powers `find-decorator-usage`.
+
 ### DDL
 
 Data Definition Language — the `CREATE TABLE` / `CREATE INDEX` strings in `src/db.ts`. Distinct from **schema** (the conceptual structure) and from **`SCHEMA_VERSION`** (the integer that triggers auto-rebuild on mismatch).
@@ -194,6 +202,10 @@ Resolved file-to-file edges derived from `imports.resolved_path`. Composite prim
 ### `DependencyRow`
 
 TS shape for one row of the `dependencies` table.
+
+### `dynamic_imports` (table)
+
+One row per `import()` expression. `source_kind` is `literal` / `template` / `expression`; `resolved_path` filled when literal and resolvable. `in_async_fn` flags dynamic imports inside async functions. Powers `find-dynamic-imports`.
 
 ---
 
@@ -225,7 +237,7 @@ Number of edges _out of_ a file — `COUNT(*) FROM dependencies WHERE from_path 
 
 ### `files` (table)
 
-Header row for every indexed file. `path` is the primary key; all other tables FK to it with `ON DELETE CASCADE`. See `FileRow`.
+Header row for every indexed file. `path` is the primary key; all other tables FK to it with `ON DELETE CASCADE`. Flags: `is_barrel` (100% re-exports, no local value symbols) and `has_side_effects` (module-level call/assignment seen at parse time). See `FileRow`.
 
 ### `FileRow`
 
@@ -285,7 +297,7 @@ Symbol or file blast-radius walker. CLI: `codemap impact <target> [--direction u
 
 ### `import_specifiers` (table)
 
-Per-specifier breakdown of the `imports.specifiers` JSON blob. One row per imported binding — `imported_name` (original) and `local_name` (renamed via `as`), `kind` in `{named, default, namespace}`, `is_type_only`, column-precise position. Powers specifier-precise rewrites and the `find-import-sites` recipe.
+Per-specifier breakdown of the `imports.specifiers` JSON blob. One row per imported binding — or one `kind='side-effect'` row for bare `import "mod"`. Columns include `imported_name`, `local_name`, `kind` in `{named, default, namespace, side-effect}`, `is_type_only`, column-precise position, and `import_id` FK to `imports`. Powers `find-import-sites` and `find-side-effect-imports`.
 
 ### `imports` (table)
 
@@ -302,6 +314,22 @@ TS shape emitted under `IndexRunStats.performance` when `--performance` is set. 
 ### `IndexResult`
 
 Public TS shape returned from `Codemap#index()` and `runCodemapIndex()`. Wall-clock + row counts + optional performance report.
+
+---
+
+## J
+
+### `jsdoc_tags` (table)
+
+Structured JSDoc tags parsed from `symbols.doc_comment` — one row per tag per symbol (`@param`, `@throws`, `@returns`, …). FK `symbol_id` → `symbols(id)`. Powers `find-throws-jsdoc`.
+
+### `jsx_attributes` (table)
+
+One row per JSX attribute on a `jsx_elements` row. `value_kind` in `{string, expression, boolean, spread, element}`. Join parent via `element_id`.
+
+### `jsx_elements` (table)
+
+One row per JSX element or fragment in `.tsx`/`.jsx` files. `parent_element_id` linked in a per-file post-insert pass. `is_fragment = 1` for `<>…</>`. Powers `find-jsx-usages`.
 
 ---
 
@@ -520,7 +548,7 @@ SQLite per-table option enforcing column types at insert time. Every Codemap tab
 
 ### `symbols` (table)
 
-Functions / consts / classes / interfaces / types / enums, plus class members (`method`, `property`, `getter`, `setter`). Class members carry `parent_name`. JSDoc tags in `doc_comment` power the `deprecated-symbols` and `visibility-tags` recipes; `members` is JSON for enums. See `SymbolRow`.
+Functions / consts / classes / interfaces / types / enums, plus class members (`method`, `property`, `getter`, `setter`). Class members carry `parent_name`. Function-shaped rows may carry `return_type`, `is_async`, and `is_generator`. JSDoc tags in `doc_comment` power the `deprecated-symbols` and `visibility-tags` recipes; structured tags also land in `jsdoc_tags`. `members` is JSON for enums. See `SymbolRow`.
 
 ### `SymbolRow`
 
@@ -529,6 +557,10 @@ TS shape for one row of the `symbols` table.
 ---
 
 ## T
+
+### `try_catch` (table)
+
+One row per `TryStatement`. Heuristic flags include `catch_logs_only` (catch body only calls `console.*`) and `catch_rethrows`. Powers `find-swallowed-errors`.
 
 ### `test_suites` (table)
 

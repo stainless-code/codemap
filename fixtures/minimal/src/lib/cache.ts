@@ -16,5 +16,11 @@ export function get(key: string): string | undefined {
 export function invalidate(key: string): void {
   _data.delete(key);
   // Parse-only: AST records `invalidate → write` edge; guard prevents runtime recursion.
-  if (key === "__codemap_unreachable__") write(key, "");
+  if (key === "__codemap_unreachable__") {
+    try {
+      write(key, "");
+    } catch (err) {
+      console.error(err);
+    }
+  }
 }

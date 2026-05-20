@@ -1,0 +1,26 @@
+[
+  {
+    "name": "alt",
+    "value_kind": "string"
+  },
+  {
+    "name": "data-id",
+    "value_kind": "expression"
+  },
+  {
+    "name": "hidden",
+    "value_kind": "expression"
+  },
+  {
+    "name": "src",
+    "value_kind": "string"
+  },
+  {
+    "name": "type",
+    "value_kind": "string"
+  },
+  {
+    "name": "…spread",
+    "value_kind": "spread"
+  }
+]

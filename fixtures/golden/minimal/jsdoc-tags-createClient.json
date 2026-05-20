@@ -1,0 +1,17 @@
+[
+  {
+    "tag": "@param",
+    "name": "config",
+    "type_text": null
+  },
+  {
+    "tag": "@returns",
+    "name": null,
+    "type_text": null
+  },
+  {
+    "tag": "@throws",
+    "name": null,
+    "type_text": "Error"
+  }
+]

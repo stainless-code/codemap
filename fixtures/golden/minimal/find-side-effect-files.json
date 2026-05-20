@@ -1,0 +1,20 @@
+[
+  {
+    "path": "src/__tests__/smoke.test.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  },
+  {
+    "path": "src/consumer.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  },
+  {
+    "path": "src/polyfill.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  }
+]

@@ -119,7 +119,7 @@ A local SQLite database (`.codemap/index.db`) indexes the project tree and store
 
 **Commands and flags** (index, query, **`codemap agents init`**, **`--root`**, **`--config`**, environment): [../README.md § CLI](../README.md#cli) — **do not duplicate** flag lists here; this section only adds implementation notes. From this repository: **`bun run dev`** or **`bun src/index.ts`** (same flags).
 
-**Query wiring:** **`src/cli/cmd-query.ts`** (argv, **`printQueryResult`**, `--recipe` / `-r` alias, **`--summary`**, **`--changed-since`**, **`--group-by`**, **`--save-baseline`** / **`--baseline`** / **`--baselines`** / **`--drop-baseline`**, **`--ci`** (aliases `--format sarif` + non-zero exit on findings + quiet)), **`src/application/query-recipes.ts`** (**`QUERY_RECIPES`** — bundled SQL only source; optional **`actions: RecipeAction[]`** per recipe), **`src/cli/main.ts`** (**`--recipes-json`** / **`--print-sql`** exit before config/DB). With **`--json`**, errors use **`{"error":"…"}`** on stdout for SQL failures, DB open, and bootstrap (same shape); **`runQueryCmd`** sets **`process.exitCode`** instead of **`process.exit`**. Friendlier "no `.codemap/index.db`" — `no such table: <X>` and `no such column: <X>` errors are rewritten in **`enrichQueryError`** to point at `codemap` / `codemap --full`. **`--summary`** filters output only — the SQL still executes against the index; output collapses to `{"count": N}` (with `--json`) or `count: N`. **`--changed-since <ref>`** post-filters result rows by `path` / `file_path` / `from_path` / `to_path` / `resolved_path` against `git diff --name-only <ref>...HEAD ∪ git status --porcelain` (helper: **`src/git-changed.ts`** — `getFilesChangedSince`, `filterRowsByChangedFiles`, `PATH_COLUMNS`); rows with no recognised path column pass through. **`--group-by <mode>`** (`owner` | `directory` | `package`) routes through **`runGroupedQuery`** in `cmd-query.ts` and emits `{"group_by": "<mode>", "groups": [{key, count, rows}]}` (or `[{key, count}]` with `--summary`); helpers in **`src/group-by.ts`** (`groupRowsBy`, `firstDirectory`, `loadCodeowners`, `discoverWorkspaceRoots`, `makePackageBucketizer`, `codeownersGlobToRegex`). CODEOWNERS lookup is last-match-wins (GitHub semantics); workspace discovery reads `package.json` `workspaces` and `pnpm-workspace.yaml` `packages:`. **`--save-baseline[=<name>]`** snapshots the result to the **`query_baselines`** table inside `.codemap/index.db` (no parallel JSON files; survives `--full` / SCHEMA bumps because the table is intentionally absent from `dropAll()`); name defaults to `--recipe` id, ad-hoc SQL needs an explicit name. **`--baseline[=<name>]`** replays the SQL, fetches the saved row set, and emits `{baseline:{...}, current_row_count, added: [...], removed: [...]}` (or `{baseline:{...}, current_row_count, added: N, removed: N}` with `--summary`); identity is per-row multiset equality (canonical `JSON.stringify` keyed frequency map — duplicate rows are tracked, not collapsed). No fuzzy "changed" category in v1. **`--group-by` is mutually exclusive** with both `--save-baseline` and `--baseline` (different output shapes). **`--baselines`** (read-only list) and **`--drop-baseline <name>`** complete the surface; helpers in **`src/db.ts`** (`upsertQueryBaseline`, `getQueryBaseline`, `listQueryBaselines`, `deleteQueryBaseline`). **Per-row recipe `actions`** are appended only when the user runs **`--recipe <id>`** with **`--json`** AND the recipe defines an `actions` template — programmatic `cm.query(sql)` and ad-hoc CLI SQL never carry actions; under `--baseline`, actions attach to `added` rows only (the rows the agent should act on). The **`components-by-hooks`** recipe ranks by hook count with a **comma-based tally** on **`hooks_used`** (no SQLite JSON1). Shipped **`templates/agents/`** documents **`codemap query --json`** as the primary agent example ([README § CLI](../README.md#cli)).
+**Query wiring:** Ad-hoc and recipe CLI SQL runs through **`printQueryResult`**, which sets **`PRAGMA query_only = 1`** before execute (parity with **`queryRows`** / **`executeQuery`**). **`src/cli/cmd-query.ts`** (argv, **`printQueryResult`**, `--recipe` / `-r` alias, **`--summary`**, **`--changed-since`**, **`--group-by`**, **`--save-baseline`** / **`--baseline`** / **`--baselines`** / **`--drop-baseline`**, **`--ci`** (aliases `--format sarif` + non-zero exit on findings + quiet)), **`src/application/query-recipes.ts`** (**`QUERY_RECIPES`** — bundled SQL only source; optional **`actions: RecipeAction[]`** per recipe), **`src/cli/main.ts`** (**`--recipes-json`** / **`--print-sql`** exit before config/DB). With **`--json`**, errors use **`{"error":"…"}`** on stdout for SQL failures, DB open, and bootstrap (same shape); **`runQueryCmd`** sets **`process.exitCode`** instead of **`process.exit`**. Friendlier "no `.codemap/index.db`" — `no such table: <X>` and `no such column: <X>` errors are rewritten in **`enrichQueryError`** to point at `codemap` / `codemap --full`. **`--summary`** filters output only — the SQL still executes against the index; output collapses to `{"count": N}` (with `--json`) or `count: N`. **`--changed-since <ref>`** post-filters result rows by `path` / `file_path` / `from_path` / `to_path` / `resolved_path` against `git diff --name-only <ref>...HEAD ∪ git status --porcelain` (helper: **`src/git-changed.ts`** — `getFilesChangedSince`, `filterRowsByChangedFiles`, `PATH_COLUMNS`); rows with no recognised path column pass through. **`--group-by <mode>`** (`owner` | `directory` | `package`) routes through **`runGroupedQuery`** in `cmd-query.ts` and emits `{"group_by": "<mode>", "groups": [{key, count, rows}]}` (or `[{key, count}]` with `--summary`); helpers in **`src/group-by.ts`** (`groupRowsBy`, `firstDirectory`, `loadCodeowners`, `discoverWorkspaceRoots`, `makePackageBucketizer`, `codeownersGlobToRegex`). CODEOWNERS lookup is last-match-wins (GitHub semantics); workspace discovery reads `package.json` `workspaces` and `pnpm-workspace.yaml` `packages:`. **`--save-baseline[=<name>]`** snapshots the result to the **`query_baselines`** table inside `.codemap/index.db` (no parallel JSON files; survives `--full` / SCHEMA bumps because the table is intentionally absent from `dropAll()`); name defaults to `--recipe` id, ad-hoc SQL needs an explicit name. **`--baseline[=<name>]`** replays the SQL, fetches the saved row set, and emits `{baseline:{...}, current_row_count, added: [...], removed: [...]}` (or `{baseline:{...}, current_row_count, added: N, removed: N}` with `--summary`); identity is per-row multiset equality (canonical `JSON.stringify` keyed frequency map — duplicate rows are tracked, not collapsed). No fuzzy "changed" category in v1. **`--group-by` is mutually exclusive** with both `--save-baseline` and `--baseline` (different output shapes). **`--baselines`** (read-only list) and **`--drop-baseline <name>`** complete the surface; helpers in **`src/db.ts`** (`upsertQueryBaseline`, `getQueryBaseline`, `listQueryBaselines`, `deleteQueryBaseline`). **Per-row recipe `actions`** are appended only when the user runs **`--recipe <id>`** with **`--json`** AND the recipe defines an `actions` template — programmatic `cm.query(sql)` and ad-hoc CLI SQL never carry actions; under `--baseline`, actions attach to `added` rows only (the rows the agent should act on). The **`components-by-hooks`** recipe ranks by hook count with a **comma-based tally** on **`hooks_used`** (no SQLite JSON1). Shipped **`templates/agents/`** documents **`codemap query --json`** as the primary agent example ([README § CLI](../README.md#cli)).
 
 **Output formatters:** **`src/application/output-formatters.ts`** — pure transport-agnostic; **`formatSarif`** emits SARIF 2.1.0 (auto-detected location columns: `file_path` / `path` / `to_path` / `from_path` priority + optional `line_start` / `line_end` region; `rule.id = codemap.<recipe-id>` for `--recipe`, `codemap.adhoc` for ad-hoc SQL; aggregate recipes without locations → `results: []` + stderr warning); **`formatAuditSarif`** emits the audit-shaped variant — one rule per delta key (`codemap.audit.<key>-added`), one result per `added` row at severity `warning`; `removed` rows excluded (SARIF surfaces findings, not cleanups); location-only rows fall back to `"new <key>: <uri>"` messages; **`formatAnnotations`** emits `::notice file=…,line=…::msg` GitHub Actions workflow commands (one line per locatable row; messages collapsed to a single line because the GH parser stops at the first newline); **`formatMermaid`** emits a `flowchart LR` from `{from, to, label?, kind?}` rows with a hard `MERMAID_MAX_EDGES = 50` ceiling — unbounded inputs reject with a scope-suggestion error naming the recipe + count + `LIMIT` / `--via` / `WHERE` knobs (auto-truncation deliberately out of scope; would be a verdict masquerading as output mode); **`formatDiff`** emits read-only unified diff text from `{file_path, line_start, before_pattern, after_pattern}` rows; **`formatDiffJson`** emits structured `{files, warnings, summary}` hunks for agents. Diff formatters read source files at format time and surface `stale` / `missing` flags when the indexed line no longer matches. Wired into both **`src/cli/cmd-query.ts`** (`--format <text|json|sarif|annotations|mermaid|diff|diff-json>`; `--format` overrides `--json`; formatted outputs reject `--summary` / `--group-by` / baseline at parse time) and the MCP **`query`** / **`query_recipe`** tools (`format: "sarif" | "annotations" | "mermaid" | "diff" | "diff-json"` with the same incompatibility guard). Per-recipe `sarifLevel` / `sarifMessage` / `sarifRuleId` overrides via frontmatter on `<id>.md` deferred to v1.x.
 
@@ -187,21 +187,23 @@ Optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; def
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap/index.db`**.
 
-Current schema version: **27** — see [Schema Versioning](#schema-versioning) for details.
+Current schema version: **34** — see [Schema Versioning](#schema-versioning) for details.
 
 All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 
 ### `files` — Every indexed file (`STRICT`)
 
-| Column        | Type    | Description                                    |
-| ------------- | ------- | ---------------------------------------------- |
-| path          | TEXT PK | Relative path from project root                |
-| content_hash  | TEXT    | SHA-256 hex — see **Fingerprints** at § Schema |
-| size          | INTEGER | File size in bytes                             |
-| line_count    | INTEGER | Total lines                                    |
-| language      | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                 |
-| last_modified | INTEGER | File mtime (epoch ms)                          |
-| indexed_at    | INTEGER | When this row was written                      |
+| Column           | Type    | Description                                                          |
+| ---------------- | ------- | -------------------------------------------------------------------- |
+| path             | TEXT PK | Relative path from project root                                      |
+| content_hash     | TEXT    | SHA-256 hex — see **Fingerprints** at § Schema                       |
+| size             | INTEGER | File size in bytes                                                   |
+| line_count       | INTEGER | Total lines                                                          |
+| language         | TEXT    | `ts`, `tsx`, `css`, `md`, etc.                                       |
+| last_modified    | INTEGER | File mtime (epoch ms)                                                |
+| indexed_at       | INTEGER | When this row was written                                            |
+| is_barrel        | INTEGER | 1 when every export is a re-export and no local value symbols exist  |
+| has_side_effects | INTEGER | 1 when module-level calls or assignments were detected at parse time |
 
 ### `symbols` — Functions, constants, classes, interfaces, types, enums (`STRICT`)
 
@@ -228,21 +230,28 @@ All tables use `STRICT` mode. Tables marked with `WITHOUT ROWID` store data dire
 | body_line_count   | INTEGER    | `line_end - line_start + 1` for function-shaped symbols; NULL for non-functions                                                                                                                                                                                                                                                                                                                                             |
 | param_count       | INTEGER    | Parameter count for function-shaped symbols; NULL otherwise                                                                                                                                                                                                                                                                                                                                                                 |
 | nesting_depth     | INTEGER    | Max conditional/loop/ternary nesting inside the body; NULL for non-functions                                                                                                                                                                                                                                                                                                                                                |
+| return_type       | TEXT       | Stringified return type for function-shaped symbols; NULL when unannotated or N/A                                                                                                                                                                                                                                                                                                                                           |
+| is_async          | INTEGER    | 1 for async function-shaped symbols (`function`, `method`, arrow-assigned `function` kind)                                                                                                                                                                                                                                                                                                                                  |
+| is_generator      | INTEGER    | 1 for generator function-shaped symbols                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
 
-| Column       | Type       | Description                                                                                                                       |
-| ------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| id           | INTEGER PK | Auto-increment row id                                                                                                             |
-| file_path    | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
-| caller_name  | TEXT       | Name of the calling function/method                                                                                               |
-| caller_scope | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
-| callee_name  | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
-| line_start   | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
-| column_start | INTEGER    | 0-based byte column of the callee token                                                                                           |
-| column_end   | INTEGER    | One-past-last column                                                                                                              |
+| Column              | Type       | Description                                                                                                                       |
+| ------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment row id                                                                                                             |
+| file_path           | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
+| caller_name         | TEXT       | Name of the calling function/method                                                                                               |
+| caller_scope        | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
+| callee_name         | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
+| line_start          | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
+| column_start        | INTEGER    | 0-based byte column of the callee token                                                                                           |
+| column_end          | INTEGER    | One-past-last column                                                                                                              |
+| args_count          | INTEGER    | Argument count; NULL when a spread argument is present                                                                            |
+| is_method_call      | INTEGER    | 1 when callee is a member expression (`obj.method()`)                                                                             |
+| is_constructor_call | INTEGER    | 1 for `new Foo()` (`NewExpression`)                                                                                               |
+| is_optional_chain   | INTEGER    | 1 when the call uses optional chaining (`?.`)                                                                                     |
 
-Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` three times in the same file, only one row is stored. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
+Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `foo` calls `bar` three times in the same file, only one row is stored. `foo()` and `new Foo()` with the same callee name remain distinct rows. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
 ### `type_members` — Properties and methods of interfaces and object-literal types (`STRICT`)
 
@@ -314,8 +323,9 @@ Edges are deduped per (caller_scope, callee) per file: if `foo` calls `bar` thre
 | column_end    | INTEGER    | One-past-last column                                                            |
 | imported_name | TEXT       | Original exported name (or `default` / `*`)                                     |
 | local_name    | TEXT       | Local binding name (different from `imported_name` for `import { foo as bar }`) |
-| kind          | TEXT       | `named` / `default` / `namespace`                                               |
+| kind          | TEXT       | `named` / `default` / `namespace` / `side-effect`                               |
 | is_type_only  | INTEGER    | 1 if this specifier is `type`-only                                              |
+| import_id     | INTEGER FK | Parent `imports.id`; populated for all specifier rows including side-effect     |
 
 ### `scopes` — Lexical scope graph (`STRICT, WITHOUT ROWID`)
 
@@ -355,7 +365,7 @@ Per [R.12]. One row per non-`member`-kind `references` row. Resolved in a single
 | ------------------ | ------- | ------------------------------------------------------------------------------- |
 | reference_id       | INTEGER | PK + FK → `references(id)` CASCADE                                              |
 | resolved_symbol_id | INTEGER | FK → `symbols(id)` SET NULL. NULL for `is_external=1` / `global` / `unresolved` |
-| resolution_kind    | TEXT    | `same-file` / `imported` / `global` / `unresolved`                              |
+| resolution_kind    | TEXT    | `same-file` / `imported` / `re-exported` / `global` / `unresolved`              |
 | is_external        | INTEGER | 1 when the import target isn't in the indexed set (e.g. `react`, `lodash`)      |
 
 ### `function_params` — Typed parameters per function/method (`STRICT`)
@@ -420,6 +430,47 @@ SCCs of size ≥ 2 from `dependencies`, plus size-1 SCCs with a self-edge. Compu
 | file_path  | TEXT PK | FK → `files(path)` CASCADE                                  |
 | cycle_id   | INTEGER | Per-PR auto-numbered cycle id (shared across cycle members) |
 | cycle_size | INTEGER | Number of files in the cycle                                |
+
+### `dynamic_imports` — Dynamic `import()` sites (`STRICT`)
+
+| Column         | Type       | Description                                                           |
+| -------------- | ---------- | --------------------------------------------------------------------- |
+| id             | INTEGER PK | Auto-increment row id                                                 |
+| file_path      | TEXT FK    | Containing file                                                       |
+| line_start     | INTEGER    | 1-based line of the module specifier token                            |
+| column_start   | INTEGER    | 0-based column of the specifier start                                 |
+| source_kind    | TEXT       | `literal` / `template` / `expression`                                 |
+| source_text    | TEXT       | Specifier text (literal value, template source, or expression source) |
+| resolved_path  | TEXT       | Project-relative path when `source_kind = 'literal'` and resolvable   |
+| in_async_fn    | INTEGER    | 1 when the import sits inside an async function body                  |
+| scope_local_id | INTEGER    | Enclosing scope (joins `scopes.local_id`; `0` = module)               |
+
+### `jsx_elements` / `jsx_attributes` — JSX substrate (`STRICT`)
+
+Every JSX element and attribute in `.tsx`/`.jsx` files. `parent_element_id` is filled in a post-insert pass within the file. Fragments use `is_fragment = 1` and empty `component_name`.
+
+| Column (elements) | Type       | Description                            |
+| ----------------- | ---------- | -------------------------------------- |
+| component_name    | TEXT       | Tag name (`ProductCard`, `article`, …) |
+| is_self_closing   | INTEGER    | 1 for `<Foo />`                        |
+| is_fragment       | INTEGER    | 1 for `<>…</>`                         |
+| is_lowercase      | INTEGER    | 1 for native HTML tags                 |
+| parent_element_id | INTEGER FK | Parent element row                     |
+| children_count    | INTEGER    | Direct JSX child element count         |
+
+| Column (attributes) | Type | Description                                                |
+| ------------------- | ---- | ---------------------------------------------------------- |
+| element_id          | FK   | Owning `jsx_elements.id`                                   |
+| value_kind          | TEXT | `string` / `expression` / `boolean` / `spread` / `element` |
+
+### `async_calls` / `try_catch` / `decorators` / `jsdoc_tags` — Behavioral substrate (`STRICT`)
+
+| Table         | Flagship signal                                                        |
+| ------------- | ---------------------------------------------------------------------- |
+| `async_calls` | `AwaitExpression` sites with `in_loop` / `in_try` context stack        |
+| `try_catch`   | `TryStatement` shape + `catch_logs_only` / `catch_rethrows` heuristics |
+| `decorators`  | Decorator name + `target_kind`; `target_symbol_id` linked post-insert  |
+| `jsdoc_tags`  | Structured tags (`@param`, `@throws`, …) per symbol from `doc_comment` |
 
 ### `runtime_markers` — Operational signals (`STRICT`)
 

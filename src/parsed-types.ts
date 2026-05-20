@@ -18,6 +18,7 @@ import type {
   FunctionParamRow,
   RuntimeMarkerRow,
   TestSuiteRow,
+  DynamicImportRow,
 } from "./db";
 
 /**
@@ -51,6 +52,14 @@ export interface ParsedFile {
   functionParams?: FunctionParamRow[];
   runtimeMarkers?: RuntimeMarkerRow[];
   testSuites?: TestSuiteRow[];
+  dynamicImports?: DynamicImportRow[];
+  jsxElements?: import("./extractors/jsx").ParsedJsxElement[];
+  jsxAttributes?: import("./extractors/jsx").ParsedJsxAttribute[];
+  asyncCalls?: import("./extractors/behavioral").ParsedAsyncCall[];
+  tryCatchRows?: import("./extractors/behavioral").ParsedTryCatch[];
+  decorators?: import("./extractors/behavioral").ParsedDecorator[];
+  jsdocTags?: import("./extractors/behavioral").ParsedJsdocTag[];
+  hasSideEffects?: number;
   /** CSS-only fields (populated when `category === "css"`). */
   cssVariables?: CssVariableRow[];
   cssClasses?: CssClassRow[];

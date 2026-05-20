@@ -1,0 +1,122 @@
+[
+  {
+    "file_path": "src/api/client.ts",
+    "exported_count": 7,
+    "fan_in": 2,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 300
+  },
+  {
+    "file_path": "src/lib/cache.ts",
+    "exported_count": 2,
+    "fan_in": 2,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 300
+  },
+  {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "exported_count": 4,
+    "fan_in": 2,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 300
+  },
+  {
+    "file_path": "src/utils/date.ts",
+    "exported_count": 4,
+    "fan_in": 3,
+    "avg_coverage_pct": 33.3,
+    "measured_symbols": 3,
+    "risk_score": 266.7
+  },
+  {
+    "file_path": "src/api/decorated.ts",
+    "exported_count": 1,
+    "fan_in": 1,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 200
+  },
+  {
+    "file_path": "src/lib/store.ts",
+    "exported_count": 2,
+    "fan_in": 1,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 200
+  },
+  {
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "exported_count": 1,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "exported_count": 2,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/env.ts",
+    "exported_count": 2,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/orphan.ts",
+    "exported_count": 2,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/types/status.ts",
+    "exported_count": 1,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/utils/format.ts",
+    "exported_count": 2,
+    "fan_in": 1,
+    "avg_coverage_pct": 50,
+    "measured_symbols": 2,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "exported_count": 2,
+    "fan_in": 1,
+    "avg_coverage_pct": 66.7,
+    "measured_symbols": 3,
+    "risk_score": 66.7
+  },
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "exported_count": 1,
+    "fan_in": 0,
+    "avg_coverage_pct": 100,
+    "measured_symbols": 1,
+    "risk_score": 0
+  },
+  {
+    "file_path": "src/usePermissions.ts",
+    "exported_count": 1,
+    "fan_in": 2,
+    "avg_coverage_pct": 100,
+    "measured_symbols": 1,
+    "risk_score": 0
+  }
+]
