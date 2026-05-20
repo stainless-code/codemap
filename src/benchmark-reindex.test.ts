@@ -21,6 +21,23 @@ describe("runBenchmarkReindex", () => {
     expect(spawnCalls).toBe(1);
   });
 
+  it("rejects invalid runs values", async () => {
+    const spawnIndexer = async () => ({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
+    });
+    await expect(
+      runBenchmarkReindex("bad-runs", [], { runs: 0, spawnIndexer }),
+    ).rejects.toThrow(/requires runs >= 1/);
+    await expect(
+      runBenchmarkReindex("bad-runs", [], { runs: -1, spawnIndexer }),
+    ).rejects.toThrow(/requires runs >= 1/);
+    await expect(
+      runBenchmarkReindex("bad-runs", [], { runs: 1.5, spawnIndexer }),
+    ).rejects.toThrow(/requires runs >= 1/);
+  });
+
   it("records timings when every run exits zero", async () => {
     const result = await runBenchmarkReindex("ok", [], {
       runs: 2,

@@ -24,6 +24,9 @@ export async function runBenchmarkReindex(
   runs: number;
 }> {
   const runs = opts.runs ?? 3;
+  if (!Number.isInteger(runs) || runs < 1) {
+    throw new Error(`benchmark reindex "${label}" requires runs >= 1`);
+  }
   const times: number[] = [];
   for (let i = 0; i < runs; i++) {
     const t = await timeMsAsync(async () => {
