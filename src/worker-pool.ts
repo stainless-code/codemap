@@ -20,14 +20,25 @@ const WORKER_URL_NODE = new URL(
   import.meta.url,
 );
 
+const PARSE_WORKER_COUNT_RE = /^\d+$/;
+
+/** Returns clamped override [1, 32], or `null` when unset/empty/invalid. */
+export function parseParseWorkerCountOverride(
+  env: string | undefined,
+): number | null {
+  if (env === undefined || env === "") return null;
+  if (!PARSE_WORKER_COUNT_RE.test(env)) return null;
+  const parsed = Number(env);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) return null;
+  return Math.min(parsed, 32);
+}
+
 // Override via `CODEMAP_PARSE_WORKERS` (clamped [1, 32]); default formula unchanged when unset.
 function resolveWorkerCount(): number {
   const env = process.env.CODEMAP_PARSE_WORKERS;
+  const override = parseParseWorkerCountOverride(env);
+  if (override !== null) return override;
   if (env !== undefined && env !== "") {
-    const parsed = Number.parseInt(env, 10);
-    if (Number.isFinite(parsed) && parsed >= 1) {
-      return Math.min(parsed, 32);
-    }
     console.error(
       `[worker-pool] ignoring invalid CODEMAP_PARSE_WORKERS=${JSON.stringify(env)} (expected positive integer ≤32)`,
     );
