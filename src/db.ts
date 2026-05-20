@@ -868,9 +868,7 @@ export interface SymbolRow {
   nesting_depth?: number | null;
   /** Stringified return type for function-shaped symbols; NULL when unannotated or N/A. */
   return_type?: string | null;
-  /** 1 for async function-shaped symbols. */
   is_async?: number;
-  /** 1 for generator function-shaped symbols. */
   is_generator?: number;
 }
 
@@ -1651,9 +1649,9 @@ export function insertScopes(db: CodemapDatabase, rows: ScopeRow[]) {
 
 /**
  * Per-specifier row for `import { foo, bar as baz }` / `import foo from 'mod'`
- * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) have
- * no specifiers. JOIN to `imports` by (file_path, line, source) when the
- * import statement's other fields are needed.
+ * / `import * as ns from 'mod'`. Side-effect imports (`import "mod"`) emit one
+ * `kind='side-effect'` row (no binding names). JOIN to `imports` by
+ * (file_path, line, source) when the import statement's other fields are needed.
  */
 export interface ImportSpecifierRow {
   file_path: string;

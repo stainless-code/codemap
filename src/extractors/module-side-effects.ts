@@ -1,5 +1,5 @@
 /**
- * Module-level side effects — top-level calls and assignments per Tier 6.
+ * Module-level side effects — top-level calls and assignments.
  */
 
 import type { TierExtractor } from "./types";

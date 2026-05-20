@@ -16,13 +16,14 @@ The substrate-growth half of this synthesis lifted to a dedicated plan PR — [`
 
 **Shipped via the substrate plan:**
 
-- **Synthesis Step 5** (`calls.{line_start, column_start, column_end}`) — shipped as substrate plan **Tier 1 Slice 1.A**. Proposed call metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) is not in the live schema.
+- **Synthesis Step 5** (`calls.{line_start, column_start, column_end}`) — shipped as substrate plan **Tier 1 Slice 1.A**. Call metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) shipped 2026-05-19.
 - **Synthesis Step 7** (`exports.{line_start, line_end, column_start, column_end, is_re_export}`) — shipped as substrate plan **Tier 1 Slice 1.B**.
 - **§ 4.1 column anchoring on `symbols` / `imports` / `markers`** ("Deferred (incremental)") — shipped as substrate plan **Tier 1 Slices 1.C / 1.D**.
-- **§ 4.2 `import_specifiers` child table** — shipped as substrate plan **Tier 1 Slice 1.D**, with the live schema keyed by `file_path`/`source` rather than the originally proposed `import_id` FK.
-- **§ 4.2 generalised `references` + `scopes` + `bindings` + `symbol_namespace`** ("Deferred — defer until ≥3 narrower position tables prove demand") — the trigger fired with Tier 1 landing four position-precise surfaces; lifted to substrate plan **Tier 2** and shipped in narrowed form. Live schema has `references.kind IN ('value','type','jsx','member')` and `bindings.resolution_kind IN ('same-file','imported','global','unresolved')`; richer namespaces / re-export resolution kinds remain deferred.
+- **§ 4.2 `import_specifiers` child table** — shipped as substrate plan **Tier 1 Slice 1.D**, including `import_id` FK and `kind='side-effect'` rows (2026-05-19).
+- **§ 4.2 generalised `references` + `scopes` + `bindings` + `symbol_namespace`** ("Deferred — defer until ≥3 narrower position tables prove demand") — the trigger fired with Tier 1 landing four position-precise surfaces; lifted to substrate plan **Tier 2** and shipped in narrowed form. Live schema has `references.kind IN ('value','type','jsx','member')` and `bindings.resolution_kind IN ('same-file','imported','re-exported','global','unresolved')`; richer `bindings.namespace` remains deferred.
 - **§ 5.3 leverage-ranked items 1 + 3** — shipped via Tiers 1 + 2.
-- **Partial ship** of substrate plan Tiers 4 / 6 / 9 / 10 / 11 / 12 — foundation tables landed (`function_params` / `re_export_chains` / `test_suites` / `runtime_markers` / `file_metrics` / `module_cycles`); deferred bits stay tracked under each tier's heading.
+- **Substrate plan Tiers 1–6 (2026-05-19)** — remainder shipped: JSX (`jsx_elements` / `jsx_attributes`), behavioral (`async_calls`, `try_catch`, `decorators`, `jsdoc_tags`), `symbols.{return_type,is_async,is_generator}`, `dynamic_imports`, `files.{is_barrel,has_side_effects}`. **`files.is_entry`** deferred to [`plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md).
+- **Partial ship** of substrate plan Tiers 9 / 10 / 11 / 12 — foundation tables landed (`test_suites` / `runtime_markers` / `file_metrics` / `module_cycles`); deferred bits stay tracked under each tier's heading. Tier 4 partial: `function_params` shipped; `generic_params` / `type_predicates` deferred.
 
 **Still open (the apply-engine half of this synthesis):**
 
