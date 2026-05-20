@@ -36,6 +36,8 @@ import {
   insertTypeMembers,
   insertCalls,
   insertDynamicImports,
+  insertAsyncCalls,
+  insertTryCatchRows,
   getAllFileHashes,
   upsertSourceFts,
   META_FTS5_ENABLED_KEY,
@@ -58,12 +60,7 @@ import {
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
-import {
-  insertAsyncCalls,
-  insertDecorators,
-  insertJsdocTags,
-  insertTryCatchRows,
-} from "./behavioral-persist";
+import { insertDecorators, insertJsdocTags } from "./behavioral-persist";
 import {
   persistBindings,
   persistReExportChains,

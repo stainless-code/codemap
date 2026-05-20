@@ -1304,6 +1304,72 @@ export function insertDynamicImports(
   );
 }
 
+export interface AsyncCallRow {
+  file_path: string;
+  caller_scope: string;
+  awaited_expression: string;
+  awaited_callee_name: string | null;
+  line_start: number;
+  column_start: number;
+  in_loop: number;
+  in_try: number;
+  scope_local_id: number;
+}
+
+export function insertAsyncCalls(db: CodemapDatabase, rows: AsyncCallRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO async_calls (file_path, caller_scope, awaited_expression, awaited_callee_name, line_start, column_start, in_loop, in_try, scope_local_id)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.caller_scope,
+        r.awaited_expression,
+        r.awaited_callee_name,
+        r.line_start,
+        r.column_start,
+        r.in_loop,
+        r.in_try,
+        r.scope_local_id,
+      ),
+  );
+}
+
+export interface TryCatchRow {
+  file_path: string;
+  containing_scope_local_id: number;
+  try_line_start: number;
+  try_line_end: number;
+  has_catch: number;
+  catch_param: string | null;
+  catch_rethrows: number;
+  catch_logs_only: number;
+  has_finally: number;
+}
+
+export function insertTryCatchRows(db: CodemapDatabase, rows: TryCatchRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO try_catch (file_path, containing_scope_local_id, try_line_start, try_line_end, has_catch, catch_param, catch_rethrows, catch_logs_only, has_finally)",
+    "(?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.containing_scope_local_id,
+        r.try_line_start,
+        r.try_line_end,
+        r.has_catch,
+        r.catch_param,
+        r.catch_rethrows,
+        r.catch_logs_only,
+        r.has_finally,
+      ),
+  );
+}
+
 /**
  * Lexical scope row per [R.11]. `parent_local_id` is `null` for the
  * module scope; `owner_symbol_name` is `null` for module + arrow scopes.
