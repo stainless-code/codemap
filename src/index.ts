@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,7 +31,10 @@ function isMainModule(): boolean {
   const arg1 = process.argv[1];
   if (!arg1) return false;
   try {
-    return fileURLToPath(import.meta.url) === resolve(arg1);
+    const modulePath = fileURLToPath(import.meta.url);
+    const argPath = resolve(arg1);
+    if (modulePath === argPath) return true;
+    return realpathSync(modulePath) === realpathSync(argPath);
   } catch {
     return false;
   }

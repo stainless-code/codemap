@@ -1,9 +1,15 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   assertReadOnlyIndexedSql,
   collectGlobalRegexMatches,
+  loadScenariosFromConfigFile,
 } from "./benchmark-config";
+import { closeDb } from "./db";
+import { openCodemapDatabase } from "./sqlite-db";
 
 describe("assertReadOnlyIndexedSql", () => {
   it("allows SELECT", () => {
@@ -48,5 +54,37 @@ describe("collectGlobalRegexMatches", () => {
     expect(collectGlobalRegexMatches("import foo\n", "^import")).toEqual([
       "import",
     ]);
+  });
+});
+
+describe("loadScenariosFromConfigFile", () => {
+  it("rejects invalid traditional.regex at load time", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-bench-cfg-"));
+    const path = join(dir, "scenarios.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        scenarios: [
+          {
+            name: "bad-regex",
+            indexedSql: "SELECT 1",
+            traditional: {
+              globs: ["**/*"],
+              regex: "(unclosed",
+              mode: "files",
+            },
+          },
+        ],
+      }),
+    );
+    const db = openCodemapDatabase(":memory:");
+    try {
+      expect(() => loadScenariosFromConfigFile(db, path)).toThrow(
+        /valid regex/,
+      );
+    } finally {
+      closeDb(db);
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

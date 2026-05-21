@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 
 /**
  * Files changed between `ref` and the working tree — union of:
- * - `git diff --name-only <ref>...HEAD` (committed deltas since the merge base)
- * - `git status --porcelain --no-renames` (staged + unstaged changes not in the diff)
+ * - `git diff --name-only -z <ref>...HEAD` (committed deltas since the merge base)
+ * - `git status --porcelain -z --no-renames` (staged + unstaged changes not in the diff)
  *
  * Paths are returned **project-relative, POSIX-style** (matching how `files.path`
  * is stored in the index). The `ref` can be any committish (`origin/main`,
@@ -35,9 +35,13 @@ export function getFilesChangedSince(
     };
   }
 
-  const diff = spawnSync("git", ["diff", "--name-only", `${ref}...HEAD`], {
-    cwd: root,
-  });
+  const diff = spawnSync(
+    "git",
+    ["diff", "--name-only", "-z", `${ref}...HEAD`],
+    {
+      cwd: root,
+    },
+  );
   if (diff.status !== 0) {
     const stderr = diff.stderr.toString().trim();
     return {
@@ -46,9 +50,13 @@ export function getFilesChangedSince(
     };
   }
 
-  const status = spawnSync("git", ["status", "--porcelain", "--no-renames"], {
-    cwd: root,
-  });
+  const status = spawnSync(
+    "git",
+    ["status", "--porcelain", "-z", "--no-renames"],
+    {
+      cwd: root,
+    },
+  );
   if (status.status !== 0) {
     const stderr = status.stderr.toString().trim();
     return {
@@ -57,14 +65,13 @@ export function getFilesChangedSince(
     };
   }
 
-  const diffFiles = diff.stdout.toString().trim().split("\n").filter(Boolean);
-  // Porcelain rows are `XY path` (two status chars + space); slice past the prefix.
+  const diffFiles = diff.stdout.toString().split("\0").filter(Boolean);
+  // Porcelain -z records are NUL-terminated; paths are unquoted (no C-style quoting).
   const statusFiles = status.stdout
     .toString()
-    .trim()
-    .split("\n")
+    .split("\0")
     .filter(Boolean)
-    .map((line) => line.slice(3).trim());
+    .map((line) => line.slice(3));
 
   return { ok: true, files: new Set([...diffFiles, ...statusFiles]) };
 }

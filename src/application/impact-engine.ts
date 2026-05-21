@@ -290,14 +290,14 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   // Seed depth = 0; `WHERE depth > 0` filters seed; `< depthLimit` is the cap.
   const sql = `
     WITH RECURSIVE walk(node, depth, path, file_path) AS (
-      SELECT ?, 0, ',' || ? || ',', NULL
+      SELECT ?, 0, char(30) || ? || char(30), NULL
       UNION ALL
       SELECT c.${joinToCol}, walk.depth + 1,
-             walk.path || c.${joinToCol} || ',', c.file_path
+             walk.path || c.${joinToCol} || char(30), c.file_path
       FROM calls c
       JOIN walk ON c.${joinFromCol} = walk.node
       WHERE walk.depth < ?
-        AND instr(walk.path, ',' || c.${joinToCol} || ',') = 0
+        AND instr(walk.path, char(30) || c.${joinToCol} || char(30)) = 0
     )
     SELECT node, depth, file_path
     FROM (
@@ -359,14 +359,14 @@ function walkFileGraph(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
 
   const sql = `
     WITH RECURSIVE walk(node, depth, path) AS (
-      SELECT ?, 0, ',' || ? || ','
+      SELECT ?, 0, char(30) || ? || char(30)
       UNION ALL
       SELECT c.${joinToCol}, walk.depth + 1,
-             walk.path || c.${joinToCol} || ','
+             walk.path || c.${joinToCol} || char(30)
       FROM ${table} c
       JOIN walk ON c.${joinFromCol} = walk.node
       WHERE walk.depth < ?
-        AND instr(walk.path, ',' || c.${joinToCol} || ',') = 0
+        AND instr(walk.path, char(30) || c.${joinToCol} || char(30)) = 0
         ${filterNonNull}
     )
     SELECT node, MIN(depth) AS depth

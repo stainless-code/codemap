@@ -216,11 +216,28 @@ export function discoverWorkspaceRoots(root: string): string[] {
 // Tiny YAML extractor — reads the `packages:` list from pnpm-workspace.yaml without
 // a YAML dep. Handles `- "pkg/*"` and `- pkg/*` shapes only; that's the documented
 // pnpm format. If a project uses fancier YAML, they can fall back to --group-by directory.
+function stripInlineYamlComment(line: string): string {
+  let quote: '"' | "'" | null = null;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      continue;
+    }
+    if (c === "#") return line.slice(0, i);
+  }
+  return line;
+}
+
 function parsePnpmPackages(body: string): string[] {
   const out: string[] = [];
   let inPackages = false;
   for (const raw of body.split("\n")) {
-    const line = raw.replace(/#.*$/, "");
+    const line = stripInlineYamlComment(raw);
     if (/^packages:\s*$/.test(line)) {
       inPackages = true;
       continue;

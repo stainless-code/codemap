@@ -197,10 +197,10 @@ function escapeRegexChars(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function codemapPointerBlockRegex(): RegExp {
+function codemapPointerBlockRegex(flags = "m"): RegExp {
   return new RegExp(
     `${escapeRegexChars(CODMAP_POINTER_BEGIN)}\\s*[\\s\\S]*?${escapeRegexChars(CODMAP_POINTER_END)}`,
-    "m",
+    flags,
   );
 }
 
@@ -247,10 +247,15 @@ export function upsertCodemapPointerFile(
   }
 
   const content = readFileSync(path, "utf-8");
-  const re = codemapPointerBlockRegex();
 
-  if (content.match(re)) {
-    const next = content.replace(re, wrapped);
+  if (content.match(codemapPointerBlockRegex())) {
+    const stripped = content
+      .replace(codemapPointerBlockRegex("gm"), "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trimEnd();
+    const sep = stripped.length === 0 || stripped.endsWith("\n") ? "" : "\n\n";
+    const next =
+      stripped.length === 0 ? wrapped : `${stripped}${sep}${wrapped}`;
     if (next === content) {
       console.log(`  Codemap section in ${label} already up to date`);
       return;

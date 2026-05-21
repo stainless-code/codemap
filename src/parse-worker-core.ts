@@ -68,7 +68,7 @@ export function parseWorkerInput(input: WorkerInput): WorkerOutput {
     }
     const lineCount = countLines(source);
 
-    const ext = extname(relPath);
+    const ext = extname(relPath).toLowerCase();
     const language = LANG_MAP[ext] ?? "text";
 
     const parsed: ParsedFile = {

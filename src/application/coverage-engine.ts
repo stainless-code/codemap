@@ -144,8 +144,7 @@ export function upsertCoverageRows(opts: UpsertOpts): IngestResult {
   // we're ingesting (a re-ingest is a full replace per file, not a merge),
   // then bulk-insert the new aggregates. Idempotent across re-runs.
   let pruned = 0;
-  db.run("BEGIN");
-  try {
+  const persist = db.transaction(() => {
     for (const file_path of filesSeen) {
       db.run("DELETE FROM coverage WHERE file_path = ?", [file_path]);
     }
@@ -203,12 +202,8 @@ export function upsertCoverageRows(opts: UpsertOpts): IngestResult {
       "coverage_last_ingested_format",
       format,
     ]);
-
-    db.run("COMMIT");
-  } catch (err) {
-    db.run("ROLLBACK");
-    throw err;
-  }
+  });
+  persist();
 
   return {
     ingested: { symbols: buckets.size, files: filesSeen.size },

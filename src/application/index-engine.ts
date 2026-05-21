@@ -91,11 +91,11 @@ const TS_EXTENSIONS = new Set([
 const CSS_EXTENSIONS = new Set([".css"]);
 
 function langFromExt(ext: string): string {
-  return LANG_MAP[ext] ?? "text";
+  return LANG_MAP[ext.toLowerCase()] ?? "text";
 }
 
 function fileCategory(path: string): "ts" | "css" | "text" {
-  const ext = extname(path);
+  const ext = extname(path).toLowerCase();
   if (TS_EXTENSIONS.has(ext)) return "ts";
   if (CSS_EXTENSIONS.has(ext)) return "css";
   return "text";
@@ -190,14 +190,14 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const diffResult = spawnSync(
       "git",
-      ["diff", "--name-status", "--no-renames", `${lastCommit}..HEAD`],
+      ["diff", "--name-status", "-z", "--no-renames", `${lastCommit}..HEAD`],
       {
         cwd: root,
       },
     );
     const statusResult = spawnSync(
       "git",
-      ["status", "--porcelain", "--no-renames"],
+      ["status", "--porcelain", "-z", "--no-renames"],
       {
         cwd: root,
       },
@@ -205,30 +205,29 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const diffDeletedFromCommit: string[] = [];
     const diffFiles: string[] = [];
-    for (const line of diffResult.stdout
+    // --name-status -z records are STATUS NUL path NUL pairs (paths unquoted).
+    const diffRecords = diffResult.stdout
       .toString()
-      .trim()
-      .split("\n")
-      .filter(Boolean)) {
-      const tab = line.indexOf("\t");
-      if (tab === -1) continue;
-      const status = line.slice(0, tab);
-      const path = line.slice(tab + 1);
+      .split("\0")
+      .filter(Boolean);
+    for (let i = 0; i < diffRecords.length; i += 2) {
+      const status = diffRecords[i];
+      const path = diffRecords[i + 1];
+      if (path === undefined) continue;
       if (status === "D") diffDeletedFromCommit.push(path);
       else diffFiles.push(path);
     }
-    // Porcelain lines are `XY path` (two status chars + space); skip the prefix to get the path.
+    // Porcelain -z records are NUL-terminated; paths are unquoted (no C-style quoting).
     const statusFiles = statusResult.stdout
       .toString()
-      .trim()
-      .split("\n")
+      .split("\0")
       .filter(Boolean)
-      .map((line: string) => line.slice(3).trim());
+      .map((line: string) => line.slice(3));
 
     const existingHashes = getAllFileHashes(db);
     const allCandidates = [...new Set([...diffFiles, ...statusFiles])].filter(
       (f) => {
-        const ext = extname(f);
+        const ext = extname(f).toLowerCase();
         return ext in LANG_MAP || existingHashes.has(f);
       },
     );
@@ -425,6 +424,8 @@ export async function indexFiles(
     sourceCache?: ChangedSourceCache;
     /** When set, incremental branch skips its own `getAllFileHashes(db)` call. */
     existingHashes?: Map<string, string>;
+    /** When set, incremental branch deletes these paths inside the same transaction as re-indexing. */
+    deletedPaths?: string[];
   },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
@@ -486,6 +487,10 @@ export async function indexFiles(
     const sourceCache = options?.sourceCache;
 
     const transaction = db.transaction(() => {
+      const deleted = options?.deletedPaths ?? [];
+      if (deleted.length > 0) {
+        deleteFilesFromIndex(db, deleted, quiet);
+      }
       for (const relPath of filePaths) {
         const absPath = join(root, relPath);
         let source: string;

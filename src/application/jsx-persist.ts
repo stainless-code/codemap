@@ -10,13 +10,15 @@ export function persistJsxElementsAndAttributes(
   if (!elements.length) return;
   const idMap = new Map<number, number>();
   for (const el of elements) {
-    db.run(
-      `INSERT INTO jsx_elements (
+    const row = db
+      .query<{ id: number }>(
+        `INSERT INTO jsx_elements (
         file_path, component_name, line_start, line_end, column_start, column_end,
         is_self_closing, is_fragment, namespace_prefix, parent_element_id,
         children_count, is_lowercase
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
+      )
+      .get(
         el.file_path,
         el.component_name,
         el.line_start,
@@ -29,12 +31,8 @@ export function persistJsxElementsAndAttributes(
         null,
         el.children_count,
         el.is_lowercase,
-      ],
-    );
-    idMap.set(
-      el._local_id,
-      db.query<{ id: number }>("SELECT last_insert_rowid() AS id").get()!.id,
-    );
+      );
+    idMap.set(el._local_id, row!.id);
   }
   for (const el of elements) {
     if (el._parent_local_id == null) continue;

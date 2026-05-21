@@ -116,6 +116,36 @@ const { a } = obj;
     const aRefs = data.references.filter((r) => r.name === "a");
     expect(aRefs.some((r) => r.is_write === 1)).toBe(true);
   });
+
+  it("marks for-of destructuring bindings as writes without spurious reads", () => {
+    const src = `
+for (const { a } of items) {}
+`;
+    const data = extractFileData("/proj/forof.ts", src, "forof.ts");
+    const aRefs = data.references.filter((r) => r.name === "a");
+    expect(aRefs.some((r) => r.is_write === 1)).toBe(true);
+    expect(aRefs.some((r) => r.is_write === 0)).toBe(false);
+  });
+});
+
+describe("decorator args_text", () => {
+  it("is null for zero-arg calls and omits callee for multi-arg", () => {
+    const src = `
+function log() {}
+function route() {}
+class C {
+  @log()
+  m1() {}
+  @route('GET', '/users')
+  m2() {}
+}
+`;
+    const data = extractFileData("/proj/dec.ts", src, "dec.ts");
+    const logDec = data.decorators.find((d) => d.name === "log");
+    const routeDec = data.decorators.find((d) => d.name === "route");
+    expect(logDec?.args_text).toBeNull();
+    expect(routeDec?.args_text).toBe("'GET', '/users'");
+  });
 });
 
 describe("module side effects", () => {
@@ -140,6 +170,17 @@ test.each([[1]])("case %p", () => {});
     expect(data.testSuites).toHaveLength(1);
     expect(data.testSuites[0]?.name).toBe("case %p");
     expect(data.testSuites[0]?.kind).toBe("test");
+  });
+
+  it("describe.each does not corrupt sibling parent_index", () => {
+    const src = `
+import { describe, it } from "bun:test";
+describe.each([[1]])("group %p", () => { it("inner", () => {}); });
+it("sibling", () => {});
+`;
+    const data = extractFileData("/proj/t.ts", src, "t.ts");
+    const sibling = data.testSuites.find((r) => r.name === "sibling");
+    expect(sibling?.parent_index).toBeNull();
   });
 });
 

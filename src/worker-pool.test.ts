@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseParseWorkerCountOverride } from "./worker-pool";
+import {
+  parseFilesParallel,
+  parseParseWorkerCountOverride,
+} from "./worker-pool";
 
 describe("parseParseWorkerCountOverride", () => {
   test("accepts valid decimal integers", () => {
@@ -20,5 +23,11 @@ describe("parseParseWorkerCountOverride", () => {
   test("treats unset or empty as no override", () => {
     expect(parseParseWorkerCountOverride(undefined)).toBeNull();
     expect(parseParseWorkerCountOverride("")).toBeNull();
+  });
+});
+
+describe("parseFilesParallel", () => {
+  test("resolves immediately for an empty file list", async () => {
+    await expect(parseFilesParallel([])).resolves.toEqual([]);
   });
 });

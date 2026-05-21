@@ -133,6 +133,7 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   // would split phase 2 mid-loop and leak Q2 (c) all-or-nothing.
   const seenLines = new Map<string, Set<number>>();
   let validRows = 0;
+  const distinctInputFiles = new Set<string>();
 
   for (const row of rows) {
     const filePath = readString(row, "file_path");
@@ -151,6 +152,11 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
       continue;
     }
     validRows++;
+    distinctInputFiles.add(
+      isAbsolute(filePath) || !isWithinProjectRoot(resolvedRoot, filePath)
+        ? filePath
+        : canonicalizeProjectFilePath(resolvedRoot, filePath),
+    );
 
     // Path-containment guard — without it `file_path: "../escape.ts"` would
     // write sibling-of-root files (CLI + MCP + HTTP all share this engine).
@@ -261,20 +267,6 @@ export function applyDiffPayload(opts: ApplyDiffPayloadOpts): ApplyJsonPayload {
   }
 
   const filesWithConflicts = new Set(conflicts.map((c) => c.file_path)).size;
-  const distinctInputFiles = new Set<string>();
-  for (const row of rows) {
-    const filePath = readString(row, "file_path");
-    if (filePath === undefined) continue;
-    // Count distinct disk targets, not distinct spellings — same as the
-    // dedup applied to the cache + pending keys.
-    if (isAbsolute(filePath) || !isWithinProjectRoot(resolvedRoot, filePath)) {
-      distinctInputFiles.add(filePath);
-    } else {
-      distinctInputFiles.add(
-        canonicalizeProjectFilePath(resolvedRoot, filePath),
-      );
-    }
-  }
 
   // Q2 (c) — any conflict aborts the run; dry-run never writes. Same Q5 envelope.
   if (dryRun || conflicts.length > 0) {

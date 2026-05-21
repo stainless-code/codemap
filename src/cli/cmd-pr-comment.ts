@@ -126,6 +126,14 @@ export function parsePrCommentRest(rest: string[]): ParsedPrCommentRest {
 
 export async function runPrCommentCmd(opts: PrCommentOpts): Promise<void> {
   try {
+    if (opts.inputPath === "-" && process.stdin.isTTY) {
+      emitPrCommentError(
+        "stdin is a TTY — pipe a JSON file to stdin or pass a file path",
+        opts.json,
+      );
+      return;
+    }
+
     await bootstrapCodemap(opts);
 
     const raw =

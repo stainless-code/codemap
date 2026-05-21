@@ -285,6 +285,24 @@ describe("parseQueryRest", () => {
     if (r.kind === "error") expect(r.message).toContain("non-empty name");
   });
 
+  it("errors when --save-baseline has empty two-token name", () => {
+    const r = parseQueryRest(["query", "--save-baseline", "", "-r", "fan-out"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("non-empty name");
+  });
+
+  it("errors when --baseline has empty two-token name", () => {
+    const r = parseQueryRest(["query", "--baseline", "", "-r", "fan-out"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("non-empty name");
+  });
+
+  it("errors when --params= has empty value", () => {
+    const r = parseQueryRest(["query", "-r", "fan-out", "--params="]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--params");
+  });
+
   it("parses --baseline=<name> with ad-hoc SQL", () => {
     const r = parseQueryRest(["query", "--baseline=pre-refactor", "SELECT 1"]);
     if (r.kind !== "run") throw new Error("expected run");

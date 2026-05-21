@@ -119,6 +119,7 @@ export const referencesExtractor: TierExtractor = {
             if (decl.init) markPatternWrites(decl.id, true);
             else if (decl.id?.type === "Identifier")
               suppressedReads.add(decl.id.start);
+            else markPatternWrites(decl.id, true);
           }
         } else if (node.left?.type === "Identifier") {
           writePositions.add(node.left.start);
@@ -130,6 +131,7 @@ export const referencesExtractor: TierExtractor = {
             if (decl.init) markPatternWrites(decl.id, true);
             else if (decl.id?.type === "Identifier")
               suppressedReads.add(decl.id.start);
+            else markPatternWrites(decl.id, true);
           }
         } else if (node.left?.type === "Identifier") {
           writePositions.add(node.left.start);

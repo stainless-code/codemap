@@ -102,7 +102,12 @@ function traditionalFromSpec(spec: TraditionalSpec): () => {
   return () => {
     const cwd = getProjectRoot();
     const files = globFilesFiltered(globs, cwd);
-    const { totalBytes, contents } = readAll(files, cwd);
+    const { totalBytes, contents, unreadable } = readAll(files, cwd);
+    if (unreadable.length > 0) {
+      console.error(
+        `[benchmark] skipped ${unreadable.length} unreadable file(s): ${unreadable.slice(0, 3).join(", ")}${unreadable.length > 3 ? "…" : ""}`,
+      );
+    }
     const results: unknown[] = [];
     if (mode === "matches") {
       for (const [path, content] of contents) {
@@ -161,6 +166,14 @@ function parseConfigJson(raw: string): BenchmarkConfigFile {
     if (typeof t.regex !== "string") {
       throw new Error(
         `benchmark config: ${e.name}: traditional.regex required`,
+      );
+    }
+    try {
+      new RegExp(t.regex as string);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `benchmark config: ${e.name}: traditional.regex is not a valid regex: ${msg}`,
       );
     }
     if (t.mode !== "files" && t.mode !== "matches") {

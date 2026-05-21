@@ -369,6 +369,31 @@ describe("upsertCodemapPointerFile", () => {
     }
   });
 
+  it("replaces ALL managed sections when file has two blocks", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
+    const p = join(dir, "NOTE.md");
+    try {
+      writeFileSync(
+        p,
+        `${wrapPointerTest("FIRST")}\nOther content\n${wrapPointerTest("SECOND")}`,
+        "utf-8",
+      );
+      upsertCodemapPointerFile(
+        p,
+        "UPDATED\n\nstill https://github.com/stainless-code/codemap\n`.agents/skills/codemap`\n`codemap query`",
+        "NOTE.md",
+        false,
+      );
+      const out = readFileSync(p, "utf-8");
+      expect(out).toContain("UPDATED");
+      expect(out).not.toContain("FIRST");
+      expect(out).not.toContain("SECOND");
+      expect(out.match(new RegExp(CODMAP_POINTER_BEGIN, "g"))?.length).toBe(1);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("--force replaces entire file with managed section", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "AGENTS.md");

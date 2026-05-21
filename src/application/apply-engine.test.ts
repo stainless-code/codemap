@@ -753,6 +753,7 @@ describe("applyDiffPayload", () => {
       });
 
       expect(result.summary.rows).toBe(0); // row silently dropped
+      expect(result.summary.files).toBe(0);
       expect(result.files).toEqual([]);
     });
   });

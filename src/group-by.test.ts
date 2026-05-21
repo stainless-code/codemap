@@ -172,6 +172,20 @@ describe("discoverWorkspaceRoots", () => {
     }
   });
 
+  it("preserves # inside quoted pnpm package paths", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-ws-"));
+    try {
+      mkdirSync(join(dir, "packages/core#legacy"), { recursive: true });
+      writeFileSync(
+        join(dir, "pnpm-workspace.yaml"),
+        ["packages:", '  - "packages/core#legacy"'].join("\n"),
+      );
+      expect(discoverWorkspaceRoots(dir)).toContain("packages/core#legacy");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("returns [] when no workspaces are declared", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-ws-"));
     try {
