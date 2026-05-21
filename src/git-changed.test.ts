@@ -1,10 +1,41 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import {
   filterRowsByChangedFiles,
   getFilesChangedSince,
   PATH_COLUMNS,
 } from "./git-changed";
+
+let projectRoot: string;
+
+function fixtureEnv(): NodeJS.ProcessEnv {
+  const e: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.startsWith("GIT_") || k.startsWith("HUSKY")) continue;
+    e[k] = v;
+  }
+  e.GIT_AUTHOR_DATE = "2026-01-01T00:00:00Z";
+  e.GIT_COMMITTER_DATE = "2026-01-01T00:00:00Z";
+  return e;
+}
+
+function git(args: string[]): string {
+  const r = spawnSync("git", args, { cwd: projectRoot, env: fixtureEnv() });
+  if (r.status !== 0) {
+    throw new Error(`git ${args.join(" ")}: ${r.stderr.toString().trim()}`);
+  }
+  return r.stdout.toString().trim();
+}
+
+function commitAll(message: string): string {
+  git(["add", "."]);
+  git(["commit", "-m", message, "--no-gpg-sign"]);
+  return git(["rev-parse", "HEAD"]);
+}
 
 describe("filterRowsByChangedFiles", () => {
   const changed = new Set(["src/a.ts", "src/b.tsx"]);
@@ -87,5 +118,36 @@ describe("getFilesChangedSince", () => {
     const r = getFilesChangedSince("not-a-real-ref-xyz123", root);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("cannot resolve");
+  });
+
+  describe("temp git repo", () => {
+    beforeEach(() => {
+      projectRoot = mkdtempSync(join(tmpdir(), "codemap-git-changed-"));
+      git(["init", "-q", "-b", "main", "--template="]);
+      git(["config", "user.email", "t@example.com"]);
+      git(["config", "user.name", "T"]);
+      git(["config", "commit.gpgsign", "false"]);
+    });
+
+    afterEach(() => {
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it("includes paths with spaces from porcelain -z output", () => {
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src/my module.ts"),
+        "export const x = 1;\n",
+      );
+      const base = commitAll("add spaced file");
+      writeFileSync(
+        join(projectRoot, "src/my module.ts"),
+        "export const x = 2;\n",
+      );
+
+      const r = getFilesChangedSince(base, projectRoot);
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.files.has("src/my module.ts")).toBe(true);
+    });
   });
 });

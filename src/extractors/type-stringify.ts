@@ -95,10 +95,8 @@ export function stringifyTypeNode(node: any): string | null {
       return null;
     }
     case "TSTypeQuery": {
-      const exprName = node.exprName;
-      const n =
-        typeof exprName?.name === "string" ? exprName.name : exprName?.name;
-      return n ? `typeof ${n}` : null;
+      const name = qualifiedNameOf(node.exprName);
+      return name ? `typeof ${name}` : null;
     }
     case "TSTypeOperator": {
       const inner = stringifyTypeNode(node.typeAnnotation);

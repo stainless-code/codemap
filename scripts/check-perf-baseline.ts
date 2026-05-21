@@ -7,7 +7,14 @@ import type { IndexPerformanceReport } from "../src/application/types";
 // 25% threshold + 10ms noise floor gate real regressions, not jitter; docs/benchmark.md § Perf baseline.
 const NOISE_FLOOR_MS = Number(process.env.CODEMAP_PERF_NOISE_FLOOR_MS ?? 10);
 const REGRESSION_PCT = Number(process.env.CODEMAP_PERF_REGRESSION_PCT ?? 25);
-const RUNS = Number(process.env.CODEMAP_PERF_RUNS ?? 3);
+const RUNS_RAW = Number(process.env.CODEMAP_PERF_RUNS ?? 3);
+if (!Number.isInteger(RUNS_RAW) || RUNS_RAW < 1) {
+  console.error(
+    `CODEMAP_PERF_RUNS must be a positive integer (got ${process.env.CODEMAP_PERF_RUNS ?? RUNS_RAW})`,
+  );
+  process.exit(2);
+}
+const RUNS = RUNS_RAW;
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 const INDEXER = join(REPO_ROOT, "src/index.ts");
