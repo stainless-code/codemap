@@ -75,4 +75,34 @@ describe("getChangedFiles", () => {
       closeDb(db);
     }
   });
+
+  it("indexes modified files whose paths contain spaces (porcelain -z)", () => {
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(
+      join(projectRoot, "src/my module.ts"),
+      "export const x = 1;\n",
+    );
+    const base = commitAll("add spaced file");
+
+    writeFileSync(
+      join(projectRoot, "src/my module.ts"),
+      "export const x = 2;\n",
+    );
+
+    const db = openDb();
+    try {
+      createTables(db);
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/my module.ts', 'old', 1, 1, 'typescript', 1, 1)",
+      );
+      setMeta(db, "last_indexed_commit", base);
+
+      const delta = getChangedFiles(db);
+      expect(delta).not.toBeNull();
+      expect(delta!.changed).toContain("src/my module.ts");
+      expect(delta!.deleted).not.toContain("src/my module.ts");
+    } finally {
+      closeDb(db);
+    }
+  });
 });

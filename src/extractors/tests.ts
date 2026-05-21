@@ -122,7 +122,13 @@ export const testsExtractor: TierExtractor = {
             is_todo: parsed.modifier === "todo" ? 1 : 0,
             framework,
           });
-          if (parsed.kind === "describe") parentStack.push(idx);
+          if (
+            parsed.kind === "describe" ||
+            parsed.kind === "suite" ||
+            parsed.kind === "context"
+          ) {
+            parentStack.push(idx);
+          }
           return;
         }
         if (!parsed) return;
@@ -153,7 +159,10 @@ export const testsExtractor: TierExtractor = {
         }
       },
       "CallExpression:exit"(node: any) {
-        const parsed = parseTestCallee(node.callee);
+        let parsed = parseTestCallee(node.callee);
+        if (!parsed && node.callee?.type === "CallExpression") {
+          parsed = parseTestCallee(node.callee.callee);
+        }
         if (!parsed) return;
         if (
           parsed.kind === "describe" ||

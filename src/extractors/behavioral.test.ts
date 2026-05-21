@@ -141,6 +141,17 @@ test.each([[1]])("case %p", () => {});
     expect(data.testSuites[0]?.name).toBe("case %p");
     expect(data.testSuites[0]?.kind).toBe("test");
   });
+
+  it("describe.each does not corrupt sibling parent_index", () => {
+    const src = `
+import { describe, it } from "bun:test";
+describe.each([[1]])("group %p", () => { it("inner", () => {}); });
+it("sibling", () => {});
+`;
+    const data = extractFileData("/proj/t.ts", src, "t.ts");
+    const sibling = data.testSuites.find((r) => r.name === "sibling");
+    expect(sibling?.parent_index).toBeNull();
+  });
 });
 
 describe("runtimeMarkers process.env", () => {

@@ -197,7 +197,7 @@ export function getChangedFiles(db: CodemapDatabase): {
     );
     const statusResult = spawnSync(
       "git",
-      ["status", "--porcelain", "--no-renames"],
+      ["status", "--porcelain", "-z", "--no-renames"],
       {
         cwd: root,
       },
@@ -217,13 +217,12 @@ export function getChangedFiles(db: CodemapDatabase): {
       if (status === "D") diffDeletedFromCommit.push(path);
       else diffFiles.push(path);
     }
-    // Porcelain lines are `XY path` (two status chars + space); skip the prefix to get the path.
+    // Porcelain -z records are NUL-terminated; paths are unquoted (no C-style quoting).
     const statusFiles = statusResult.stdout
       .toString()
-      .trim()
-      .split("\n")
+      .split("\0")
       .filter(Boolean)
-      .map((line: string) => line.slice(3).trim());
+      .map((line: string) => line.slice(3));
 
     const existingHashes = getAllFileHashes(db);
     const allCandidates = [...new Set([...diffFiles, ...statusFiles])].filter(
