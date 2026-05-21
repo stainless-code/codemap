@@ -1,5 +1,67 @@
 # @stainless-code/codemap
 
+## 0.8.0
+
+### Minor Changes
+
+- [#107](https://github.com/stainless-code/codemap/pull/107) [`f24f8b6`](https://github.com/stainless-code/codemap/commit/f24f8b6d1b531d4425664f6f1aca506bd11cfd6c) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Substrate tiers 1–6 remainder (excludes C.9 / `files.is_entry`). **Schema bump** `SCHEMA_VERSION` 27 → **34** — first run after upgrade auto-rebuilds `.codemap/index.db` via the existing version-mismatch path.
+
+  **Tier 1 — call + import precision**
+  - `calls.{args_count,is_method_call,is_constructor_call,is_optional_chain}`; constructor vs call dedup key fix
+  - `symbols.{return_type,is_async,is_generator}`
+  - Side-effect `import_specifiers` rows (`kind='side-effect'`) + `import_id` FK to `imports`
+
+  **Tier 2 — bindings**
+  - `bindings.resolution_kind='re-exported'` when resolution walks a re-export chain
+
+  **Tier 3 — JSX**
+  - New tables `jsx_elements` / `jsx_attributes`; extractor with per-file parent linking post-pass
+
+  **Tier 5 — behavioral**
+  - New tables `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`; context stack for `in_loop` / `in_try`
+
+  **Tier 6 — module graph (no entry points)**
+  - `dynamic_imports` table + extractor
+  - Post-pass `files.is_barrel` and parse-time `files.has_side_effects`
+
+  **Recipes + goldens:** `find-call-sites` (extended), `find-async-functions`, `find-dynamic-imports`, `find-barrel-files`, `find-side-effect-files`, `find-re-exported-bindings`, `find-side-effect-imports`, `find-jsx-usages`, `find-await-in-loop`, `find-swallowed-errors`, `find-decorator-usage`, `find-throws-jsdoc`, plus golden coverage for `fan-out-sample` / `fan-out-sample-json` and substrate regression tests.
+
+  **Read-only CLI hardening:** `printQueryResult` (ad-hoc `codemap query "<SQL>"`) now sets `PRAGMA query_only = 1`, closing the last gap vs `queryRows` / `executeQuery` ([#107](https://github.com/stainless-code/codemap/issues/107)).
+
+  **Out of scope:** C.9 plugin layer (`files.is_entry`, reachability-from-entry); tiers 7–13.
+
+  **Migration:** No in-place DDL — rebuild on schema mismatch preserves user-data tables (`coverage`, `query_baselines`, `recipe_recency`). Re-run `codemap --full` (or any index) after upgrade.
+
+### Patch Changes
+
+- [#118](https://github.com/stainless-code/codemap/pull/118) [`665c19a`](https://github.com/stainless-code/codemap/commit/665c19a547b06855d643d6037702475292fd98c1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Reject apply targets that are symlinks so phase-2 rename cannot replace a link with a regular file.
+
+- [#117](https://github.com/stainless-code/codemap/pull/117) [`5ee5f2e`](https://github.com/stainless-code/codemap/commit/5ee5f2ecf8c41cffc8094e54e4e52b6c2052149b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fail benchmark reindex runs when the spawned indexer exits non-zero instead of recording misleading timings.
+
+- [#109](https://github.com/stainless-code/codemap/pull/109) [`02a628f`](https://github.com/stainless-code/codemap/commit/02a628f2db0d88949fc1400b43c8069d8ee1acc4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Validate `codemap index --files` operands before indexing starts.
+
+- [#110](https://github.com/stainless-code/codemap/pull/110) [`7767a97`](https://github.com/stainless-code/codemap/commit/7767a975e72ce76a413c8a840c69418d9a5d807e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Validate `VERSION` output in `detect-pm` before writing GitHub Actions outputs.
+
+- [#112](https://github.com/stainless-code/codemap/pull/112) [`ec31949`](https://github.com/stainless-code/codemap/commit/ec319495500bdaed0e538dd2b8b52a465ba4a108) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Harden apply and diff-json path containment against traversal outside the project root.
+
+- [#123](https://github.com/stainless-code/codemap/pull/123) [`54ad25a`](https://github.com/stainless-code/codemap/commit/54ad25a380b2d85760bef07319dd172036a3d0d4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix high-severity bugs (describe.each parent stack, git porcelain -z paths, CLI symlink entry, pr-comment TTY stdin), medium bugs (changed-since -z paths, perf baseline RUNS guard, qualified typeof, decorator args_text, for-of binding refs, HTTP body drain, benchmark regex validation, jsx INSERT RETURNING id, sqlite stmt cache on close), and low bugs (CLI parse guards, incremental delete transaction, apply summary.files, extension case, pnpm # paths, coverage db.transaction, impact walk delimiter, worker errors, pointer dedup, benchmark readAll visibility).
+
+- [#114](https://github.com/stainless-code/codemap/pull/114) [`ae54ce0`](https://github.com/stainless-code/codemap/commit/ae54ce0d754bdb1455f9b16d59eed6b6f7fa9d2e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix diff preview deletions, config empty-array overrides, resolver path containment, impact call-site selection, and FTS cleanup on file delete.
+
+- [#122](https://github.com/stainless-code/codemap/pull/122) [`4e191ba`](https://github.com/stainless-code/codemap/commit/4e191bacceeda7fe463f2a2020b83c1bc4b6ddc1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Run full `check` (not build-only) in `prepublishOnly` so npm publish cannot skip tests or typecheck.
+
+- [#113](https://github.com/stainless-code/codemap/pull/113) [`126066d`](https://github.com/stainless-code/codemap/commit/126066d2f53129915b993fa81b7d3d2685d25cf1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Reject opaque `Origin: null` in `codemap serve` CSRF checks.
+
+- [#120](https://github.com/stainless-code/codemap/pull/120) [`17dcbd1`](https://github.com/stainless-code/codemap/commit/17dcbd150fead9033eeb1cd0d3458733836c6dfd) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Reject unexpected arguments on `codemap skill` and `codemap rule` instead of silently printing bundled content.
+
+- [#119](https://github.com/stainless-code/codemap/pull/119) [`cf0532b`](https://github.com/stainless-code/codemap/commit/cf0532b4d4b955ee089ec9cb7f1e55129bcc816a) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Print symbol signature in `codemap snippet` terminal output, matching `codemap show` and the documented contract.
+
+- [#116](https://github.com/stainless-code/codemap/pull/116) [`a444c40`](https://github.com/stainless-code/codemap/commit/a444c4006e64a0b92edc5404ce0833d6d39d0f67) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix V8 coverage ingest so innermost-wins applies across all FunctionCoverage entries in a script, not per-function iteration order.
+
+- [#115](https://github.com/stainless-code/codemap/pull/115) [`eb18750`](https://github.com/stainless-code/codemap/commit/eb18750762d2a725c7d7289fd197b7fec75c0f44) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix watcher priming race, parse-worker stat errors, incremental rename cleanup, and several indexer extractor gaps (scopes, references, tests.each, process.env, CSS imports).
+
+- [#121](https://github.com/stainless-code/codemap/pull/121) [`f5d013c`](https://github.com/stainless-code/codemap/commit/f5d013cda1d1a71a544130e8c759d1e50a72950b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Reject malformed `CODEMAP_PARSE_WORKERS` values (e.g. `2abc`, `1.5`) instead of silently truncating with `parseInt`.
+
 ## 0.7.5
 
 ### Patch Changes
