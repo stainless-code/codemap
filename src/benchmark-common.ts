@@ -21,17 +21,24 @@ export function globFilesFiltered(patterns: string[], cwd: string): string[] {
 export function readAll(
   paths: string[],
   cwd: string,
-): { totalBytes: number; contents: Map<string, string> } {
+): {
+  totalBytes: number;
+  contents: Map<string, string>;
+  unreadable: string[];
+} {
   let totalBytes = 0;
   const contents = new Map<string, string>();
+  const unreadable: string[] = [];
   for (const p of paths) {
     try {
       const content = readFileSync(join(cwd, p), "utf-8");
       totalBytes += Buffer.byteLength(content);
       contents.set(p, content);
-    } catch {}
+    } catch {
+      unreadable.push(p);
+    }
   }
-  return { totalBytes, contents };
+  return { totalBytes, contents, unreadable };
 }
 
 export function traditionalFanoutImportLines(): {

@@ -233,7 +233,10 @@ function consumeFlagValue(
   ) {
     return {
       kind: "error",
-      message: `codemap audit: "${flagName}" requires a value.`,
+      message:
+        next !== undefined && next.startsWith("-")
+          ? `codemap audit: "${flagName}" value looks like another flag (${next}). Use ${flagName}=${next} if the value starts with '-'.`
+          : `codemap audit: "${flagName}" requires a value.`,
     };
   }
   return { kind: "value", value: next, next: i + 2 };

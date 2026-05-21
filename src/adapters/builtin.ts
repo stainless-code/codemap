@@ -109,7 +109,8 @@ function buildAdapterIndex(
   // First-match-wins: skip ext if an earlier adapter already claimed it.
   for (const a of adapters) {
     for (const ext of a.extensions) {
-      if (!index.has(ext)) index.set(ext, a);
+      const key = ext.toLowerCase();
+      if (!index.has(key)) index.set(key, a);
     }
   }
   return index;
@@ -129,5 +130,5 @@ export function getAdapterForExtension(
     index = buildAdapterIndex(adapters);
     adapterIndexCache.set(adapters, index);
   }
-  return index.get(ext);
+  return index.get(ext.toLowerCase());
 }

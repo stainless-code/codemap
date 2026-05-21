@@ -187,7 +187,6 @@ export async function runCodemapIndex(
           `  Incremental: ${diff.changed.length} changed, ${diff.deleted.length} deleted`,
         );
       }
-      deleteFilesFromIndex(db, diff.deleted, quiet);
       if (diff.changed.length > 0) {
         const indexedPaths = diff.existingPaths;
         for (const f of diff.changed) indexedPaths.add(f);
@@ -195,6 +194,7 @@ export async function runCodemapIndex(
           quiet,
           sourceCache: diff.sourceCache,
           existingHashes: diff.existingHashes,
+          deletedPaths: diff.deleted,
         });
         return {
           mode: "incremental",
@@ -205,6 +205,7 @@ export async function runCodemapIndex(
         };
       }
       if (diff.deleted.length > 0) {
+        deleteFilesFromIndex(db, diff.deleted, quiet);
         setMeta(db, "last_indexed_commit", getCurrentCommit());
         if (!quiet) console.log("  Index updated (deletions only)");
         return {

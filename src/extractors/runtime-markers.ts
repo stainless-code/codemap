@@ -100,12 +100,7 @@ export const runtimeMarkersExtractor: TierExtractor = {
           node.property?.type === "Literal" &&
           typeof node.property.value === "string"
         ) {
-          emit(
-            "process-env",
-            node.object.start,
-            node.property.end,
-            node.property.value,
-          );
+          emit("process-env", node.start, node.end, node.property.value);
         }
       },
     });

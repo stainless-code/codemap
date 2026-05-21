@@ -5,6 +5,7 @@ import { BUILTIN_ADAPTERS, getAdapterForExtension } from "./builtin";
 describe("getAdapterForExtension", () => {
   it("resolves TS/JS extensions to builtin.ts-js", () => {
     expect(getAdapterForExtension(".ts")?.id).toBe("builtin.ts-js");
+    expect(getAdapterForExtension(".TS")?.id).toBe("builtin.ts-js");
     expect(getAdapterForExtension(".tsx")?.id).toBe("builtin.ts-js");
   });
 

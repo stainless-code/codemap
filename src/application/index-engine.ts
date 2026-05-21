@@ -91,11 +91,11 @@ const TS_EXTENSIONS = new Set([
 const CSS_EXTENSIONS = new Set([".css"]);
 
 function langFromExt(ext: string): string {
-  return LANG_MAP[ext] ?? "text";
+  return LANG_MAP[ext.toLowerCase()] ?? "text";
 }
 
 function fileCategory(path: string): "ts" | "css" | "text" {
-  const ext = extname(path);
+  const ext = extname(path).toLowerCase();
   if (TS_EXTENSIONS.has(ext)) return "ts";
   if (CSS_EXTENSIONS.has(ext)) return "css";
   return "text";
@@ -424,6 +424,8 @@ export async function indexFiles(
     sourceCache?: ChangedSourceCache;
     /** When set, incremental branch skips its own `getAllFileHashes(db)` call. */
     existingHashes?: Map<string, string>;
+    /** When set, incremental branch deletes these paths inside the same transaction as re-indexing. */
+    deletedPaths?: string[];
   },
 ): Promise<IndexRunStats> {
   const quiet = options?.quiet ?? false;
@@ -485,6 +487,10 @@ export async function indexFiles(
     const sourceCache = options?.sourceCache;
 
     const transaction = db.transaction(() => {
+      const deleted = options?.deletedPaths ?? [];
+      if (deleted.length > 0) {
+        deleteFilesFromIndex(db, deleted, quiet);
+      }
       for (const relPath of filePaths) {
         const absPath = join(root, relPath);
         let source: string;
