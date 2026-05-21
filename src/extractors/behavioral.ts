@@ -238,8 +238,8 @@ export const behavioralExtractor: TierExtractor = {
       const lineStartOffset = lineMap[line - 1] ?? 0;
       const expr = dec.expression;
       const argsText =
-        expr?.type === "CallExpression"
-          ? source.slice(expr.arguments[0]?.start ?? expr.start, expr.end)
+        expr?.type === "CallExpression" && expr.arguments?.length
+          ? source.slice(expr.arguments[0].start, expr.end - 1)
           : null;
       decorators.push({
         file_path: relPath,

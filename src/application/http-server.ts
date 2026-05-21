@@ -346,6 +346,7 @@ async function readJsonBody(
     const buf = chunk as Buffer;
     total += buf.length;
     if (total > MAX_BYTES) {
+      req.resume();
       return {
         ok: false,
         error: `codemap serve: request body exceeds ${MAX_BYTES} bytes.`,

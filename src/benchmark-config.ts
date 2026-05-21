@@ -163,6 +163,14 @@ function parseConfigJson(raw: string): BenchmarkConfigFile {
         `benchmark config: ${e.name}: traditional.regex required`,
       );
     }
+    try {
+      new RegExp(t.regex as string);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `benchmark config: ${e.name}: traditional.regex is not a valid regex: ${msg}`,
+      );
+    }
     if (t.mode !== "files" && t.mode !== "matches") {
       throw new Error(
         `benchmark config: ${e.name}: traditional.mode must be "files" or "matches"`,

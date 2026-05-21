@@ -106,6 +106,7 @@ function openRaw(path: string): SqliteInner {
       return rawDb.transaction(fn);
     },
     close() {
+      stmtCache.clear();
       rawDb.close();
     },
   };
