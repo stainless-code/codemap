@@ -223,6 +223,13 @@ export function parseQueryRest(rest: string[]):
         continue;
       }
       const next = rest[i + 1];
+      if (next === "") {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--save-baseline=<name>" requires a non-empty name. Drop the "=" to use the recipe id as the default name.',
+        };
+      }
       if (next !== undefined && !next.startsWith("-")) {
         saveBaseline = next;
         i += 2;
@@ -248,6 +255,13 @@ export function parseQueryRest(rest: string[]):
         continue;
       }
       const next = rest[i + 1];
+      if (next === "") {
+        return {
+          kind: "error",
+          message:
+            'codemap: "--baseline=<name>" requires a non-empty name. Drop the "=" to use the recipe id as the default name.',
+        };
+      }
       if (next !== undefined && !next.startsWith("-")) {
         baseline = next;
         i += 2;
@@ -308,7 +322,7 @@ export function parseQueryRest(rest: string[]):
     if (a === "--params" || a.startsWith("--params=")) {
       const eq = a.indexOf("=");
       const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
-      if (v === undefined || v.startsWith("-")) {
+      if (v === undefined || v === "" || v.startsWith("-")) {
         return {
           kind: "error",
           message:

@@ -51,6 +51,7 @@ const IS_BUN = typeof Bun !== "undefined";
 const NODE_WORKER_PATH = IS_BUN ? "" : fileURLToPath(WORKER_URL_NODE);
 
 export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
+  if (filePaths.length === 0) return Promise.resolve([]);
   const chunkSize = Math.ceil(filePaths.length / WORKER_COUNT);
   const chunks: string[][] = [];
   for (let i = 0; i < filePaths.length; i += chunkSize) {
