@@ -188,6 +188,20 @@ describe("findImpact — cycle detection", () => {
     const names = r.matches.map((m) => m.name).sort();
     expect(names).toEqual(["b", "c"]);
   });
+
+  it("does not treat comma-containing symbol names as prefix matches", () => {
+    seedFile("src/a.ts");
+    seedFile("src/ab.ts");
+    seedFile("src/c.ts");
+    seedSymbol("a", "src/a.ts");
+    seedSymbol("a,b", "src/ab.ts");
+    seedSymbol("c", "src/c.ts");
+    seedCall("src/ab.ts", "a,b", "c");
+    seedCall("src/a.ts", "a", "c");
+    const r = findImpact(db, { target: "c", direction: "up", depth: 3 });
+    const names = r.matches.map((m) => m.name).sort();
+    expect(names).toEqual(["a", "a,b"]);
+  });
 });
 
 describe("findImpact — limit termination", () => {

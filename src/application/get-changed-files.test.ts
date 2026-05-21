@@ -105,4 +105,89 @@ describe("getChangedFiles", () => {
       closeDb(db);
     }
   });
+
+  it("detects committed changes to paths with spaces (diff --name-status -z)", () => {
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(
+      join(projectRoot, "src/my module.ts"),
+      "export const x = 1;\n",
+    );
+    writeFileSync(join(projectRoot, "src/other.ts"), "export const o = 1;\n");
+    const base = commitAll("add spaced and other");
+
+    writeFileSync(
+      join(projectRoot, "src/my module.ts"),
+      "export const x = 2;\n",
+    );
+    commitAll("commit spaced change");
+
+    const db = openDb();
+    try {
+      createTables(db);
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/my module.ts', 'old', 1, 1, 'typescript', 1, 1)",
+      );
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/other.ts', 'old', 1, 1, 'typescript', 1, 1)",
+      );
+      setMeta(db, "last_indexed_commit", base);
+
+      const delta = getChangedFiles(db);
+      expect(delta).not.toBeNull();
+      expect(delta!.changed).toContain("src/my module.ts");
+      expect(delta!.deleted).not.toContain("src/my module.ts");
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("includes uppercase extensions in incremental candidates", () => {
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/File.TS"), "export const x = 1;\n");
+    const base = commitAll("add uppercase ext");
+
+    writeFileSync(join(projectRoot, "src/File.TS"), "export const x = 2;\n");
+
+    const db = openDb();
+    try {
+      createTables(db);
+      setMeta(db, "last_indexed_commit", base);
+
+      const delta = getChangedFiles(db);
+      expect(delta).not.toBeNull();
+      expect(delta!.changed).toContain("src/File.TS");
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("returns deleted and changed paths in the same delta", () => {
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/a.ts"), "export const a = 1;\n");
+    writeFileSync(join(projectRoot, "src/b.ts"), "export const b = 1;\n");
+    const base = commitAll("add a and b");
+
+    git(["rm", "src/a.ts"]);
+    commitAll("delete a");
+    writeFileSync(join(projectRoot, "src/b.ts"), "export const b = 2;\n");
+
+    const db = openDb();
+    try {
+      createTables(db);
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/a.ts', 'old', 1, 1, 'typescript', 1, 1)",
+      );
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/b.ts', 'old', 1, 1, 'typescript', 1, 1)",
+      );
+      setMeta(db, "last_indexed_commit", base);
+
+      const delta = getChangedFiles(db);
+      expect(delta).not.toBeNull();
+      expect(delta!.deleted).toContain("src/a.ts");
+      expect(delta!.changed).toContain("src/b.ts");
+    } finally {
+      closeDb(db);
+    }
+  });
 });

@@ -190,7 +190,7 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const diffResult = spawnSync(
       "git",
-      ["diff", "--name-status", "--no-renames", `${lastCommit}..HEAD`],
+      ["diff", "--name-status", "-z", "--no-renames", `${lastCommit}..HEAD`],
       {
         cwd: root,
       },
@@ -205,15 +205,15 @@ export function getChangedFiles(db: CodemapDatabase): {
 
     const diffDeletedFromCommit: string[] = [];
     const diffFiles: string[] = [];
-    for (const line of diffResult.stdout
+    // --name-status -z records are STATUS NUL path NUL pairs (paths unquoted).
+    const diffRecords = diffResult.stdout
       .toString()
-      .trim()
-      .split("\n")
-      .filter(Boolean)) {
-      const tab = line.indexOf("\t");
-      if (tab === -1) continue;
-      const status = line.slice(0, tab);
-      const path = line.slice(tab + 1);
+      .split("\0")
+      .filter(Boolean);
+    for (let i = 0; i < diffRecords.length; i += 2) {
+      const status = diffRecords[i];
+      const path = diffRecords[i + 1];
+      if (path === undefined) continue;
       if (status === "D") diffDeletedFromCommit.push(path);
       else diffFiles.push(path);
     }
@@ -227,7 +227,7 @@ export function getChangedFiles(db: CodemapDatabase): {
     const existingHashes = getAllFileHashes(db);
     const allCandidates = [...new Set([...diffFiles, ...statusFiles])].filter(
       (f) => {
-        const ext = extname(f);
+        const ext = extname(f).toLowerCase();
         return ext in LANG_MAP || existingHashes.has(f);
       },
     );
