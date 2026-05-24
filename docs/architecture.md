@@ -28,7 +28,7 @@ A local SQLite database (`.codemap/index.db`) indexes the project tree and store
 
 ### Full rebuild (parallel)
 
-````text
+```text
   application/index-engine.ts (main thread)
     │
     ├─ collectFiles()
@@ -911,4 +911,3 @@ Key covering indexes:
 | `idx_css_variables_name` | `name, value, scope, file_path`                                       | CSS token lookup by name   |
 | `idx_css_classes_name`   | `name, file_path, is_module`                                          | CSS class lookup           |
 | `idx_css_keyframes_name` | `name, file_path`                                                     | Keyframe lookup            |
-````
