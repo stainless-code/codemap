@@ -137,12 +137,11 @@ When this exception applies, drop a one-line summary of contested rebuttals into
 ### Commands
 
 ```bash
-# Reply to a thread
+# Reply to a thread — write body to a temp file first (heredocs mangle backticks in markdown)
+printf '%s' '<reply text>' > /tmp/pr-<number>-reply.md
 gh api "repos/{owner}/{repo}/pulls/<number>/comments" \
-  -f body="$(cat <<'EOF'
-<reply text>
-EOF
-)" -F in_reply_to=<comment_id>
+  --field body=@/tmp/pr-<number>-reply.md \
+  -F in_reply_to=<comment_id>
 
 # Resolve a thread (GraphQL only — REST endpoints don't support resolve)
 gh api graphql -f query='mutation($id: ID!) {
@@ -156,7 +155,7 @@ The thread node ID (`PRRT_…`) comes from the GraphQL `reviewThreads` query in 
 
 These come up repeatedly with LLM reviewers and warrant extra scrutiny. The codemap-shape ones (1–4) come from the codemap thesis — what Codemap deliberately is and isn't (per [`docs/why-codemap.md` § When to reach for something else](../../../docs/why-codemap.md#when-to-reach-for-something-else) and [`docs/roadmap.md` § Non-goals](../../../docs/roadmap.md#non-goals-v1)). The shape-5+ ones are universal across TS projects:
 
-1. **"Just regex this"** when the file is in `src/parsers/` or `src/adapters/` — codemap is AST-backed by design (oxc for TS, lightningcss for CSS). Suggesting a regex replacement undoes the architectural choice. Verify against [`docs/architecture.md` § Parsers / Adapters](../../../docs/architecture.md) before accepting.
+1. **"Just regex this"** when the file is in `src/parser.ts`, `src/css-parser.ts`, or `src/adapters/` — codemap is AST-backed by design (oxc for TS, lightningcss for CSS). Suggesting a regex replacement undoes the architectural choice. Verify against [`docs/architecture.md` § Parsers](../../../docs/architecture.md#parsers) before accepting.
 2. **"Add full-text search"** — explicitly a non-goal per [`docs/roadmap.md` § Non-goals (v1)](../../../docs/roadmap.md#non-goals-v1). Push back with that anchor.
 3. **"Add a daemon for performance"** — same; one-shot CLI is intentional, sub-100ms cold start makes a daemon unnecessary. Same non-goal anchor.
 4. **"Index this column"** in `src/db.ts` — Codemap's SQLite schema is intentionally lean. Indexes are added when a query benchmark proves them necessary, not pre-emptively. Push back: ask for the query that's slow.

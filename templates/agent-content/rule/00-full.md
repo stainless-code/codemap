@@ -6,7 +6,7 @@ alwaysApply: true
 
 > **STOP.** Before you call Grep, Glob, SemanticSearch, or Read to answer a **structural** question about this repository — query the Codemap SQLite index first.
 
-This project is indexed by **Codemap** — a local SQLite database (default **`.codemap/index.db`**) of structure: `files`, `symbols`, `imports`, `exports`, `dependencies`, `calls`, `components`, `markers`, `type_members`, `import_specifiers`, `scopes`, `references`, `bindings`, `function_params`, `runtime_markers`, `test_suites`, `re_export_chains`, `module_cycles`, `file_metrics`, `css_variables`, `css_classes`, `css_keyframes`, and (after `codemap ingest-coverage <path>`) `coverage`.
+This project is indexed by **Codemap** — a local SQLite database (default **`.codemap/index.db`**) of structure: `files`, `symbols`, `imports`, `exports`, `dependencies`, `calls`, `components`, `markers`, `type_members`, `import_specifiers`, `scopes`, `references`, `bindings`, `function_params`, `dynamic_imports`, `jsx_elements`, `jsx_attributes`, `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`, `runtime_markers`, `test_suites`, `re_export_chains`, `module_cycles`, `file_metrics`, `css_variables`, `css_classes`, `css_keyframes`, `suppressions`, `boundary_rules`, and (after `codemap ingest-coverage <path>`) `coverage`. Full DDL: `codemap query --json "SELECT sql FROM sqlite_schema WHERE type='table'"` or MCP resource `codemap://schema`.
 
 ## How to query
 

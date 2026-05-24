@@ -8,7 +8,7 @@ alwaysApply: false
 
 Before authoring or editing any doc in this repo, **read the [`docs-governance` skill](../skills/docs-governance/SKILL.md)** for the full reference. This rule is the priming layer.
 
-The canonical Rules (1–9) live in [`docs/README.md`](../../docs/README.md) — cite them by number; never restate them.
+The canonical Rules (1–10) live in [`docs/README.md`](../../docs/README.md) — cite them by number; never restate them.
 
 ## Surface tiers (which subset of governance applies)
 
@@ -51,6 +51,6 @@ If none → fold + delete.
 - Full reference: [`.agents/skills/docs-governance/SKILL.md`](../skills/docs-governance/SKILL.md)
 - Doc janitor (operational sweep — apply the spec mechanically, classify Tier A / B / C, delete dead weight): [`.agents/skills/docs-lifecycle-sweep/SKILL.md`](../skills/docs-lifecycle-sweep/SKILL.md). Fire on intent ("clean up stale docs", "compact audits") or proactively after closing a Plan / Audit / Research file.
 - Audit framework: [`.agents/skills/audit-pr-architecture/SKILL.md`](../skills/audit-pr-architecture/SKILL.md). Fire on intent ("audit this PR's architecture", "structural review of #N") or proactively when a PR moves ≥5 files between top-level `src/` modules.
-- Canonical Rules: [`docs/README.md`](../../docs/README.md) — Rules 1–9 cited from across `docs/` and `.agents/`. Don't renumber without a coordinated re-grep + edit pass.
+- Canonical Rules: [`docs/README.md`](../../docs/README.md) — Rules 1–10 cited from across `docs/` and `.agents/`. Don't renumber without a coordinated re-grep + edit pass.
 - File-layout: [`agents-first-convention`](./agents-first-convention.md)
 - Rules vs skills tier system: [`agents-tier-system`](./agents-tier-system.md)

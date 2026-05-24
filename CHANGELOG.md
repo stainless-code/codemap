@@ -38,7 +38,7 @@
 
 - [#117](https://github.com/stainless-code/codemap/pull/117) [`5ee5f2e`](https://github.com/stainless-code/codemap/commit/5ee5f2ecf8c41cffc8094e54e4e52b6c2052149b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fail benchmark reindex runs when the spawned indexer exits non-zero instead of recording misleading timings.
 
-- [#109](https://github.com/stainless-code/codemap/pull/109) [`02a628f`](https://github.com/stainless-code/codemap/commit/02a628f2db0d88949fc1400b43c8069d8ee1acc4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Validate `codemap index --files` operands before indexing starts.
+- [#109](https://github.com/stainless-code/codemap/pull/109) [`02a628f`](https://github.com/stainless-code/codemap/commit/02a628f2db0d88949fc1400b43c8069d8ee1acc4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Validate `codemap --files` operands before indexing starts.
 
 - [#110](https://github.com/stainless-code/codemap/pull/110) [`7767a97`](https://github.com/stainless-code/codemap/commit/7767a975e72ce76a413c8a840c69418d9a5d807e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Validate `VERSION` output in `detect-pm` before writing GitHub Actions outputs.
 

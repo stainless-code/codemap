@@ -13,7 +13,7 @@ bun run dev   # same as `bun src/index.ts` — CLI from source
 bun test
 bun run test:golden   # golden SQL vs fixtures/minimal (also runs at end of `bun run check`)
 bun run test:golden:external   # Tier B: local tree via CODEMAP_ROOT / --root (not in CI)
-bun run check   # format + lint + tests + typecheck + build + test:golden
+bun run check   # build, then format:check + lint:ci + test + typecheck, then test:golden
 bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap/`)
 bun run check-updates   # interactive dependency updates (`bun update -i --latest`)
 ```
@@ -60,7 +60,9 @@ Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — ru
 
 **Upstream** skill and rules in this repo (e.g. `codemap`) stay **generic** — placeholder SQL and triggers, no product-specific paths. Consumer projects can run **`codemap agents init`** (ships **`templates/agents`** on npm; see [docs/agents.md](../docs/agents.md)) or **copy/symlink** manually, then **edit their copy** for team aliases and queries. Customization always belongs in the **consumer** repo.
 
-Rules live under **`.agents/rules/`** as `.md` files; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink into **`.cursor/`** with `.mdc` extension (Cursor requires `.mdc` for frontmatter parsing; see [agents-first-convention.md](../.agents/rules/agents-first-convention.md)):
+Rules live under **`.agents/rules/`** as `.md` files; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink into **`.cursor/`** with `.mdc` extension (Cursor requires `.mdc` for frontmatter parsing; see [agents-first-convention.md](../.agents/rules/agents-first-convention.md)). Full rule inventory and tier system: [docs/agents.md](../docs/agents.md) and [agents-tier-system.md](../.agents/rules/agents-tier-system.md).
+
+Example minimum symlink set:
 
 ```bash
 mkdir -p .cursor/rules .cursor/skills
@@ -69,14 +71,5 @@ for f in codemap agents-first-convention no-bypass-hooks verify-after-each-step 
 done
 ln -sf ../../.agents/skills/codemap .cursor/skills/codemap
 ```
-
-| Rule                         | Purpose                                   |
-| ---------------------------- | ----------------------------------------- |
-| `codemap.md`                 | Query SQLite index before structural grep |
-| `agents-first-convention.md` | `.agents/` source + `.cursor/` symlinks   |
-| `no-bypass-hooks.md`         | Never `--no-verify` on commit             |
-| `verify-after-each-step.md`  | Run checks between milestones             |
-| `tracer-bullets.md`          | Vertical slices end-to-end                |
-| `concise-reporting.md`       | Short agent replies                       |
 
 Thank you for helping make structural codebase queries fast and reusable for agents.

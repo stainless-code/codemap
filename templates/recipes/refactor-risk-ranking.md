@@ -9,7 +9,7 @@ Files ranked by refactor-risk score `(fan_in + 1) × (100 - avg_coverage_pct)`.
 
 Higher score = higher refactor risk. Output is **per-file** (one row per high-risk file) — symbols within a file inherit the file's structural risk.
 
-**Why per-file (not per-symbol):** `dependencies` is tracked at the file level — every symbol in a popular file ties at the same score under per-symbol ranking, producing 30 noisy rows from one file. File-level aggregation gives 30 actionable rows ranking the riskiest files. Drill into a specific file's symbols via `query --recipe ad-hoc "SELECT name, kind, signature FROM symbols WHERE file_path = '<path>' AND is_exported = 1"`.
+**Why per-file (not per-symbol):** `dependencies` is tracked at the file level — every symbol in a popular file ties at the same score under per-symbol ranking, producing 30 noisy rows from one file. File-level aggregation gives 30 actionable rows ranking the riskiest files. Drill into a specific file's symbols via `codemap query --json "SELECT name, kind, signature FROM symbols WHERE file_path = '<path>' AND is_exported = 1"`.
 
 Three correctness fixes baked into the formula:
 

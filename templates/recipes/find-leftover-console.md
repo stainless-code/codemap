@@ -12,7 +12,7 @@ Every `console.*` call in the indexed codebase. Pair with a path filter to scope
 ```bash
 codemap query --recipe find-leftover-console
 
-codemap query --json 'SELECT * FROM runtime_markers WHERE kind = "console" AND file_path LIKE "src/%" AND file_path NOT LIKE "%.test.%"'
+codemap query --json 'SELECT * FROM runtime_markers WHERE kind = '\''console'\'' AND file_path LIKE "src/%" AND file_path NOT LIKE "%.test.%"'
 ```
 
 Methods (in `detail`): `log` / `warn` / `error` / `info` / `debug` / `trace` / `dir` / `table` / `group` / `groupEnd` / `time` / etc.

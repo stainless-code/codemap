@@ -27,7 +27,7 @@ The substrate-growth half of this synthesis lifted to a dedicated plan PR — [`
 
 **Still open (the apply-engine half of this synthesis):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — not shipped. Step 1's doc reframe is effectively lifted into `roadmap.md` / `why-codemap.md`; the remaining 12-step path still drives the apply-engine direction (new diff-shape recipes, write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
+- **§ 6 Steps 2–4, 6, 8–12** — not shipped. **Step 1 (doc reframe) shipped** — [`roadmap.md`](../roadmap.md) Floors split + [`why-codemap.md`](../why-codemap.md) verdict/autofix wording. The remaining steps still drive the apply-engine direction (new diff-shape recipes, write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
 - **§ 4.4 engine extensions** (`apply --rows -`, `apply --diff-input`, `--until-empty`, etc.) — none shipped; still tracked as the agent-in-the-loop unlock per [§ 5.4 agent-angle gap analysis](#54-agent-angle-gap-analysis-from-a4).
 - **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
 
@@ -71,16 +71,16 @@ A1 and A4 share an author but diverge on the agent-angle weighting and AST-engin
 
 These have **6/6** support (counting A1 and A4 separately because their conclusions diverge on emphasis even when the author overlaps). They are the load-bearing claims for the synthesised path; nothing in the disagreement map should override them.
 
-| #   | Claim                                                                                                                                                                                                                                                                                                                                     | Supported by                                     |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| C1  | The "no fix engine" floor language at [`roadmap.md`](../roadmap.md) Floors row 45 is **stale documentation**, contradicted by `apply-engine.ts` + `cmd-apply.ts` + `rename-preview.sql` + the [`glossary.md`](../glossary.md) "Substrate-shaped fix executor" entry. The floor conflated two product classes; doc reframe is the unblock. | A1, A2, A3, A4, A5, A6                           |
-| C2  | The reframe shape: **"No verdict-shaped fix engine"** (preserved — `knip` / `eslint --fix` / `jscpd` own that class) AND **"Substrate-shaped diff executor IS in scope"** (the shipped reality; recipes propose, engine executes, agent confirms).                                                                                        | A1, A2 (implicit), A3 (implicit), A4, A5, A6     |
-| C3  | `calls.{line_start, column_start}` is the **highest-ROI single substrate addition.** Closes the rename-preview substrate gap; unblocks app-wide rename of call sites; foundation for replace-deprecated-call recipes; foundation for diagnostic-push hotspot rendering when LSP plan ships.                                               | A1, A2, A3, A4, A5, A6                           |
-| C4  | **Re-export source locations** are needed (whether as `exports.{line_start, column_start}` columns or a separate `export_locations` table). Re-export alias chains and barrel-safe rewrites both need it.                                                                                                                                 | A1, A2, A3, A4, A5, A6                           |
-| C5  | More diff-shape recipes are needed in the bundled catalog. Today the count is 1 (`rename-preview`); consensus floor is 3–5 more. Specific candidates with multi-source agreement listed in [§ 4.3](#43-recipe-additions).                                                                                                                 | A1, A2, A3, A4 (item #4), A5, A6 (implicit)      |
-| C6  | **Moat A applies to writes by analogue.** Reviewer test: _"is this fix also expressible as `query --recipe <id>` + `apply <recipe-id>`?"_ Pass → moat-clean. Fail → verdict shape; reject. The recipes are the API for writes, same as for reads.                                                                                         | A1, A2, A3, A4, A5, A6                           |
-| C7  | **Dry-run-first + explicit confirmation gate is correct** and stays. Phase-1-validates-before-phase-2-writes pattern preserved; non-TTY without `--yes` rejected.                                                                                                                                                                         | A1, A2, A3, A4, A5, A6                           |
-| C8  | **Watch + apply + reindex is the agent loop.** Default-ON watch on long-running transports keeps reads fresh; codemap-specific structural verification (the index reflects disk truth) is sufficient for the agent path; full typecheck/lint/tests verifier is consumer-side.                                                             | A1, A4, A6 explicit; A2, A3, A5 don't contradict |
+| #   | Claim                                                                                                                                                                                                                                                                                       | Supported by                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| C1  | The doc reframe (**shipped 2026-05**): [`roadmap.md`](../roadmap.md) Floors now split verdict-shaped lints from the substrate-shaped `codemap apply` executor. The old single "no fix engine" row conflated two product classes.                                                            | A1, A2, A3, A4, A5, A6                           |
+| C2  | The reframe shape: **"No verdict-shaped fix engine"** (preserved — `knip` / `eslint --fix` / `jscpd` own that class) AND **"Substrate-shaped diff executor IS in scope"** (the shipped reality; recipes propose, engine executes, agent confirms).                                          | A1, A2 (implicit), A3 (implicit), A4, A5, A6     |
+| C3  | `calls.{line_start, column_start}` is the **highest-ROI single substrate addition.** Closes the rename-preview substrate gap; unblocks app-wide rename of call sites; foundation for replace-deprecated-call recipes; foundation for diagnostic-push hotspot rendering when LSP plan ships. | A1, A2, A3, A4, A5, A6                           |
+| C4  | **Re-export source locations** are needed (whether as `exports.{line_start, column_start}` columns or a separate `export_locations` table). Re-export alias chains and barrel-safe rewrites both need it.                                                                                   | A1, A2, A3, A4, A5, A6                           |
+| C5  | More diff-shape recipes are needed in the bundled catalog. Today the count is 1 (`rename-preview`); consensus floor is 3–5 more. Specific candidates with multi-source agreement listed in [§ 4.3](#43-recipe-additions).                                                                   | A1, A2, A3, A4 (item #4), A5, A6 (implicit)      |
+| C6  | **Moat A applies to writes by analogue.** Reviewer test: _"is this fix also expressible as `query --recipe <id>` + `apply <recipe-id>`?"_ Pass → moat-clean. Fail → verdict shape; reject. The recipes are the API for writes, same as for reads.                                           | A1, A2, A3, A4, A5, A6                           |
+| C7  | **Dry-run-first + explicit confirmation gate is correct** and stays. Phase-1-validates-before-phase-2-writes pattern preserved; non-TTY without `--yes` rejected.                                                                                                                           | A1, A2, A3, A4, A5, A6                           |
+| C8  | **Watch + apply + reindex is the agent loop.** Default-ON watch on long-running transports keeps reads fresh; codemap-specific structural verification (the index reflects disk truth) is sufficient for the agent path; full typecheck/lint/tests verifier is consumer-side.               | A1, A4, A6 explicit; A2, A3, A5 don't contradict |
 
 These eight are the **non-negotiable spine** of any synthesis path. Every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) preserves them.
 
@@ -521,9 +521,9 @@ Defer until 2+ recipes hit it. The current `apply-engine.ts` "same-line ambiguit
 
 The minimum synthesis preserving every consensus claim (§ 2) and resolving every disagreement (§ 3) per the verdicts. Each step lists open implementation questions to settle in its plan PR (lifted from the per-source plan-PR Q1–Q10 lists; questions internal to a step's design, not reasons to defer the step).
 
-### Step 1 — Doc reframe (XS)
+### Step 1 — Doc reframe (XS) — ✓ Shipped 2026-05
 
-Replace [`roadmap.md`](../roadmap.md) Floors row 45 with two distinct rows per C2; sweep [`why-codemap.md`](../why-codemap.md) "When to reach for something else" line 22 to drop "fix patches" from the list `knip`/`jscpd`/`eslint --fix` own.
+[`roadmap.md`](../roadmap.md) Floors split into verdict-shaped lints vs substrate-shaped `codemap apply`; [`why-codemap.md`](../why-codemap.md) § When to reach for something else updated.
 
 **Source ancestry:** C1, C2; all six positions.
 
@@ -567,7 +567,7 @@ Flip the existing `actions[].auto_fixable` flag from advisory to enforcing. `app
 
 ### Step 5 — `calls.{line_start, column_start}` substrate column (S) — ✓ Shipped 2026-05-15
 
-**What shipped:** [`substrate-extraction.md` Tier 1 Slice 1.A](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `calls.{line_start, column_start, column_end}` + bundled `find-call-sites` recipe. Call-shape metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) shipped 2026-05-19 (schema 28).
+**What shipped:** [`substrate-extraction.md` Tier 1 Slice 1.A](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `calls.{line_start, column_start, column_end}` + bundled `find-call-sites` recipe. Call-shape metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) shipped 2026-05-19 (schema 34 wave).
 
 Single oxc visitor extension reusing existing `buildLineMap` / `offsetToLine` from `parser.ts`; schema bump triggers one-shot reindex.
 
@@ -728,12 +728,12 @@ Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance
 
 ### Internal anchors cited from this synthesis
 
-- [`roadmap.md` Floors](../roadmap.md#floors-v1-product-shape) — current "No fix engine" floor (Step 1 target)
+- [`roadmap.md` Floors](../roadmap.md#floors-v1-product-shape) — verdict-shaped lints vs substrate-shaped apply (Step 1 shipped)
 - [`roadmap.md` Moats](../roadmap.md#moats-load-bearing) — Moat A reviewer test (consensus C6)
 - [`roadmap.md` Backlog](../roadmap.md#backlog) — `audit verdict` deferral precedent for § 3.5 verdict
 - [`architecture.md` Apply wiring](../architecture.md#cli-usage) — the engine the synthesis path grows the substrate around
 - [`glossary.md` Substrate-shaped fix executor](../glossary.md) — current canonical definition (preserved)
-- [`why-codemap.md` § When to reach for something else](../why-codemap.md#when-to-reach-for-something-else) — Step 1 secondary target (drop "fix patches" from the list)
+- [`why-codemap.md` § When to reach for something else](../why-codemap.md#when-to-reach-for-something-else) — verdict/autofix vs predicate-as-API (Step 1 shipped)
 - [`research/non-goals-reassessment-2026-05.md`](./non-goals-reassessment-2026-05.md) — precedent for floor-flips after architectural reality outpaces docs
 - [`docs/plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md) — C.9 entry-point work; orthogonal to synthesis path
 - [`docs/plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md) — sibling plan; Steps 8–9 (agent-in-the-loop) and the LSP `code_action` shape converge naturally

@@ -20,7 +20,7 @@ Every doc in this repo lives in one of **two surface tiers** (codemap is small e
 
 The same shared spine applies to both. The differences are what subset each tier needs.
 
-> **Why no Tier C / Tier A in codemap?** Tier C (per-feature governance) only kicks in when a codebase grows independently-evolving feature folders (`app/features/<f>/`). Tier A (per-shared-component) only kicks in when shared components accumulate enough rationale to need a `README.md` next to the source. Codemap has neither today — the source tree is `src/cli/`, `src/application/`, `src/adapters/`, `src/parsers/`, `src/db.ts`, etc., all governed by the central `docs/` surface. If codemap ever grows a `src/<feature>/` partition or a `src/components/<x>/` shared-component substrate worth documenting in-place, this skill grows the corresponding tier rows then — not before (per § 5 anti-bloat).
+> **Why no Tier C / Tier A in codemap?** Tier C (per-feature governance) only kicks in when a codebase grows independently-evolving feature folders (`app/features/<f>/`). Tier A (per-shared-component) only kicks in when shared components accumulate enough rationale to need a `README.md` next to the source. Codemap has neither today — the source tree is `src/cli/`, `src/application/`, `src/adapters/`, `src/parser.ts`, `src/db.ts`, etc., all governed by the central `docs/` surface. If codemap ever grows a `src/<feature>/` partition or a `src/components/<x>/` shared-component substrate worth documenting in-place, this skill grows the corresponding tier rows then — not before (per § 5 anti-bloat).
 
 ---
 

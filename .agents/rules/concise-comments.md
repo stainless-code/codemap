@@ -1,6 +1,5 @@
 ---
 description: Sweep your own new comments at the end of every change. Keep what code can't say; cut the rest.
-globs: "**/*.{ts,tsx,css,html,md}"
 alwaysApply: true
 ---
 

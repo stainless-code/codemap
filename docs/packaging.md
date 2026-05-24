@@ -27,7 +27,7 @@ Same schema and CLI; implementation differs by runtime. Details: [architecture.m
 | ------------- | --------------------------------- | --------------------------------------------- |
 | SQLite        | **`bun:sqlite`** (`sqlite-db.ts`) | **`better-sqlite3`**                          |
 | Workers       | **`Worker`** → `parse-worker.ts`  | **`worker_threads`** → `parse-worker-node.ts` |
-| Include globs | **`Glob`** (`glob-sync.ts`)       | **`tinyglobby`**                              |
+| Include globs | **`tinyglobby`** (`glob-sync.ts`) | **`tinyglobby`** (`glob-sync.ts`)             |
 | JSON config   | **`Bun.file(…).json()`**          | **`readFile` + `JSON.parse`** (`config.ts`)   |
 
 **`db.ts`** does not import **`bun:sqlite`**. Upstream API: [Bun SQLite](https://bun.com/docs/api/sqlite). No **`bun build --compile`** shipping — see [Bun executables](https://bun.sh/docs/bundler/executables).

@@ -1,3 +1,8 @@
+---
+description: Read lessons at session start; append after corrections
+alwaysApply: true
+---
+
 # Lessons Convention
 
 ## Rules

@@ -53,11 +53,11 @@ One row per `AwaitExpression`. Captures `awaited_expression` source text, option
 
 ### barrel file
 
-In Codemap usage: a file whose exports are entirely re-exports with no local value symbols — surfaced as `files.is_barrel = 1` (post-pass) and by the `barrel-files` / `find-barrel-files` recipes. Distinct from **hub** below — barrel measures _exports out_, hub measures _imports in_.
+In Codemap usage: a file whose exports are entirely re-exports with no local value symbols — surfaced as `files.is_barrel = 1` (post-pass). **`find-barrel-files`** lists barrel files (`is_barrel = 1`); **`barrel-files`** ranks files by export count (hub detection). Distinct from **hub** below — barrel measures _exports out_, hub measures _imports in_.
 
 ### batch insert
 
-The shared `batchInsert<T>()` helper in `src/db.ts`. Splits inserts into multi-row `INSERT … VALUES (…),(…)` statements of `BATCH_SIZE` (500) rows each, with pre-computed placeholder strings. Used by every `insertX` function.
+The shared `batchInsert<T>()` helper in `src/db.ts`. Splits inserts into multi-row `INSERT … VALUES (…),(…)` statements sized by `batchSizeForTuple()` (cap **`MAX_ROWS_PER_BATCH = 5000`**), with pre-computed placeholder strings. Used by every `insertX` function.
 
 ### `bindings` (table) / bindings resolver
 
@@ -441,7 +441,7 @@ A managed root-level file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copil
 
 ### query
 
-Any SQL run against `.codemap/index.db` — either a **recipe** (bundled SQL) or ad-hoc. Distinct from **query-recipes.ts** (the file that holds bundled recipe SQL strings).
+Any SQL run against `.codemap/index.db` — either a **recipe** (bundled SQL) or ad-hoc. Bundled SQL lives in `templates/recipes/`; **`src/application/query-recipes.ts`** is the registry/loader shim over **`recipes-loader.ts`**.
 
 ### query baseline
 

@@ -58,7 +58,7 @@ codemap agents init                                          # scaffold .agents/
 codemap apply rename-preview --params old=foo,new=bar --dry-run  # preview recipe-driven edits (substrate executor)
 ```
 
-**Version-matched agent guidance:** `codemap agents init` writes **thin pointer files** to `.agents/` (~16-line SKILL.md + ~22-line rule). The full content is served live by **`codemap skill`** / **`codemap rule`** (CLI) and **`codemap://skill`** / **`codemap://rule`** (MCP / HTTP) — so `bun update @stainless-code/codemap` auto-refreshes the content agents see, no re-init needed. See [docs/agents.md](docs/agents.md).
+**Version-matched agent guidance:** `codemap agents init` writes **thin pointer files** to `.agents/` (short SKILL + rule). The full content is served live by **`codemap skill`** / **`codemap rule`** (CLI) and **`codemap://skill`** / **`codemap://rule`** (MCP / HTTP) — so `bun update @stainless-code/codemap` auto-refreshes the content agents see, no re-init needed. See [docs/agents.md](docs/agents.md).
 
 ### Full reference
 
@@ -121,11 +121,11 @@ codemap audit --json --summary --baseline base                  # counts-only �
 codemap audit --files-baseline base-files                       # explicit per-delta — runs only the slots provided
 codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto-resolve deps + deprecated; override files
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
-codemap audit --base origin/main --json                         # ad-hoc — worktree+reindex against any committish; no --save-baseline needed
+codemap audit --base origin/main --json                         # ad-hoc — archive+reindex against any committish; no --save-baseline needed
 codemap audit --base origin/main --format sarif                 # emit SARIF 2.1.0 directly (Code Scanning); also: --ci alias
 codemap audit --base origin/main --ci                           # CI shortcut: --format sarif + non-zero exit on additions + quiet
 codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override
-# --base materialises <ref> via `git worktree add` to .codemap/audit-cache/<sha>/, reindexes into
+# --base materialises <ref> via `git archive | tar -x` to .codemap/audit-cache/<sha>/, reindexes into
 # a temp DB, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
 # non-git projects get a clean `--base requires a git repository` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
@@ -213,8 +213,8 @@ codemap mcp                                                     # JSON-RPC on st
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
 #        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact, apply
 # Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
-#            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
-#            codemap://files/{path}, codemap://symbols/{name} (live per-file / per-symbol roll-ups)
+#            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh)
+# HTTP-only resources (via `codemap serve` GET /resources/{uri}): codemap://files/{path}, codemap://symbols/{name}
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
 # Another project
@@ -265,7 +265,7 @@ Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 | Command                              | Purpose                                                                                                                                                                            |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                                                                                                                               |
-| `bun run check`                      | Build, format check, lint, tests, typecheck — run before pushing                                                                                                                   |
+| `bun run check`                      | Build, format check, lint, tests, typecheck, golden queries — run before pushing                                                                                                   |
 | `bun run fix`                        | Apply lint fixes, then format                                                                                                                                                      |
 | `bun run test` / `bun run typecheck` | Focused checks                                                                                                                                                                     |
 | `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)                                                                                                                |
@@ -275,7 +275,7 @@ Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 
 ```bash
 bun install
-bun run check    # build + format:check + lint + test + typecheck
+bun run check    # build + format:check + lint:ci + test + typecheck + test:golden
 bun run fix      # oxlint --fix, then oxfmt
 ```
 

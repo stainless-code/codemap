@@ -1,6 +1,5 @@
 ---
 description: Never remove comments, TODOs, or commented-out code without explicit confirmation
-globs: "**/*.{ts,tsx,css,html}"
 alwaysApply: true
 ---
 

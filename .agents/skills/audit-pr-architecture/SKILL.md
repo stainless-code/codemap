@@ -5,7 +5,7 @@ description: Audit a PR's structural choices against architecture-priming, the r
 
 # Audit a PR's architecture
 
-Mid-flight or post-merge structural review of a PR against the repo's own architecture and boundary conventions. Sister skill to [`pr-comment-fact-check`](../pr-comment-fact-check/SKILL.md) when codemap adopts that one (reviewer-comment-driven).
+Mid-flight or post-merge structural review of a PR against the repo's own architecture and boundary conventions. Sister skill to [`pr-comment-fact-check`](../pr-comment-fact-check/SKILL.md) (reviewer-comment-driven triage).
 
 This skill exists because:
 
@@ -34,7 +34,7 @@ Also fire **proactively** when:
 ### 1. Reindex codemap and identify the diff scope
 
 ```bash
-bun run codemap   # or: codemap (from outside the repo)
+bun src/index.ts   # or: codemap (from outside the repo)
 git diff --name-status origin/main...HEAD
 ```
 
@@ -148,7 +148,7 @@ Doc shape — mirror the most recent audit under `docs/audits/` (or — if this 
 **Scope:** <one paragraph: what diff, what HEAD, what subtree(s)>.
 **Method:** <codemap audit + structural-smell recipes + cross-check; cite which queries>.
 
-This audit follows [docs/README.md Rule 6](../README.md) (no inventory counts in evergreen prose) and [docs/README.md Rule 7](../README.md) (no line-number references). All numbers below are flagged "at audit time."
+This audit follows [docs/README.md Rule 6](../../../docs/README.md) (no inventory counts in evergreen prose) and [docs/README.md Rule 7](../../../docs/README.md) (no line-number references). All numbers below are flagged "at audit time."
 
 ---
 
