@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path";
+
 import type { CodemapDatabase } from "../db";
 import { getFts5Enabled } from "../runtime";
 import { isSourceFtsPopulated, searchSymbols } from "./search-engine";
@@ -57,7 +59,7 @@ export function executeShowLookup(
   };
 }
 
-/** Parse `--query` and normalize `path:` to project-relative keys. */
+/** Parse `--query` and normalize `path:` / `in:` to project-relative keys. */
 export function parseAndNormalizeSearchQuery(
   query: string,
   projectRoot: string,
@@ -72,7 +74,28 @@ export function parseAndNormalizeSearchQuery(
   if (parsed.path !== undefined) {
     parsed.path = toProjectRelative(projectRoot, parsed.path);
   }
+  if (parsed.inGlob !== undefined) {
+    parsed.inGlob = normalizeSearchInGlob(projectRoot, parsed.inGlob);
+  }
   return { ok: true, parsed };
+}
+
+/** Normalize absolute path prefixes in `in:` globs to project-relative keys. */
+export function normalizeSearchInGlob(
+  projectRoot: string,
+  glob: string,
+): string {
+  const metaIdx = glob.search(/[*?\[]/);
+  if (metaIdx === -1) {
+    return isAbsolute(glob) ? toProjectRelative(projectRoot, glob) : glob;
+  }
+  const prefix = glob.slice(0, metaIdx);
+  const suffix = glob.slice(metaIdx);
+  const prefixBody = prefix.replace(/\/+$/, "");
+  if (prefixBody.length === 0 || !isAbsolute(prefixBody)) return glob;
+  const rel = toProjectRelative(projectRoot, prefixBody);
+  const sep = prefix.endsWith("/") ? "/" : "";
+  return `${rel}${sep}${suffix}`;
 }
 
 export interface ResolveSearchWithFtsResult {

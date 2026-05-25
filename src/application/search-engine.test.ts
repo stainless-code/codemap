@@ -80,6 +80,7 @@ describe("buildSymbolSearchSql", () => {
   it("formatFtsMatchQuery quotes phrases for literal FTS match", () => {
     expect(formatFtsMatchQuery(["hello OR world"])).toBe('"hello OR world"');
     expect(formatFtsMatchQuery(["a", "b"])).toBe('"a" "b"');
+    expect(formatFtsMatchQuery(['say "hi"'])).toBe('"say ""hi"""');
   });
 
   it("--print-sql inlines literals safely", () => {
@@ -163,5 +164,25 @@ describe("searchSymbols", () => {
       withFts: true,
     });
     expect(rows.every((r) => r.file_path === "src/api/auth.ts")).toBe(true);
+  });
+
+  it("FTS returns all symbols in a matching file, not name-filtered rows", () => {
+    db.run(
+      `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+       VALUES ('src/api/auth.ts', 'helperFn', 'function', 20, 25, 'function helperFn(): void', 1, 0)`,
+    );
+    upsertSourceFts(db, "src/api/auth.ts", "uniqueSecretTokenInBody");
+    const rows = searchSymbols(db, {
+      parsed: {
+        namePatterns: [],
+        freeText: ["uniqueSecretTokenInBody"],
+      },
+      withFts: true,
+    });
+    expect(rows.map((r) => r.name).sort()).toEqual([
+      "AuthContext",
+      "authenticate",
+      "helperFn",
+    ]);
   });
 });

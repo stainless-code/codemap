@@ -46,6 +46,8 @@ Field-qualified search (--query):
   in:<glob>          SQLite GLOB on file_path (e.g. in:src/**/*.ts).
   Free text          Unqualified tokens → name LIKE, or source_fts phrase
                      search when FTS5 is indexed (--with-fts or fts5: true).
+                     With FTS, matches file bodies — returns all symbols in
+                     matching files (not symbol-level body hits).
 
 Args:
   <name>             Exact symbol name (case-sensitive). Omit when using

@@ -28,6 +28,8 @@ SELECT s.name, s.kind, s.file_path, s.line_start, s.line_end, s.signature,
 FROM symbols s JOIN source_fts fts ON fts.file_path = s.file_path
 WHERE source_fts MATCH '"Auth"'
 ORDER BY s.file_path ASC, s.line_start ASC;
+-- Note: FTS matches file bodies via source_fts — every symbol in a matching
+-- file is returned, not just symbols whose names contain the free-text token.
 
 -- All exported symbols from a file
 SELECT name, kind, signature

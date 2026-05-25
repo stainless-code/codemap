@@ -275,4 +275,15 @@ describe("runShowCmd — query zero-match JSON envelope", () => {
     expect(json.warning).toContain("source_fts is empty");
     expect(r.err).toContain("source_fts is empty");
   });
+
+  it("prints generated SQL for --query --print-sql", async () => {
+    const r = await runCli(
+      ["show", "--query", "kind:function name:entry", "--print-sql"],
+      { CODEMAP_ROOT: projectRoot },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.out).toContain("kind = 'function'");
+    expect(r.out).toContain("name LIKE '%entry%'");
+    expect(r.out).toContain("ORDER BY file_path ASC, line_start ASC");
+  });
 });

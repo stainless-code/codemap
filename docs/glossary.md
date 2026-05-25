@@ -510,7 +510,7 @@ Integer constant in `src/db.ts`. Bumped only for rebuild-forcing DDL changes; ad
 
 ### show
 
-`codemap show <name>` — one-step lookup that returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for symbol(s). **Exact mode:** `<name>` is case-sensitive; flags `--kind`, `--in`. **Field-qualified mode:** `--query 'kind:… name:… path:… in:…'` with optional free text; `--with-fts` (or `fts5: true` when indexed) searches file bodies via `source_fts`; `--print-sql` prints Moat-A equivalent SQL. Output: `{matches, disambiguation?, warning?}` (`warning` when FTS was requested but `source_fts` is empty). MCP: `show` with `{name}` or `{query, with_fts?}`. Distinct from **snippet** (adds source text) and from hand-composed `query` SQL. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+`codemap show <name>` — one-step lookup that returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for symbol(s). **Exact mode:** `<name>` is case-sensitive; flags `--kind`, `--in`. **Field-qualified mode:** `--query 'kind:… name:… path:… in:…'` with optional free text; `--with-fts` (or `fts5: true` when indexed) searches file bodies via `source_fts` and returns every symbol in matching files; `--print-sql` prints Moat-A equivalent SQL. Output: `{matches, disambiguation?, warning?}` (`warning` when FTS was requested but `source_fts` is empty). MCP: `show` with `{name}` or `{query, with_fts?}`. Distinct from **snippet** (adds source text) and from hand-composed `query` SQL. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
 
 ### snippet
 

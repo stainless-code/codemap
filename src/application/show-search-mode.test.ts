@@ -5,6 +5,7 @@ import type { CodemapDatabase } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   executeShowLookup,
+  normalizeSearchInGlob,
   parseAndNormalizeSearchQuery,
   resolveSearchWithFts,
   resolveShowLookupMode,
@@ -19,6 +20,30 @@ describe("parseAndNormalizeSearchQuery", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.parsed.path).toBe("src/api");
+  });
+
+  it("normalizes absolute in: glob prefix to project-relative", () => {
+    const r = parseAndNormalizeSearchQuery(
+      "in:/tmp/project/src/**/*.ts",
+      "/tmp/project",
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.parsed.inGlob).toBe("src/**/*.ts");
+  });
+});
+
+describe("normalizeSearchInGlob", () => {
+  it("leaves relative globs unchanged", () => {
+    expect(normalizeSearchInGlob("/tmp/project", "src/**/*.ts")).toBe(
+      "src/**/*.ts",
+    );
+  });
+
+  it("normalizes absolute globs", () => {
+    expect(
+      normalizeSearchInGlob("/tmp/project", "/tmp/project/src/api/*.ts"),
+    ).toBe("src/api/*.ts");
   });
 });
 

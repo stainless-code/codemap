@@ -39,7 +39,9 @@ Args:
 
 Flags:
   --query <q>        Field-qualified discovery search (same as show).
-  --with-fts         FTS phrase search for free-text tokens when indexed.
+  --with-fts         FTS phrase search for free-text tokens when indexed
+                     (matches file bodies — returns all symbols in matching
+                     files, not symbol-level body hits).
   --kind <kind>      Filter by symbols.kind (exact-name mode only).
   --in <path>        Filter by file scope (exact-name mode only).
   --json             Emit the JSON envelope (always wrapped in {matches}).
