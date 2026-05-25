@@ -10,11 +10,11 @@
 
 ## Quick resume
 
-| Next action         | Detail                                                                                                |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| **In flight**       | **PR 9** — `agent-eval-harness` (tracer bullet: probe arms + log parser) on `feat/agent-eval-harness` |
-| **Recently merged** | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)            |
-|                     | [#135](https://github.com/stainless-code/codemap/pull/135) — agents init `--mcp` (PR 8)               |
+| Next action         | Detail                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **In review**       | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval harness (PR 9) on `feat/agent-eval-harness` |
+| **Recently merged** | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                          |
+|                     | [#135](https://github.com/stainless-code/codemap/pull/135) — agents init `--mcp` (PR 8)                             |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -44,7 +44,7 @@ Max **3 parallel tracks** at once.
 | **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions | merged | [#134](https://github.com/stainless-code/codemap/pull/134) | PR 1, PR 4 |
 | **7** | [`field-qualified-search`](./field-qualified-search.md) | merged | [#138](https://github.com/stainless-code/codemap/pull/138) | PR 1, PR 6 |
 | **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md) | merged | [#135](https://github.com/stainless-code/codemap/pull/135) | 3–5 |
-| **9** | [`agent-eval-harness`](./agent-eval-harness.md) | open | `feat/agent-eval-harness` | PR 1, PR 8 (merged), allowlist |
+| **9** | [`agent-eval-harness`](./agent-eval-harness.md) | open | [#139](https://github.com/stainless-code/codemap/pull/139) | PR 1, PR 8 (merged), allowlist |
 
 **Parallelization constraints**
 
