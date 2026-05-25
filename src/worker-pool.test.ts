@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   parseFilesParallel,
   parseParseWorkerCountOverride,
+  parseWorkerRecycleEvery,
 } from "./worker-pool";
 
 describe("parseParseWorkerCountOverride", () => {
@@ -23,6 +24,16 @@ describe("parseParseWorkerCountOverride", () => {
   test("treats unset or empty as no override", () => {
     expect(parseParseWorkerCountOverride(undefined)).toBeNull();
     expect(parseParseWorkerCountOverride("")).toBeNull();
+  });
+});
+
+describe("parseWorkerRecycleEvery", () => {
+  test("defaults when unset", () => {
+    expect(parseWorkerRecycleEvery(undefined)).toBe(250);
+  });
+
+  test("accepts positive integers", () => {
+    expect(parseWorkerRecycleEvery("100")).toBe(100);
   });
 });
 
