@@ -124,6 +124,7 @@ describe("http-server — health + tools catalog", () => {
     expect(body.tools.map((t) => t.name)).toContain("query");
     expect(body.tools.map((t) => t.name)).toContain("audit");
     expect(body.tools.map((t) => t.name)).toContain("affected");
+    expect(body.tools.map((t) => t.name)).toContain("trace");
   });
 
   it("404 for unknown route", async () => {
@@ -405,6 +406,141 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.error).not.toContain("--changed-since");
   });
 
+  function seedTraceGraph() {
+    writeFileSync(
+      join(benchDir, "src", "trace.ts"),
+      "export function alpha() {\n  return beta();\n}\nexport function beta() {\n  return 1;\n}\n",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/trace.ts', 'ht', 100, 6, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+         VALUES ('alpha', 'function', 'src/trace.ts', 1, 3, 'alpha()', 1, NULL, 'export'),
+                ('beta', 'function', 'src/trace.ts', 4, 6, 'beta()', 1, NULL, 'export')`,
+      );
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ('src/trace.ts', 'alpha', 'alpha', 'beta', 2, 0, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("trace returns path and snippets", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.path).toHaveLength(1);
+    expect(r.json.snippets.length).toBeGreaterThan(0);
+    expect(r.json.truncated).toBe(false);
+  });
+
+  it("explore merges neighborhoods", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", {
+      names: ["alpha", "beta"],
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.names).toEqual(["alpha", "beta"]);
+    expect(r.json.rows.length).toBeGreaterThan(0);
+  });
+
+  it("node returns center + neighborhood", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "node", {
+      name: "alpha",
+      include_snippets: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.center.matches[0]?.name).toBe("alpha");
+    expect(
+      r.json.neighborhood.some((row: { name: string }) => row.name === "beta"),
+    ).toBe(true);
+  });
+
+  it("trace with non-integer max_depth → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "a",
+      to: "b",
+      max_depth: 1.5,
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+  });
+
+  it("explore with empty names → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", { names: [] });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"explore"');
+  });
+
+  it("trace sets truncated when budget_chars is tiny", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+      budget_chars: 1,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.truncated).toBe(true);
+    expect(r.json.truncation?.snippets).toBe(true);
+  });
+
+  it("records recipe recency after trace", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+    });
+    expect(r.status).toBe(200);
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'call-path'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("records recipe recency after explore", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", {
+      names: ["alpha"],
+    });
+    expect(r.status).toBe(200);
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'symbol-neighborhood'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("list_baselines returns array (empty when none saved)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "list_baselines", {});
@@ -581,6 +717,29 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
       direction: "sideways",
     });
     expect(r.status).toBe(400);
+  });
+
+  it("trace without from → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", { to: "bar" });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+    expect(r.json.error).toContain("from");
+  });
+
+  it("trace without to → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", { from: "foo" });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+    expect(r.json.error).toContain("to");
+  });
+
+  it("node with name=number → 400 (not deep handler crash)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "node", { name: 1 });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("name");
   });
 });
 
