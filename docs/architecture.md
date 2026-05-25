@@ -849,6 +849,34 @@ bun src/index.ts query --json "
 
 Expected: `[]`. Non-empty = a new caller appeared without a docs update — escalate per [`audit-pr-architecture` skill](../.agents/skills/audit-pr-architecture/SKILL.md).
 
+### Boundary verification — `agents-template-path` leaf
+
+`agents-template-path.ts` is the leaf bundled-template resolver; only init + live-fetch surfaces may import it (tests included). Re-runnable kit:
+
+```bash
+bun src/index.ts query --json "
+  SELECT DISTINCT file_path FROM imports
+  WHERE source LIKE '%agents-template-path%'
+    AND (specifiers LIKE '%\"resolveAgentsTemplateDir\"%')
+    AND file_path NOT IN ('src/agents-init.ts',
+                          'src/application/agent-content.ts',
+                          'src/application/query-recipes.ts',
+                          'src/agents-init.test.ts')
+"
+```
+
+Expected: `[]`. **`application/` must not import `agents-init`** for template resolution:
+
+```bash
+bun src/index.ts query --json "
+  SELECT DISTINCT file_path, source FROM imports
+  WHERE file_path LIKE 'src/application/%'
+    AND source LIKE '%agents-init%'
+"
+```
+
+Expected: `[]`.
+
 ## SQLite Performance Configuration
 
 ### `bun:sqlite` API
