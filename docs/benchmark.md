@@ -9,7 +9,7 @@
 | **Point Codemap at another directory** (large app clone, QA target) while hacking in **this** repo — `CODEMAP_*`, `.env`, where `.codemap/index.db` goes | [§ Indexing another project](#indexing-another-project)                          |
 | **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
 | **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
-| **Guardrail full-rebuild per-phase walls against a committed baseline** (CI regression gate)                                                             | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
+| **Guardrail full-rebuild per-phase walls against a committed baseline** (local + weekly scheduled)                                                       | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
 
 ---
 
@@ -209,14 +209,14 @@ Independent of the consumer-facing scenarios above, the repo carries a **per-pha
 1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `total_ms`.
 2. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps that report as JSON to `<path>` after the run (no CLI flag added; env-var only).
 3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares to `fixtures/benchmark/perf-baseline.json`.
-4. CI job `📈 Perf baseline (self-index)` (in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) invokes the script on every PR. Hard gate (merge-blocking) since the baseline was re-captured from CI runner medians.
+4. **Local / scheduled only** — run before perf-sensitive PRs; [`.github/workflows/perf-baseline.yml`](../.github/workflows/perf-baseline.yml) fires weekly + `workflow_dispatch` for drift visibility. **Not** on the PR CI path (6 min × 3 runs + bimodal GHA runners → flaky merge gate).
 
 ### Why this is separate from `src/benchmark.ts`
 
-| Surface                                  | Audience                       | Fixture                                            | Gate?                           |
-| ---------------------------------------- | ------------------------------ | -------------------------------------------------- | ------------------------------- |
-| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational)              |
-| `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (self-index)                             | Yes (hard gate; merge-blocking) |
+| Surface                                  | Audience                       | Fixture                                            | Gate?                                         |
+| ---------------------------------------- | ------------------------------ | -------------------------------------------------- | --------------------------------------------- |
+| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational; runs in PR CI)             |
+| `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (self-index)                             | Local + weekly scheduled (not merge-blocking) |
 
 The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is only measurable on a tree with real cross-file edges, and (b) the audit triangulation's numbers were captured here.
 
@@ -247,6 +247,16 @@ Implication for local devs:
 - Local `bun run check:perf-baseline` should show **wide negative deltas** (you're faster than CI). That's expected — passes the check.
 - Local `bun run check:perf-baseline:update` will write **dev-machine** numbers. **Do not commit those.** If you need to refresh the baseline because of an intentional perf change, let CI capture the numbers and copy them in, OR open a PR with the baseline update and trust CI to validate it.
 - Future improvement: a `workflow_dispatch` job that re-captures + commits the baseline from CI itself, removing the manual copy step.
+
+#### CI runner variance (bimodal)
+
+GitHub Actions `ubuntu-latest` runners are **not homogeneous**. On the same commit, perf-baseline can land on a fast tier (~630 ms `total_ms`) or a slow tier (~1117 ms) — a ~75% spread with no code change. Within a single job, 3–5 consecutive runs on one runner stay tight; cross-job variance dominates.
+
+**Symptom:** `index_create_ms` or `parse_ms` fails at +25–35% while `total_ms` is only +15% (under gate). Recent example: [CI run 26409304578](https://github.com/stainless-code/codemap/actions/runs/26409304578) — `index_create_ms` 104→137 (+31.7%) on a slow runner; an earlier run the same day passed at 633 ms total on a fast runner.
+
+**Baseline strategy:** capture medians from the **slow tier** (copy from a failing or borderline scheduled CI log, not from local dev). Fast-tier runs then show negative deltas (pass). The +25% gate still catches real regressions on the slow tier when you run the check locally or on the weekly workflow.
+
+**When refreshing:** aggregate medians from 2–3 slow-tier CI logs on `main`, not a single lucky fast run.
 
 #### Where the index doesn't help
 

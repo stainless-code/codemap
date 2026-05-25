@@ -151,25 +151,6 @@ jobs:
           bun run dev --full
           bun run benchmark
 
-  perf-baseline:
-    # Regression guardrail per docs/plans/perf-triangulation-rollout.md Tier 1.2.
-    # Hard gate since #99 re-baselined from CI runner medians (~5% within-run
-    # variance, well inside the 25% threshold). Add to branch protection's
-    # required_status_checks list for true merge-blocking enforcement.
-    name: 📈 Perf baseline (self-index)
-    needs: skip-ci
-    if: needs['skip-ci'].outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Compare per-phase wall vs baseline
-        run: bun run check:perf-baseline
-
   audit:
     # Non-blocking — visibility into transitive-dep CVEs without gating PRs.
     # Promote to a hard gate once the team agrees on a vulnerability budget.
@@ -219,8 +200,7 @@ jobs:
 
   ci-complete:
     name: CI complete
-    needs:
-      [skip-ci, format, lint, typecheck, test, build, benchmark, perf-baseline]
+    needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -232,8 +212,7 @@ jobs:
             needs.typecheck.result != 'success' ||
             needs.test.result != 'success' ||
             needs.build.result != 'success' ||
-            needs.benchmark.result != 'success' ||
-            needs['perf-baseline'].result != 'success'
+            needs.benchmark.result != 'success'
           )
         run: exit 1
 
