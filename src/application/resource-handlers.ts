@@ -2,9 +2,10 @@
  * Pure transport-agnostic resource fetchers — every MCP resource the
  * codemap server exposes (`codemap://recipes`, `codemap://recipes/{id}`,
  * `codemap://schema`, `codemap://skill`, `codemap://rule`,
- * `codemap://files/{path}`, `codemap://symbols/{name}`) is also reachable
+ * `codemap://mcp-instructions`, `codemap://files/{path}`,
+ * `codemap://symbols/{name}`) is also reachable
  * over HTTP via `GET /resources/{encoded-uri}`. Lazy-cached:
- * `schema` / `skill` / `rule` (constant for the process lifetime).
+ * `schema` / `skill` / `rule` / `mcp-instructions` (constant for the process lifetime).
  * Live read-per-call: `recipes` / `recipes/{id}` (recipes carry inline
  * recency fields that must reflect mutations during the server lifetime),
  * `files/{path}` / `symbols/{name}` (the index can change between calls
@@ -12,7 +13,7 @@
  */
 
 import { closeDb, openDb } from "../db";
-import { assembleAgentContent } from "./agent-content";
+import { assembleAgentContent, assembleMcpInstructions } from "./agent-content";
 import {
   getQueryRecipeCatalogEntry,
   listQueryRecipeCatalog,
@@ -33,6 +34,7 @@ export interface ResourcePayload {
 let schemaCache: ResourcePayload | undefined;
 let skillCache: ResourcePayload | undefined;
 let ruleCache: ResourcePayload | undefined;
+let mcpInstructionsCache: ResourcePayload | undefined;
 
 /**
  * Test-only escape hatch — drops every cached payload so a temp-DB test
@@ -42,6 +44,7 @@ export function _resetResourceCachesForTests(): void {
   schemaCache = undefined;
   skillCache = undefined;
   ruleCache = undefined;
+  mcpInstructionsCache = undefined;
 }
 
 /**
@@ -62,6 +65,7 @@ export function readResource(uri: string): ResourcePayload | undefined {
   if (uri === "codemap://schema") return readSchema();
   if (uri === "codemap://skill") return readSkill();
   if (uri === "codemap://rule") return readRule();
+  if (uri === "codemap://mcp-instructions") return readMcpInstructions();
   if (uri.startsWith("codemap://files/")) {
     const path = decodeURIComponent(uri.slice("codemap://files/".length));
     return readFileResource(path);
@@ -97,6 +101,10 @@ export function listResources(): { uri: string; description: string }[] {
     {
       uri: "codemap://rule",
       description: "Full text of the bundled codemap rule markdown.",
+    },
+    {
+      uri: "codemap://mcp-instructions",
+      description: "MCP initialize tool-selection playbook.",
     },
     {
       uri: "codemap://files/{path}",
@@ -174,6 +182,15 @@ function readRule(): ResourcePayload {
     text: assembleAgentContent("rule"),
   };
   return ruleCache;
+}
+
+function readMcpInstructions(): ResourcePayload {
+  if (mcpInstructionsCache !== undefined) return mcpInstructionsCache;
+  mcpInstructionsCache = {
+    mimeType: "text/markdown",
+    text: assembleMcpInstructions(),
+  };
+  return mcpInstructionsCache;
 }
 
 /**
