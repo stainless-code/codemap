@@ -27,10 +27,19 @@ async function runCli(
     cwd: repoRoot,
     stdout: "pipe",
     stderr: "pipe",
-    stdin:
-      opts.stdin === undefined ? "ignore" : new Blob([opts.stdin]).stream(),
+    stdin: opts.stdin === undefined ? "ignore" : "pipe",
     env: { ...process.env, ...opts.env },
   });
+  if (opts.stdin !== undefined) {
+    const stdin = proc.stdin;
+    if (stdin === undefined) {
+      throw new Error(
+        "cmd-affected.test: expected pipe stdin on spawned process.",
+      );
+    }
+    stdin.write(opts.stdin);
+    stdin.end();
+  }
   const exitCode = await proc.exited;
   const out = await new Response(proc.stdout).text();
   const err = await new Response(proc.stderr).text();
