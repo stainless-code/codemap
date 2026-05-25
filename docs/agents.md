@@ -60,6 +60,8 @@ All integrations reuse the **same** bundled content under **`.agents/`**. Symlin
 
 When the file watcher is off (WSL `/mnt/*` mounts, `CODEMAP_WATCH=0`, etc.), **`codemap agents init --git-hooks`** installs marker-delimited blocks in **`post-commit`**, **`post-merge`**, and **`post-checkout`** that run `( codemap >/dev/null 2>&1 & )` — non-blocking background incremental index. **`--no-git-hooks`** removes only codemap-marked blocks. Interactive init offers hooks automatically when [`watch-policy.ts`](../src/application/watch-policy.ts) would disable the watcher for the project root.
 
+Concurrent indexers (CLI, MCP `--watch`, git hooks) coordinate via **`<state-dir>/index.lock`**. If indexing fails with “Index already running” after a crash, run **`codemap unlock`**. Per-file parse failures append to **`<state-dir>/errors.log`**.
+
 ## Pointer files
 
 Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md`**, **`.github/copilot-instructions.md`**) use a **managed section** between **`<!-- codemap-pointer:begin -->`** and **`<!-- codemap-pointer:end -->`** (HTML comments — usually hidden in rendered Markdown):

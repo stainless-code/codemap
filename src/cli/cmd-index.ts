@@ -1,6 +1,7 @@
 import { extname } from "node:path";
 
 import { VALID_EXTENSIONS } from "../application/index-engine";
+import { IndexLockHeldError } from "../application/index-lock";
 import { runCodemapIndex } from "../application/run-index";
 import { closeDb, openDb } from "../db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
@@ -38,6 +39,12 @@ export async function runIndexCmd(opts: {
         performance: reportPerformance,
       });
     }
+  } catch (err) {
+    if (err instanceof IndexLockHeldError) {
+      console.error(err.message);
+      process.exit(1);
+    }
+    throw err;
   } finally {
     closeDb(db);
   }

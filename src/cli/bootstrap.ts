@@ -63,6 +63,7 @@ Coverage ingest (Istanbul JSON or LCOV from any test runner):
   codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected
 
 Other:
+  codemap unlock [--force]     Remove stale cross-process index lock
   codemap version
   codemap --version, -V
 

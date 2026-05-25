@@ -490,6 +490,22 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "unlock") {
+    const { parseUnlockRest, printUnlockCmdHelp, runUnlockCmd } =
+      await import("./cmd-unlock.js");
+    const parsed = parseUnlockRest(rest);
+    if (parsed.kind === "help") {
+      printUnlockCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runUnlockCmd({ root, stateDir, force: parsed.force });
+    return;
+  }
+
   const { runIndexCmd } = await import("./cmd-index.js");
   await runIndexCmd({ root, configFile, stateDir, fts5Cli, rest });
 }

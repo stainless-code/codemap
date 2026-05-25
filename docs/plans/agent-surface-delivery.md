@@ -10,11 +10,11 @@
 
 ## Quick resume
 
-| Next action           | Detail                                                                                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Review / merge P0** | PR [#126](https://github.com/stainless-code/codemap/pull/126) (MCP instructions + allowlist), PR [#127](https://github.com/stainless-code/codemap/pull/127) (WSL watch + git hooks) |
-| **Start next**        | **PR 3** — [`index-lock-and-error-log`](./index-lock-and-error-log.md) on branch from fresh `main`                                                                                  |
-| **Do not start yet**  | PR 6 (MCP trace tools) until PR 1 + PR 4 land; PR 9 (eval harness) until PR 1 + PR 8                                                                                                |
+| Next action          | Detail                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Review / merge**   | PR 3 — index lock + error log (branch `feat/index-lock`) when open                                                                   |
+| **Start next**       | **PR 4** — trace recipes (`call-path`, `symbol-neighborhood`) or **PR 5** — `affected-tests-recipe` (parallel with 4 after 3 merges) |
+| **Do not start yet** | PR 6 (MCP trace tools) until PR 4 land; PR 9 (eval harness) until PR 8                                                               |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -26,24 +26,24 @@ Merge each PR to `main` directly. No long-lived integration branch (`feat/agent-
 
 ### Wave 1 — P0 (~1 week wall clock, 2 PRs)
 
-| PR    | Plans bundled                                                                                               | Status | Branch / link                                                                           | Notes                                                                                                                       |
-| ----- | ----------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **1** | [`mcp-server-instructions`](./mcp-server-instructions.md) + [`mcp-tool-allowlist`](./mcp-tool-allowlist.md) | open   | [`feat/mcp-instructions-allowlist`](https://github.com/stainless-code/codemap/pull/126) | Same hot files (`mcp-server.ts`, `agent-content`); ~3–4 days                                                                |
-| **2** | [`wsl-watch-policy`](./wsl-watch-policy.md) → [`git-hook-auto-sync`](./git-hook-auto-sync.md)               | open   | [`feat/wsl-watch-git-hooks`](https://github.com/stainless-code/codemap/pull/127)        | `watch-policy.ts` first; hooks reference it in diagnostics. Lock deferred to PR 3 — note concurrent hook + MCP in PR 2 body |
+| PR    | Plans bundled                                                                                               | Status | Branch / link                                              | Notes                                                                                                                       |
+| ----- | ----------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **1** | [`mcp-server-instructions`](./mcp-server-instructions.md) + [`mcp-tool-allowlist`](./mcp-tool-allowlist.md) | merged | [#126](https://github.com/stainless-code/codemap/pull/126) | Same hot files (`mcp-server.ts`, `agent-content`); ~3–4 days                                                                |
+| **2** | [`wsl-watch-policy`](./wsl-watch-policy.md) → [`git-hook-auto-sync`](./git-hook-auto-sync.md)               | merged | [#127](https://github.com/stainless-code/codemap/pull/127) | `watch-policy.ts` first; hooks reference it in diagnostics. Lock deferred to PR 3 — note concurrent hook + MCP in PR 2 body |
 
 ### Wave 2 — P1 (~2–3 weeks, parallel tracks)
 
 Max **3 parallel tracks** at once.
 
-| PR    | Plans                                                                                                                         | Status  | Blocked by                          | Parallel with                     |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | ----------------------------------- | --------------------------------- |
-| **3** | [`index-lock-and-error-log`](./index-lock-and-error-log.md) → [`parse-worker-hardening`](./parse-worker-hardening.md) (stack) | planned | PR 2 merged (doc note on hook+lock) | 4, 5                              |
-| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)     | planned | —                                   | 3, 5                              |
-| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md)                                                                         | planned | —                                   | 3, 4                              |
-| **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions                                                  | planned | PR 1, PR 4                          | —                                 |
-| **7** | [`field-qualified-search`](./field-qualified-search.md)                                                                       | planned | PR 1                                | 4, 5 if `mcp-server.ts` untouched |
-| **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md)                                                                       | planned | PR 1                                | 3–5                               |
-| **9** | [`agent-eval-harness`](./agent-eval-harness.md)                                                                               | planned | PR 1, PR 8, allowlist               | **last P1**                       |
+| PR    | Plans                                                                                                                         | Status  | Blocked by            | Parallel with                     |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | --------------------- | --------------------------------- |
+| **3** | [`index-lock-and-error-log`](./index-lock-and-error-log.md) → [`parse-worker-hardening`](./parse-worker-hardening.md) (stack) | open    | PR 2 merged           | 4, 5                              |
+| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)     | planned | —                     | 3, 5                              |
+| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md)                                                                         | planned | —                     | 3, 4                              |
+| **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions                                                  | planned | PR 1, PR 4            | —                                 |
+| **7** | [`field-qualified-search`](./field-qualified-search.md)                                                                       | planned | PR 1                  | 4, 5 if `mcp-server.ts` untouched |
+| **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md)                                                                       | planned | PR 1                  | 3–5                               |
+| **9** | [`agent-eval-harness`](./agent-eval-harness.md)                                                                               | planned | PR 1, PR 8, allowlist | **last P1**                       |
 
 **Parallelization constraints**
 

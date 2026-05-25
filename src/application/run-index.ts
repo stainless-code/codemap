@@ -7,6 +7,7 @@ import {
 } from "../db";
 import type { CodemapDatabase } from "../db";
 import { getBoundaryRules, getFts5Enabled } from "../runtime";
+import { getStateDir } from "../runtime";
 import {
   collectFiles,
   deleteFilesFromIndex,
@@ -16,6 +17,7 @@ import {
   indexFiles,
   targetedReindex,
 } from "./index-engine";
+import { acquireIndexLock } from "./index-lock";
 import type { IndexResult, IndexTableStats } from "./types";
 
 /**
@@ -114,8 +116,30 @@ export interface RunIndexOptions {
  *
  * @remarks
  * Call `initCodemap()` and `configureResolver()` for this project before invoking (same as CLI bootstrap).
+ * Serialises in-process and via `<state-dir>/index.lock` for cross-process safety.
  */
+let indexRunChain: Promise<unknown> = Promise.resolve();
+
 export async function runCodemapIndex(
+  db: CodemapDatabase,
+  options: RunIndexOptions = {},
+): Promise<IndexResult> {
+  const run = indexRunChain.then(async () => {
+    const release = acquireIndexLock(getStateDir());
+    try {
+      return await runCodemapIndexBody(db, options);
+    } finally {
+      release();
+    }
+  });
+  indexRunChain = run.then(
+    () => {},
+    () => {},
+  );
+  return run as Promise<IndexResult>;
+}
+
+async function runCodemapIndexBody(
   db: CodemapDatabase,
   options: RunIndexOptions = {},
 ): Promise<IndexResult> {
