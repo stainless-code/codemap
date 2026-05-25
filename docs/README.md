@@ -22,7 +22,7 @@ Each topic has exactly one canonical file. Other files cross-reference by relati
 | [packaging.md](./packaging.md)                | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets; **`bun run version`** + oxfmt **`CHANGELOG.md`**).                                                                                                                                                                                                                                                                               |
 | [roadmap.md](./roadmap.md)                    | Forward-looking [**Backlog**](./roadmap.md#backlog) and [**Non-goals**](./roadmap.md#non-goals-v1) (not a `src/` inventory).                                                                                                                                                                                                                                                                                                                                                                          |
 | [plans/](./plans/)                            | One `<feature-name>.md` per in-flight plan. Created on demand — don't add the `-plan` suffix; the folder provides context. See folder contents for the current in-flight set; avoid maintaining a duplicate inline list.                                                                                                                                                                                                                                                                              |
-| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. None open; deleted audits indexed under [Closing audits (pointers)](#closing-audits-pointers) below.                                                                                                                                                                                                                                                                                                                                          |
+| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. None open.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans, non-goals reassessments). Each note links shipped items back to canonical homes — see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md).                                                                                                                                                                                                                                                                |
 
 ---
@@ -117,15 +117,13 @@ Adding a new top-level doc requires:
 
 When in doubt, default to absorbing into the closest existing root-level file (usually `roadmap.md` for forward-looking work, `architecture.md` for shipped behavior, `glossary.md` for terminology, `research/` for snapshot notes).
 
-### Closing audits (pointers)
+### Closing audits
 
-**Deleted audit files only.** Slimmed files that stay in `audits/` with a `Status: Closed` header, and plans that absorbed audit content, are self-indexing — no row here.
+When an audit closes, lift shipped work into canonical homes (`architecture.md`, a plan, `.agents/lessons.md`, `roadmap.md` backlog). **Do not leave tombstones** — no pointer table, no "recover via `git log --follow -- <deleted-path>`" rows in living docs. Deleted audit text lives in git history only; cite the shipping PR or commit when closure needs a durable anchor.
 
-Add a row when an audit file is **deleted** after closure and recovery would be non-obvious. Recover full text: `git log --follow -- <path>`.
-
-| Topic                            | Canonical home                                                               | Deleted path                                          | Closed     |
-| -------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- | ---------- |
-| Full `.md` fact-check (May 2026) | [#124](https://github.com/stainless-code/codemap/pull/124) (R.1–R.9 shipped) | `docs/audits/2026-05-24-docs-fact-check-residuals.md` | 2026-05-24 |
+- **Delete** when the re-derivable test passes (findings visible in source / no source-cites / no unique policy) — see [docs-governance § Closing an audit](../../.agents/skills/docs-governance/SKILL.md#closing-an-audit).
+- **Slim + keep** in `audits/` when the file carries decisions-of-record, source back-references, or methodology not captured elsewhere — add a `Status: Closed` header.
+- **Absorb into a plan** when the audit is the synthesis substrate for in-flight work — the plan's provenance block owns recovery (`git show <sha> -- docs/audits/…` belongs there, not in `docs/README.md`).
 
 ---
 
