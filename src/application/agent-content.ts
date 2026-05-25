@@ -39,6 +39,25 @@ export function resolveAgentContentDir(): string {
   return join(resolveAgentsTemplateDir(), "..", "agent-content");
 }
 
+const MCP_INSTRUCTIONS_FILE = "mcp-instructions.md";
+const MCP_RECIPE_REFS_RE = /<!--\s*codemap-mcp-recipe-refs:\s*([^>]+?)-->/;
+
+/** MCP initialize playbook — `templates/agent-content/mcp-instructions.md`. */
+export function assembleMcpInstructions(): string {
+  const path = join(resolveAgentContentDir(), MCP_INSTRUCTIONS_FILE);
+  return readFileSync(path, "utf8").trimEnd() + "\n";
+}
+
+/** Recipe ids declared in the MCP instructions machine-ref comment. */
+export function extractMcpInstructionRecipeIds(content: string): string[] {
+  const match = content.match(MCP_RECIPE_REFS_RE);
+  if (match === null) return [];
+  return match[1]!
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
 /**
  * Renderer registry — keyed by `<kind>/<filename>`. Files ending in
  * `.gen.md` are treated as generated content: if a renderer is
