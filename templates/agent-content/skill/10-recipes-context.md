@@ -49,7 +49,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`impact`** — `{target, direction?, via?, depth?, limit?, summary?}`. Symbol/file blast-radius walker (replaces hand-composed `WITH RECURSIVE`). Auto-resolves symbol vs file target; `via` defaults to every backend compatible with the kind.
 - **`apply`** — `{recipe, params?, dry_run?, yes?}`. Executes the diff hunks a recipe row produces (`{file_path, line_start, before_pattern, after_pattern}`). **All-or-nothing**: any conflict aborts before any file is written. Over MCP/HTTP `yes: true` is required for the write path; `dry_run` and `yes` are mutually exclusive.
 
-**CLI-only (no MCP twin yet):** **`codemap affected`** — reverse `dependencies` walk from changed files to test paths. Thin composer over the bundled **`affected-tests`** recipe (Moat A). Path sources: positional args → `--stdin` (newline-delimited) → `--changed-since <ref>` → default `HEAD` (working tree via `git status` + `HEAD...HEAD` diff). Pass recipe knobs via `--params test_glob=…,max_depth=…`. Agents without the verb can call **`query_recipe`** with `recipe: "affected-tests"` and RS-delimited `changed_files`. Example:
+**Affected tests (CLI-first):** **`codemap affected`** — reverse `dependencies` walk from changed files to test paths; primary consumer is CI/shell (`stdin`, `--changed-since`). Thin composer over the bundled **`affected-tests`** recipe. **Agents (MCP/HTTP):** use **`query_recipe`** with `recipe: "affected-tests"` and `changed_files` (RS-delimited paths when multiple). Path sources for the CLI verb: positional args → `--stdin` → `--changed-since <ref>` → default `HEAD` (working tree via `git status` + `HEAD...HEAD` diff). Example:
 
 ```bash
 codemap affected --json
