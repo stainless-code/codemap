@@ -10,11 +10,12 @@
 
 ## Quick resume
 
-| Next action          | Detail                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| **Review / merge**   | [#134](https://github.com/stainless-code/codemap/pull/134) — MCP trace tools (PR 6) |
-| **Recently merged**  | [#133](https://github.com/stainless-code/codemap/pull/133) — MCP `affected`         |
-| **Do not start yet** | PR 9 (eval harness) until PR 8                                                      |
+| Next action          | Detail                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| **Review / merge**   | [#135](https://github.com/stainless-code/codemap/pull/135) — agents init `--mcp` (PR 8) |
+| **Recently merged**  | [#134](https://github.com/stainless-code/codemap/pull/134) — MCP trace tools (PR 6)     |
+| **Start next**       | **PR 7** — `field-qualified-search` (branch from `main`)                                |
+| **Do not start yet** | PR 9 (eval harness) until PR 8 merges                                                   |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -35,15 +36,16 @@ Merge each PR to `main` directly. No long-lived integration branch (`feat/agent-
 
 Max **3 parallel tracks** at once.
 
-| PR    | Plans                                                                                                                                          | Status  | Blocked by                                                                                                             | Parallel with                     |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| **3** | [`index-lock-and-error-log`](./index-lock-and-error-log.md) → [`parse-worker-hardening`](./parse-worker-hardening.md) (stack)                  | merged  | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5                              |
-| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)                      | merged  | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5                              |
-| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md) (+ Phase 2 MCP `affected` in [#133](https://github.com/stainless-code/codemap/pull/133)) | merged  | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4                              |
-| **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions                                                                   | open    | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4                        |
-| **7** | [`field-qualified-search`](./field-qualified-search.md)                                                                                        | planned | PR 1                                                                                                                   | 4, 5 if `mcp-server.ts` untouched |
-| **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md)                                                                                        | planned | PR 1                                                                                                                   | 3–5                               |
-| **9** | [`agent-eval-harness`](./agent-eval-harness.md)                                                                                                | planned | PR 1, PR 8, allowlist                                                                                                  | **last P1**                       |
+| PR    | Plans                                                                                                                                          | Status | Blocked by                                                                                                             | Parallel with |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **3** | [`index-lock-and-error-log`](./index-lock-and-error-log.md) → [`parse-worker-hardening`](./parse-worker-hardening.md) (stack)                  | merged | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5          |
+| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)                      | merged | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5          |
+| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md) (+ Phase 2 MCP `affected` in [#133](https://github.com/stainless-code/codemap/pull/133)) | merged | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4          |
+
+| **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions | merged | [#134](https://github.com/stainless-code/codemap/pull/134) | PR 1, PR 4 |
+| **7** | [`field-qualified-search`](./field-qualified-search.md) | planned | PR 1, PR 6 | 4, 5 if `mcp-server.ts` untouched |
+| **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md) | open | [#135](https://github.com/stainless-code/codemap/pull/135) | 3–5 (branch from `main`) |
+| **9** | [`agent-eval-harness`](./agent-eval-harness.md) | planned | PR 1, PR 8, allowlist | **last P1** |
 
 **Parallelization constraints**
 

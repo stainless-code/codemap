@@ -12,6 +12,9 @@ import {
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { applyAgentsInitMcp } from "./agents-init-mcp";
+import { resolveAgentsInitMcpTargets } from "./agents-init-mcp-registry";
+import type { AgentsInitTarget } from "./agents-init-targets";
 import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
@@ -123,34 +126,11 @@ function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
   }
 }
 
-/**
- * Optional integrations after canonical `.agents/` is written.
- * - Symlink/copy: `cursor`, `windsurf`, `continue`, `cline`, `amazon-q` (per-file symlinks or copies from `.agents/rules`; Cursor also `.agents/skills`).
- * - Pointer files: `copilot`, `claude-md`, `agents-md`, `gemini-md`.
- */
-export type AgentsInitTarget =
-  | "cursor"
-  | "claude-md"
-  | "copilot"
-  | "windsurf"
-  | "continue"
-  | "cline"
-  | "amazon-q"
-  | "agents-md"
-  | "gemini-md";
-
-/** Targets that mirror `.agents/rules` (and Cursor also `.agents/skills`) via per-file symlink or copy. */
-export const AGENTS_INIT_SYMLINK_TARGETS: readonly AgentsInitTarget[] = [
-  "cursor",
-  "windsurf",
-  "continue",
-  "cline",
-  "amazon-q",
-] as const;
-
-export function targetsNeedLinkMode(targets: AgentsInitTarget[]): boolean {
-  return targets.some((t) => AGENTS_INIT_SYMLINK_TARGETS.includes(t));
-}
+export type { AgentsInitTarget } from "./agents-init-targets";
+export {
+  AGENTS_INIT_SYMLINK_TARGETS,
+  targetsNeedLinkMode,
+} from "./agents-init-targets";
 
 /** Per-file symlinks vs full file copies into IDE paths. */
 export type AgentsInitLinkMode = "symlink" | "copy";
@@ -291,6 +271,8 @@ export interface AgentsInitOptions {
   linkMode?: AgentsInitLinkMode;
   /** Install or remove opt-in git hooks for background incremental index. */
   gitHooks?: "install" | "uninstall";
+  /** Write MCP config for supported integrations (see `docs/agents.md`). */
+  mcp?: boolean;
 }
 
 /**
@@ -513,15 +495,26 @@ function applyCursorIntegration(
   );
 }
 
+function maybeApplyAgentsInitMcp(options: AgentsInitOptions): void {
+  if (options.mcp === true) {
+    applyAgentsInitMcp({
+      projectRoot: options.projectRoot,
+      force: !!options.force,
+      targets: resolveAgentsInitMcpTargets(options.targets),
+    });
+  }
+}
+
 /**
  * Copy bundled `rules/` and `skills/` into `<projectRoot>/.agents/`, optional integrations, `.gitignore` hint.
  * **`--force`** deletes only template-backed files, then writes those files again with per-file copies — your other files under **`.agents/`**, **`rules/`**, or **`skills/`** stay.
- * @returns `false` when `.agents/` exists and `--force` was not used.
+ * @returns `false` when `.agents/` exists and `--force` was not used (unless only side effects like `--git-hooks` / `--mcp`).
  */
 export function runAgentsInit(options: AgentsInitOptions): boolean {
   if (options.gitHooks === "uninstall") {
     uninstallGitHooks(options.projectRoot);
     console.log("  Removed codemap blocks from git hooks");
+    maybeApplyAgentsInitMcp(options);
     return true;
   }
 
@@ -553,6 +546,11 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
         console.log(
           "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
         );
+        maybeApplyAgentsInitMcp(options);
+        return true;
+      }
+      if (options.mcp === true) {
+        maybeApplyAgentsInitMcp(options);
         return true;
       }
       console.error(
@@ -594,6 +592,8 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
       "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
     );
   }
+
+  maybeApplyAgentsInitMcp(options);
 
   return true;
 }

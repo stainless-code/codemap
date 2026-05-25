@@ -1,6 +1,6 @@
 # Agents init MCP wiring — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~1–2 weeks)
+> **Status:** open (in review) · **PR:** [#135](https://github.com/stainless-code/codemap/pull/135) · **Priority:** P1 · **Effort:** M (~1–2 weeks)
 >
 > **Motivator:** `codemap agents init` wires rules/skills into 9 IDE targets but leaves MCP config manual. Agents won't use the index if MCP isn't configured and permission-gated (Claude Code blocks tools by default).
 >
@@ -19,40 +19,62 @@
 
 ---
 
-## Target matrix (v1)
+## Shipped (PR #135)
 
-| Target                | Config path                                        | Notes                              |
-| --------------------- | -------------------------------------------------- | ---------------------------------- |
-| Cursor                | `~/.cursor/mcp.json` or project `.cursor/mcp.json` | Inject `--root ${workspaceFolder}` |
-| Claude Code           | `~/.claude.json` MCP + settings permissions        | Auto-allow codemap tools           |
-| VS Code / Copilot     | `.vscode/mcp.json` if supported                    | Detect capability                  |
-| Continue / Cline      | existing init paths                                | Same stdio command                 |
-| AGENTS.md / GEMINI.md | Usage section only (no MCP file)                   | Document manual MCP                |
+| Target            | Config path                                                             | Notes                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Cursor            | project **`.cursor/mcp.json`**                                          | `--root ${workspaceFolder}`                                                                           |
+| Claude Code       | project **`.mcp.json`** + **`.claude/settings.json`**                   | cwd-based MCP; `permissions.allow`                                                                    |
+| VS Code / Copilot | project **`.vscode/mcp.json`** (`servers` key)                          | [VS Code MCP reference](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)       |
+| Continue          | project **`.continue/mcpServers/codemap-mcp.json`**                     | JSON `mcpServers` block file                                                                          |
+| Amazon Q          | project **`.amazonq/default.json`** + **`.amazonq/mcp.json`**           | [AWS MCP IDE docs](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html) — see below |
+| Gemini CLI        | project **`.gemini/settings.json`** (`mcpServers`)                      | [Gemini CLI MCP](https://github.com/google-gemini/gemini-cli/blob/HEAD/docs/tools/mcp-server.md)      |
+| Cline             | project **`.cline/mcp.json`**                                           | [Cline CLI reference](https://docs.cline.bot/cli/cli-reference)                                       |
+| Windsurf          | user **`~/.codeium/windsurf/mcp_config.json`** when `windsurf` selected | User-global only per [Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp)                  |
 
-Reuse patterns from `src/agents-init-interactive.ts`; add `src/agents-init-mcp.ts`.
+Default **`--mcp`** (no `--target` filter) writes all **project-local** rows. **Windsurf** runs only when that integration is explicitly selected.
+
+Side-effect-only re-runs: **`--mcp`**, **`--git-hooks`**, **`--no-git-hooks --mcp`** work when `.agents/` already exists without **`--force`**.
+
+### Amazon Q (IDE + legacy)
+
+Per [AWS MCP configuration for Q Developer in the IDE](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html):
+
+| Scope     | Canonical (GUI)               | Legacy (still supported, default-on) |
+| --------- | ----------------------------- | ------------------------------------ |
+| Workspace | **`.amazonq/default.json`**   | **`.amazonq/mcp.json`**              |
+| Global    | `~/.aws/amazonq/default.json` | `~/.aws/amazonq/mcp.json`            |
+
+**Codemap writes both workspace files** when Amazon Q is in scope:
+
+- **`.amazonq/default.json`** — canonical IDE store; codemap entry includes `transportType: "stdio"`, `timeout: 60`, `disabled: false` per Q IDE examples.
+- **`.amazonq/mcp.json`** — legacy path; plain `{ command, args }` in `mcpServers`. Still read when global `useLegacyMcpJson` is true (AWS default).
+
+Workspace config takes precedence over global. Global paths are **not** written by `agents init --mcp` (team check-in / project-local scope).
 
 ---
 
-## Implementation steps
+## Deferred (v2+)
 
-1. **Detect + write MCP entries** per target (read-merge, don't clobber unrelated servers)
-2. **Marker blocks** for idempotent uninstall (`<!-- CODEMAP_MCP_START -->`)
-3. **`--mcp` flag** on `agents init` and interactive prompt
-4. **Cursor workaround** — document in generated rule pointer: "always pass workspace root"
-5. **Tests** — fixture configs; merge preserves foreign entries
-6. **Docs** — agents.md § MCP wiring; README quickstart
+| Item                                                  | Notes                                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------------- |
+| Global `~/.cursor/mcp.json` / `~/.claude.json`        | Project config preferred for team check-in                          |
+| Global `~/.aws/amazonq/default.json` / `mcp.json`     | Amazon Q global MCP — same rationale as other global-only deferrals |
+| Marker-based uninstall (`<!-- CODEMAP_MCP_START -->`) | No `--no-mcp` strip path yet                                        |
 
 ---
 
 ## Acceptance
 
-- [ ] `codemap agents init --mcp -i` writes working MCP config for Cursor + Claude
-- [ ] Re-run is idempotent
-- [ ] Pointer skill/rule unchanged in content shape
+- [x] `codemap agents init --mcp` writes all default project-local MCP targets ([#135](https://github.com/stainless-code/codemap/pull/135))
+- [x] Amazon Q writes **both** workspace `.amazonq/default.json` and `.amazonq/mcp.json`
+- [x] Interactive `-i` writes MCP only for selected integrations (empty selection skips MCP)
+- [x] Re-run is idempotent (merge preserves foreign servers)
+- [x] Pointer skill/rule unchanged in content shape (JSON only)
 
 ---
 
 ## Dependencies
 
-- [mcp-server-instructions](./mcp-server-instructions.md) improves first-run agent behavior
-- [mcp-tool-allowlist](./mcp-tool-allowlist.md) optional for minimal installs
+- [mcp-server-instructions](./mcp-server-instructions.md) — landed [#126](https://github.com/stainless-code/codemap/pull/126)
+- [mcp-tool-allowlist](./mcp-tool-allowlist.md) — landed [#126](https://github.com/stainless-code/codemap/pull/126)

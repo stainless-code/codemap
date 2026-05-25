@@ -59,11 +59,12 @@ export async function main(): Promise<void> {
 
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
-      console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--git-hooks] [--no-git-hooks]
+      console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--mcp] [--git-hooks] [--no-git-hooks]
 
 Copies bundled agent templates into .agents/ under the project root.
   --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
   --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
+  --mcp          Write MCP config for supported IDEs (see docs/agents.md)
   --git-hooks    Install background incremental index hooks (post-commit, post-merge, post-checkout)
   --no-git-hooks Remove codemap blocks from git hooks
 `);
@@ -74,6 +75,7 @@ Copies bundled agent templates into .agents/ under the project root.
       "--force",
       "--interactive",
       "-i",
+      "--mcp",
       "--git-hooks",
       "--no-git-hooks",
       "--help",
@@ -97,7 +99,10 @@ Copies bundled agent templates into .agents/ under the project root.
       : rest.includes("--git-hooks")
         ? "install"
         : undefined;
-    if (gitHooks !== undefined && rest.includes("--interactive")) {
+    if (
+      gitHooks !== undefined &&
+      (rest.includes("--interactive") || rest.includes("-i"))
+    ) {
       console.error(
         "codemap: --git-hooks / --no-git-hooks cannot be combined with --interactive.",
       );
@@ -108,6 +113,7 @@ Copies bundled agent templates into .agents/ under the project root.
       force: rest.includes("--force"),
       interactive: rest.includes("--interactive") || rest.includes("-i"),
       gitHooks,
+      mcp: rest.includes("--mcp") ? true : undefined,
     });
     if (!ok) process.exit(1);
     return;
