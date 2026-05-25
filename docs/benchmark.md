@@ -10,7 +10,7 @@
 | **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
 | **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
 | **Guardrail full-rebuild per-phase walls against a committed baseline** (local + weekly scheduled)                                                       | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
-| **A/B agent eval** — MCP-on vs discovery-without-index tool-call + token comparison on fixed probes                                                      | [§ Agent eval harness](#agent-eval-harness)                                      |
+| **A/B agent eval** — indexed MCP-on vs file-scan MCP-off tool-call + token comparison on fixed probes                                                    | [§ Agent eval harness](#agent-eval-harness)                                      |
 
 ---
 
@@ -287,7 +287,7 @@ bun run benchmark
 
 ### Agent eval harness
 
-Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Compares a **codemap MCP-on** arm (one `query` tool call per probe) against an **MCP-off** arm that simulates agent discovery (`glob` → `read` × N → `grep`). Probes mirror [golden scenarios](../fixtures/golden/scenarios.json); see [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json).
+Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Indexes the fixture corpus once, then compares a **codemap MCP-on** arm (one `query` tool call per probe) against an **MCP-off** arm that simulates agent discovery without the index (`glob` → `read` × N → `grep`). Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId`; the MCP-off **traditional** regex/globs in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) approximate naive file discovery (not byte-identical to golden SQL).
 
 **One-command local run:**
 
@@ -296,9 +296,9 @@ bash scripts/agent-eval/run-arms.sh
 # default output: .agent-eval/comparison.json
 ```
 
-Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_RUNS`, `AGENT_EVAL_FIXTURE_ROOT`. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, and `resultCount`; `toolSequence` stays from the first run. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
 
-**Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4`), success bit (both arms returned rows). Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
+**Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload — MCP-on includes SQL + JSON rows; MCP-off includes bytes read + grep hits), per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed. Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
 
 **Methodology notes:**
 

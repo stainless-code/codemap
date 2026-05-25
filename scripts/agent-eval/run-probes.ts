@@ -4,14 +4,15 @@ import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../../src/api";
 import { queryRows } from "../../src/application/index-engine";
-import {
-  getQueryRecipeParams,
-  getQueryRecipeSql,
-} from "../../src/application/query-recipes";
-import { resolveRecipeParams } from "../../src/application/recipe-params";
+import type { RecipeParamValue } from "../../src/application/recipe-params";
+import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
-import { estimateTokens, jsonCharLength } from "./metrics";
+import {
+  estimateProbeTokens,
+  mcpOffPayloadChars,
+  mcpOnPayloadChars,
+} from "./probe-tokens";
 import { parseProbesJson } from "./schema";
 import type { AgentEvalProbe } from "./schema";
 import {
@@ -36,6 +37,8 @@ export interface ScenarioComparison {
   prompt: string;
   mcpOn: ArmRunMetrics;
   mcpOff: ArmRunMetrics;
+  /** Both arms returned at least one row. */
+  scenarioSuccess: boolean;
   delta: {
     toolCallCount: number;
     wallMs: number;
@@ -82,53 +85,21 @@ function parseArgs(argv: string[]) {
   return { output, runs, help, fixtureRoot };
 }
 
-function resolveGoldenQuery(s: GoldenScenario): {
-  sql: string;
-  bindValues: unknown[];
-} {
-  if (s.sql !== undefined) {
-    if (s.params !== undefined) {
-      throw new Error(
-        `Golden scenario "${s.id}": params only allowed with recipe`,
-      );
-    }
-    return { sql: s.sql, bindValues: [] };
-  }
-  if (s.recipe !== undefined) {
-    const sql = getQueryRecipeSql(s.recipe);
-    if (sql === undefined) {
-      throw new Error(`Golden scenario "${s.id}": unknown recipe`);
-    }
-    const resolved = resolveRecipeParams({
-      recipeId: s.recipe,
-      declared: getQueryRecipeParams(s.recipe),
-      provided: s.params,
-    });
-    if (!resolved.ok) {
-      throw new Error(`Golden scenario "${s.id}": ${resolved.error}`);
-    }
-    return { sql, bindValues: resolved.values };
-  }
-  throw new Error(`Golden scenario "${s.id}": missing sql or recipe`);
-}
-
 function runMcpOnArm(
   prompt: string,
   sql: string,
-  bindValues: unknown[],
+  bindValues: RecipeParamValue[],
 ): ArmRunMetrics {
   const t0 = performance.now();
   const rows = queryRows(sql, bindValues) as unknown[];
   const wallMs = performance.now() - t0;
   const toolSequence = ["query"];
-  const estChars =
-    Buffer.byteLength(prompt, "utf-8") + jsonCharLength(rows) + 32;
   return {
     wallMs,
     toolSequence,
     toolCallCount: toolSequence.length,
     resultCount: rows.length,
-    estTokens: estimateTokens(estChars),
+    estTokens: estimateProbeTokens(prompt, mcpOnPayloadChars(sql, rows)),
     success: rows.length > 0,
   };
 }
@@ -136,21 +107,20 @@ function runMcpOnArm(
 function runMcpOffArm(prompt: string, probe: AgentEvalProbe): ArmRunMetrics {
   const trad = runTraditionalProbe(probe.traditional);
   const toolSequence = traditionalToolSequence(trad.filesRead);
-  const estChars =
-    Buffer.byteLength(prompt, "utf-8") +
-    jsonCharLength(trad.results) +
-    trad.bytesRead / 4;
   return {
     wallMs: trad.wallMs,
     toolSequence,
     toolCallCount: toolSequence.length,
     resultCount: trad.results.length,
-    estTokens: estimateTokens(estChars),
+    estTokens: estimateProbeTokens(
+      prompt,
+      mcpOffPayloadChars(trad.bytesRead, trad.results),
+    ),
     success: trad.results.length > 0,
   };
 }
 
-function runProbeOnce(
+export function runProbeOnce(
   probe: AgentEvalProbe,
   goldenById: Map<string, GoldenScenario>,
 ): ScenarioComparison {
@@ -164,12 +134,12 @@ function runProbeOnce(
   const { sql, bindValues } = resolveGoldenQuery(golden);
   const mcpOn = runMcpOnArm(prompt, sql, bindValues);
   const mcpOff = runMcpOffArm(prompt, probe);
-  const success = mcpOn.success && mcpOff.success;
   return {
     id: probe.id,
     prompt,
-    mcpOn: { ...mcpOn, success: success && mcpOn.success },
-    mcpOff: { ...mcpOff, success: success && mcpOff.success },
+    mcpOn,
+    mcpOff,
+    scenarioSuccess: mcpOn.success && mcpOff.success,
     delta: {
       toolCallCount: mcpOff.toolCallCount - mcpOn.toolCallCount,
       wallMs: mcpOff.wallMs - mcpOn.wallMs,
@@ -178,7 +148,7 @@ function runProbeOnce(
   };
 }
 
-function summarize(
+export function summarize(
   scenarios: ScenarioComparison[],
 ): AgentEvalComparison["summary"] {
   let mcpOnTotalToolCalls = 0;
@@ -195,7 +165,7 @@ function summarize(
     mcpOffTotalWallMs += s.mcpOff.wallMs;
     mcpOnTotalEstTokens += s.mcpOn.estTokens;
     mcpOffTotalEstTokens += s.mcpOff.estTokens;
-    if (s.mcpOn.success && s.mcpOff.success) successCount++;
+    if (s.scenarioSuccess) successCount++;
   }
   return {
     mcpOnTotalToolCalls,
@@ -218,7 +188,7 @@ Indexes fixtures/minimal by default; writes comparison JSON locally (no upload).
 
 Options:
   --output FILE       Output JSON path (default: .agent-eval/comparison.json)
-  --runs N            Repeat each probe N times and average metrics (default: 1)
+  --runs N            Repeat each probe N times; averages wallMs/estTokens (toolSequence from run 1)
   --fixture-root DIR  Corpus to index (default: fixtures/minimal)
   -h, --help
 `);
@@ -265,7 +235,7 @@ Options:
   );
 }
 
-function averageSamples(
+export function averageSamples(
   id: string,
   samples: ScenarioComparison[],
 ): ScenarioComparison {
@@ -291,19 +261,21 @@ function averageSamples(
     return {
       wallMs: wallMs / n,
       toolSequence: first.toolSequence,
-      toolCallCount: toolCallCount / n,
-      resultCount: resultCount / n,
+      toolCallCount: Math.round(toolCallCount / n),
+      resultCount: Math.round(resultCount / n),
       estTokens: estTokens / n,
       success,
     };
   };
   const mcpOn = avgArm((s) => s.mcpOn);
   const mcpOff = avgArm((s) => s.mcpOff);
+  const scenarioSuccess = samples.every((s) => s.scenarioSuccess);
   return {
     id,
     prompt,
     mcpOn,
     mcpOff,
+    scenarioSuccess,
     delta: {
       toolCallCount: mcpOff.toolCallCount - mcpOn.toolCallCount,
       wallMs: mcpOff.wallMs - mcpOn.wallMs,
@@ -312,7 +284,9 @@ function averageSamples(
   };
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

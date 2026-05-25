@@ -6,13 +6,8 @@ import { fileURLToPath } from "node:url";
 import { createCodemap } from "../src/api";
 import { ingestIstanbul, ingestLcov } from "../src/application/coverage-engine";
 import { queryRows } from "../src/application/index-engine";
-import {
-  getQueryRecipeParams,
-  getQueryRecipeSql,
-} from "../src/application/query-recipes";
-import { resolveRecipeParams } from "../src/application/recipe-params";
-import type { RecipeParamValue } from "../src/application/recipe-params";
 import { closeDb, openDb } from "../src/db";
+import { resolveGoldenQuery } from "./query-golden/resolve-golden-query";
 import { parseScenariosJson } from "./query-golden/schema";
 import type {
   GoldenMatch,
@@ -86,36 +81,6 @@ function stableStringify(value: unknown): string {
   const o = value as Record<string, unknown>;
   const keys = Object.keys(o).sort();
   return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(o[k])}`).join(",")}}`;
-}
-
-function resolveQuery(s: GoldenScenario): {
-  sql: string;
-  bindValues: RecipeParamValue[];
-} {
-  if (s.sql !== undefined) {
-    if (s.params !== undefined) {
-      throw new Error(
-        `Scenario "${s.id}": params are only supported with recipe-based scenarios; raw SQL scenarios must not declare params.`,
-      );
-    }
-    return { sql: s.sql, bindValues: [] };
-  }
-  if (s.recipe !== undefined) {
-    const sql = getQueryRecipeSql(s.recipe);
-    if (sql === undefined) {
-      throw new Error(`Scenario "${s.id}": unknown recipe "${s.recipe}"`);
-    }
-    const resolved = resolveRecipeParams({
-      recipeId: s.recipe,
-      declared: getQueryRecipeParams(s.recipe),
-      provided: s.params,
-    });
-    if (!resolved.ok) {
-      throw new Error(`Scenario "${s.id}": ${resolved.error}`);
-    }
-    return { sql, bindValues: resolved.values };
-  }
-  throw new Error(`Scenario "${s.id}": missing sql or recipe`);
 }
 
 function defaultMatch(s: GoldenScenario): GoldenMatch {
@@ -251,7 +216,7 @@ async function main(): Promise<void> {
   let budgetFailures = 0;
 
   for (const s of scenarios) {
-    const { sql, bindValues } = resolveQuery(s);
+    const { sql, bindValues } = resolveGoldenQuery(s);
     const t0 = performance.now();
     const rows = queryRows(sql, bindValues) as unknown[];
     const durationMs = performance.now() - t0;

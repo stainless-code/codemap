@@ -17,6 +17,7 @@
     "tsdown.config.ts",
     "scripts/query-golden.ts",
     "scripts/query-golden/**/*.ts",
-    "scripts/qa-external-repo.ts"
+    "scripts/qa-external-repo.ts",
+    "scripts/agent-eval/**/*.ts"
   ]
 }

@@ -26,6 +26,33 @@ function toolNameFromCall(call: JsonRecord): string | undefined {
   return undefined;
 }
 
+function collectToolsFromEntry(entry: JsonRecord): string[] {
+  if (entry.role === "assistant" && Array.isArray(entry.tool_calls)) {
+    const fromCalls: string[] = [];
+    for (const call of entry.tool_calls) {
+      if (!isRecord(call)) continue;
+      const name = toolNameFromCall(call);
+      if (name) fromCalls.push(normalizeToolName(name));
+    }
+    if (fromCalls.length > 0) return fromCalls;
+  }
+  if (entry.role === "assistant" && Array.isArray(entry.toolCalls)) {
+    const fromCalls: string[] = [];
+    for (const call of entry.toolCalls) {
+      if (!isRecord(call)) continue;
+      const name = toolNameFromCall(call);
+      if (name) fromCalls.push(normalizeToolName(name));
+    }
+    if (fromCalls.length > 0) return fromCalls;
+  }
+  const kind = entry.kind ?? entry.type;
+  if (kind === "tool_call" || kind === "tool_use") {
+    const name = toolNameFromCall(entry);
+    if (name) return [normalizeToolName(name)];
+  }
+  return [];
+}
+
 function collectFromEntries(entries: unknown[]): {
   tools: string[];
   promptChars: number;
@@ -35,29 +62,13 @@ function collectFromEntries(entries: unknown[]): {
   const tools: string[] = [];
   let promptChars = 0;
   let outputChars = 0;
-  let wallMs: number | undefined;
+  let wallMsTotal = 0;
+  let wallMsCount = 0;
 
   for (const entry of entries) {
     if (!isRecord(entry)) continue;
+    tools.push(...collectToolsFromEntry(entry));
     const kind = entry.kind ?? entry.type;
-    if (kind === "tool_call" || kind === "tool_use") {
-      const name = toolNameFromCall(entry);
-      if (name) tools.push(normalizeToolName(name));
-    }
-    if (entry.role === "assistant" && Array.isArray(entry.tool_calls)) {
-      for (const call of entry.tool_calls) {
-        if (!isRecord(call)) continue;
-        const name = toolNameFromCall(call);
-        if (name) tools.push(normalizeToolName(name));
-      }
-    }
-    if (entry.role === "assistant" && Array.isArray(entry.toolCalls)) {
-      for (const call of entry.toolCalls) {
-        if (!isRecord(call)) continue;
-        const name = toolNameFromCall(call);
-        if (name) tools.push(normalizeToolName(name));
-      }
-    }
     const text =
       typeof entry.text === "string"
         ? entry.text
@@ -71,15 +82,28 @@ function collectFromEntries(entries: unknown[]): {
         outputChars += Buffer.byteLength(text, "utf-8");
       }
     }
-    if (typeof entry.wallMs === "number") wallMs = entry.wallMs;
-    if (typeof entry.durationMs === "number") wallMs = entry.durationMs;
+    if (typeof entry.wallMs === "number") {
+      wallMsTotal += entry.wallMs;
+      wallMsCount++;
+    } else if (typeof entry.durationMs === "number") {
+      wallMsTotal += entry.durationMs;
+      wallMsCount++;
+    }
   }
 
-  return { tools, promptChars, outputChars, wallMs };
+  return {
+    tools,
+    promptChars,
+    outputChars,
+    wallMs: wallMsCount > 0 ? wallMsTotal / wallMsCount : undefined,
+  };
 }
 
 function normalizeToolName(name: string): string {
-  return name.replace(/^mcp[_-]?/i, "").replace(/^codemap[_-]?/i, "");
+  return name
+    .replace(/^mcp[_-]?/i, "")
+    .replace(/^codemap[_-]?/i, "")
+    .toLowerCase();
 }
 
 function parseJsonLog(data: unknown): ParsedAgentLog {
@@ -169,7 +193,12 @@ function parseLineLog(raw: string): ParsedAgentLog {
 export function parseAgentLog(raw: string): ParsedAgentLog {
   const trimmed = raw.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return parseJsonLog(JSON.parse(raw) as unknown);
+    try {
+      return parseJsonLog(JSON.parse(raw) as unknown);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`agent log: invalid JSON: ${msg}`);
+    }
   }
   return parseLineLog(raw);
 }
