@@ -33,8 +33,12 @@ afterEach(() => {
   rmSync(benchDir, { recursive: true, force: true });
 });
 
-async function makeClient() {
-  const server = createMcpServer({ version: "0.0.0-test", root: benchDir });
+async function makeClient(env?: NodeJS.ProcessEnv) {
+  const server = createMcpServer({
+    version: "0.0.0-test",
+    root: benchDir,
+    env,
+  });
   const client = new Client({ name: "test-client", version: "0.0.0" });
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -53,6 +57,62 @@ function readJson(result: unknown): any {
   }
   return JSON.parse(first.text) as unknown;
 }
+
+describe("MCP server — initialize instructions", () => {
+  it("includes tool-selection playbook in initialize handshake", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const instructions = client.getInstructions();
+      expect(instructions).toBeDefined();
+      expect(instructions!.length).toBeGreaterThan(500);
+      expect(instructions).toContain("Session start");
+      expect(instructions).toContain("codemap://rule");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("cites only shipped recipe ids", async () => {
+    const { assembleMcpInstructions, extractMcpInstructionRecipeIds } =
+      await import("./agent-content");
+    const { listQueryRecipeCatalog } = await import("./query-recipes");
+    const cited = extractMcpInstructionRecipeIds(assembleMcpInstructions());
+    expect(cited.length).toBeGreaterThan(0);
+    const catalog = new Set(listQueryRecipeCatalog().map((e) => e.id));
+    for (const id of cited) {
+      expect(catalog.has(id)).toBe(true);
+    }
+  });
+});
+
+describe("MCP server — tool allowlist", () => {
+  it("registers only listed tools when CODEMAP_MCP_TOOLS is set", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,show",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name).sort();
+      expect(names).toEqual(["query", "show"]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("excludes query_batch unless explicitly listed", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("query");
+      expect(names).not.toContain("query_batch");
+    } finally {
+      await server.close();
+    }
+  });
+});
 
 describe("MCP server — query tool", () => {
   it("lists query and query_batch in tools/list", async () => {
@@ -717,6 +777,7 @@ describe("MCP server — resources", () => {
       expect(uris).toContain("codemap://schema");
       expect(uris).toContain("codemap://skill");
       expect(uris).toContain("codemap://rule");
+      expect(uris).toContain("codemap://mcp-instructions");
       // The recipe-by-id resource is a template — surfaced via list-template
       // callback as one entry per recipe id.
       const recipeUris = uris.filter((u) => u.startsWith("codemap://recipes/"));
@@ -810,6 +871,22 @@ describe("MCP server — resources", () => {
       const text = readResourceText(r);
       expect(text.startsWith("---")).toBe(true);
       expect(text).toContain("alwaysApply: true");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://mcp-instructions returns the MCP playbook", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({
+        uri: "codemap://mcp-instructions",
+      });
+      const first = r.contents[0] as { mimeType?: string };
+      expect(first.mimeType).toBe("text/markdown");
+      const text = readResourceText(r);
+      expect(text).toContain("tool selection");
+      expect(text).toContain("Session start");
     } finally {
       await server.close();
     }

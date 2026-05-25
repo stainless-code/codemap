@@ -78,7 +78,25 @@ Once `agents init` has written the pointer templates, the consumer's disk holds 
 | MCP                    | resource `codemap://skill`                               | resource `codemap://rule`                               |
 | HTTP (`codemap serve`) | `GET /resources/{encoded uri}` against `codemap://skill` | `GET /resources/{encoded uri}` against `codemap://rule` |
 
-All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path for skill/rule content. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts` for schema/skill/rule; recipes, files, and symbols read live every call. The CLI re-assembles every call (cheap — markdown read + concat).
+All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path for skill/rule content. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts` for schema/skill/rule/mcp-instructions; recipes, files, and symbols read live every call. The CLI re-assembles every call (cheap — markdown read + concat).
+
+## MCP server instructions
+
+`codemap mcp` passes a tool-selection playbook in the MCP **`initialize`** response **`instructions`** field. MCP clients (Cursor, Claude Code, etc.) inject this into the agent system prompt — operational guidance only (which tool when, common chains, anti-patterns). Full schema and recipe catalog stay on **`codemap://skill`** / **`codemap://rule`**.
+
+| Surface             | URI / field                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| MCP initialize      | `instructions` on handshake                                                                                    |
+| MCP / HTTP resource | `codemap://mcp-instructions`                                                                                   |
+| Source file         | `templates/agent-content/mcp-instructions.md` (assembled by `assembleMcpInstructions()` in `agent-content.ts`) |
+
+Recipe ids cited in the playbook are machine-validated in tests against the live catalog (`extractMcpInstructionRecipeIds`).
+
+## MCP tool allowlist
+
+**`CODEMAP_MCP_TOOLS`** — comma-separated snake_case MCP tool names. When set, only listed tools register (stderr lists the active set). Unknown names are ignored with a warning. Unset = all tools (default). **`query_batch`** registers only when listed or when unset (eval ablation).
+
+Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
 ## Section assembler and `*.gen.md`
 

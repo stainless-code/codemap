@@ -12,6 +12,13 @@ import {
   getTsconfigPath,
   initCodemap,
 } from "../runtime";
+import { assembleMcpInstructions } from "./agent-content";
+import {
+  isMcpToolEnabled,
+  logMcpToolAllowlist,
+  resolveMcpToolAllowlist,
+} from "./mcp-tool-allowlist";
+import type { McpToolName } from "./mcp-tool-allowlist";
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import type { ResourcePayload } from "./resource-handlers";
@@ -67,6 +74,8 @@ interface ServerOpts {
   root: string;
   configFile?: string | undefined;
   stateDir?: string | undefined;
+  /** Test hook — defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv | undefined;
   /**
    * If true, boot a co-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data without
@@ -107,25 +116,39 @@ function wrapToolResult(r: ToolResult) {
  * `InMemoryTransport.createLinkedPair()` for in-process driving).
  */
 export function createMcpServer(opts: ServerOpts): McpServer {
-  const server = new McpServer({
-    name: "codemap",
-    version: opts.version,
-  });
+  const allowlistResolved = resolveMcpToolAllowlist(opts.env ?? process.env);
+  const server = new McpServer(
+    {
+      name: "codemap",
+      version: opts.version,
+    },
+    {
+      instructions: assembleMcpInstructions(),
+    },
+  );
 
-  registerQueryTool(server, opts);
-  registerQueryBatchTool(server, opts);
-  registerQueryRecipeTool(server, opts);
-  registerAuditTool(server);
-  registerContextTool(server);
-  registerValidateTool(server);
-  registerSaveBaselineTool(server, opts);
-  registerListBaselinesTool(server);
-  registerDropBaselineTool(server);
-  registerShowTool(server, opts);
-  registerSnippetTool(server, opts);
-  registerImpactTool(server);
-  registerApplyTool(server, opts);
+  const registered: McpToolName[] = [];
+  const maybeRegister = (name: McpToolName, register: () => void): void => {
+    if (!isMcpToolEnabled(name, allowlistResolved.allowlist)) return;
+    register();
+    registered.push(name);
+  };
+
+  maybeRegister("query", () => registerQueryTool(server, opts));
+  maybeRegister("query_batch", () => registerQueryBatchTool(server, opts));
+  maybeRegister("query_recipe", () => registerQueryRecipeTool(server, opts));
+  maybeRegister("audit", () => registerAuditTool(server));
+  maybeRegister("context", () => registerContextTool(server));
+  maybeRegister("validate", () => registerValidateTool(server));
+  maybeRegister("save_baseline", () => registerSaveBaselineTool(server, opts));
+  maybeRegister("list_baselines", () => registerListBaselinesTool(server));
+  maybeRegister("drop_baseline", () => registerDropBaselineTool(server));
+  maybeRegister("show", () => registerShowTool(server, opts));
+  maybeRegister("snippet", () => registerSnippetTool(server, opts));
+  maybeRegister("impact", () => registerImpactTool(server));
+  maybeRegister("apply", () => registerApplyTool(server, opts));
   registerResources(server);
+  logMcpToolAllowlist(allowlistResolved, registered);
 
   return server;
 }
@@ -319,6 +342,12 @@ function registerResources(server: McpServer): void {
     "rule",
     "codemap://rule",
     "Full text of the bundled `templates/agents/rules/codemap.md` (always-on priming for agents working in this repo).",
+  );
+  registerStaticResource(
+    server,
+    "mcp-instructions",
+    "codemap://mcp-instructions",
+    "MCP initialize tool-selection playbook (operational guidance only; full catalog in codemap://skill).",
   );
 
   // codemap://recipes/{id} — one recipe (template form). Payload includes
