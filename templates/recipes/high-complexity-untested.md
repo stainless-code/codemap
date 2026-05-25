@@ -26,7 +26,7 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's pa
 
 ## Tuning axes for project-local overrides
 
-`<projectRoot>/.codemap/recipes/high-complexity-untested.sql`:
+`<state-dir>/recipes/high-complexity-untested.sql` (default `.codemap/recipes/`):
 
 - **Complexity threshold**: change `>= 10` to project's risk-appetite (5 for strict; 15 for tolerant).
 - **Coverage threshold**: change `< 50` to project's risk-appetite (`< 80` for strict).

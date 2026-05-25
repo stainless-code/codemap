@@ -56,7 +56,7 @@ Map each file to one of the 5 lifecycle types per [docs-governance § 1](../docs
 
 ### 2. Apply the existence test
 
-Per [docs-governance § 2](../docs-governance/SKILL.md#2-existence-test-apply-on-every-doc-touching-pr), each file earns its place if it meets ≥1 of: source cite / durable policy / open work / unique historical context.
+Per [docs-governance § 2](../docs-governance/SKILL.md#2-existence-test-apply-on-every-doc-touching-pr), each file earns its place if it meets ≥1 of: source cite / durable policy / open work / inbound cites require slim stub.
 
 For each file, run the cite-check evidence command:
 
@@ -72,11 +72,11 @@ If the file is an audit, also check the [docs-governance § Closing an audit re-
 
 ### 3. Classify each file
 
-| Tier                  | Verdict                                                                                                         | Action                                                                                                                                                                           |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A — Keep verbatim** | Cited from source by rule number / section anchor; OR Reference / Roadmap that lives forever per its lifecycle  | Update "Last verified" header (audits) or no-op                                                                                                                                  |
-| **B — Slim + keep**   | Closed but ≥1 audit keep-criteria applies; OR has cited content that's stable                                   | Slim to cited / durable bits + verification recipe + status header; preserve cited rule numbers per [§ 7](../docs-governance/SKILL.md#7-cross-reference-preservation-discipline) |
-| **C — Delete + lift** | Closed AND no source cites AND all findings shipped/lifted; OR superseded; OR fails the existence test outright | Lift any orphan-able knowledge into the natural reference doc / skill; update the pointer index; **delete the file** (no tombstones)                                             |
+| Tier                  | Verdict                                                                                                         | Action                                                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — Keep verbatim** | Cited from source by rule number / section anchor; OR Reference / Roadmap that lives forever per its lifecycle  | No-op (open audits may carry a "Last verified" date — refresh only while findings are open)                                                                                                  |
+| **B — Slim + keep**   | Closed but ≥1 audit keep-criteria applies; OR has cited content that's stable                                   | Slim to cited / durable bits + verification recipe + status header; preserve cited rule numbers per [§ 7](../docs-governance/SKILL.md#7-cross-reference-preservation-discipline)             |
+| **C — Delete + lift** | Closed AND no source cites AND all findings shipped/lifted; OR superseded; OR fails the existence test outright | Lift any orphan-able knowledge into the natural reference doc / skill; fix inbound cross-refs; **delete the file** (no tombstones, no pointer rows, no recovery instructions in living docs) |
 
 ### 4. Surface the classification report (BEFORE any edits)
 
@@ -91,7 +91,7 @@ In dependency order (delete + lift before slimming so cross-refs are correct):
 1. **Lift** orphan-able knowledge to its destination.
 2. **Update** every inbound cross-reference (in-place edits).
 3. **Delete** the source file (Tier C) or apply the slim diff (Tier B).
-4. **Update pointer index** — `roadmap.md § Closed audits (pointers)` for audits; `architecture.md` for newly-promoted reference content; `docs/README.md § File Ownership` table for added/removed top-level docs (per [`docs/README.md` Rule 4](../../../docs/README.md)).
+4. **Update cross-references** — fix inbound links to deleted paths; `architecture.md` for newly-promoted reference content; `docs/README.md § File Ownership` table for added/removed top-level docs (per [`docs/README.md` Rule 4](../../../docs/README.md)). Do not add tombstone rows for deleted audit paths.
 5. **Re-grep** to confirm zero broken cross-references: `rg "<deleted-filename>"` returns 0 hits outside the deletion commit message.
 
 After execution, the surface is **clean** by definition.
@@ -100,7 +100,7 @@ After execution, the surface is **clean** by definition.
 
 A sweep report is **transient** by design — it lives on the PR / chat where the sweep ran, not in `docs/`. The findings + chosen actions land as commit messages + cross-link updates; the report itself is not a doc to keep.
 
-If the user wants a durable record, promote it to a one-time entry in `roadmap.md § Closed audits (pointers)` or to a slim `audits/<date>-lifecycle-sweep.md` — but only if the rationale would be hard to reconstruct from `git log --follow`. Default is: don't write a meta-doc about the cleanup.
+Default: don't write a meta-doc about the cleanup. Durable closure anchors are the shipping PR / commit — not a maintained list of deleted paths.
 
 ## Anti-patterns
 

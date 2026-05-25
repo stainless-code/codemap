@@ -26,7 +26,7 @@ SELECT * FROM function_params WHERE type_text LIKE '%User%';
 
 Available filters on `function_params`:
 
-- `owner_kind` — column exists; extractor currently sets `function` for all owners (distinct `method` / `arrow` / etc. values are planned)
+- `owner_kind` — `function`, `method`, `getter`, `setter`, `arrow`, `constructor`
 - `is_rest = 1` — `...args` rest params only
 - `is_optional = 1` — params with `?` or default value
 - `default_text IS NOT NULL` — params that have an inline default

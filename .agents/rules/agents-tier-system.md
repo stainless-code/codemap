@@ -28,7 +28,7 @@ Genuinely cross-cutting. Apply to every turn regardless of file:
 - `codemap` — STOP-before-grep
 - `concise-comments` — sweep your own new comments before reporting
 - `concise-reporting` — extreme concision in agent reports
-- `lessons` — read at session start, append after corrections
+- `lessons` — read when relevant; lift durable ones into rules/skills
 - `no-bypass-hooks` — never `--no-verify` on `git commit`
 - `pr-comment-fact-check` — fires the fact-check skill on PR-comment intent triggers
 - `preserve-comments` — never silently delete TODOs / commented-out code
@@ -45,7 +45,7 @@ Today's Tier-2 rules:
 
 - `agents-tier-system` (this rule) — auto-attaches when authoring under `.agents/**` or `.cursor/**`.
 - `docs-governance` — primes the docs framework when authoring under `docs/**` or `.agents/**` (paired with [`docs-governance` skill](../skills/docs-governance/SKILL.md)).
-- `plan-pr-inspiration-discipline` — primes plan-PR / recipe authoring with the open-spec inspection list when authoring under `docs/plans/**` or `templates/recipes/**`. The canonical inspection-sources table lives in the rule body itself (lifted from `research/non-goals-reassessment-2026-05.md § 4` in 2026-05; see [§ 7 Lifted to](../../docs/research/non-goals-reassessment-2026-05.md#7-lifted-to)).
+- `plan-pr-inspiration-discipline` — primes plan-PR / recipe authoring with the open-spec inspection list when authoring under `docs/plans/**` or `templates/recipes/**`. The canonical inspection-sources table lives in the rule body itself.
 
 ### Tier 3 — Discoverable skills (no rule)
 

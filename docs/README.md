@@ -22,8 +22,8 @@ Each topic has exactly one canonical file. Other files cross-reference by relati
 | [packaging.md](./packaging.md)                | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets; **`bun run version`** + oxfmt **`CHANGELOG.md`**).                                                                                                                                                                                                                                                                               |
 | [roadmap.md](./roadmap.md)                    | Forward-looking [**Backlog**](./roadmap.md#backlog) and [**Non-goals**](./roadmap.md#non-goals-v1) (not a `src/` inventory).                                                                                                                                                                                                                                                                                                                                                                          |
 | [plans/](./plans/)                            | One `<feature-name>.md` per in-flight plan. Created on demand — don't add the `-plan` suffix; the folder provides context. See folder contents for the current in-flight set; avoid maintaining a duplicate inline list.                                                                                                                                                                                                                                                                              |
-| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. Open: [`audits/2026-05-24-docs-fact-check-residuals.md`](./audits/2026-05-24-docs-fact-check-residuals.md). Closed audits indexed from [`roadmap.md` § Closed audits (pointers)](./roadmap.md#closed-audits-pointers).                                                                                                                                                                                                                        |
-| [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans, non-goals reassessments). Each note links shipped items back to canonical homes — see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md).                                                                                                                                                                                                                                                                |
+| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. None open.                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| [research/](./research/)                      | Dated snapshot notes for **open** evaluations. Closed adopted notes delete after lift; rejected notes keep a one-line status header only.                                                                                                                                                                                                                                                                                                                                                             |
 
 ---
 
@@ -38,7 +38,7 @@ These rules are normative — cite them by number in PR review. Ordered by how o
 5. **Cross-references use relative paths** — `[architecture.md § Section](./architecture.md#section)` or `[plans/foo.md](./plans/foo.md)`. Prefer section-deep links over file-only links.
 6. **No inventory counts in narrative** — don't hardcode counts of files, symbols, recipes, or other code-derived quantities. Use qualitative descriptors or a `codemap query --json` example. Decision values (cache TTLs, batch sizes, schema version) are fine — those are decisions, not inventory.
 7. **No line-number references** — line numbers (e.g. `parser.ts:241`) rot on every edit. Reference by function name, section heading, or symbol from `codemap query` instead. Methodology tables in [benchmark.md](./benchmark.md) are exempt.
-8. **Research notes get closed** — when a research scan's adopt items ship, slim the note to a "What shipped" appendix linking to canonical homes (see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md) as the precedent — its § 8 errata + § Closed-out items pattern). Rejected items keep a `Status: Rejected (date) — <one-line reason>` header.
+8. **Research notes get closed** — **default: lift + delete.** When adopt items ship, move decisions-of-record into canonical homes (`architecture.md`, `glossary.md`, `roadmap.md`, a plan, `.agents/rules/`). **Delete** the research file once nothing in source cites it by path. **Rejected-only keep:** add `Status: Rejected (YYYY-MM-DD) — <one-line reason>` and stop — no "analytical history" appendices. **Slim + keep** only when inbound source cites (rule numbers, `NOTE(...)`, tests) would orphan — then keep cited sections + status header, not the full evaluation prose. Do **not** retain "What shipped" inventory tables or `git log` / `git show` recovery rows in living docs.
 9. **New term ⇒ update [glossary.md](./glossary.md) in the same PR** — when a PR introduces a new domain noun / verb / acronym (table name, recipe id, parser name, schema column), add or update its entry. Disambiguations (e.g. `FileRow` TS shape vs `files` SQLite table) take priority over single defs.
 10. **Core surface change ⇒ check which agent-content layer it belongs to** — the v1 pointer pattern split the agent surface in two:
     - **Auto-flows (no template edit needed)** — recipe additions (`templates/recipes/*.{sql,md}`), schema additions (`src/db.ts` `createTables()`). Both surfaces via `*.gen.md` renderers in `src/application/agent-content.ts` and the served skill regenerates on every fetch.
@@ -95,7 +95,7 @@ A file earns its place if it meets at least one of:
 1. **Source code or another doc cites it** (grep finds the path).
 2. **It documents durable policy or framework** unavailable elsewhere.
 3. **It tracks open work** (open audit findings, in-flight plan, roadmap items).
-4. **It carries unique historical context** that `git log` + `architecture.md` cannot reconstruct.
+4. **Inbound source cites require a slim stub** — JSDoc, rules, tests, or plans link to this file by path/anchor; deletion would orphan them. (Not "interesting history" — if only git could reconstruct it, delete.).
 
 If none → fold any salvageable content into roadmap / architecture / glossary, fix the cross-refs, delete the file.
 
@@ -103,7 +103,7 @@ If none → fold any salvageable content into roadmap / architecture / glossary,
 
 A research note's job is the evaluation. When it concludes:
 
-- **Adopted** → lift the decisions-of-record into the relevant reference doc; slim the note to a "What shipped" appendix linking to canonical homes (precedent: [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md)).
+- **Adopted** → lift the decision-of-record into the relevant reference doc; **delete** the research file when nothing cites it by path. Rejected-only keep per Rule 8 above.
 - **Rejected** → add `Status: Rejected (YYYY-MM-DD) — <one-line reason>` at the top. Keep the file. Don't delete; the rejection rationale saves the next agent from re-litigating.
 - **Open** → stays in `research/` with no status header (open is the default).
 
@@ -117,12 +117,20 @@ Adding a new top-level doc requires:
 
 When in doubt, default to absorbing into the closest existing root-level file (usually `roadmap.md` for forward-looking work, `architecture.md` for shipped behavior, `glossary.md` for terminology, `research/` for snapshot notes).
 
+### Closing audits
+
+When an audit closes, lift shipped work into canonical homes (`architecture.md`, a plan, `.agents/lessons.md`, `roadmap.md` backlog). **Do not leave tombstones** — no pointer table, no "recover via `git log --follow -- <deleted-path>`" rows in living docs. Deleted audit text lives in git history only; cite the shipping PR or commit when closure needs a durable anchor.
+
+- **Delete** when the re-derivable test passes (findings visible in source / no source-cites / no unique policy) — see [docs-governance § Closing an audit](../../.agents/skills/docs-governance/SKILL.md#closing-an-audit).
+- **Slim + keep** in `audits/` when the file carries decisions-of-record, source back-references, or methodology not captured elsewhere — add a `Status: Closed` header.
+- **Absorb into a plan** when the audit is the synthesis substrate for in-flight work — the plan's provenance block owns recovery (`git show <sha> -- docs/audits/…` belongs there, not in `docs/README.md`).
+
 ---
 
 ## Naming Conventions
 
 - **`plans/` files**: `<feature-name>.md` — the folder provides "plan" context, don't add a `-plan` suffix.
-- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots (e.g. `non-goals-reassessment-2026-05.md`); `<tool-name>.md` for ongoing tool evaluations.
+- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots; `<tool-name>.md` for ongoing tool evaluations. **Delete after lift** when adopted (Rule 8).
 - **Top-level files**: descriptive domain noun (`architecture.md`, `glossary.md`, `roadmap.md`) — no prefix or suffix.
 
 ---

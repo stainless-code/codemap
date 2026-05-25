@@ -1,10 +1,14 @@
 # Lessons
 
-Persistent log of corrections and insights from past sessions. Agents **must** check this file at the start of every session and append new lessons after corrections.
+Persistent log of corrections and insights from past sessions. Read when relevant; **encode durable lessons in rules/skills** — this file is a staging area, not an archive.
 
-## Format
+## Rules
 
-Each entry is a single bullet: `- **<topic>** — <lesson>`. Newest entries at the bottom.
+1. **Append only durable, non-obvious corrections** — not session trivia already captured in a rule, skill, or reference doc.
+2. **Prefer lifting** — when a lesson becomes policy, move it to `.agents/rules/` or the relevant skill and **delete** the bullet here (or supersede with one line pointing at the rule).
+3. **Keep entries atomic** — one lesson per bullet. One sentence.
+4. **No duplicates** — check before appending; merge or supersede instead.
+5. **Supersede, don't accumulate** — outdated lesson → replace with a new bullet citing what changed; don't leave both.
 
 ## Lessons
 

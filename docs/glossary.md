@@ -12,7 +12,7 @@ Alphabetical, lowercase. Disambiguation pairs link to each other.
 
 - **TS shape** = a TypeScript interface or type alias.
 - **SQLite table** = an actual on-disk table in `.codemap/index.db`.
-- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (project-local). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
+- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<state-dir>/recipes/<id>.{sql,md}` (project-local; default `.codemap/recipes/`). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
 - **Query** = any SQL run against the index (recipe or ad-hoc).
 
 ---
@@ -353,7 +353,7 @@ Rust-based CSS parser (NAPI bindings). Codemap's `src/css-parser.ts` uses its vi
 
 ### `codemap mcp` / MCP server
 
-Stdio MCP (Model Context Protocol) server exposing codemap's structural-query surface to agent hosts (Claude Code, Cursor, Codex, generic MCP clients) as JSON-RPC tools — eliminates the bash round-trip on every agent invocation. v1 ships the query / audit / context / validate / show / snippet / impact / baseline / apply tool set, plus MCP resources for `codemap://schema`, `codemap://skill`, `codemap://rule`, `codemap://recipes`, and `codemap://recipes/{id}`. Resource freshness is split by contract: schema / skill / rule are lazy-cached per server process; recipes are live read-per-call so inline `last_run_at` / `run_count` recency fields don't freeze at first read. HTTP's `GET /resources/{encoded-uri}` uses the same resource handler and additionally serves direct `codemap://files/{path}` and `codemap://symbols/{name}` lookups. Tool input/output keys are snake_case — Codemap's convention, matching the patterns in MCP spec examples and reference servers (GitHub MCP, Cursor built-ins); the spec itself doesn't mandate it. CLI stays kebab — translation lives at the MCP-arg layer. Output shape is verbatim from the CLI's `--json` envelope (no re-mapping). Bootstrap once at server boot; tool handlers (in `application/tool-handlers.ts`) and resource handlers (in `application/resource-handlers.ts`) are pure transport-agnostic — the same handlers serve `codemap serve` (HTTP) via `POST /tool/{name}` and `GET /resources/{encoded-uri}`. Implementation: `src/cli/cmd-mcp.ts` (CLI shell) + `src/application/mcp-server.ts` (engine). See [`architecture.md` § MCP wiring](./architecture.md#cli-usage).
+Stdio MCP (Model Context Protocol) server exposing codemap's structural-query surface to agent hosts (Claude Code, Cursor, Codex, generic MCP clients) as JSON-RPC tools — eliminates the bash round-trip on every agent invocation. v1 ships the query / audit / context / validate / show / snippet / impact / baseline / apply tool set, plus MCP resources for `codemap://schema`, `codemap://skill`, `codemap://rule`, `codemap://recipes`, `codemap://recipes/{id}`, `codemap://files/{path}`, and `codemap://symbols/{name}`. Resource freshness is split by contract: schema / skill / rule are lazy-cached per server process; recipes, files, and symbols are live read-per-call so inline recency fields and index mutations under `--watch` don't freeze at first read. HTTP's `GET /resources/{encoded-uri}` uses the same resource handler. Tool input/output keys are snake_case — Codemap's convention, matching the patterns in MCP spec examples and reference servers (GitHub MCP, Cursor built-ins); the spec itself doesn't mandate it. CLI stays kebab — translation lives at the MCP-arg layer. Output shape is verbatim from the CLI's `--json` envelope (no re-mapping). Bootstrap once at server boot; tool handlers (in `application/tool-handlers.ts`) and resource handlers (in `application/resource-handlers.ts`) are pure transport-agnostic — the same handlers serve `codemap serve` (HTTP) via `POST /tool/{name}` and `GET /resources/{encoded-uri}`. Implementation: `src/cli/cmd-mcp.ts` (CLI shell) + `src/application/mcp-server.ts` (engine). See [`architecture.md` § MCP wiring](./architecture.md#cli-usage).
 
 ### `query_batch` (MCP-only tool)
 
@@ -460,7 +460,7 @@ See **recipe**.
 A SQL file (plus optional sibling `.md` description) loaded into the catalog by `src/application/recipes-loader.ts`. Two sources, same shape:
 
 - **Bundled** — ships in the npm package as `templates/recipes/<id>.{sql,md}`. Examples: `fan-in`, `deprecated-symbols`, `files-hashes`.
-- **Project-local** — loaded from `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (root-only resolution; not gitignored — meant to be checked in for team review).
+- **Project-local** — loaded from `<state-dir>/recipes/<id>.{sql,md}` (default `.codemap/recipes/`; honors `--state-dir` / `CODEMAP_STATE_DIR`; root-only resolution; not gitignored — meant to be checked in for team review).
 
 Run via `codemap query --recipe <id>` (alias `-r`). Project recipes win on id collision with bundled ones (entries carry `shadows: true` in the catalog so agents reading `codemap://recipes` at session start see when a recipe behaves differently from the documented bundled version). Per-row `actions` templates (kebab-case verb + description) live in YAML frontmatter on each `<id>.md` — uniform between bundled and project. Load-time validation rejects empty SQL and DML / DDL keywords; runtime `PRAGMA query_only=1` on `queryRows`, `executeQuery`, and `printQueryResult` (ad-hoc CLI SQL) is the parser-proof backstop. Distinct from an ad-hoc **query** (any SQL string the agent composes itself; ad-hoc SQL never carries actions).
 
@@ -474,7 +474,7 @@ Per-recipe `last_run_at` (epoch ms) + `run_count` for agent-host ranking — sur
 
 ### research
 
-A snapshot-style note under `docs/research/` capturing a competitive scan or evaluation. Closed per [README § Closing research](./README.md#closing-research) — adopted items are slimmed to a "What shipped" appendix; rejected items keep a status header.
+A snapshot-style note under `docs/research/` capturing a competitive scan or evaluation. Closed per [README § Closing research](./README.md#closing-research) — **default lift + delete**; rejected-only keep with a status header.
 
 ### resolver
 

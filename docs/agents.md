@@ -78,7 +78,7 @@ Once `agents init` has written the pointer templates, the consumer's disk holds 
 | MCP                    | resource `codemap://skill`                               | resource `codemap://rule`                               |
 | HTTP (`codemap serve`) | `GET /resources/{encoded uri}` against `codemap://skill` | `GET /resources/{encoded uri}` against `codemap://rule` |
 
-All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts`; the CLI re-assembles every call (cheap — markdown read + concat).
+All three transports resolve to the same `assembleAgentContent(kind)` function in `src/application/agent-content.ts` — there is no MCP-only or HTTP-only path for skill/rule content. The MCP and HTTP paths share a lazy per-process cache via `readResource()` in `src/application/resource-handlers.ts` for schema/skill/rule; recipes, files, and symbols read live every call. The CLI re-assembles every call (cheap — markdown read + concat).
 
 ## Section assembler and `*.gen.md`
 
@@ -88,15 +88,15 @@ All three transports resolve to the same `assembleAgentContent(kind)` function i
 
 Current skill section layout:
 
-| File                    | Source                                    | Updates when                                                         |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------------------------- |
-| `00-overview.md`        | Hand-written                              | Rare (intro / CLI usage / output contract)                           |
-| `10-recipes-context.md` | Hand-written                              | Rare (flags, MCP/HTTP/Apply, tools, resources)                       |
-| `20-recipes.gen.md`     | Generated from `listQueryRecipeCatalog()` | Every recipe added under `templates/recipes/` or `.codemap/recipes/` |
-| `30-schema.gen.md`      | Generated from `createTables()` DDL       | Every column / table added in `src/db.ts`                            |
-| `40-query-patterns.md`  | Hand-written                              | Rare (basic / dep / component / CSS / agg examples)                  |
-| `50-maintenance.md`     | Hand-written                              | Rare (re-indexing guidance)                                          |
-| `90-troubleshooting.md` | Hand-written                              | Rare (FAQ)                                                           |
+| File                    | Source                                    | Updates when                                                            |
+| ----------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| `00-overview.md`        | Hand-written                              | Rare (intro / CLI usage / output contract)                              |
+| `10-recipes-context.md` | Hand-written                              | Rare (flags, MCP/HTTP/Apply, tools, resources)                          |
+| `20-recipes.gen.md`     | Generated from `listQueryRecipeCatalog()` | Every recipe added under `templates/recipes/` or `<state-dir>/recipes/` |
+| `30-schema.gen.md`      | Generated from `createTables()` DDL       | Every column / table added in `src/db.ts`                               |
+| `40-query-patterns.md`  | Hand-written                              | Rare (basic / dep / component / CSS / agg examples)                     |
+| `50-maintenance.md`     | Hand-written                              | Rare (re-indexing guidance)                                             |
+| `90-troubleshooting.md` | Hand-written                              | Rare (FAQ)                                                              |
 
 Adding a new generated section: write a renderer, register it in `RENDERERS`, drop a placeholder `XX-name.gen.md` in the kind directory (the placeholder body is the offline-fallback prose). No assembler change.
 

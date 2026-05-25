@@ -1,6 +1,6 @@
 # Substrate extraction — maximal AST → SQLite enrichment plan
 
-> **Status:** open (tiers **7–13**) · plan iterating in parallel with the broader [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) write-engine direction.
+> **Status:** open (tiers **7–13**) · tiers **1–6** shipped (`SCHEMA_VERSION` **34**); live schema in [`architecture.md § Schema`](../architecture.md#schema). Apply-engine direction in [`apply-engine-direction.md`](./apply-engine-direction.md).
 >
 > **Per-tier ship status (fact-checked 2026-05-19):** Tiers **1–6** remainder shipped (`SCHEMA_VERSION` **34**). Tier headings carry the PR landing date for that slice; the SCHEMA 34 remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **7–13** open.
 >

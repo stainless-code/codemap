@@ -721,6 +721,13 @@ describe("MCP server — resources", () => {
       // callback as one entry per recipe id.
       const recipeUris = uris.filter((u) => u.startsWith("codemap://recipes/"));
       expect(recipeUris.length).toBeGreaterThan(0);
+
+      const templates = await client.listResourceTemplates();
+      const templateUris = templates.resourceTemplates.map(
+        (t) => t.uriTemplate,
+      );
+      expect(templateUris).toContain("codemap://files/{+path}");
+      expect(templateUris).toContain("codemap://symbols/{name}{?in}");
     } finally {
       await server.close();
     }
@@ -803,6 +810,50 @@ describe("MCP server — resources", () => {
       const text = readResourceText(r);
       expect(text.startsWith("---")).toBe(true);
       expect(text).toContain("alwaysApply: true");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://files/{path} returns a per-file roll-up", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({ uri: "codemap://files/src/a.ts" });
+      const parsed = JSON.parse(readResourceText(r));
+      expect(parsed).toMatchObject({
+        path: "src/a.ts",
+        language: "typescript",
+        line_count: 1,
+      });
+      expect(Array.isArray(parsed.symbols)).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("codemap://symbols/{name} resolves indexed symbols", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/a.ts', 'A', 'const', 1, 1, 'const A', 1, 0),
+                ('src/b.ts', 'A', 'const', 1, 1, 'const A', 1, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.readResource({
+        uri: "codemap://symbols/A?in=src/a.ts",
+      });
+      const parsed = JSON.parse(readResourceText(r));
+      expect(parsed.matches).toEqual([
+        expect.objectContaining({
+          name: "A",
+          file_path: "src/a.ts",
+        }),
+      ]);
     } finally {
       await server.close();
     }

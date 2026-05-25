@@ -83,4 +83,28 @@ describe("setQueryRecipesProjectRoot — pre-bootstrap CLI parse-phase path", ()
       rmSync(otherRoot, { recursive: true, force: true });
     }
   });
+
+  it("loads project recipes from a custom --state-dir before bootstrap", () => {
+    const recipesDir = join(projectRoot, ".cm", "recipes");
+    mkdirSync(recipesDir, { recursive: true });
+    writeFileSync(join(recipesDir, `${primaryId}.sql`), "SELECT 3 AS ok\n");
+    setQueryRecipesProjectRoot(projectRoot, ".cm");
+    expect(listQueryRecipeIds()).toContain(primaryId);
+    expect(getQueryRecipeSql(primaryId)).toContain("SELECT 3");
+  });
+
+  it("invalidates the cache when --state-dir changes for the same root", () => {
+    const cmDir = join(projectRoot, ".cm", "recipes");
+    const otherDir = join(projectRoot, ".other", "recipes");
+    mkdirSync(cmDir, { recursive: true });
+    mkdirSync(otherDir, { recursive: true });
+    writeFileSync(join(cmDir, `${primaryId}.sql`), "SELECT 3\n");
+    writeFileSync(join(otherDir, `${otherId}.sql`), "SELECT 4\n");
+    setQueryRecipesProjectRoot(projectRoot, ".cm");
+    expect(listQueryRecipeIds()).toContain(primaryId);
+    setQueryRecipesProjectRoot(projectRoot, ".other");
+    const ids = listQueryRecipeIds();
+    expect(ids).toContain(otherId);
+    expect(ids).not.toContain(primaryId);
+  });
 });

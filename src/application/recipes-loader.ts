@@ -62,7 +62,7 @@ export interface LoadRecipesOpts {
    */
   bundledDir: string;
   /**
-   * Absolute path to the project's `.codemap/recipes/` directory, or
+   * Absolute path to the project's `<state-dir>/recipes/` directory, or
    * `undefined` if it doesn't exist. Tracer 3 wires this; Tracer 1
    * accepts but doesn't read it.
    */
@@ -113,7 +113,7 @@ export function mergeRecipes(
 /**
  * Read every `<id>.sql` from `dir`, pair with optional `<id>.md`. Returns
  * `[]` if the directory doesn't exist (project-recipes case — absence of
- * `.codemap/recipes/` is not an error). Throws with recipe-aware error
+ * `<state-dir>/recipes/` is not an error). Throws with recipe-aware error
  * messages if a `<id>.sql` fails load-time validation (empty after
  * comment-stripping, or starts with a DML / DDL keyword).
  *

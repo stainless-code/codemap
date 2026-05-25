@@ -16,7 +16,7 @@ actions:
 
 The toggle-change auto-detect upgrades incremental → full when flipping `fts5: false → true`, so a fresh `--full` is automatic.
 
-**Tuning axes** for project-local overrides at `<projectRoot>/.codemap/recipes/text-in-deprecated-functions.sql`:
+**Tuning axes** for project-local overrides at `<state-dir>/recipes/text-in-deprecated-functions.sql` (default `.codemap/recipes/`):
 
 - **Different markers**: replace `'TODO OR FIXME OR HACK'` with any FTS5 query (e.g. `'NOTE OR REVIEW'`).
 - **Different coverage threshold**: change `< 50` to project's risk-appetite (e.g. `< 80` for stricter projects).

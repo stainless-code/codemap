@@ -45,6 +45,12 @@ describe("shouldIndexPath", () => {
     expect(shouldIndexPath(".codemap/recipes/foo.md", exclude)).toBe(true);
   });
 
+  it("accepts custom state-dir recipe paths", () => {
+    expect(
+      shouldIndexPath(".cm/recipes/team.sql", exclude, ".cm/recipes/"),
+    ).toBe(true);
+  });
+
   it("rejects .codemap.db and other dot-prefixed files", () => {
     // The DB itself + WAL / SHM live under .codemap/ (or the root
     // depending on config) — never reindex on those.

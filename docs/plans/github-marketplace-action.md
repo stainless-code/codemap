@@ -112,7 +112,7 @@ These are the design questions the plan-PR resolves before impl starts. Each get
     cli = resolveCommand(agent, 'execute',       ['@stainless-code/codemap@latest'])
   ```
 
-  Reasoning: matches consumer's pinned version by default (no surprise drift between local dev and CI); project-local recipes (`<projectRoot>/.codemap/recipes/`) work for free; faster on cached runners (`node_modules/.bin/codemap` already there post-`npm ci`). `version:` input forces a pinned `'execute'` when set — explicit override stays clean. Rejected execute-only (ignores consumer's pinned version), project-only (friction for trial-run), pinned-first inversion (the strongest signal is "what runs locally", which is `package.json#devDependencies`).
+  Reasoning: matches consumer's pinned version by default (no surprise drift between local dev and CI); project-local recipes (`<state-dir>/recipes/`; default `.codemap/recipes/`) work for free; faster on cached runners (`node_modules/.bin/codemap` already there post-`npm ci`). `version:` input forces a pinned `'execute'` when set — explicit override stays clean. Rejected execute-only (ignores consumer's pinned version), project-only (friction for trial-run), pinned-first inversion (the strongest signal is "what runs locally", which is `package.json#devDependencies`).
 
   **Edge cases:**
   - **Version mismatch warning.** If `version:` input is set AND `codemap` is in `devDependencies` AND they disagree → log a warning ("Action input version=X differs from project devDependency Y; using input"). Don't error — consumer may be deliberately overriding.
@@ -205,7 +205,7 @@ No schema changes. No new transports. The Action consumes existing engines.
 
 - **Agent UX directly** — agents call MCP / CLI, not Actions. Indirect lift only: the Action seeds CodeRabbit / Copilot / Cursor-bot reviews with codemap's structural facts, which they then cite — but that's downstream of the Action's primary value.
 - **Audit verdict semantics** — Action ships raw deltas + SARIF; pass/warn/fail thresholds remain backlog (per L.7). Shipping the Action is itself the most likely accelerant for the trigger fire (real consumers writing `jq` threshold scripts).
-- **Recipe authoring** — Action consumes recipes, doesn't grow them. Project-local recipes (`<projectRoot>/.codemap/recipes/`) work in CI exactly as locally; no Action-specific surface.
+- **Recipe authoring** — Action consumes recipes, doesn't grow them. Project-local recipes (`<state-dir>/recipes/`; default `.codemap/recipes/`) work in CI exactly as locally; no Action-specific surface.
 - **IDE integration** — that's [`(d) LSP plan`](./lsp-diagnostic-push.md)'s scope; sibling plan, see relationship below.
 
 ## Relationship to `(d) LSP diagnostic-push` plan
@@ -314,7 +314,6 @@ Slices 1-4 are in-tree; Slice 5 is a sequenced manual runbook that requires a me
 
 ## Cross-references
 
-- [`docs/research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical) — pick-order rationale + the 2026-05 impact-vs-cadence amendment that surfaced this pick.
 - [`docs/roadmap.md § Backlog`](../roadmap.md#backlog) — backlog entry + audit-verdict trigger that this Action's adoption is likely to fire.
 - [`docs/plans/lsp-diagnostic-push.md`](./lsp-diagnostic-push.md) — sibling plan rendering same recipe substrate to IDE / VSCode surface; complementary, not competitive (see "Relationship to (d) LSP plan" section above).
 - [`docs/README.md` Rule 3](../README.md) — plan-file convention (this file's location).

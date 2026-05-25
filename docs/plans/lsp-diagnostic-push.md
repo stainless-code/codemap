@@ -1,28 +1,54 @@
 # (d) LSP diagnostic-push server + paired VSCode extension — plan
 
-> **Status:** open · plan iterating in parallel with (b) C.9 + every shipping-cadence item before (d). Pick-order rationale (the (d) v1 → v2 → v3 three-revisions arc) at [`research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical).
+> **Status:** open · ships after [`c9-plugin-layer.md`](./c9-plugin-layer.md) (C.9) in the impact-vs-cadence sequence — not a hard block; diagnostics on existing recipes work without entry-point hints, but landing C.9 first reduces false positives on framework files.
 >
 > **Motivator:** humans-in-IDEs surface for codemap's recipe outputs. Diagnostics-as-squigglies for `untested-and-dead`, `components-touching-deprecated`, `boundary-violations`, `unimported-exports`, `high-complexity-untested`, `deprecated-symbols` callers. Hover provider over `symbols.signature` + `doc_comment` + `complexity` + caller-count fills a gap `tsserver` doesn't (codemap-unique metadata, not types). Code lens for fan-in / complexity / coverage. Code actions hooked to `recipe.actions` template.
 >
-> **Tier:** XL effort (per the research note's § 5 (d) row). Two paired components: `codemap-lsp` server + `codemap-vscode` extension. Server alone is incomplete — extension is required to consume the custom `codemap/analysisComplete` notification + render status bar / tree views.
+> **Tier:** XL effort. Two paired components: `codemap-lsp` server + `codemap-vscode` extension. Server alone is incomplete — extension is required to consume the custom `codemap/analysisComplete` notification + render status bar / tree views.
 >
 > **Implementation libraries:** [`vscode-languageserver`](https://github.com/microsoft/vscode-languageserver-node) for the server side; [`vscode-languageclient`](https://github.com/microsoft/vscode-languageserver-node) for the paired VSCode extension. Both Microsoft-official LSP libraries on top of which the codemap-specific diagnostic-push behavior is built.
 
 ---
 
-## Pre-locked decisions (from non-goals-reassessment grill 2026-05)
+## Pre-locked decisions
 
 These are committed to v1. Questions opened against them must justify against the linked decisions.
 
-| #   | Decision                                                                                                                                                                                                                                            | Source                                                                                                                                                                                  |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L.1 | **Diagnostic-push shape, NOT request-handler shape.** No `textDocument/definition` / `references` / `hover types` / `workspace/symbol`. `tsserver` dominates those for JS/TS users; competing is wasted surface.                                    | [§ 2.5 v3 verdict](../research/non-goals-reassessment-2026-05.md#25-no-lsp-replacement); [§ 8 errata row](../research/non-goals-reassessment-2026-05.md#8-triangulation-errata-2026-05) |
-| L.2 | **Moat-A discipline:** every diagnostic must be the `--format lsp-diagnostic` rendering of a bundled recipe. Reviewer test: "is this finding queryable via `query --recipe X`?" If no recipe drives the diagnostic, it's rejected.                  | [Moat A](../roadmap.md#moats-load-bearing)                                                                                                                                              |
-| L.3 | **Moat-B aligned:** server consumes shipped engines (`application/show-engine.ts`, `application/impact-engine.ts`, `application/watcher.ts`); does NOT re-extract structure inside the protocol layer.                                              | [Moat B](../roadmap.md#moats-load-bearing); [§ 2.5 "no LSP engine"](../research/non-goals-reassessment-2026-05.md#25-no-lsp-replacement)                                                |
-| L.4 | **Bun/Node binary, not Rust.** Keep the toolchain consistent; reuse engines via direct imports.                                                                                                                                                     | Operational — repo is TS                                                                                                                                                                |
-| L.5 | **Server + extension is the unit, not either alone.** Custom `codemap/analysisComplete` notification requires the paired extension to render status bar / tree views; LSP-only consumption (no extension) is reduced UX, not v1.                    | [§ 2.5 v3 verdict](../research/non-goals-reassessment-2026-05.md#25-no-lsp-replacement)                                                                                                 |
-| L.6 | **No JS execution at index time** survives — server speaks LSP, doesn't `eval` recipe SQL or extension-injected code.                                                                                                                               | [Floors "No JS execution at index time"](../roadmap.md#floors-v1-product-shape)                                                                                                         |
-| L.7 | **Ships AFTER (b) C.9** per cadence. Not a hard block — (d) ships valid diagnostics on existing recipe outputs without (b); but landing (b) first means `untested-and-dead` / `unimported-exports` diagnostics inherit cleaner inputs from day one. | [§ 5 Rationale 5](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical)                                                                                      |
+| #   | Decision                                                                                                                                                                                                                                        | Source                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| L.1 | **Diagnostic-push shape, NOT request-handler shape.** No `textDocument/definition` / `references` / `hover types` / `workspace/symbol`. `tsserver` dominates those for JS/TS users; competing is wasted surface.                                | This plan § Shape; [`roadmap.md § Floors`](../roadmap.md#floors-v1-product-shape) (no LSP engine) |
+| L.2 | **Moat-A discipline:** every diagnostic must be the `--format lsp-diagnostic` rendering of a bundled recipe. Reviewer test: "is this finding queryable via `query --recipe X`?" If no recipe drives the diagnostic, it's rejected.              | [Moat A](../roadmap.md#moats-load-bearing)                                                        |
+| L.3 | **Moat-B aligned:** server consumes shipped engines (`application/show-engine.ts`, `application/impact-engine.ts`, `application/watcher.ts`); does NOT re-extract structure inside the protocol layer.                                          | [Moat B](../roadmap.md#moats-load-bearing)                                                        |
+| L.4 | **Bun/Node binary, not Rust.** Keep the toolchain consistent; reuse engines via direct imports.                                                                                                                                                 | Operational — repo is TS                                                                          |
+| L.5 | **Server + extension is the unit, not either alone.** Custom `codemap/analysisComplete` notification requires the paired extension to render status bar / tree views; LSP-only consumption (no extension) is reduced UX, not v1.                | This plan § Motivator                                                                             |
+| L.6 | **No JS execution at index time** survives — server speaks LSP, doesn't `eval` recipe SQL or extension-injected code.                                                                                                                           | [Floors "No JS execution at index time"](../roadmap.md#floors-v1-product-shape)                   |
+| L.7 | **Ships AFTER C.9** per cadence. Not a hard block — (d) ships valid diagnostics on existing recipe outputs without (b); but landing (b) first means `untested-and-dead` / `unimported-exports` diagnostics inherit cleaner inputs from day one. | [`c9-plugin-layer.md`](./c9-plugin-layer.md) § Shipping cadence; § What C.9 sharpens              |
+
+---
+
+## Consumer-shape audit (decisions of record)
+
+- **Agents use MCP, not LSP** — a request-handler shim wrapping `show` / `impact` for agent UX was a dead end.
+- **`tsserver` dominates** standard pull requests (`textDocument/definition`, `references`, `hover types`, `workspace/symbol`) for JS/TS.
+- **Valuable shape:** diagnostic-push — `diagnostic` (LSP 3.17 pull), `code_action`, `code_lens`, `hover`, custom `codemap/analysisComplete` — plus a paired VSCode extension. Recipes render as `Diagnostic[]` (squigglies), not go-to-def.
+- **Moat-A discipline:** diagnostics are `--format lsp-diagnostic` renderings of bundled recipes; reviewer test: "is this finding queryable via `query --recipe X`?"
+
+## Shape evolution (v1 → v3)
+
+| Rev    | Proposal                                                   | Outcome                                                                            |
+| ------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| v1     | Thin shim over show/impact engines; ship before C.9        | Rejected — assumed C.9 `is_entry` rides on LSP `Location[]` responses              |
+| v2     | Orthogonal to C.9; ship before C.9                         | Correctly rejected request-handler shape; wrongly dropped diagnostic-push entirely |
+| v2.5   | Defer until concrete consumer                              | Incomplete — conflated rejected shape with high-value diagnostic-push              |
+| **v3** | Diagnostic-push server + VSCode extension; ships after C.9 | **Current plan** — server + extension is one unit (L.5)                            |
+
+## v1 protocol surface
+
+**Implement:** `initialize`, `did_open`, `did_change`, `did_save`, `diagnostic` (pull), `code_action`, `code_lens`, `hover`, custom `codemap/analysisComplete`.
+
+**Explicitly skip:** `definition`, `references`, `documentSymbol`, `workspace/symbol` — `tsserver` covers these.
+
+Diagnostic codes map 1:1 to recipe ids from `--recipes-json`. Paired extension: tree views, status bar via custom notification, settings for issue toggles + git ref scope.
 
 ---
 
@@ -338,8 +364,7 @@ Bias: **locked**. Relevant to Q1 — monorepo workspaces makes locked versioning
 
 ## Cross-references
 
-- [`docs/research/non-goals-reassessment-2026-05.md`](../research/non-goals-reassessment-2026-05.md) — research foundation: [§ 2.5 v3 verdict](../research/non-goals-reassessment-2026-05.md#25-no-lsp-replacement), [§ 5 pick-order rationale (the (d) v1 → v2 → v3 arc)](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical), [§ 8 errata](../research/non-goals-reassessment-2026-05.md#8-triangulation-errata-2026-05). Moats lifted to [`roadmap.md § Non-goals (v1)`](../roadmap.md#non-goals-v1).
-- [`docs/plans/c9-plugin-layer.md`](./c9-plugin-layer.md) — C.9 plan (lands before (d); sharpens (d)'s diagnostic precision via entry-point awareness)
+- [`docs/plans/c9-plugin-layer.md`](./c9-plugin-layer.md) — C.9 plan (lands before this plan; sharpens diagnostic precision via entry-point awareness)
 - [`docs/architecture.md`](../architecture.md) — engine reference (`application/show-engine.ts`, `application/impact-engine.ts`, `application/watcher.ts`)
 - [`docs/golden-queries.md`](../golden-queries.md) — golden-query test pattern (LSP fixture follows the same shape)
 - [`docs/README.md` Rule 3](../README.md) — plan-file convention (this file's location)

@@ -111,6 +111,6 @@ Required before declaring done:
 - [ ] All `[DEBUG-…]` instrumentation removed (`grep` the prefix)
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
-- [ ] If the post-mortem yields a permanent insight, append a one-line entry to [`.agents/lessons.md`](../../lessons.md) per the lessons-rule discipline
+- [ ] If the post-mortem yields a permanent insight, **lift** it into `.agents/rules/` or the relevant skill; append to [`.agents/lessons.md`](../../lessons.md) only when it is not yet encoded elsewhere
 
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to [`improve-codebase-architecture`](../improve-codebase-architecture/SKILL.md) with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.

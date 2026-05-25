@@ -98,6 +98,12 @@ export const scopesExtractor: TierExtractor = {
         // Constructor params already emitted as class-scope symbols by
         // symbolsExtractor.ClassDeclaration — skip to avoid duplicates.
         if (node.kind !== "constructor" && node.value?.params?.length) {
+          const ownerKind =
+            node.kind === "get"
+              ? "getter"
+              : node.kind === "set"
+                ? "setter"
+                : "method";
           pushTypeParams(
             node.value.typeParameters,
             scopes.currentLocalId(),
@@ -111,6 +117,7 @@ export const scopesExtractor: TierExtractor = {
             ctx,
             jsDocComments,
             source,
+            ownerKind,
           );
         }
       },
@@ -146,6 +153,7 @@ export const scopesExtractor: TierExtractor = {
             ctx,
             jsDocComments,
             source,
+            "arrow",
           );
           return;
         }
@@ -195,6 +203,7 @@ export const scopesExtractor: TierExtractor = {
           ctx,
           jsDocComments,
           source,
+          "function",
         );
       },
       "FunctionExpression:exit"(node: any) {
