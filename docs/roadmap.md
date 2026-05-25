@@ -35,7 +35,7 @@ Every PR reviewer defends these. The reviewer tests embedded below are the canon
 
 Soft constraints — describe shipped reality. Decided-but-unshipped flips live in [§ Backlog](#backlog), not here.
 
-- **Full-text search default-on** — opt-in FTS5 ships per the `--with-fts` CLI flag / `fts5: true` config field (default OFF; populates `source_fts` virtual table at index time). Default-on revisits a v2 size-tax measurement.
+- **Full-text search default-on** — opt-in FTS5 ships per the `--with-fts` CLI flag / `fts5: true` config field (default OFF; populates `source_fts` virtual table at index time). Default-on decision gated on measurement — plan: [`plans/fts-default-on-evaluation.md`](./plans/fts-default-on-evaluation.md).
 - **No LSP engine** — no rename / go-to-definition / hover types. Read-side LSP-adjacent primitives (`show` / `snippet` / `impact`) ship as CLI / MCP / HTTP verbs (see [README § CLI](../README.md#cli)). LSP **diagnostic-push** server (recipes-as-`Diagnostic[]`) is a separate roadmap item tracked at [`plans/lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md).
 - **No opinionated rule engine / fix engine / severity levels** — verdict-shaped lints (`knip`, `jscpd`, `eslint`) are a different product class. Predicate-as-API recipes (`untested-and-dead`, `worst-covered-exports`, `visibility-tags`, `barrel-files`, `deprecated-symbols`, …) are in scope and shipping; they're upstream of [Moat A](#moats-load-bearing). **Suppression comments** ship as opt-in substrate (`// codemap-ignore-{next-line,file} <recipe-id>` → `suppressions` table; recipes JOIN to honor) — no severity, no suppression-by-default, no universal-honor; consumer-chosen, not policy.
 - **No renderer runtime** — skyline / ASCII art / animated diagrams; the index emits structured rows. Shape-only output formatters (`--format mermaid` shipped; `--format sarif` / `annotations` for CI; D2 / Graphviz on demand) are in scope.
@@ -52,16 +52,48 @@ Soft constraints — describe shipped reality. Decided-but-unshipped flips live 
 
 ## Backlog
 
+### Agent & indexing ops
+
+Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-and-ops.md`](./plans/agent-surface-and-ops.md).
+
+**P0 — quick wins**
+
+- [ ] **MCP server instructions** — tool-selection playbook in MCP `initialize`. Plan: [`plans/mcp-server-instructions.md`](./plans/mcp-server-instructions.md). Effort: S.
+- [ ] **WSL watch policy** — disable unreliable watcher on `/mnt/*`; env overrides. Plan: [`plans/wsl-watch-policy.md`](./plans/wsl-watch-policy.md). Effort: S.
+- [ ] **Git hook auto-sync** — opt-in background incremental index when watcher off. Plan: [`plans/git-hook-auto-sync.md`](./plans/git-hook-auto-sync.md). Effort: S.
+- [ ] **MCP tool allowlist** — `CODEMAP_MCP_TOOLS` env for subset registration. Plan: [`plans/mcp-tool-allowlist.md`](./plans/mcp-tool-allowlist.md). Effort: S.
+
+**P1 — medium**
+
+- [ ] **MCP trace / explore / node** — recipe twins + thin MCP composers. Plan: [`plans/mcp-trace-explore-tools.md`](./plans/mcp-trace-explore-tools.md). Effort: M.
+- [ ] **Agents init MCP wiring** — `agents init --mcp` + permissions. Plan: [`plans/agents-init-mcp-wiring.md`](./plans/agents-init-mcp-wiring.md). Effort: M.
+- [ ] **Affected tests recipe** — dep-graph test selection + stdin. Plan: [`plans/affected-tests-recipe.md`](./plans/affected-tests-recipe.md). Effort: M.
+- [ ] **Index lock + error log** — cross-process lock, `unlock`, `errors.log`. Plan: [`plans/index-lock-and-error-log.md`](./plans/index-lock-and-error-log.md). Effort: M.
+- [ ] **Parse worker hardening** — per-file timeout + worker recycle. Plan: [`plans/parse-worker-hardening.md`](./plans/parse-worker-hardening.md). Effort: M.
+- [ ] **Field-qualified search** — `kind:` / `path:` / `name:` → SQL. Plan: [`plans/field-qualified-search.md`](./plans/field-qualified-search.md). Effort: M.
+- [ ] **Agent eval harness** — A/B MCP tool-call + token metrics. Plan: [`plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). Effort: M.
+
+**P2 — strategic (trigger-gated where noted)**
+
+- [ ] **Framework route extraction** — Express / React Router / NestJS `http_routes` substrate. Plan: [`plans/framework-route-extraction.md`](./plans/framework-route-extraction.md). Blocked on C.9 contract. Effort: L.
+- [ ] **Callback dispatch synthesis** — heuristic `calls` with `provenance`. Plan: [`plans/callback-dispatch-synthesis.md`](./plans/callback-dispatch-synthesis.md). Effort: L.
+- [ ] **Unresolved calls staging** — two-phase call resolution queue. Plan: [`plans/unresolved-calls-staging.md`](./plans/unresolved-calls-staging.md). Effort: L.
+- [ ] **Cross-project MCP root** — optional `root` on tools + DB cache. Plan: [`plans/cross-project-mcp-root.md`](./plans/cross-project-mcp-root.md). Effort: M.
+- [ ] **FTS default-on evaluation** — measure DB size tax; maybe flip default. Plan: [`plans/fts-default-on-evaluation.md`](./plans/fts-default-on-evaluation.md). Effort: S–M.
+- [ ] **Call path + type hierarchy recipes** — `type-ancestors` / descendants. Plan: [`plans/call-path-type-hierarchy-recipes.md`](./plans/call-path-type-hierarchy-recipes.md). Effort: M.
+
+---
+
+### Core substrate & platform
+
 - [ ] **C.9 framework plugin layer** — static entry-point hints on `files` to sharpen reachability-predicate recipes (`untested-and-dead`, `unimported-exports`, future `dead-files-by-reachability`). Plan: [`plans/c9-plugin-layer.md`](./plans/c9-plugin-layer.md). Effort: XL; ships last in the impact-vs-cadence sequence (see plan § Shipping cadence).
 - [ ] **LSP diagnostic-push + VSCode extension** — recipes-as-`Diagnostic[]` server + paired extension; explicitly **not** a go-to-def / references shim (`tsserver` covers those). Plan: [`plans/lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md). Effort: XL; soft ordering after C.9 for cleaner squigglies on framework files.
 - [ ] **Apply-engine direction** — diff-shape recipes, per-row `actions[].command`, `apply --rows` / `--diff-input` / fixpoint loop. Substrate tiers 1–6 shipped; open steps 2–12. Plan: [`plans/apply-engine-direction.md`](./plans/apply-engine-direction.md).
-- [ ] **Test-impact / `affected` recipe** (trigger-gated) — codemap has the dep graph substrate. **Revisit when:** a consumer asks for CI test-selection from indexed deps + a documented test-file convention. Effort: M.
-- [ ] **Framework route extraction** (trigger-gated) — Express / Next / React Router route nodes (peer tools extract these; codemap is TS/JS-deep but route-aware). **Revisit when:** C.9 plugin contract exists OR ≥2 consumers ask with concrete framework targets. Effort: High; likely extends C.9 plugin shape, not a standalone engine.
 - [ ] **`history` table** (deferred — revisit-triggered) — temporal queries: "when did symbol X get `@deprecated`?", "coverage trend over last 50 commits", "files that became dead this week". `audit --base <ref>` covers the most-common temporal question (PR-scoped diff) without schema growth, so the table earns its place only when bigger questions emerge. Two shapes (per-commit snapshots ~N × DB size; append-only event log heavier CTE walks); both pay an N-reindexes backfill cost (~30s per reindex). **Revisit triggers:** two consumers ship `jq`-based "audit-runs-over-time" workflows, OR `query_baselines` evolution becomes a recurring agent need.
 - [ ] **`codemap audit` verdict + thresholds** (v1.x) — `verdict: "pass" | "warn" | "fail"` driven by an `audit.deltas[<key>].{added_max, action}` field on the config object (`.codemap/config.{ts,js,json}`). Triggers: two consumers ship `jq`-based threshold scripts with similar shapes, OR one consumer asks with a concrete config sketch. Until then, raw deltas + consumer-side `jq` is the CI exit-code idiom. **Likely accelerant:** the Marketplace Action (next item) shipping is the most plausible path to firing the trigger — once `- uses: stainless-code/codemap@v1` is the dominant CI path, real `jq` threshold scripts will surface.
 - [ ] **GitHub Marketplace Action — publish + listing finish** — core Action implementation is in-tree: root `action.yml`, `query --ci`, `audit --format sarif` / `--ci`, package-manager detection, dogfood smoke, and opt-in `pr-comment` summary renderer have shipped. Remaining work is the release/listing slice: `MARKETPLACE.md`, `v1.0.0` / floating `v1` tags, Marketplace setup, sacrificial-repo smoke, and making `action-smoke` blocking once the Action tag exists. Action version stream is independent of CLI version (`package.json` currently drives CLI/npm version; Action publishes at its own `v1.0.0`). Plan: [`plans/github-marketplace-action.md`](./plans/github-marketplace-action.md). Effort: S.
 - [ ] **AST-hash duplication** — `symbols.body_hash` column (normalized AST hash via oxc, computed at parse time — Rust-native, fast) + bundled `duplicates.sql` recipe joining on `body_hash` (`SELECT * FROM symbols GROUP BY body_hash HAVING COUNT(*) > 1`). **Different shape from token-level suffix-array dupes** (catches structurally-identical functions, not copy-paste with renamed variables). Substrate addition — consumer writes the JOIN that decides "this is a problem"; no severity, no suppression-by-default. Effort: ~2 weeks (M). **Needs a plan PR before impl** — design questions: which oxc visitor scope (function bodies only? expressions? include comments?), what counts as "structurally identical" (rename-aware? whitespace-tolerant?), schema delta.
-- [ ] **Falsifiable benchmark CI on named external fixtures** — codemap vs `find` + `grep` + `Read`-loop agent-discovery on zod, fastify, vue-core, next.js. Numbers land in [`docs/benchmark.md`](./benchmark.md); ~3 surface in `MARKETPLACE.md`. Replaces the unfalsifiable "sub-millisecond" claim with named-fixture comparisons any consumer can re-run. Effort: M. **Self-index regression guardrail already shipped** (#96 + #99 + #100): `bun run check:perf-baseline` + the `📈 Perf baseline (self-index)` CI hard gate on per-phase walls vs `fixtures/benchmark/perf-baseline.json`. This roadmap item is the external-fixture extension.
+- [ ] **Falsifiable benchmark CI on named external fixtures** — codemap vs `find` + `grep` + `Read`-loop agent-discovery on zod, fastify, vue-core, next.js. Numbers land in [`docs/benchmark.md`](./benchmark.md); ~3 surface in `MARKETPLACE.md`. Plan: [`plans/agent-eval-harness.md`](./plans/agent-eval-harness.md) (harness) + external fixture extension. Effort: M. **Self-index regression guardrail already shipped** (#96 + #99 + #100): `bun run check:perf-baseline` + the `📈 Perf baseline (self-index)` CI hard gate on per-phase walls vs `fixtures/benchmark/perf-baseline.json`.
 - [ ] **Perf-triangulation deferrals (trigger-gated)** — Tier 5.2 / 5.4 / 5.6 / 5.7 / 6.1 / 6.2 from [`plans/perf-triangulation-rollout.md`](./plans/perf-triangulation-rollout.md) (Phases 0-2 + Phase 5 shipped; per-model audit + triangulation source content consolidated into the rollout plan 2026-05-18). Each ships when its trigger fires:
   - **5.2 IPC encoding (CBOR / transferables)** — after a `parse_ms_pure_worker` instrumentation split shows IPC > ~30% of `parse_ms`.
   - **5.4 `extractMarkers` lineMap reuse on TS/JS** — if marker extraction becomes hot on >10k-file trees (~1ms on this repo today).
