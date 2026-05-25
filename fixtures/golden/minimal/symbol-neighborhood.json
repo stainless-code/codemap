@@ -1,0 +1,79 @@
+[
+  {
+    "name": "setupTransport",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 27,
+    "line_end": 31,
+    "signature": "setupTransport(baseUrl): Transport",
+    "edge": "callee",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "legacyClient",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 46,
+    "line_end": 48,
+    "signature": "legacyClient()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "function",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "line_end": 7,
+    "signature": "ApiBridge()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "run",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 22,
+    "line_end": 31,
+    "signature": "run()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "function",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "line_end": 7,
+    "signature": "ApiBridge()",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  },
+  {
+    "name": "prefetch",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 15,
+    "line_end": 20,
+    "signature": "prefetch(): Promise<void>",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  },
+  {
+    "name": "run",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 22,
+    "line_end": 31,
+    "signature": "run()",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  }
+]

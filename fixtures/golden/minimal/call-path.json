@@ -1,0 +1,18 @@
+[
+  {
+    "file_path": "src/api/client.ts",
+    "caller_name": "createClient",
+    "callee_name": "setupTransport",
+    "line_start": 21,
+    "hop": 1,
+    "via": "calls"
+  },
+  {
+    "file_path": "src/api/client.ts",
+    "caller_name": "setupTransport",
+    "callee_name": "handshake",
+    "line_start": 29,
+    "hop": 2,
+    "via": "calls"
+  }
+]
