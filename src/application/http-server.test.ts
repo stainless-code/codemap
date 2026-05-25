@@ -271,6 +271,55 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(Array.isArray(r.json.matches)).toBe(true);
   });
 
+  it("affected returns transitive test paths for explicit paths", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/lib/util.ts', 'h3', 10, 1, 'typescript', 1, 1),
+                ('src/__tests__/util.test.ts', 'h4', 10, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO dependencies (from_path, to_path)
+         VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
+      );
+      db.run(
+        `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
+         VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "affected", {
+      paths: ["src/lib/util.ts"],
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual([
+      {
+        test_path: "src/__tests__/util.test.ts",
+        impact_depth: 1,
+        actions: [
+          {
+            type: "run-affected-tests",
+            description:
+              "Test file paths only — CI composes the exit policy and runner command.",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("affected with non-integer max_depth → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "affected", {
+      paths: ["src/a.ts"],
+      max_depth: 1.5,
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"affected"');
+  });
+
   it("list_baselines returns array (empty when none saved)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "list_baselines", {});

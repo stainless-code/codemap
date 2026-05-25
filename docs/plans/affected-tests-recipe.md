@@ -59,7 +59,13 @@ No dedicated MCP tool required — agents call **`query_recipe`** with `recipe: 
 3. Document test-file conventions in recipe `.md`
 4. Optional GitHub Action input `mode: affected` in [github-marketplace-action](./github-marketplace-action.md) (follow-up)
 
-**Out of scope:** dedicated MCP/HTTP `affected` tool (same outcome reachable via `query_recipe`; revisit only if agent eval shows friction).
+**Out of scope (v1):** ~~dedicated MCP/HTTP `affected` tool~~ — shipped Phase 2 follow-up (`affected` tool; same engine as CLI). `query_recipe` remains the Moat-A substrate.
+
+---
+
+## Phase 2 (optional, shipped)
+
+MCP/HTTP **`affected`** — `{ paths?, changed_since?, test_glob?, max_depth? }` → shared `affected-engine` → `affected-tests` recipe. Documented in `mcp-instructions`; respects `CODEMAP_MCP_TOOLS` allowlist.
 
 ---
 

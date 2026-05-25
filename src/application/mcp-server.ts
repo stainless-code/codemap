@@ -23,12 +23,14 @@ import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import type { ResourcePayload } from "./resource-handlers";
 import {
+  affectedArgsSchema,
   applyArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
   handleApply,
   handleAudit,
+  handleAffected,
   handleContext,
   handleDropBaseline,
   handleImpact,
@@ -146,6 +148,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("show", () => registerShowTool(server, opts));
   maybeRegister("snippet", () => registerSnippetTool(server, opts));
   maybeRegister("impact", () => registerImpactTool(server));
+  maybeRegister("affected", () => registerAffectedTool(server, opts));
   maybeRegister("apply", () => registerApplyTool(server, opts));
   registerResources(server);
   logMcpToolAllowlist(allowlistResolved, registered);
@@ -282,6 +285,18 @@ function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
       inputSchema: snippetArgsSchema,
     },
     (args) => wrapToolResult(handleSnippet(args, opts.root)),
+  );
+}
+
+function registerAffectedTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "affected",
+    {
+      description:
+        "List test files transitively impacted by changed source files (reverse BFS on `dependencies`). Same preprocessor as `codemap affected` → `affected-tests` recipe. Args: paths (explicit project-relative paths; when set, skips git discovery), changed_since (git ref when paths omitted; default HEAD), test_glob (SQLite GLOB; replaces default suffix globs when set), max_depth (optional BFS cap). Returns JSON array of {test_path, impact_depth, actions?} — file paths only; CI composes the runner command.",
+      inputSchema: affectedArgsSchema,
+    },
+    (args) => wrapToolResult(handleAffected(args, opts.root)),
   );
 }
 

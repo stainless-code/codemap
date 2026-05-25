@@ -1232,3 +1232,78 @@ describe("MCP server — impact tool", () => {
     }
   });
 });
+
+describe("MCP server — affected tool", () => {
+  function seedAffectedGraph() {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/lib/util.ts', 'h3', 10, 1, 'typescript', 1, 1),
+                ('src/__tests__/util.test.ts', 'h4', 10, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO dependencies (from_path, to_path)
+         VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
+      );
+      db.run(
+        `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
+         VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists affected in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("affected");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected returns transitive test paths for explicit paths", async () => {
+    seedAffectedGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/lib/util.ts"] },
+      });
+      const json = readJson(r);
+      expect(json).toEqual([
+        {
+          test_path: "src/__tests__/util.test.ts",
+          impact_depth: 1,
+          actions: [
+            {
+              type: "run-affected-tests",
+              description:
+                "Test file paths only — CI composes the exit policy and runner command.",
+            },
+          ],
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("respects CODEMAP_MCP_TOOLS allowlist", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,affected",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toEqual(expect.arrayContaining(["query", "affected"]));
+      expect(names).not.toContain("impact");
+    } finally {
+      await server.close();
+    }
+  });
+});
