@@ -34,4 +34,4 @@ git diff --name-only origin/main | codemap affected --stdin --json
 codemap query --recipe affected-tests --params changed_files=src/lib/complexity-fixture.ts --json
 ```
 
-Each row: `test_path`, `impact_depth`.
+Each row: `test_path`, `impact_depth`, optional per-row `actions` (same as `--json` recipe output).

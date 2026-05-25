@@ -67,7 +67,7 @@ Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-a
 
 - [ ] **MCP trace / explore / node** — recipe twins + thin MCP composers. Plan: [`plans/mcp-trace-explore-tools.md`](./plans/mcp-trace-explore-tools.md). Effort: M.
 - [ ] **Agents init MCP wiring** — `agents init --mcp` + permissions. Plan: [`plans/agents-init-mcp-wiring.md`](./plans/agents-init-mcp-wiring.md). Effort: M.
-- [ ] **Affected tests recipe** — dep-graph test selection + stdin. Plan: [`plans/affected-tests-recipe.md`](./plans/affected-tests-recipe.md). Effort: M.
+- [x] **Affected tests recipe** — dep-graph test selection + stdin + MCP `affected` tool. Plan: [`plans/affected-tests-recipe.md`](./plans/affected-tests-recipe.md). Shipped #132 + #133.
 - [ ] **Index lock + error log** — cross-process lock, `unlock`, `errors.log`. Plan: [`plans/index-lock-and-error-log.md`](./plans/index-lock-and-error-log.md). Effort: M.
 - [ ] **Parse worker hardening** — per-file timeout + worker recycle. Plan: [`plans/parse-worker-hardening.md`](./plans/parse-worker-hardening.md). Effort: M.
 - [ ] **Field-qualified search** — `kind:` / `path:` / `name:` → SQL. Plan: [`plans/field-qualified-search.md`](./plans/field-qualified-search.md). Effort: M.

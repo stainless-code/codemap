@@ -1232,3 +1232,191 @@ describe("MCP server — impact tool", () => {
     }
   });
 });
+
+describe("MCP server — affected tool", () => {
+  function seedAffectedGraph() {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/lib/util.ts', 'h3', 10, 1, 'typescript', 1, 1),
+                ('src/__tests__/util.test.ts', 'h4', 10, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO dependencies (from_path, to_path)
+         VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
+      );
+      db.run(
+        `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
+         VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists affected in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("affected");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected returns transitive test paths for explicit paths", async () => {
+    seedAffectedGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/lib/util.ts"] },
+      });
+      const json = readJson(r);
+      expect(json).toEqual([
+        {
+          test_path: "src/__tests__/util.test.ts",
+          impact_depth: 1,
+          actions: [
+            {
+              type: "run-affected-tests",
+              description:
+                "Test file paths only — CI composes the exit policy and runner command.",
+            },
+          ],
+        },
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("respects CODEMAP_MCP_TOOLS allowlist", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,affected",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toEqual(expect.arrayContaining(["query", "affected"]));
+      expect(names).not.toContain("impact");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("excludes affected when not in CODEMAP_MCP_TOOLS", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,show",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).not.toContain("affected");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected with paths: [] returns empty array without git", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: [] },
+      });
+      const json = readJson(r);
+      expect(json).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("does not record recency when paths: []", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const dbBefore = openDb();
+      let before = 0;
+      try {
+        before =
+          dbBefore
+            .query<{ run_count: number }>(
+              "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+            )
+            .get()?.run_count ?? 0;
+      } finally {
+        closeDb(dbBefore);
+      }
+      await client.callTool({ name: "affected", arguments: { paths: [] } });
+      const dbAfter = openDb();
+      try {
+        const after =
+          dbAfter
+            .query<{ run_count: number }>(
+              "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+            )
+            .get()?.run_count ?? 0;
+        expect(after).toBe(before);
+      } finally {
+        closeDb(dbAfter);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected returns isError on non-integer max_depth (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/a.ts"], max_depth: 1.5 },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected reports changed_since in git errors", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { changed_since: "not-a-real-ref-xyz" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      const json = readJson(r);
+      expect(json.error).toContain("changed_since");
+      expect(json.error).not.toContain("--changed-since");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("records recipe recency after a successful affected run", async () => {
+    seedAffectedGraph();
+    const { client, server } = await makeClient();
+    try {
+      await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/lib/util.ts"] },
+      });
+      const db = openDb();
+      try {
+        const row = db
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get();
+        expect(row?.run_count).toBeGreaterThanOrEqual(1);
+      } finally {
+        closeDb(db);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+});

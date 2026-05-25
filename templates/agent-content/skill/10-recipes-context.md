@@ -47,13 +47,15 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`show`** — `{name, kind?, in?}`. Exact symbol lookup → `{matches, disambiguation?}`. Fuzzy lookup belongs in `query` with `LIKE`.
 - **`snippet`** — same shape as `show` but each match also carries `source` (file text) + `stale` / `missing` flags. No reindex side-effects.
 - **`impact`** — `{target, direction?, via?, depth?, limit?, summary?}`. Symbol/file blast-radius walker (replaces hand-composed `WITH RECURSIVE`). Auto-resolves symbol vs file target; `via` defaults to every backend compatible with the kind.
+- **`affected`** — `{paths?, changed_since?, test_glob?, max_depth?}`. Reverse-dependency walk from changed files to test paths (same preprocessor as **`codemap affected`** → **`affected-tests`** recipe). Explicit `paths` (including `paths: []` for empty — skips git) wins over git discovery; omit `paths` for working tree vs `changed_since` (default `HEAD`). When both `paths` and `changed_since` are sent, `paths` wins (mirrors CLI positional + `--changed-since`).
 - **`apply`** — `{recipe, params?, dry_run?, yes?}`. Executes the diff hunks a recipe row produces (`{file_path, line_start, before_pattern, after_pattern}`). **All-or-nothing**: any conflict aborts before any file is written. Over MCP/HTTP `yes: true` is required for the write path; `dry_run` and `yes` are mutually exclusive.
 
-**Affected tests (CLI-first):** **`codemap affected`** — reverse `dependencies` walk from changed files to test paths; primary consumer is CI/shell (`stdin`, `--changed-since`). Thin composer over the bundled **`affected-tests`** recipe. **Agents (MCP/HTTP):** use **`query_recipe`** with `recipe: "affected-tests"` and `changed_files` (RS-delimited paths when multiple). Path sources for the CLI verb: positional args → `--stdin` → `--changed-since <ref>` → default `HEAD` (working tree via `git status` + `HEAD...HEAD` diff). Example:
+**Affected tests:** **`codemap affected`** (CLI) for CI/shell (`stdin`, `--changed-since`). **`affected`** MCP/HTTP tool or **`query_recipe`** with `recipe: "affected-tests"` for agents. Path sources on CLI: positional → `--stdin` → `--changed-since` → default `HEAD`. On MCP/HTTP: `paths` array → else `changed_since` / `HEAD`. Example:
 
 ```bash
 codemap affected --json
 git diff --name-only origin/main | codemap affected --stdin --json
+# MCP/HTTP: affected { paths: ["src/foo.ts"] }  — or query_recipe fallback:
 codemap query --json --recipe affected-tests --params changed_files=src/foo.ts
 ```
 

@@ -29,6 +29,10 @@ import { getFilesChangedSince } from "../git-changed";
 import type { GroupByMode } from "../group-by";
 import { GROUP_BY_MODES } from "../group-by";
 import { getProjectRoot } from "../runtime";
+import {
+  executeAffectedTests,
+  resolveAffectedChangedPaths,
+} from "./affected-engine";
 import { applyDiffPayload } from "./apply-engine";
 import {
   makeWorktreeReindex,
@@ -726,6 +730,50 @@ export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
     } finally {
       closeDb(db, { readonly: true });
     }
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === affected ===============================================================
+
+export const affectedArgsSchema = {
+  paths: z.array(z.string()).optional(),
+  changed_since: z.string().optional(),
+  test_glob: z.string().optional(),
+  max_depth: z.number().int().nonnegative().optional(),
+};
+
+export interface AffectedArgs {
+  paths?: string[];
+  changed_since?: string;
+  test_glob?: string;
+  max_depth?: number;
+}
+
+export function handleAffected(args: AffectedArgs, root: string): ToolResult {
+  try {
+    const pathsResult = resolveAffectedChangedPaths({
+      root,
+      paths: args.paths,
+      changedSince: args.changed_since,
+      errorStyle: "agent",
+    });
+    if (!pathsResult.ok) return err(pathsResult.error);
+
+    const result = executeAffectedTests({
+      root,
+      changedPaths: pathsResult.paths,
+      testGlob: args.test_glob,
+      maxDepth: args.max_depth,
+    });
+    if (!result.ok) {
+      return err(result.error, result.kind === "internal" ? 500 : undefined);
+    }
+    if (pathsResult.paths.length > 0) {
+      tryRecordRecipeRun("affected-tests");
+    }
+    return ok(result.rows);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
   }

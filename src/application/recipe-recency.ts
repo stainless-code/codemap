@@ -7,7 +7,7 @@ import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
  * Write-path imports (`tryRecordRecipeRun` / `recordRecipeRun`) are restricted
- * to `tool-handlers.ts` + `cmd-query.ts` (+ the test file). Re-runnable
+ * to `tool-handlers.ts` + `cli/cmd-query.ts` + `cli/cmd-affected.ts` (+ the test file). Re-runnable
  * forbidden-edge query lives at [`docs/architecture.md` § Boundary verification —
  * `recipe_recency` write path](../../docs/architecture.md#boundary-verification--recipe_recency-write-path).
  * Read-path imports (`enrichWithRecency` / `loadRecipeRecency`) are unrestricted.
@@ -55,12 +55,14 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
 }
 
 /**
- * The wrapper both write sites call (`handleQueryRecipe` for MCP/HTTP +
- * `runQueryCmd` for CLI). Opens its own DB because `executeQuery` runs
- * with `PRAGMA query_only = 1` and can't double as the writer. Swallows
- * every error — recency-write failures NEVER block the recipe response.
+ * Orchestration-layer wrapper (`handleQueryRecipe`, `handleAffected`, `runQueryCmd`,
+ * `runAffectedCmd`). Opens its own DB because `executeQuery` runs with
+ * `PRAGMA query_only = 1` and can't double as the writer. Swallows every error —
+ * recency-write failures NEVER block the recipe response.
  *
- * Caller contract: only call AFTER recipe execution returns successfully.
+ * Caller contract: only call AFTER recipe execution returns successfully. Convenience
+ * tools (`affected`, `codemap affected`) skip the call when no changed paths were
+ * resolved (empty `paths` / stdin / git discovery) — no SQL ran, so no recency bump.
  *
  * `_openDb` is a test seam — production omits it.
  */

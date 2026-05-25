@@ -1,18 +1,18 @@
 import { stdin as input } from "node:process";
 
-import { executeQuery } from "../application/query-engine";
 import {
-  getQueryRecipeActions,
-  getQueryRecipeParams,
-  getQueryRecipeSql,
-} from "../application/query-recipes";
-import { resolveRecipeParams } from "../application/recipe-params";
-import { getFilesChangedSince } from "../git-changed";
+  executeAffectedTests,
+  normalizeChangedPathList,
+  resolveAffectedChangedPaths,
+} from "../application/affected-engine";
+import { tryRecordRecipeRun } from "../application/recipe-recency";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
-/** Delimiter for `affected-tests.changed_files` (ASCII RS). */
-export const CHANGED_PATH_DELIM = "\u001e";
+export {
+  CHANGED_PATH_DELIM,
+  joinChangedPaths,
+} from "../application/affected-engine";
 
 export interface AffectedOpts {
   root: string;
@@ -25,22 +25,6 @@ export interface AffectedOpts {
 }
 
 /**
- * Join project-relative paths for the `affected-tests` recipe param.
- * Filters empty segments; preserves order of first occurrence.
- */
-export function joinChangedPaths(paths: Iterable<string>): string {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of paths) {
-    const path = raw.trim().replace(/^\.\/+/, "");
-    if (path.length === 0 || seen.has(path)) continue;
-    seen.add(path);
-    out.push(path);
-  }
-  return out.join(CHANGED_PATH_DELIM);
-}
-
-/**
  * Read newline-delimited paths from stdin (ignores empty lines).
  */
 export async function readChangedPathsFromStdin(): Promise<string[]> {
@@ -49,10 +33,9 @@ export async function readChangedPathsFromStdin(): Promise<string[]> {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   const text = Buffer.concat(chunks).toString("utf8");
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^\.\/+/, ""))
-    .filter((line) => line.length > 0);
+  return normalizeChangedPathList(
+    text.split(/\r?\n/).map((line) => line.trim()),
+  );
 }
 
 export function printAffectedCmdHelp(): void {
@@ -70,7 +53,7 @@ Path sources (first match wins):
 Flags:
   --params key=value    Pass recipe params (repeatable). Supported: test_glob,
                         max_depth. changed_files is built automatically.
-  --json                Emit JSON array of {test_path, impact_depth}.
+  --json                Emit JSON array of {test_path, impact_depth, actions?}.
   --help, -h            Show this help.
 
 Examples:
@@ -146,10 +129,10 @@ export function parseAffectedRest(rest: string[]):
         if (key === "test_glob") testGlob = value;
         else if (key === "max_depth") {
           const n = Number(value);
-          if (!Number.isFinite(n) || n < 0) {
+          if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
             return {
               kind: "error",
-              message: `codemap affected: --params max_depth="${value}" must be a non-negative number.`,
+              message: `codemap affected: --params max_depth="${value}" must be a non-negative integer.`,
             };
           }
           maxDepth = n;
@@ -203,15 +186,15 @@ async function resolveChangedPaths(opts: {
   positionalPaths: string[];
 }): Promise<{ ok: true; paths: string[] } | { ok: false; error: string }> {
   if (opts.positionalPaths.length > 0) {
-    return { ok: true, paths: opts.positionalPaths };
+    return { ok: true, paths: normalizeChangedPathList(opts.positionalPaths) };
   }
   if (opts.stdin) {
     return { ok: true, paths: await readChangedPathsFromStdin() };
   }
-  const ref = opts.changedSince ?? "HEAD";
-  const result = getFilesChangedSince(ref, opts.root);
-  if (!result.ok) return { ok: false, error: result.error };
-  return { ok: true, paths: [...result.files] };
+  return resolveAffectedChangedPaths({
+    root: opts.root,
+    changedSince: opts.changedSince,
+  });
 }
 
 /**
@@ -221,54 +204,21 @@ export async function runAffectedCmd(opts: AffectedOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
 
-    const changedRaw = joinChangedPaths(opts.changedPaths);
-    if (changedRaw.length === 0) {
-      if (opts.json) {
-        console.log("[]");
-      } else {
-        console.log("(no changed files — no affected tests)");
-      }
-      return;
-    }
-
-    const declared = getQueryRecipeParams("affected-tests");
-    const resolved = resolveRecipeParams({
-      recipeId: "affected-tests",
-      declared,
-      provided: {
-        changed_files: changedRaw,
-        ...(opts.testGlob !== undefined ? { test_glob: opts.testGlob } : {}),
-        ...(opts.maxDepth !== undefined ? { max_depth: opts.maxDepth } : {}),
-      },
-    });
-    if (!resolved.ok) {
-      throw new Error(resolved.error);
-    }
-
-    const sql = getQueryRecipeSql("affected-tests");
-    if (sql === undefined) {
-      throw new Error(
-        'codemap affected: bundled recipe "affected-tests" missing',
-      );
-    }
-
-    const payload = executeQuery({
-      sql,
-      bindValues: resolved.values,
+    const result = executeAffectedTests({
       root: getProjectRoot(),
-      recipeActions: getQueryRecipeActions("affected-tests"),
+      changedPaths: opts.changedPaths,
+      testGlob: opts.testGlob,
+      maxDepth: opts.maxDepth,
     });
-
-    if (
-      payload !== null &&
-      typeof payload === "object" &&
-      !Array.isArray(payload) &&
-      "error" in payload
-    ) {
-      throw new Error(String((payload as { error: string }).error));
+    if (!result.ok) {
+      throw new Error(result.error);
     }
 
-    const rows = payload as unknown[];
+    if (opts.changedPaths.length > 0) {
+      tryRecordRecipeRun("affected-tests");
+    }
+
+    const rows = result.rows;
 
     if (opts.json) {
       console.log(JSON.stringify(rows));
@@ -276,7 +226,11 @@ export async function runAffectedCmd(opts: AffectedOpts): Promise<void> {
     }
 
     if (rows.length === 0) {
-      console.log("(no affected test files)");
+      console.log(
+        opts.changedPaths.length === 0
+          ? "(no changed files — no affected tests)"
+          : "(no affected test files)",
+      );
       return;
     }
 

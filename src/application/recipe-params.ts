@@ -131,6 +131,12 @@ function coerceParamValue(
         error: `${prefix(recipeId)} --params ${param.name}="${String(raw)}" is not a number.`,
       };
     }
+    if (!Number.isInteger(n)) {
+      return {
+        ok: false,
+        error: `${prefix(recipeId)} --params ${param.name}="${String(raw)}" must be an integer.`,
+      };
+    }
     return { ok: true, value: n };
   }
   if (typeof raw === "boolean") return { ok: true, value: raw };
