@@ -5,7 +5,7 @@ actions:
     description: "Member of an EXPORTED type that has no detectable importer. STARTING POINT for review only — codemap cannot see indexed access (T['field']), keyof T, mapped types, type spreads, destructuring, or re-export chains. Cross-check with rg before deleting."
 ---
 
-Field-level enumeration of types that are **exported but never directly imported** anywhere in the project. Sister recipe to [`unimported-exports`](./unimported-exports.md): same upstream signal (`exports.name NOT IN imports.specifiers`), but JOINed against `type_members` so each row carries the field's name, type annotation, optionality, and readonly flag.
+Field-level enumeration of types that are **exported but never directly imported** anywhere in the project. Sister recipe to **`unimported-exports`**: same upstream signal (`exports.name NOT IN imports.specifiers`), but JOINed against `type_members` so each row carries the field's name, type annotation, optionality, and readonly flag.
 
 ## When to reach for it
 

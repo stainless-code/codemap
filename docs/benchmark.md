@@ -145,6 +145,8 @@ This document measures **indexed SQL vs traditional glob/read** on an existing d
 
 ### Results
 
+**Snapshot only — not CI-gated.** Regenerate with `bun src/benchmark.ts` (or `bun src/index.ts benchmark`) after reindexing; numbers vary by machine, thermal state, and tree size.
+
 Example snapshot from `bun src/benchmark.ts` immediately after `bun src/index.ts --full` on **this repository** (small tree; many scenario counts are zero). Numbers vary by machine and project. Schema, indexes, and content fingerprints: [architecture.md § Schema](./architecture.md#schema).
 
 | Scenario                                | Index Time | Results | Trad. Time | Results | Files Read | Bytes Read | Speedup  |

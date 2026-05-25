@@ -8,6 +8,8 @@
 >
 > **Implementation check (2026-05-18):** Most lifted items are now shipped. Remaining open surfaces are C.9 reachability (`files.is_entry` absent), LSP diagnostic-push, `history`, `symbols.body_hash`, and GitHub Marketplace Action publishing/listing. The Action's core wrapper, audit SARIF/`--ci`, and PR-comment summary path have shipped in-tree. `unused-type-members` has since shipped despite older wording below still describing § 1.6 as pending.
 
+> **Section numbering:** §4 and §6 were lifted to [`roadmap.md`](../roadmap.md) and plan PRs; headings jump 3→5→7 intentionally.
+
 ---
 
 ## 0. Reframing question
