@@ -10,12 +10,12 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                                              | Source                                     |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| L.1 | **Moat-A clean** — `affected-tests` recipe + optional CLI alias `codemap affected` (outcome alias cap: 5 total — audit alias budget). | [Moat A](../roadmap.md#moats-load-bearing) |
-| L.2 | Algorithm: reverse BFS on `dependencies` from changed files → filter test paths via `test_suites.file_path` and configurable globs.   | Uses existing substrate                    |
-| L.3 | **Stdin support** — accept changed paths from `git diff --name-only` (same ergonomics as CI scripts).                                 | CLI ergonomics                             |
-| L.4 | Not a verdict — output is file paths only; CI composes exit policy.                                                                   | Moat A                                     |
+| #   | Decision                                                                                                                                                                                                                             | Source                                     |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| L.1 | **Moat-A clean** — `affected-tests` recipe satisfies the agent surface; **`query_recipe`** is the MCP/HTTP path. Optional dedicated CLI verb **`codemap affected`** for CI (`stdin` / git path discovery) — not a 6th outcome alias. | [Moat A](../roadmap.md#moats-load-bearing) |
+| L.2 | Algorithm: reverse BFS on `dependencies` from changed files → filter test paths via `test_suites.file_path` and configurable globs.                                                                                                  | Uses existing substrate                    |
+| L.3 | **Stdin support** — accept changed paths from `git diff --name-only` (same ergonomics as CI scripts).                                                                                                                                | CLI ergonomics                             |
+| L.4 | Not a verdict — output is file paths only; CI composes exit policy.                                                                                                                                                                  | Moat A                                     |
 
 ---
 
@@ -37,31 +37,37 @@
 
 ---
 
-## CLI alias
+## CLI verb (CI)
 
 ```bash
-codemap affected --json                    # git diff vs HEAD
+codemap affected --json                    # working tree vs HEAD
 git diff --name-only origin/main | codemap affected --stdin --json
 ```
 
-Implement in `src/cli/aliases.ts` if alias budget allows; else recipe-only with documented shell wrapper.
+Dedicated `cmd-affected.ts` (not an outcome alias — 5-alias cap unchanged). Shipped as **`codemap affected`**, not `aliases.ts`.
+
+## Agent surface (Moat A)
+
+No dedicated MCP tool required — agents call **`query_recipe`** with `recipe: "affected-tests"` and `params.changed_files` (ASCII RS between paths when multiple). The recipe is the Moat-A substrate; the CLI verb is CI ergonomics only.
 
 ---
 
 ## Implementation steps
 
 1. Recipe SQL + frontmatter + golden query fixture
-2. CLI stdin handling in `cmd-query` or dedicated thin `cmd-affected.ts`
+2. CLI stdin handling in dedicated `cmd-affected.ts`
 3. Document test-file conventions in recipe `.md`
 4. Optional GitHub Action input `mode: affected` in [github-marketplace-action](./github-marketplace-action.md) (follow-up)
+
+**Out of scope:** dedicated MCP/HTTP `affected` tool (same outcome reachable via `query_recipe`; revisit only if agent eval shows friction).
 
 ---
 
 ## Acceptance
 
-- [ ] Recipe returns test file paths for a known fixture delta
-- [ ] Stdin mode works in shell pipeline
-- [ ] Documented in README + skill
+- [x] Recipe returns test file paths for a known fixture delta
+- [x] Stdin mode works in shell pipeline
+- [x] Documented in README + skill
 
 ---
 
