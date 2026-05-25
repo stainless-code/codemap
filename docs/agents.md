@@ -118,7 +118,7 @@ Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. Requires `codemap` on `PATH` (global install or dev dependency binary).
 
-**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` (or `--git-hooks`, or `--no-git-hooks --mcp`) still applies MCP/hook changes without `--force`. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (which replaces the whole file and drops foreign entries — a warning is printed).
+**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` or `--git-hooks` still applies MCP/hook changes without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (which replaces the whole file and drops foreign entries — a warning is printed).
 
 ## Section assembler and `*.gen.md`
 

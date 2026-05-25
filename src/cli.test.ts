@@ -147,6 +147,28 @@ describe("CLI unknown / invalid args", () => {
     }
   });
 
+  test("agents init --mcp exits 1 with message on unparseable MCP JSON", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-bad-"));
+    try {
+      const { mkdirSync, writeFileSync } = await import("node:fs");
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      mkdirSync(join(dir, ".cursor"), { recursive: true });
+      writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toMatch(/could not parse|Codemap:/);
+      expect(err).not.toMatch(/at upsertMcpServersFile/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("--files without paths exits 1 before DB", async () => {
     const { exitCode, err } = await runCli(["--files"]);
     expect(exitCode).toBe(1);

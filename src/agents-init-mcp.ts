@@ -34,14 +34,48 @@ export function buildCodemapMcpServerEntry(opts?: {
   return { command: "codemap", args };
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Validate top-level file + optional `mcpServers` map before merge. */
+export function normalizeExistingMcpServersFile(
+  parsed: unknown,
+  opts: { label: string; force: boolean },
+): { existing: McpServersFile; replacedInvalid: boolean } {
+  if (!isPlainObject(parsed)) {
+    if (!opts.force) {
+      throw new Error(
+        `Codemap: ${opts.label} is not a JSON object — use --force to replace.`,
+      );
+    }
+    return { existing: {}, replacedInvalid: true };
+  }
+  const file = parsed as McpServersFile;
+  const ms = file.mcpServers;
+  if (
+    ms !== undefined &&
+    (ms === null || typeof ms !== "object" || Array.isArray(ms))
+  ) {
+    if (!opts.force) {
+      throw new Error(
+        `Codemap: ${opts.label} mcpServers must be a JSON object — use --force to replace.`,
+      );
+    }
+    return { existing: {}, replacedInvalid: true };
+  }
+  return { existing: file, replacedInvalid: false };
+}
+
 export function mergeCodemapMcpServer(
   existing: McpServersFile,
   entry: McpServerEntry,
 ): McpServersFile {
+  const prior = existing.mcpServers ?? {};
   return {
     ...existing,
     mcpServers: {
-      ...existing.mcpServers,
+      ...prior,
       [CODEMAP_MCP_SERVER_KEY]: entry,
     },
   };
@@ -81,20 +115,16 @@ export function upsertMcpServersFile(opts: {
     let replacedUnparseable = false;
     try {
       const parsed = readJsonFile(opts.path);
-      if (
-        parsed !== null &&
-        typeof parsed === "object" &&
-        !Array.isArray(parsed)
-      ) {
-        existing = parsed as McpServersFile;
-      } else if (!opts.force) {
-        throw new Error(
-          `Codemap: ${opts.label} is not a JSON object — use --force to replace.`,
-        );
-      } else {
-        replacedUnparseable = true;
-      }
+      const normalized = normalizeExistingMcpServersFile(parsed, {
+        label: opts.label,
+        force: opts.force,
+      });
+      existing = normalized.existing;
+      replacedUnparseable = normalized.replacedInvalid;
     } catch (err) {
+      if (err instanceof Error && err.message.startsWith("Codemap:")) {
+        throw err;
+      }
       if (!opts.force) {
         throw new Error(
           `Codemap: could not parse ${opts.label} — fix JSON or use --force to replace (${String(err)})`,

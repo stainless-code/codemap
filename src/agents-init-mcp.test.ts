@@ -17,6 +17,7 @@ import {
   buildCodemapMcpServerEntry,
   mergeClaudeCodemapPermissions,
   mergeCodemapMcpServer,
+  normalizeExistingMcpServersFile,
 } from "./agents-init-mcp";
 
 describe("buildCodemapMcpServerEntry", () => {
@@ -58,6 +59,31 @@ describe("mergeCodemapMcpServer", () => {
       buildCodemapMcpServerEntry(),
     );
     expect(Object.keys(merged.mcpServers ?? {})).toEqual(["codemap"]);
+  });
+
+  it("adds codemap when mcpServers key is missing", () => {
+    const merged = mergeCodemapMcpServer({}, buildCodemapMcpServerEntry());
+    expect(Object.keys(merged.mcpServers ?? {})).toEqual(["codemap"]);
+  });
+});
+
+describe("normalizeExistingMcpServersFile", () => {
+  it("rejects non-object mcpServers without force", () => {
+    expect(() =>
+      normalizeExistingMcpServersFile(
+        { mcpServers: "not-an-object" },
+        { label: ".cursor/mcp.json", force: false },
+      ),
+    ).toThrow(/mcpServers must be a JSON object/);
+  });
+
+  it("replaces non-object mcpServers with force", () => {
+    expect(
+      normalizeExistingMcpServersFile(
+        { mcpServers: ["a", "b"] },
+        { label: ".mcp.json", force: true },
+      ),
+    ).toEqual({ existing: {}, replacedInvalid: true });
   });
 });
 
@@ -167,6 +193,23 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
+  it("rejects non-object mcpServers without --force", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    try {
+      mkdirSync(join(dir, ".cursor"), { recursive: true });
+      writeFileSync(
+        join(dir, ".cursor", "mcp.json"),
+        `${JSON.stringify({ mcpServers: "bad" }, null, 2)}\n`,
+        "utf-8",
+      );
+      expect(() =>
+        applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
+      ).toThrow(/mcpServers must be a JSON object/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("replaces invalid JSON with --force", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
@@ -193,6 +236,77 @@ describe("applyAgentsInitMcp", () => {
       );
       expect(
         stderr.some((line) => line.includes("replacing unparseable")),
+      ).toBe(true);
+    } finally {
+      console.error = prevError;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces invalid Claude .mcp.json with --force", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    const stderr: string[] = [];
+    const prevError = console.error;
+    console.error = (...args: unknown[]) => {
+      stderr.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+      prevError(...args);
+    };
+    try {
+      writeFileSync(join(dir, ".mcp.json"), "{ not json", "utf-8");
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["claude-code"],
+        force: true,
+      });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".mcp.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<string, { command: string }>;
+      };
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
+        "codemap",
+      );
+      expect(
+        stderr.some((line) => line.includes(".mcp.json (Claude Code)")),
+      ).toBe(true);
+    } finally {
+      console.error = prevError;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces invalid .claude/settings.json with --force", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    const stderr: string[] = [];
+    const prevError = console.error;
+    console.error = (...args: unknown[]) => {
+      stderr.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+      prevError(...args);
+    };
+    try {
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(dir, ".claude", "settings.json"),
+        "{ not json",
+        "utf-8",
+      );
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["claude-code"],
+        force: true,
+      });
+      const settings = JSON.parse(
+        readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),
+      ) as { permissions: { allow: string[] } };
+      expect(settings.permissions.allow).toContain(
+        CODEMAP_MCP_PERMISSION_ALLOW,
+      );
+      expect(
+        stderr.some((line) => line.includes(".claude/settings.json")),
       ).toBe(true);
     } finally {
       console.error = prevError;

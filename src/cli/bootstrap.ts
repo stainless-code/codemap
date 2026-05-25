@@ -33,7 +33,7 @@ Audit (structural drift — baseline snapshots or git ref):
   codemap audit [--baseline <prefix>] [--base <ref>] [--json] [--ci] ...
 
 Agents:
-  codemap agents init [--force] [--interactive|-i] [--mcp]
+  codemap agents init [--force] [--interactive|-i] [--mcp] [--git-hooks] [--no-git-hooks]
   codemap skill · codemap rule              # live full markdown (pointer protocol)
 
 PR comment renderer (audit/SARIF → markdown summary):
