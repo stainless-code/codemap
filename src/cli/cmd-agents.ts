@@ -4,6 +4,7 @@ export async function runAgentsInitCmd(opts: {
   projectRoot: string;
   force: boolean;
   interactive: boolean;
+  gitHooks?: "install" | "uninstall";
 }): Promise<boolean> {
   if (opts.interactive) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -16,5 +17,9 @@ export async function runAgentsInitCmd(opts: {
       await import("../agents-init-interactive.js");
     return runAgentsInitInteractive(opts);
   }
-  return runAgentsInit(opts);
+  return runAgentsInit({
+    projectRoot: opts.projectRoot,
+    force: opts.force,
+    gitHooks: opts.gitHooks,
+  });
 }

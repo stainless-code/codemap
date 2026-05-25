@@ -12,6 +12,7 @@ import {
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
 /**
@@ -288,6 +289,8 @@ export interface AgentsInitOptions {
    * Default \`symlink\`.
    */
   linkMode?: AgentsInitLinkMode;
+  /** Install or remove opt-in git hooks for background incremental index. */
+  gitHooks?: "install" | "uninstall";
 }
 
 /**
@@ -516,6 +519,12 @@ function applyCursorIntegration(
  * @returns `false` when `.agents/` exists and `--force` was not used.
  */
 export function runAgentsInit(options: AgentsInitOptions): boolean {
+  if (options.gitHooks === "uninstall") {
+    uninstallGitHooks(options.projectRoot);
+    console.log("  Removed codemap blocks from git hooks");
+    return true;
+  }
+
   const templateRoot = resolveAgentsTemplateDir();
   if (!existsSync(templateRoot)) {
     throw new Error(
@@ -539,6 +548,13 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
       );
     }
     if (!options.force) {
+      if (options.gitHooks === "install") {
+        installGitHooks(options.projectRoot);
+        console.log(
+          "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
+        );
+        return true;
+      }
       console.error(
         `  .agents/ already exists at ${destRoot}. Re-run with --force to refresh bundled template files under rules/ and skills/, or remove the directory.`,
       );
@@ -571,5 +587,13 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
   }
 
   ensureGitignoreCodemapPattern(options.projectRoot);
+
+  if (options.gitHooks === "install") {
+    installGitHooks(options.projectRoot);
+    console.log(
+      "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
+    );
+  }
+
   return true;
 }

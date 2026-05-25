@@ -1,3 +1,4 @@
+import { applyWatchPolicy } from "../application/watch-policy";
 import {
   createPrimeIndex,
   createReindexOnChange,
@@ -125,6 +126,16 @@ export async function runWatchCmd(opts: WatchOpts): Promise<void> {
     await bootstrapCodemap(opts);
 
     const root = getProjectRoot();
+    const { watch } = applyWatchPolicy({
+      root,
+      requestedWatch: true,
+      label: "codemap watch",
+    });
+    if (!watch) {
+      process.exitCode = 1;
+      return;
+    }
+
     if (!opts.quiet) {
       // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
       console.error(

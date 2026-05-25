@@ -11,10 +11,12 @@ import {
 
 import type { AgentsInitLinkMode, AgentsInitTarget } from "./agents-init";
 import { runAgentsInit, targetsNeedLinkMode } from "./agents-init";
+import { watchDisabledReason } from "./application/watch-policy";
 
 export interface RunAgentsInitInteractiveOptions {
   projectRoot: string;
   force: boolean;
+  gitHooks?: "install" | "uninstall";
 }
 
 const INTEGRATION_OPTIONS: {
@@ -148,11 +150,29 @@ export async function runAgentsInitInteractive(
     return false;
   }
 
+  let gitHooks = opts.gitHooks;
+  if (
+    gitHooks === undefined &&
+    watchDisabledReason(opts.projectRoot) !== null
+  ) {
+    const offerHooks = await confirm({
+      message:
+        "File watcher is unreliable here — install git hooks for background codemap sync after commit/merge/checkout?",
+      initialValue: true,
+    });
+    if (isCancel(offerHooks)) {
+      cancel("Cancelled.");
+      return false;
+    }
+    if (offerHooks) gitHooks = "install";
+  }
+
   const success = runAgentsInit({
     projectRoot: opts.projectRoot,
     force: opts.force,
     targets,
     linkMode,
+    gitHooks,
   });
 
   if (success) {

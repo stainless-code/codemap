@@ -27,6 +27,8 @@ This repo also has [`.agents/`](../.agents/) for Codemap development (CLI from s
 codemap agents init
 codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
+codemap agents init --git-hooks       # opt-in background index on git events
+codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
 
 - **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
@@ -53,6 +55,10 @@ All integrations reuse the **same** bundled content under **`.agents/`**. Symlin
 | **Claude Code**                       | **`CLAUDE.md`**                                            | Root onboarding pointer.                                                                                                            |
 | **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                            | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
 | **Gemini**                            | **`GEMINI.md`**                                            | For integrations that load **`GEMINI.md`**.                                                                                         |
+
+## Git hooks (opt-in freshness)
+
+When the file watcher is off (WSL `/mnt/*` mounts, `CODEMAP_WATCH=0`, etc.), **`codemap agents init --git-hooks`** installs marker-delimited blocks in **`post-commit`**, **`post-merge`**, and **`post-checkout`** that run `( codemap >/dev/null 2>&1 & )` — non-blocking background incremental index. **`--no-git-hooks`** removes only codemap-marked blocks. Interactive init offers hooks automatically when [`watch-policy.ts`](../src/application/watch-policy.ts) would disable the watcher for the project root.
 
 ## Pointer files
 
