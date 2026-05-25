@@ -79,6 +79,22 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit with mcp writes .cursor/mcp.json", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      expect(runAgentsInit({ projectRoot: dir, force: true, mcp: true })).toBe(
+        true,
+      );
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as { mcpServers: Record<string, { command: string }> };
+      expect(parsed.mcpServers.codemap?.command).toBe("codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("listRegularFilesRecursive matches bundled rules and skills files", () => {
     const root = resolveAgentsTemplateDir();
     const rules = listRegularFilesRecursive(join(root, "rules")).sort();

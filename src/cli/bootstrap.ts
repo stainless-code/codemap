@@ -33,7 +33,7 @@ Audit (structural drift — baseline snapshots or git ref):
   codemap audit [--baseline <prefix>] [--base <ref>] [--json] [--ci] ...
 
 Agents:
-  codemap agents init [--force] [--interactive|-i]
+  codemap agents init [--force] [--interactive|-i] [--mcp]
   codemap skill · codemap rule              # live full markdown (pointer protocol)
 
 PR comment renderer (audit/SARIF → markdown summary):
@@ -138,7 +138,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
     console.error(
-      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force] [--interactive|-i]`,
+      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force] [--interactive|-i] [--mcp]`,
     );
     process.exit(1);
   }

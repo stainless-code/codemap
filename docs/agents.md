@@ -106,6 +106,17 @@ Recipe ids cited in the playbook are machine-validated in tests against the live
 
 Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
+## MCP wiring via `agents init`
+
+**`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown:
+
+| Target      | Files written                                                                          |
+| ----------- | -------------------------------------------------------------------------------------- |
+| Cursor      | `.cursor/mcp.json` — `codemap mcp --watch --root ${workspaceFolder}`                   |
+| Claude Code | `.mcp.json` + `.claude/settings.json` — `permissions.allow` includes `mcp__codemap__*` |
+
+Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. Requires `codemap` on `PATH` (global install or dev dependency binary).
+
 ## Section assembler and `*.gen.md`
 
 `templates/agent-content/<kind>/` is a directory of section files concatenated in lexical name order (joined with a blank line). A numeric prefix (`00-`, `10-`, …) controls section order so renumbering is a file-rename, never a code edit.

@@ -17,6 +17,7 @@ export interface RunAgentsInitInteractiveOptions {
   projectRoot: string;
   force: boolean;
   gitHooks?: "install" | "uninstall";
+  mcp?: boolean;
 }
 
 const INTEGRATION_OPTIONS: {
@@ -167,12 +168,27 @@ export async function runAgentsInitInteractive(
     if (offerHooks) gitHooks = "install";
   }
 
+  let mcp = opts.mcp;
+  if (mcp === undefined) {
+    const offerMcp = await confirm({
+      message:
+        "Write MCP config (Cursor .cursor/mcp.json + Claude .mcp.json / permissions)?",
+      initialValue: true,
+    });
+    if (isCancel(offerMcp)) {
+      cancel("Cancelled.");
+      return false;
+    }
+    mcp = offerMcp;
+  }
+
   const success = runAgentsInit({
     projectRoot: opts.projectRoot,
     force: opts.force,
     targets,
     linkMode,
     gitHooks,
+    mcp,
   });
 
   if (success) {

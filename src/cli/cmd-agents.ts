@@ -5,6 +5,7 @@ export async function runAgentsInitCmd(opts: {
   force: boolean;
   interactive: boolean;
   gitHooks?: "install" | "uninstall";
+  mcp?: boolean;
 }): Promise<boolean> {
   if (opts.interactive) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -21,5 +22,6 @@ export async function runAgentsInitCmd(opts: {
     projectRoot: opts.projectRoot,
     force: opts.force,
     gitHooks: opts.gitHooks,
+    mcp: opts.mcp,
   });
 }

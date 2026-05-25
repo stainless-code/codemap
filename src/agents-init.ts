@@ -12,6 +12,7 @@ import {
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { applyAgentsInitMcp } from "./agents-init-mcp";
 import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
@@ -291,6 +292,8 @@ export interface AgentsInitOptions {
   linkMode?: AgentsInitLinkMode;
   /** Install or remove opt-in git hooks for background incremental index. */
   gitHooks?: "install" | "uninstall";
+  /** Write MCP config (Cursor `.cursor/mcp.json`, Claude `.mcp.json` + permissions). */
+  mcp?: boolean;
 }
 
 /**
@@ -593,6 +596,13 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
     console.log(
       "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
     );
+  }
+
+  if (options.mcp === true) {
+    applyAgentsInitMcp({
+      projectRoot: options.projectRoot,
+      force: !!options.force,
+    });
   }
 
   return true;
