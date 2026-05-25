@@ -1,6 +1,6 @@
 # Field-qualified search — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~1 week)
+> **Status:** merge-ready · **PR:** [#138](https://github.com/stainless-code/codemap/pull/138) · **Priority:** P1 · **Effort:** M (~1 week)
 >
 > **Motivator:** Agents often search with partial constraints (`kind:function`, `path:src/api`, `name:Auth`). Today they must write SQL or use exact `show` — higher friction for discovery queries.
 >
@@ -10,12 +10,12 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                           | Source                                     |
-| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| L.1 | **Moat-A clean** — parser translates to SQL WHERE clauses; always log/return equivalent SQL in `--print-sql` mode. | [Moat A](../roadmap.md#moats-load-bearing) |
-| L.2 | Fields v1: `kind:`, `name:`, `path:`, `in:` (file glob). Optional FTS join when `--with-fts`.                      | Minimal surface                            |
-| L.3 | Surface on **`show` convenience** and MCP `show` / new `search` tool — not a separate verdict engine.              | Thin layer                                 |
-| L.4 | Document SQL equivalents in bundled skill.                                                                         | Transparency                               |
+| #   | Decision                                                                                                                          | Source                                     |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| L.1 | **Moat-A clean** — parser translates to SQL WHERE clauses; always log/return equivalent SQL in `--print-sql` mode.                | [Moat A](../roadmap.md#moats-load-bearing) |
+| L.2 | Fields v1: `kind:`, `name:`, `path:`, `in:` (file glob). Optional FTS join when `--with-fts`.                                     | Minimal surface                            |
+| L.3 | Surface on **`show` convenience** and MCP **`show`** / **`snippet`** — not a separate verdict engine or standalone `search` tool. | Thin layer                                 |
+| L.4 | Document SQL equivalents in bundled skill.                                                                                        | Transparency                               |
 
 ---
 
@@ -43,9 +43,9 @@ Free text without `field:` prefix → `name LIKE` or FTS if enabled.
 
 ## Acceptance
 
-- [ ] `kind:function name:auth` returns same rows as documented SQL
-- [ ] `--print-sql` shows generated statement
-- [ ] Invalid field names → clear error
+- [x] `kind:function name:auth` returns same rows as documented SQL
+- [x] `--print-sql` shows generated statement
+- [x] Invalid field names → clear error
 
 ---
 

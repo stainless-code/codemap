@@ -1,5 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "bun:test";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +22,38 @@ import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
 import { openCodemapDatabase } from "../sqlite-db";
 import { parseSnippetRest, renderSnippetTerminal } from "./cmd-snippet";
+
+const repoRoot = join(import.meta.dir, "..", "..");
+const indexTs = join(repoRoot, "src", "index.ts");
+let bunBin: string | null = null;
+
+async function runCli(
+  args: string[],
+  envOverride: Record<string, string> = {},
+): Promise<{ exitCode: number; out: string; err: string }> {
+  if (bunBin === null) {
+    throw new Error("cmd-snippet.test: bunBin not initialised by beforeAll.");
+  }
+  const proc = Bun.spawn([bunBin, indexTs, ...args], {
+    cwd: repoRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ...process.env, ...envOverride },
+  });
+  const exitCode = await proc.exited;
+  const out = await new Response(proc.stdout).text();
+  const err = await new Response(proc.stderr).text();
+  return { exitCode, out, err };
+}
+
+beforeAll(() => {
+  bunBin = Bun.which("bun");
+  if (!bunBin || !existsSync(indexTs)) {
+    throw new Error(
+      `cmd-snippet.test: cannot locate Bun (${bunBin}) or src entry (${indexTs}).`,
+    );
+  }
+});
 
 describe("parseSnippetRest", () => {
   it("returns help on --help / -h", () => {
@@ -41,8 +86,39 @@ describe("parseSnippetRest", () => {
       name: "foo",
       kindFilter: undefined,
       inPath: undefined,
+      query: undefined,
+      withFts: false,
       json: false,
     });
+  });
+
+  it("parses --query field search", () => {
+    const r = parseSnippetRest([
+      "snippet",
+      "--query",
+      "kind:function name:run",
+      "--json",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      name: undefined,
+      kindFilter: undefined,
+      inPath: undefined,
+      query: "kind:function name:run",
+      withFts: false,
+      json: true,
+    });
+  });
+
+  it("errors when --print-sql is passed (show-only flag)", () => {
+    const r = parseSnippetRest([
+      "snippet",
+      "--query",
+      "name:foo",
+      "--print-sql",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--print-sql");
   });
 
   it("parses name + flags in any order", () => {
@@ -60,6 +136,8 @@ describe("parseSnippetRest", () => {
       name: "foo",
       kindFilter: "function",
       inPath: "src/cli",
+      query: undefined,
+      withFts: false,
       json: true,
     });
   });
@@ -103,6 +181,48 @@ describe("renderSnippetTerminal", () => {
     expect(lines[0]).toBe("src/a.ts:1-2");
     expect(lines[1]).toBe("  function foo(): void");
     expect(lines[2]).toBe("line1\nline2");
+  });
+});
+
+describe("runSnippetCmd — query zero-match JSON envelope", () => {
+  let projectRoot: string;
+
+  beforeEach(async () => {
+    projectRoot = mkdtempSync(join(tmpdir(), "codemap-cli-snippet-"));
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(
+      join(projectRoot, "src", "entry.ts"),
+      "export function entryFn(): void {}\n",
+      "utf8",
+    );
+    writeFileSync(join(projectRoot, "package.json"), "{}\n", "utf8");
+    const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+    expect(idx.exitCode).toBe(0);
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it("returns {matches:[]} with exit 0 for --query --json", async () => {
+    const r = await runCli(
+      ["snippet", "--query", "name:DefinitelyNotIndexed", "--json"],
+      { CODEMAP_ROOT: projectRoot },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.out)).toEqual({ matches: [] });
+  });
+
+  it("returns warning when --with-fts and source_fts empty", async () => {
+    const r = await runCli(
+      ["snippet", "--query", "secretToken", "--with-fts", "--json"],
+      { CODEMAP_ROOT: projectRoot },
+    );
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.out) as { matches: unknown[]; warning?: string };
+    expect(json.matches).toEqual([]);
+    expect(json.warning).toContain("source_fts is empty");
+    expect(r.err).toContain("source_fts is empty");
   });
 });
 

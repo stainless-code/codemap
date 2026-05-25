@@ -261,6 +261,63 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.matches[0]).toHaveProperty("missing");
   });
 
+  it("show with query returns field-qualified matches", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'AuthService', 'class', 1, 1, 'class AuthService', NULL)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "show", { query: "name:Auth" });
+    expect(r.status).toBe(200);
+    expect(r.json.matches).toHaveLength(1);
+    expect(r.json.matches[0].name).toBe("AuthService");
+  });
+
+  it("show with query returns empty matches when nothing matches", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "show", {
+      query: "name:DefinitelyNotIndexed",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.matches).toEqual([]);
+  });
+
+  it("show with with_fts and empty source_fts returns warning", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "show", {
+      query: "secretToken",
+      with_fts: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.matches).toEqual([]);
+    expect(r.json.warning).toContain("source_fts is empty");
+  });
+
+  it("snippet with query returns source for matches", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'AuthService', 'class', 1, 1, 'class AuthService', NULL)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "snippet", {
+      query: "name:Auth",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.matches).toHaveLength(1);
+    expect(r.json.matches[0].name).toBe("AuthService");
+    expect(r.json.matches[0].source).toBeDefined();
+  });
+
   it("impact returns the {target, matches, summary} envelope", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "impact", {
@@ -665,7 +722,7 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
 
   it("validation error message names the offending tool + path", async () => {
     serverHandle = await startServer();
-    const r = await postTool(serverHandle.port, "snippet", {});
+    const r = await postTool(serverHandle.port, "snippet", { name: 1 });
     expect(r.status).toBe(400);
     expect(r.json.error).toContain('"snippet"');
     expect(r.json.error).toContain("name");

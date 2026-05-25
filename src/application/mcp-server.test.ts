@@ -1050,6 +1050,134 @@ describe("MCP server — show + snippet tools", () => {
     }
   });
 
+  it("show with query field search returns substring matches", async () => {
+    seedSymbol({ file: "src/a.ts", name: "AuthService", kind: "class" });
+    seedSymbol({ file: "src/b.ts", name: "Other", kind: "class" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:Auth" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].name).toBe("AuthService");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("snippet with query field search returns source for matches", async () => {
+    seedSymbol({
+      file: "src/a.ts",
+      name: "AuthService",
+      kind: "class",
+      lineStart: 1,
+      lineEnd: 1,
+    });
+    seedSymbol({ file: "src/b.ts", name: "Other", kind: "class" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "snippet",
+        arguments: { query: "name:Auth" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].name).toBe("AuthService");
+      expect(json.matches[0].source).toBeDefined();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show with query returns empty matches when nothing matches", async () => {
+    seedSymbol({ file: "src/a.ts", name: "AuthService", kind: "class" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:DefinitelyNotIndexed" },
+      });
+      expect(r.isError).not.toBe(true);
+      const json = readJson(r);
+      expect(json).toEqual({ matches: [] });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show with with_fts and empty source_fts returns warning", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "secretToken", with_fts: true },
+      });
+      expect(r.isError).not.toBe(true);
+      const json = readJson(r);
+      expect(json.matches).toEqual([]);
+      expect(json.warning).toContain("source_fts is empty");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("snippet with with_fts and empty source_fts returns warning", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "snippet",
+        arguments: { query: "secretToken", with_fts: true },
+      });
+      expect(r.isError).not.toBe(true);
+      const json = readJson(r);
+      expect(json.matches).toEqual([]);
+      expect(json.warning).toContain("source_fts is empty");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show errors when name and query are both passed", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "foo", query: "name:foo" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show errors when kind and query are both passed", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:foo", kind: "function" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show errors on unknown query field", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "bogus:x" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("snippet returns source text from disk + stale: false on fresh file", async () => {
     // Write a real file matching the seeded `files` row in the bench setup
     // (src/a.ts already exists with hash 'h1' but content "export const A = 1;\n").

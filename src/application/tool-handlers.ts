@@ -62,11 +62,8 @@ import { resolveRecipeParams } from "./recipe-params";
 import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
 import { tryRecordRecipeRun } from "./recipe-recency";
 import { runCodemapIndex } from "./run-index";
-import {
-  buildShowResult,
-  buildSnippetResult,
-  findSymbolsByName,
-} from "./show-engine";
+import { buildShowResult, buildSnippetResult } from "./show-engine";
+import { executeShowLookup, resolveShowLookupMode } from "./show-search-mode";
 import {
   composeExploreResult,
   composeNodeResult,
@@ -672,67 +669,78 @@ export function handleDropBaseline(args: DropBaselineArgs): ToolResult {
 // === show ===================================================================
 
 export const showArgsSchema = {
-  name: z.string().min(1, "name must be a non-empty string"),
+  name: z.string().min(1, "name must be a non-empty string").optional(),
   kind: z.string().optional(),
   in: z.string().optional(),
+  query: z.string().min(1, "query must be a non-empty string").optional(),
+  with_fts: z.boolean().optional(),
 };
 
 export interface ShowArgs {
-  name: string;
+  name?: string;
   kind?: string;
   in?: string;
+  query?: string;
+  with_fts?: boolean;
 }
 
 export function handleShow(args: ShowArgs, root: string): ToolResult {
-  try {
-    const db = openDb();
-    try {
-      const inPath =
-        args.in !== undefined && args.in.length > 0
-          ? toProjectRelative(root, args.in)
-          : undefined;
-      const matches = findSymbolsByName(db, {
-        name: args.name,
-        kind: args.kind,
-        inPath,
-      });
-      return ok(buildShowResult(matches));
-    } finally {
-      closeDb(db, { readonly: true });
-    }
-  } catch (e) {
-    return err(e instanceof Error ? e.message : String(e), 500);
-  }
+  return handleShowLike(args, root, (lookup) => {
+    const result = buildShowResult(lookup.matches);
+    if (lookup.warning !== undefined) result.warning = lookup.warning;
+    return result;
+  });
 }
 
 // === snippet ================================================================
 
 export const snippetArgsSchema = {
-  name: z.string().min(1, "name must be a non-empty string"),
+  name: z.string().min(1, "name must be a non-empty string").optional(),
   kind: z.string().optional(),
   in: z.string().optional(),
+  query: z.string().min(1, "query must be a non-empty string").optional(),
+  with_fts: z.boolean().optional(),
 };
 
 export interface SnippetArgs {
-  name: string;
+  name?: string;
   kind?: string;
   in?: string;
+  query?: string;
+  with_fts?: boolean;
 }
 
 export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
+  return handleShowLike(args, root, (lookup, db) => {
+    const result = buildSnippetResult({
+      db,
+      matches: lookup.matches,
+      projectRoot: root,
+    });
+    if (lookup.warning !== undefined) result.warning = lookup.warning;
+    return result;
+  });
+}
+
+function handleShowLike<T>(
+  args: ShowArgs,
+  root: string,
+  build: (
+    lookup: ReturnType<typeof executeShowLookup>,
+    db: ReturnType<typeof openDb>,
+  ) => T,
+): ToolResult {
   try {
+    const mode = resolveShowLookupMode(args, root);
+    if (!mode.ok) return err(mode.error, 400);
+
     const db = openDb();
     try {
-      const inPath =
-        args.in !== undefined && args.in.length > 0
-          ? toProjectRelative(root, args.in)
-          : undefined;
-      const matches = findSymbolsByName(db, {
-        name: args.name,
-        kind: args.kind,
-        inPath,
+      const lookup = executeShowLookup(db, mode, {
+        withFtsCli: args.with_fts === true,
+        exactKind: args.kind,
       });
-      return ok(buildSnippetResult({ db, matches, projectRoot: root }));
+      return ok(build(lookup, db));
     } finally {
       closeDb(db, { readonly: true });
     }

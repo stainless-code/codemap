@@ -185,10 +185,14 @@ codemap query --recipe big-ts-files                              # auto-discover
 # Targeted reads — precise lookup by symbol name without composing SQL
 codemap show runQueryCmd                                        # metadata: file:line + signature
 codemap show foo --kind function --in src/cli                   # narrow ambiguous matches
+codemap show --query 'kind:function name:Auth path:src/'        # field-qualified discovery
+codemap show --query 'kind:function name:foo' --print-sql       # Moat-A SQL transparency
 codemap snippet runQueryCmd                                     # same lookup + source text from disk
+codemap snippet --query 'kind:function name:run' --json         # field-qualified + source body
 codemap snippet foo --json                                      # {matches: [{...metadata, source, stale, missing}]}
-# Output envelope is always {matches, disambiguation?} — single match → {matches: [{...}]};
-# multi-match adds disambiguation: {n, by_kind, files, hint} for agent-friendly narrowing.
+# Output envelope is always {matches, disambiguation?, warning?} — single match → {matches: [{...}]};
+# multi-match adds disambiguation: {n, by_kind, files, hint} for agent-friendly narrowing;
+# warning when FTS was requested but source_fts is empty (re-index with --with-fts or fts5: true).
 
 # Impact analysis — symbol/file blast-radius walker (callers, callees, dependents, dependencies)
 codemap impact handleQuery                                      # both directions, depth 3, all compatible graphs

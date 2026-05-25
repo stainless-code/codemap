@@ -203,6 +203,9 @@ Copies bundled agent templates into .agents/ under the project root.
       name: parsed.name,
       kind: parsed.kindFilter,
       inPath: parsed.inPath,
+      query: parsed.query,
+      withFts: parsed.withFts,
+      printSql: parsed.printSql,
       json: parsed.json,
     });
     return;
@@ -227,6 +230,8 @@ Copies bundled agent templates into .agents/ under the project root.
       name: parsed.name,
       kind: parsed.kindFilter,
       inPath: parsed.inPath,
+      query: parsed.query,
+      withFts: parsed.withFts,
       json: parsed.json,
     });
     return;

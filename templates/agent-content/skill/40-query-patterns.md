@@ -11,6 +11,26 @@ FROM symbols WHERE name = 'getConfig';
 SELECT name, kind, file_path, line_start
 FROM symbols WHERE name LIKE '%Config%' ORDER BY name;
 
+-- Field-qualified search (CLI / MCP `show --query` / `{query: …}`) — equivalent SQL:
+-- `codemap show --query 'kind:function name:Auth path:src/' --print-sql`
+SELECT name, kind, file_path, line_start, line_end, signature,
+       is_exported, parent_name, visibility
+FROM symbols
+WHERE kind = 'function'
+  AND name LIKE '%Auth%' ESCAPE '\'
+  AND file_path LIKE 'src/%' ESCAPE '\'
+ORDER BY file_path ASC, line_start ASC;
+
+-- Same query with FTS free text (--with-fts / fts5: true when source_fts populated):
+-- `codemap show --query 'Auth' --with-fts --print-sql`
+SELECT s.name, s.kind, s.file_path, s.line_start, s.line_end, s.signature,
+       s.is_exported, s.parent_name, s.visibility
+FROM symbols s JOIN source_fts fts ON fts.file_path = s.file_path
+WHERE source_fts MATCH '"Auth"'
+ORDER BY s.file_path ASC, s.line_start ASC;
+-- Note: FTS matches file bodies via source_fts — every symbol in a matching
+-- file is returned, not just symbols whose names contain the free-text token.
+
 -- All exported symbols from a file
 SELECT name, kind, signature
 FROM symbols WHERE file_path LIKE '%settings-provider%' AND is_exported = 1;

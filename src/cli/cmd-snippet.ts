@@ -1,20 +1,27 @@
+import { buildSnippetResult } from "../application/show-engine";
+import type { SnippetResult } from "../application/show-engine";
 import {
-  buildSnippetResult,
-  findSymbolsByName,
-} from "../application/show-engine";
-import type { SnippetResult, SymbolMatch } from "../application/show-engine";
-import { toProjectRelative } from "../application/validate-engine";
+  executeShowLookup,
+  resolveShowLookupMode,
+} from "../application/show-search-mode";
 import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { parseShowSnippetRest } from "./show-snippet-args";
+import {
+  buildExactNameEmptyMessage,
+  emitErrorMaybeJson,
+} from "./show-snippet-render";
 
 interface SnippetOpts {
   root: string;
   configFile: string | undefined;
   stateDir?: string | undefined;
-  name: string;
+  name: string | undefined;
   kind: string | undefined;
   inPath: string | undefined;
+  query: string | undefined;
+  withFts: boolean;
   json: boolean;
 }
 
@@ -23,6 +30,7 @@ interface SnippetOpts {
  */
 export function printSnippetCmdHelp(): void {
   console.log(`Usage: codemap snippet <name> [--kind <kind>] [--in <path>] [--json]
+       codemap snippet --query '<field:value …>' [--with-fts] [--json]
 
 Look up symbol(s) by exact name and return the source text from disk
 (plus the same metadata \`codemap show\` returns). Same lookup semantics
@@ -30,111 +38,37 @@ as \`show\`; difference is the response carries the actual code body
 sliced from disk at line_start..line_end.
 
 Args:
-  <name>             Exact symbol name (case-sensitive).
+  <name>             Exact symbol name (case-sensitive). Omit when using
+                     --query.
 
 Flags:
-  --kind <kind>      Filter by symbols.kind (function / class / const / …).
-  --in <path>        Filter by file scope. Trailing slash or no extension
-                     in the trailing segment treats as prefix; otherwise
-                     exact file match.
+  --query <q>        Field-qualified discovery search (same as show).
+  --with-fts         FTS phrase search for free-text tokens when indexed
+                     (matches file bodies — returns all symbols in matching
+                     files, not symbol-level body hits).
+  --kind <kind>      Filter by symbols.kind (exact-name mode only).
+  --in <path>        Filter by file scope (exact-name mode only).
   --json             Emit the JSON envelope (always wrapped in {matches}).
   --help, -h         Show this help.
 
-Output (JSON, all cases):
-  { "matches": [ {name, kind, file_path, line_start, line_end, signature,
-                  source, stale, missing, ...}, ... ],
-    "disambiguation"?: { "n": <count>, "by_kind": {...}, "files": [...], "hint": "..." } }
-
-Stale-file behavior: if the file's content hash drifted since the last
-index run, the row carries \`stale: true\` and the source is still
-returned (read from disk). If the file is missing on disk, the row
-carries \`missing: true\` and source is null. The agent decides whether
-to act on stale content or re-index first.
+Output (JSON): same {matches, disambiguation?, warning?} as show; each match
+adds source / stale / missing.
 
 Examples:
   codemap snippet runQueryCmd
-  codemap snippet foo --kind function
-  codemap snippet runQueryCmd --json
+  codemap snippet --query 'kind:function name:run' --json
 `);
 }
 
-/**
- * Parse `argv` after the bootstrap split: `rest[0]` must be `"snippet"`.
- * Same shape as `parseShowRest` — same flag set + same error UX.
- */
-export function parseSnippetRest(rest: string[]):
-  | { kind: "help" }
-  | { kind: "error"; message: string }
-  | {
-      kind: "run";
-      name: string;
-      kindFilter: string | undefined;
-      inPath: string | undefined;
-      json: boolean;
-    } {
-  if (rest[0] !== "snippet") {
-    throw new Error("parseSnippetRest: expected snippet");
-  }
-
-  let json = false;
-  let name: string | undefined;
-  let kindFilter: string | undefined;
-  let inPath: string | undefined;
-
-  for (let i = 1; i < rest.length; i++) {
-    const a = rest[i]!;
-    if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
-    if (a === "--kind") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap snippet: "--kind" requires a value.`,
-        };
-      }
-      kindFilter = next;
-      i++;
-      continue;
-    }
-    if (a === "--in") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap snippet: "--in" requires a value.`,
-        };
-      }
-      inPath = next;
-      i++;
-      continue;
-    }
-    if (a.startsWith("-")) {
-      return {
-        kind: "error",
-        message: `codemap snippet: unknown option "${a}". Run \`codemap snippet --help\` for usage.`,
-      };
-    }
-    if (name !== undefined) {
-      return {
-        kind: "error",
-        message: `codemap snippet: unexpected extra argument "${a}". Pass exactly one symbol name.`,
-      };
-    }
-    name = a;
-  }
-
-  if (name === undefined) {
-    return {
-      kind: "error",
-      message: `codemap snippet: missing <name>. Run \`codemap snippet --help\` for usage.`,
-    };
-  }
-
-  return { kind: "run", name, kindFilter, inPath, json };
+/** Parse `argv` after the bootstrap split: `rest[0]` must be `"snippet"`. */
+export function parseSnippetRest(rest: string[]) {
+  const parsed = parseShowSnippetRest(rest, {
+    verb: "snippet",
+    allowPrintSql: false,
+  });
+  if (parsed.kind !== "run") return parsed;
+  const { printSql: _printSql, ...run } = parsed;
+  return run;
 }
 
 /**
@@ -146,55 +80,69 @@ export function parseSnippetRest(rest: string[]):
 export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-
     const projectRoot = getProjectRoot();
-    const inPath =
-      opts.inPath !== undefined
-        ? toProjectRelative(projectRoot, opts.inPath)
-        : undefined;
+
+    const mode = resolveShowLookupMode(
+      {
+        name: opts.name,
+        query: opts.query,
+        kind: opts.kind,
+        in: opts.inPath,
+      },
+      projectRoot,
+    );
+    if (!mode.ok) {
+      emitErrorMaybeJson(`codemap snippet: ${mode.error}`, opts.json);
+      return;
+    }
 
     const db = openDb();
-    let matches: SymbolMatch[];
-    let result: SnippetResult;
     try {
-      matches = findSymbolsByName(db, {
-        name: opts.name,
-        kind: opts.kind,
-        inPath,
+      const { matches, warning } = executeShowLookup(db, mode, {
+        withFtsCli: opts.withFts,
+        exactKind: opts.kind,
       });
+      if (warning !== undefined) {
+        console.error(`codemap snippet: ${warning}`);
+      }
+
+      const isQuery = mode.kind === "query";
       if (matches.length === 0) {
-        const filterDesc = describeFilter(opts.kind, inPath);
-        // SQLite single-quote escape (`''`) — keeps the suggested SQL valid
-        // when name contains apostrophes (e.g. `O'Brien`).
-        const safeName = opts.name.replace(/'/g, "''");
-        const message = `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap query --json "SELECT name, file_path FROM symbols WHERE name LIKE '%${safeName}%'"\` for fuzzy lookup.`;
-        emitErrorMaybeJson(message, opts.json);
+        if (isQuery) {
+          const empty = buildSnippetResult({ db, matches, projectRoot });
+          if (warning !== undefined) empty.warning = warning;
+          if (opts.json) {
+            console.log(JSON.stringify(empty));
+            return;
+          }
+          console.error(
+            `codemap snippet: no symbols matched --query "${opts.query}". Try \`codemap show --query '${opts.query}' --print-sql\`.`,
+          );
+          process.exitCode = 1;
+          return;
+        }
+        const inPath = mode.kind === "exact" ? mode.inPath : undefined;
+        emitErrorMaybeJson(
+          buildExactNameEmptyMessage("snippet", opts.name!, opts.kind, inPath),
+          opts.json,
+        );
         return;
       }
-      result = buildSnippetResult({ db, matches, projectRoot });
+
+      const result = buildSnippetResult({ db, matches, projectRoot });
+      if (warning !== undefined) result.warning = warning;
+      if (opts.json) {
+        console.log(JSON.stringify(result));
+        return;
+      }
+      renderSnippetTerminal(result);
     } finally {
       closeDb(db, { readonly: true });
     }
-
-    if (opts.json) {
-      console.log(JSON.stringify(result));
-      return;
-    }
-    renderSnippetTerminal(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
   }
-}
-
-function describeFilter(
-  kind: string | undefined,
-  inPath: string | undefined,
-): string {
-  const parts: string[] = [];
-  if (kind !== undefined) parts.push(`kind = "${kind}"`);
-  if (inPath !== undefined) parts.push(`in = "${inPath}"`);
-  return parts.length === 0 ? "" : ` (filters: ${parts.join(", ")})`;
 }
 
 export function renderSnippetTerminal(result: SnippetResult): void {
@@ -221,13 +169,4 @@ export function renderSnippetTerminal(result: SnippetResult): void {
       `\n# Some snippets are stale (file changed since last index). Run \`codemap\` or \`codemap --files <path>\` to refresh.`,
     );
   }
-}
-
-function emitErrorMaybeJson(message: string, json: boolean): void {
-  if (json) {
-    console.log(JSON.stringify({ error: message }));
-  } else {
-    console.error(message);
-  }
-  process.exitCode = 1;
 }

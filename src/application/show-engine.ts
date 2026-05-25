@@ -89,17 +89,11 @@ export function escapeLikeLiteral(s: string): string {
   return s.replace(/[\\_%]/g, (c) => `\\${c}`);
 }
 
-// Heuristic: `--in src/cli/` (trailing slash) and `--in src/cli` (no slash, no
-// dot) both mean "prefix"; `--in src/cli/cmd-show.ts` (has a file extension
-// after the last slash) means "exact file match". Conservative: anything
-// ambiguous treats as prefix — over-matching is recoverable (agent narrows
-// further); under-matching silently misses results.
-function looksLikeDirectory(p: string): boolean {
+/** Directory-shaped path prefix vs exact file (mirrors `--in` / `path:` semantics). */
+export function looksLikeDirectory(p: string): boolean {
   if (p.endsWith("/")) return true;
   const lastSlash = p.lastIndexOf("/");
   const tail = lastSlash === -1 ? p : p.slice(lastSlash + 1);
-  // No `.` in the trailing segment → directory-shaped (e.g. `src/cli`).
-  // A `.` → file-shaped (e.g. `src/cli/cmd-show.ts`, `cmd-show.ts`).
   return !tail.includes(".");
 }
 
@@ -188,6 +182,8 @@ export interface ShowResult {
     files: string[];
     hint: string;
   };
+  /** Set when FTS was requested but unavailable (e.g. empty source_fts). */
+  warning?: string;
 }
 
 /**
@@ -206,7 +202,7 @@ export function buildShowResult(matches: SymbolMatch[]): ShowResult {
       n: matches.length,
       by_kind: byKind,
       files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+      hint: "Multiple matches. Narrow with --kind <kind>, --in <path>, or --query 'kind:… name:… path:…'.",
     },
   };
 }
@@ -240,6 +236,7 @@ export interface SnippetResult {
     files: string[];
     hint: string;
   };
+  warning?: string;
 }
 
 /**
@@ -278,7 +275,7 @@ export function buildSnippetResult(opts: {
       n: enriched.length,
       by_kind: byKind,
       files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+      hint: "Multiple matches. Narrow with --kind <kind>, --in <path>, or --query 'kind:… name:… path:…'.",
     },
   };
 }
