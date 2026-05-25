@@ -120,6 +120,11 @@ ASSISTANT: found 3 call sites`;
   it("throws on invalid JSON", () => {
     expect(() => parseAgentLog("{not json")).toThrow(/invalid JSON/);
   });
+
+  it("throws on unsupported JSON shape without masking as invalid JSON", () => {
+    expect(() => parseAgentLog("{}")).toThrow(/unsupported JSON shape/);
+    expect(() => parseAgentLog("{}")).not.toThrow(/invalid JSON/);
+  });
 });
 
 describe("probe-tokens", () => {
@@ -160,6 +165,12 @@ describe("run-probes helpers", () => {
         new Map(),
       ),
     ).toThrow(/unknown goldenId/);
+  });
+
+  it("averageSamples rejects empty input", () => {
+    expect(() => averageSamples("p", [])).toThrow(
+      /requires at least one sample/,
+    );
   });
 
   it("averageSamples averages metrics and keeps per-arm success", () => {

@@ -63,6 +63,14 @@ export interface AgentEvalComparison {
   };
 }
 
+function optValue(argv: string[], i: number, flag: string): string {
+  const v = argv[i + 1];
+  if (!v || v.startsWith("-")) {
+    throw new Error(`${flag} requires a value`);
+  }
+  return v;
+}
+
 function parseArgs(argv: string[]) {
   let output = join(REPO_ROOT, ".agent-eval/comparison.json");
   let runs = 1;
@@ -71,15 +79,19 @@ function parseArgs(argv: string[]) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") help = true;
-    else if (a === "--output" && argv[i + 1]) output = resolve(argv[++i]);
-    else if (a === "--runs" && argv[i + 1]) {
-      const n = Number(argv[++i]);
+    else if (a === "--output") {
+      output = resolve(optValue(argv, i, a));
+      i++;
+    } else if (a === "--runs") {
+      const n = Number(optValue(argv, i, a));
+      i++;
       if (!Number.isInteger(n) || n < 1) {
         throw new Error("--runs must be a positive integer");
       }
       runs = n;
-    } else if (a === "--fixture-root" && argv[i + 1]) {
-      fixtureRoot = resolve(argv[++i]);
+    } else if (a === "--fixture-root") {
+      fixtureRoot = resolve(optValue(argv, i, a));
+      i++;
     } else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
   }
   return { output, runs, help, fixtureRoot };
@@ -258,6 +270,9 @@ export function averageSamples(
   samples: ScenarioComparison[],
 ): ScenarioComparison {
   const n = samples.length;
+  if (n === 0) {
+    throw new Error("averageSamples requires at least one sample");
+  }
   const prompt = samples[0]!.prompt;
   const avgArm = (
     pick: (s: ScenarioComparison) => ArmRunMetrics,

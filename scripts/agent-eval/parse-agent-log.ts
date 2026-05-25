@@ -193,12 +193,14 @@ function parseLineLog(raw: string): ParsedAgentLog {
 export function parseAgentLog(raw: string): ParsedAgentLog {
   const trimmed = raw.trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    let parsed: unknown;
     try {
-      return parseJsonLog(JSON.parse(raw) as unknown);
+      parsed = JSON.parse(raw);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`agent log: invalid JSON: ${msg}`);
     }
+    return parseJsonLog(parsed);
   }
   return parseLineLog(raw);
 }
