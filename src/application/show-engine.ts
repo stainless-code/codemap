@@ -206,7 +206,7 @@ export function buildShowResult(matches: SymbolMatch[]): ShowResult {
       n: matches.length,
       by_kind: byKind,
       files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+      hint: "Multiple matches. Narrow with --kind <kind>, --in <path>, or --query 'kind:… name:… path:…'.",
     },
   };
 }
@@ -278,7 +278,7 @@ export function buildSnippetResult(opts: {
       n: enriched.length,
       by_kind: byKind,
       files,
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+      hint: "Multiple matches. Narrow with --kind <kind>, --in <path>, or --query 'kind:… name:… path:…'.",
     },
   };
 }

@@ -278,7 +278,7 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
     "show",
     {
       description:
-        "Look up symbol(s) by exact name; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}]} with structured `disambiguation` block when multiple matches. One-step lookup that beats composing `SELECT … FROM symbols WHERE name = ?` by hand. Use `snippet` for the actual source text; use `query` with `LIKE` for fuzzy lookup.",
+        "Look up symbol(s) by exact name or field-qualified --query search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}]} with structured `disambiguation` block when multiple matches. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed). Use `snippet` for source text; use `query` for arbitrary SQL.",
       inputSchema: showArgsSchema,
     },
     (args) => wrapToolResult(handleShow(args, opts.root)),

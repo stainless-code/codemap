@@ -47,8 +47,46 @@ describe("parseShowRest", () => {
       name: "foo",
       kindFilter: undefined,
       inPath: undefined,
+      query: undefined,
+      withFts: false,
+      printSql: false,
       json: false,
     });
+  });
+
+  it("parses --query field search", () => {
+    const r = parseShowRest([
+      "show",
+      "--query",
+      "kind:function name:Auth",
+      "--json",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      name: undefined,
+      kindFilter: undefined,
+      inPath: undefined,
+      query: "kind:function name:Auth",
+      withFts: false,
+      printSql: false,
+      json: true,
+    });
+  });
+
+  it("errors when name and --query are both passed", () => {
+    const r = parseShowRest(["show", "foo", "--query", "name:foo"]);
+    expect(r.kind).toBe("error");
+  });
+
+  it("errors when --print-sql lacks --query", () => {
+    const r = parseShowRest(["show", "foo", "--print-sql"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--print-sql");
+  });
+
+  it("errors on unknown field would surface at runtime via parser", () => {
+    const r = parseShowRest(["show", "--query", "bogus:x"]);
+    expect(r.kind).toBe("run");
   });
 
   it("parses name + flags in any order", () => {
@@ -66,6 +104,9 @@ describe("parseShowRest", () => {
       name: "foo",
       kindFilter: "function",
       inPath: "src/cli",
+      query: undefined,
+      withFts: false,
+      printSql: false,
       json: true,
     });
   });
@@ -117,7 +158,7 @@ describe("buildShowResult — disambiguation envelope (Q-2)", () => {
       n: 3,
       by_kind: { function: 2, const: 1 },
       files: ["src/a.ts", "src/b.ts", "src/c.ts"],
-      hint: "Multiple matches. Narrow with --kind <kind> or --in <path>.",
+      hint: "Multiple matches. Narrow with --kind <kind>, --in <path>, or --query 'kind:… name:… path:…'.",
     });
   });
 

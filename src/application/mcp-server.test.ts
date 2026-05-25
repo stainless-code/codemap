@@ -1050,6 +1050,36 @@ describe("MCP server — show + snippet tools", () => {
     }
   });
 
+  it("show with query field search returns substring matches", async () => {
+    seedSymbol({ file: "src/a.ts", name: "AuthService", kind: "class" });
+    seedSymbol({ file: "src/b.ts", name: "Other", kind: "class" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:Auth" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].name).toBe("AuthService");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show errors when name and query are both passed", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { name: "foo", query: "name:foo" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("snippet returns source text from disk + stale: false on fresh file", async () => {
     // Write a real file matching the seeded `files` row in the bench setup
     // (src/a.ts already exists with hash 'h1' but content "export const A = 1;\n").

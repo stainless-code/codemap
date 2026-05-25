@@ -1,6 +1,6 @@
 # Field-qualified search — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~1 week)
+> **Status:** shipped · **Priority:** P1 · **Effort:** M (~1 week)
 >
 > **Motivator:** Agents often search with partial constraints (`kind:function`, `path:src/api`, `name:Auth`). Today they must write SQL or use exact `show` — higher friction for discovery queries.
 >
@@ -43,9 +43,9 @@ Free text without `field:` prefix → `name LIKE` or FTS if enabled.
 
 ## Acceptance
 
-- [ ] `kind:function name:auth` returns same rows as documented SQL
-- [ ] `--print-sql` shows generated statement
-- [ ] Invalid field names → clear error
+- [x] `kind:function name:auth` returns same rows as documented SQL
+- [x] `--print-sql` shows generated statement
+- [x] Invalid field names → clear error
 
 ---
 
