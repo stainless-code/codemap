@@ -10,11 +10,11 @@
 
 ## Quick resume
 
-| Next action          | Detail                                                    |
-| -------------------- | --------------------------------------------------------- |
-| **Review / merge**   | PR 5 — affected tests (`feat/affected-tests-recipe`)      |
-| **Start next**       | **PR 6** — MCP trace tools (`trace` / `explore` / `node`) |
-| **Do not start yet** | PR 9 (eval harness) until PR 8                            |
+| Next action          | Detail                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| **Review / merge**   | PR 5 — affected tests ([#132](https://github.com/stainless-code/codemap/pull/132)) |
+| **Start next**       | **PR 6** — MCP trace tools (`trace` / `explore` / `node`)                          |
+| **Do not start yet** | PR 9 (eval harness) until PR 8                                                     |
 
 Update the table below when a PR merges or a new branch opens.
 
