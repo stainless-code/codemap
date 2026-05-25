@@ -1,12 +1,10 @@
 # Agents init MCP wiring — plan
 
-> **Status:** open (PR [#135](https://github.com/stainless-code/codemap/pull/135)) · **Priority:** P1 · **Effort:** M (~1–2 weeks)
+> **Status:** open · **PR:** [#135](https://github.com/stainless-code/codemap/pull/135) · **Priority:** P1 · **Effort:** M (~1–2 weeks)
 >
 > **Motivator:** `codemap agents init` wires rules/skills into 9 IDE targets but leaves MCP config manual. Agents won't use the index if MCP isn't configured and permission-gated (Claude Code blocks tools by default).
 >
 > **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p1) · extends [agents.md](../agents.md)
->
-> **Shipped:** [#135](https://github.com/stainless-code/codemap/pull/135) — project-level Cursor + Claude Code
 
 ---
 

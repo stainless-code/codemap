@@ -15,6 +15,7 @@ export interface McpServerEntry {
 
 export interface McpServersFile {
   mcpServers?: Record<string, McpServerEntry>;
+  [key: string]: unknown;
 }
 
 export interface ClaudeSettingsFile {
@@ -42,7 +43,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export function normalizeExistingMcpServersFile(
   parsed: unknown,
   opts: { label: string; force: boolean },
-): { existing: McpServersFile; replacedInvalid: boolean } {
+): {
+  existing: McpServersFile;
+  replacedInvalid: boolean;
+  invalidReason?: "shape" | undefined;
+} {
   if (!isPlainObject(parsed)) {
     if (!opts.force) {
       throw new Error(
@@ -51,7 +56,7 @@ export function normalizeExistingMcpServersFile(
     }
     return { existing: {}, replacedInvalid: true };
   }
-  const file = parsed as McpServersFile;
+  const file = parsed as McpServersFile & Record<string, unknown>;
   const ms = file.mcpServers;
   if (
     ms !== undefined &&
@@ -62,7 +67,12 @@ export function normalizeExistingMcpServersFile(
         `Codemap: ${opts.label} mcpServers must be a JSON object — use --force to replace.`,
       );
     }
-    return { existing: {}, replacedInvalid: true };
+    const { mcpServers: _drop, ...rest } = file;
+    return {
+      existing: rest as McpServersFile,
+      replacedInvalid: true,
+      invalidReason: "shape",
+    };
   }
   return { existing: file, replacedInvalid: false };
 }
@@ -99,6 +109,17 @@ function writeJsonIfChanged(path: string, value: unknown, label: string): void {
   console.log(`  Wrote ${label}`);
 }
 
+function formatMcpReplaceWarning(
+  label: string,
+  reason: "unparseable" | "invalid-shape",
+): string {
+  const detail =
+    reason === "invalid-shape"
+      ? "invalid mcpServers shape"
+      : "unparseable JSON";
+  return `  Warning: replacing ${detail} in ${label} (--force); foreign MCP entries in that file are dropped.`;
+}
+
 /**
  * Merge the codemap MCP server into a JSON file with top-level `mcpServers`.
  * Preserves unrelated servers; replaces only the `codemap` entry.
@@ -112,7 +133,7 @@ export function upsertMcpServersFile(opts: {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: McpServersFile = {};
   if (existsSync(opts.path)) {
-    let replacedUnparseable = false;
+    let replaceReason: "unparseable" | "invalid-shape" | undefined;
     try {
       const parsed = readJsonFile(opts.path);
       const normalized = normalizeExistingMcpServersFile(parsed, {
@@ -120,7 +141,12 @@ export function upsertMcpServersFile(opts: {
         force: opts.force,
       });
       existing = normalized.existing;
-      replacedUnparseable = normalized.replacedInvalid;
+      if (normalized.replacedInvalid) {
+        replaceReason =
+          normalized.invalidReason === "shape"
+            ? "invalid-shape"
+            : "unparseable";
+      }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("Codemap:")) {
         throw err;
@@ -131,12 +157,10 @@ export function upsertMcpServersFile(opts: {
           { cause: err },
         );
       }
-      replacedUnparseable = true;
+      replaceReason = "unparseable";
     }
-    if (replacedUnparseable) {
-      console.error(
-        `  Warning: replacing unparseable ${opts.label} (--force); foreign MCP entries in that file are dropped.`,
-      );
+    if (replaceReason !== undefined) {
+      console.error(formatMcpReplaceWarning(opts.label, replaceReason));
     }
   }
   writeJsonIfChanged(
@@ -197,7 +221,7 @@ export function upsertClaudeSettingsPermissions(opts: {
     }
     if (replacedUnparseable) {
       console.error(
-        "  Warning: replacing unparseable .claude/settings.json (--force); prior keys in that file are dropped.",
+        "  Warning: replacing unparseable JSON in .claude/settings.json (--force); prior keys in that file are dropped.",
       );
     }
   }

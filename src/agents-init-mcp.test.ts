@@ -83,7 +83,24 @@ describe("normalizeExistingMcpServersFile", () => {
         { mcpServers: ["a", "b"] },
         { label: ".mcp.json", force: true },
       ),
-    ).toEqual({ existing: {}, replacedInvalid: true });
+    ).toEqual({
+      existing: {},
+      replacedInvalid: true,
+      invalidReason: "shape",
+    });
+  });
+
+  it("preserves non-mcpServers keys when force-replacing invalid mcpServers", () => {
+    expect(
+      normalizeExistingMcpServersFile(
+        { mcpServers: "bad", editor: "cursor" },
+        { label: ".cursor/mcp.json", force: true },
+      ),
+    ).toEqual({
+      existing: { editor: "cursor" },
+      replacedInvalid: true,
+      invalidReason: "shape",
+    });
   });
 });
 
@@ -210,6 +227,47 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
+  it("force-replaces invalid mcpServers shape and preserves other keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    const stderr: string[] = [];
+    const prevError = console.error;
+    console.error = (...args: unknown[]) => {
+      stderr.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+      prevError(...args);
+    };
+    try {
+      mkdirSync(join(dir, ".cursor"), { recursive: true });
+      writeFileSync(
+        join(dir, ".cursor", "mcp.json"),
+        `${JSON.stringify({ mcpServers: "bad", editor: "cursor" }, null, 2)}\n`,
+        "utf-8",
+      );
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["cursor"],
+        force: true,
+      });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as {
+        editor: string;
+        mcpServers: Record<string, { command: string }>;
+      };
+      expect(parsed.editor).toBe("cursor");
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
+        "codemap",
+      );
+      expect(
+        stderr.some((line) => line.includes("invalid mcpServers shape")),
+      ).toBe(true);
+    } finally {
+      console.error = prevError;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("replaces invalid JSON with --force", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
@@ -234,9 +292,9 @@ describe("applyAgentsInitMcp", () => {
       expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
         "codemap",
       );
-      expect(
-        stderr.some((line) => line.includes("replacing unparseable")),
-      ).toBe(true);
+      expect(stderr.some((line) => line.includes("unparseable JSON"))).toBe(
+        true,
+      );
     } finally {
       console.error = prevError;
       rmSync(dir, { recursive: true, force: true });

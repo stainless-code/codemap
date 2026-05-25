@@ -22,6 +22,7 @@ import {
   targetsNeedLinkMode,
   upsertCodemapPointerFile,
 } from "./agents-init";
+import { CODEMAP_MCP_PERMISSION_ALLOW } from "./agents-init-mcp";
 import {
   buildHookBlock,
   isCodemapHookInstalled,
@@ -83,17 +84,26 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with mcp writes .cursor/mcp.json", () => {
+  it("runAgentsInit with mcp writes Cursor and Claude project MCP files", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(runAgentsInit({ projectRoot: dir, force: true, mcp: true })).toBe(
         true,
       );
       expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
-      const parsed = JSON.parse(
+      const cursor = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { command: string }> };
-      expect(parsed.mcpServers.codemap?.command).toBe("codemap");
+      expect(cursor.mcpServers.codemap?.command).toBe("codemap");
+
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".claude", "settings.json"))).toBe(true);
+      const settings = JSON.parse(
+        readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),
+      ) as { permissions: { allow: string[] } };
+      expect(settings.permissions.allow).toContain(
+        CODEMAP_MCP_PERMISSION_ALLOW,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -129,6 +139,32 @@ describe("runAgentsInit", () => {
       expect(
         isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
       ).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit --git-hooks --mcp on existing .agents/ installs hooks and MCP", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      expect(
+        runAgentsInit({
+          projectRoot: dir,
+          gitHooks: "install",
+          mcp: true,
+        }),
+      ).toBe(true);
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

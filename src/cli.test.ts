@@ -1,8 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { isCodemapHookInstalled } from "./application/git-hooks";
 import { parseBootstrapArgs, validateIndexModeArgs } from "./cli";
 import { CODEMAP_VERSION } from "./version";
 
@@ -150,7 +158,6 @@ describe("CLI unknown / invalid args", () => {
   test("agents init --mcp exits 1 with message on unparseable MCP JSON", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-bad-"));
     try {
-      const { mkdirSync, writeFileSync } = await import("node:fs");
       mkdirSync(join(dir, ".agents"), { recursive: true });
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
@@ -164,6 +171,81 @@ describe("CLI unknown / invalid args", () => {
       expect(exitCode).toBe(1);
       expect(err).toMatch(/could not parse|Codemap:/);
       expect(err).not.toMatch(/at upsertMcpServersFile/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --mcp on existing .agents/ writes MCP only (CLI subprocess)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-only-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --git-hooks on existing .agents/ installs hooks only (CLI subprocess)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-hooks-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--git-hooks",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --git-hooks --mcp on existing .agents/ composes side effects", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-combo-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--git-hooks",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
