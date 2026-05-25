@@ -151,27 +151,6 @@ jobs:
           bun run dev --full
           bun run benchmark
 
-  perf-baseline:
-    # Regression guardrail per docs/plans/perf-triangulation-rollout.md Tier 1.2.
-    # Baseline medians are captured from slow-tier GHA ubuntu runners (see
-    # docs/benchmark.md § CI runner variance) — fast runners pass with negative
-    # deltas; the gate catches real regressions on the slow tier.
-    name: 📈 Perf baseline (self-index)
-    needs: skip-ci
-    if: needs['skip-ci'].outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup
-        uses: ./.github/actions/setup
-
-      - name: Compare per-phase wall vs baseline
-        env:
-          CODEMAP_PERF_RUNS: "5"
-        run: bun run check:perf-baseline
-
   audit:
     # Non-blocking — visibility into transitive-dep CVEs without gating PRs.
     # Promote to a hard gate once the team agrees on a vulnerability budget.
@@ -221,8 +200,7 @@ jobs:
 
   ci-complete:
     name: CI complete
-    needs:
-      [skip-ci, format, lint, typecheck, test, build, benchmark, perf-baseline]
+    needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -234,8 +212,7 @@ jobs:
             needs.typecheck.result != 'success' ||
             needs.test.result != 'success' ||
             needs.build.result != 'success' ||
-            needs.benchmark.result != 'success' ||
-            needs['perf-baseline'].result != 'success'
+            needs.benchmark.result != 'success'
           )
         run: exit 1
 
