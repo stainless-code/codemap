@@ -474,7 +474,7 @@ Per-recipe `last_run_at` (epoch ms) + `run_count` for agent-host ranking — sur
 
 ### research
 
-A snapshot-style note under `docs/research/` capturing a competitive scan or evaluation. Closed per [README § Closing research](./README.md#closing-research) — adopted items are slimmed to a "What shipped" appendix; rejected items keep a status header.
+A snapshot-style note under `docs/research/` capturing a competitive scan or evaluation. Closed per [README § Closing research](./README.md#closing-research) — **default lift + delete**; rejected-only keep with a status header.
 
 ### resolver
 
