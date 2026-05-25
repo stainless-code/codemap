@@ -110,7 +110,7 @@ Copies bundled agent templates into .agents/ under the project root.
       force: rest.includes("--force"),
       interactive: rest.includes("--interactive") || rest.includes("-i"),
       gitHooks,
-      mcp: rest.includes("--mcp"),
+      mcp: rest.includes("--mcp") ? true : undefined,
     });
     if (!ok) process.exit(1);
     return;

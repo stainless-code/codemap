@@ -27,6 +27,7 @@ This repo also has [`.agents/`](../.agents/) for Codemap development (CLI from s
 codemap agents init
 codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
+codemap agents init --mcp             # Cursor + Claude project MCP config
 codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
@@ -117,6 +118,8 @@ Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. Requires `codemap` on `PATH` (global install or dev dependency binary).
 
+**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` (or `--git-hooks`, or `--no-git-hooks --mcp`) still applies MCP/hook changes without `--force`. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (which replaces the whole file and drops foreign entries — a warning is printed).
+
 ## Section assembler and `*.gen.md`
 
 `templates/agent-content/<kind>/` is a directory of section files concatenated in lexical name order (joined with a blank line). A numeric prefix (`00-`, `10-`, …) controls section order so renumbering is a file-rename, never a code edit.
@@ -160,6 +163,7 @@ Warning goes to stderr only so `codemap skill > file.md` stays clean.
 | Source                                     | Role                                                                                                                                                                                                                                                                             |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`src/agents-init.ts`**                   | **`runAgentsInit`**, **`upsertCodemapPointerFile`**, **`listRegularFilesRecursive`**, **`applyAgentsInitTargets`** (per-file **`copyFileSync`** / **`symlinkFilesGranular`**), **`ensureGitignoreCodemapPattern`** (writes `<state-dir>/.gitignore`), **`targetsNeedLinkMode`**. |
+| **`src/agents-init-mcp.ts`**               | **`applyAgentsInitMcp`**, JSON merge for Cursor **`.cursor/mcp.json`**, Claude **`.mcp.json`** + **`.claude/settings.json`** (`--mcp` side effect).                                                                                                                              |
 | **`src/agents-init-interactive.ts`**       | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                                                                                                                                            |
 | **`src/cli/cmd-agents.ts`**                | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                                                                                                                                                          |
 | **`src/cli/cmd-skill.ts`**                 | `codemap skill` / `codemap rule` verbs; thin wrapper over `assembleAgentContent(kind)`.                                                                                                                                                                                          |

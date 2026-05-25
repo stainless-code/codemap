@@ -1,10 +1,12 @@
 # Agents init MCP wiring — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~1–2 weeks)
+> **Status:** shipped (v1) · **Priority:** P1 · **Effort:** M (~1–2 weeks)
 >
 > **Motivator:** `codemap agents init` wires rules/skills into 9 IDE targets but leaves MCP config manual. Agents won't use the index if MCP isn't configured and permission-gated (Claude Code blocks tools by default).
 >
 > **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p1) · extends [agents.md](../agents.md)
+>
+> **Shipped:** [#135](https://github.com/stainless-code/codemap/pull/135) — project-level Cursor + Claude Code
 
 ---
 
@@ -19,40 +21,38 @@
 
 ---
 
-## Target matrix (v1)
+## v1 shipped (PR #135)
 
-| Target                | Config path                                        | Notes                              |
-| --------------------- | -------------------------------------------------- | ---------------------------------- |
-| Cursor                | `~/.cursor/mcp.json` or project `.cursor/mcp.json` | Inject `--root ${workspaceFolder}` |
-| Claude Code           | `~/.claude.json` MCP + settings permissions        | Auto-allow codemap tools           |
-| VS Code / Copilot     | `.vscode/mcp.json` if supported                    | Detect capability                  |
-| Continue / Cline      | existing init paths                                | Same stdio command                 |
-| AGENTS.md / GEMINI.md | Usage section only (no MCP file)                   | Document manual MCP                |
+| Target      | Config path                                                                 | Notes                              |
+| ----------- | --------------------------------------------------------------------------- | ---------------------------------- |
+| Cursor      | project **`.cursor/mcp.json`**                                              | `--root ${workspaceFolder}`        |
+| Claude Code | project **`.mcp.json`** + **`.claude/settings.json`** (`permissions.allow`) | cwd-based MCP; no `--root` in args |
 
-Reuse patterns from `src/agents-init-interactive.ts`; add `src/agents-init-mcp.ts`.
+Side-effect-only re-runs: **`--mcp`**, **`--git-hooks`**, **`--no-git-hooks --mcp`** work when `.agents/` already exists without **`--force`**.
 
 ---
 
-## Implementation steps
+## Deferred (v2+)
 
-1. **Detect + write MCP entries** per target (read-merge, don't clobber unrelated servers)
-2. **Marker blocks** for idempotent uninstall (`<!-- CODEMAP_MCP_START -->`)
-3. **`--mcp` flag** on `agents init` and interactive prompt
-4. **Cursor workaround** — document in generated rule pointer: "always pass workspace root"
-5. **Tests** — fixture configs; merge preserves foreign entries
-6. **Docs** — agents.md § MCP wiring; README quickstart
+| Item                                                  | Notes                                                                        |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Global `~/.cursor/mcp.json` / `~/.claude.json`        | Project config only in v1                                                    |
+| VS Code `.vscode/mcp.json`                            | Detect capability first                                                      |
+| Continue / Cline MCP paths                            | Rules wiring exists; MCP JSON not wired                                      |
+| Marker-based uninstall (`<!-- CODEMAP_MCP_START -->`) | No `--no-mcp` strip path yet                                                 |
+| Rule pointer “always pass workspace root” blurb       | Covered in [agents.md § MCP wiring](../agents.md#mcp-wiring-via-agents-init) |
 
 ---
 
-## Acceptance
+## Acceptance (v1)
 
-- [ ] `codemap agents init --mcp -i` writes working MCP config for Cursor + Claude
-- [ ] Re-run is idempotent
-- [ ] Pointer skill/rule unchanged in content shape
+- [x] `codemap agents init --mcp` (and `-i` confirm) writes Cursor + Claude project MCP config ([#135](https://github.com/stainless-code/codemap/pull/135))
+- [x] Re-run is idempotent (merge preserves foreign servers)
+- [x] Pointer skill/rule unchanged in content shape (JSON only)
 
 ---
 
 ## Dependencies
 
-- [mcp-server-instructions](./mcp-server-instructions.md) improves first-run agent behavior
-- [mcp-tool-allowlist](./mcp-tool-allowlist.md) optional for minimal installs
+- [mcp-server-instructions](./mcp-server-instructions.md) — landed [#126](https://github.com/stainless-code/codemap/pull/126)
+- [mcp-tool-allowlist](./mcp-tool-allowlist.md) — landed [#126](https://github.com/stainless-code/codemap/pull/126)

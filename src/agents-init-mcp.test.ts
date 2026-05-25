@@ -51,6 +51,14 @@ describe("mergeCodemapMcpServer", () => {
       "${workspaceFolder}",
     );
   });
+
+  it("adds codemap to empty mcpServers", () => {
+    const merged = mergeCodemapMcpServer(
+      { mcpServers: {} },
+      buildCodemapMcpServerEntry(),
+    );
+    expect(Object.keys(merged.mcpServers ?? {})).toEqual(["codemap"]);
+  });
 });
 
 describe("mergeClaudeCodemapPermissions", () => {
@@ -154,6 +162,93 @@ describe("applyAgentsInitMcp", () => {
         applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
       ).toThrow(/could not parse/);
       expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces invalid JSON with --force", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    const stderr: string[] = [];
+    const prevError = console.error;
+    console.error = (...args: unknown[]) => {
+      stderr.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+      prevError(...args);
+    };
+    try {
+      mkdirSync(join(dir, ".cursor"), { recursive: true });
+      writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["cursor"],
+        force: true,
+      });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as { mcpServers: Record<string, { command: string }> };
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
+        "codemap",
+      );
+      expect(
+        stderr.some((line) => line.includes("replacing unparseable")),
+      ).toBe(true);
+    } finally {
+      console.error = prevError;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("merges Claude files without clobbering foreign servers or permissions", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    try {
+      writeFileSync(
+        join(dir, ".mcp.json"),
+        `${JSON.stringify(
+          {
+            mcpServers: {
+              foreign: { command: "node", args: ["other.js"] },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf-8",
+      );
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(dir, ".claude", "settings.json"),
+        `${JSON.stringify(
+          {
+            permissions: {
+              allow: ["Bash(git *)"],
+              deny: ["WebFetch"],
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf-8",
+      );
+      applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] });
+      const mcp = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf-8")) as {
+        mcpServers: Record<string, unknown>;
+      };
+      expect(mcp.mcpServers.foreign).toEqual({
+        command: "node",
+        args: ["other.js"],
+      });
+      expect(mcp.mcpServers[CODEMAP_MCP_SERVER_KEY]).toBeDefined();
+
+      const settings = JSON.parse(
+        readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),
+      ) as { permissions: { allow: string[]; deny: string[] } };
+      expect(settings.permissions.allow).toContain("Bash(git *)");
+      expect(settings.permissions.allow).toContain(
+        CODEMAP_MCP_PERMISSION_ALLOW,
+      );
+      expect(settings.permissions.deny).toEqual(["WebFetch"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

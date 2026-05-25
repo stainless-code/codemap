@@ -78,6 +78,7 @@ export function upsertMcpServersFile(opts: {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: McpServersFile = {};
   if (existsSync(opts.path)) {
+    let replacedUnparseable = false;
     try {
       const parsed = readJsonFile(opts.path);
       if (
@@ -90,6 +91,8 @@ export function upsertMcpServersFile(opts: {
         throw new Error(
           `Codemap: ${opts.label} is not a JSON object — use --force to replace.`,
         );
+      } else {
+        replacedUnparseable = true;
       }
     } catch (err) {
       if (!opts.force) {
@@ -98,6 +101,12 @@ export function upsertMcpServersFile(opts: {
           { cause: err },
         );
       }
+      replacedUnparseable = true;
+    }
+    if (replacedUnparseable) {
+      console.error(
+        `  Warning: replacing unparseable ${opts.label} (--force); foreign MCP entries in that file are dropped.`,
+      );
     }
   }
   writeJsonIfChanged(
@@ -131,6 +140,7 @@ export function upsertClaudeSettingsPermissions(opts: {
   mkdirSync(dirname(path), { recursive: true });
   let existing: ClaudeSettingsFile = {};
   if (existsSync(path)) {
+    let replacedUnparseable = false;
     try {
       const parsed = readJsonFile(path);
       if (
@@ -143,6 +153,8 @@ export function upsertClaudeSettingsPermissions(opts: {
         throw new Error(
           "Codemap: .claude/settings.json is not a JSON object — use --force to replace.",
         );
+      } else {
+        replacedUnparseable = true;
       }
     } catch (err) {
       if (!opts.force) {
@@ -151,6 +163,12 @@ export function upsertClaudeSettingsPermissions(opts: {
           { cause: err },
         );
       }
+      replacedUnparseable = true;
+    }
+    if (replacedUnparseable) {
+      console.error(
+        "  Warning: replacing unparseable .claude/settings.json (--force); prior keys in that file are dropped.",
+      );
     }
   }
   writeJsonIfChanged(

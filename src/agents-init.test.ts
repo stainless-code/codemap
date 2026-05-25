@@ -22,6 +22,10 @@ import {
   targetsNeedLinkMode,
   upsertCodemapPointerFile,
 } from "./agents-init";
+import {
+  buildHookBlock,
+  isCodemapHookInstalled,
+} from "./application/git-hooks";
 
 describe("runAgentsInit", () => {
   it("copies templates into .agents/", () => {
@@ -90,6 +94,69 @@ describe("runAgentsInit", () => {
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { command: string }> };
       expect(parsed.mcpServers.codemap?.command).toBe("codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit --mcp on existing .agents/ without --force writes MCP only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      expect(runAgentsInit({ projectRoot: dir, mcp: true })).toBe(true);
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit --git-hooks on existing .agents/ without --force installs hooks only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents"), { recursive: true });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      expect(runAgentsInit({ projectRoot: dir, gitHooks: "install" })).toBe(
+        true,
+      );
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit --no-git-hooks --mcp uninstalls hooks and writes MCP", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(
+        join(dir, ".git", "hooks", "post-commit"),
+        `echo keep\n${buildHookBlock()}`,
+        "utf-8",
+      );
+      expect(
+        runAgentsInit({
+          projectRoot: dir,
+          gitHooks: "uninstall",
+          mcp: true,
+        }),
+      ).toBe(true);
+      const hook = readFileSync(
+        join(dir, ".git", "hooks", "post-commit"),
+        "utf-8",
+      );
+      expect(hook).toContain("echo keep");
+      expect(hook).not.toContain("CODEMAP_HOOK_BEGIN");
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

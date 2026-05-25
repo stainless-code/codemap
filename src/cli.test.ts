@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { parseBootstrapArgs, validateIndexModeArgs } from "./cli";
@@ -120,6 +122,29 @@ describe("CLI unknown / invalid args", () => {
     expect(exitCode).toBe(1);
     expect(err).toContain("unexpected argument");
     expect(err).toContain("interactive");
+  });
+
+  test("agents init --force --mcp writes .cursor/mcp.json under --root", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as { mcpServers: Record<string, { command: string }> };
+      expect(parsed.mcpServers.codemap?.command).toBe("codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("--files without paths exits 1 before DB", async () => {
