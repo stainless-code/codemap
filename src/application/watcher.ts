@@ -1,10 +1,12 @@
-import { extname, relative, sep } from "node:path";
+import { extname, relative, resolve, sep } from "node:path";
 
 import chokidar from "chokidar";
 import type { FSWatcher } from "chokidar";
 
 import { closeDb, openDb } from "../db";
+import { getProjectRoot, getStateDir } from "../runtime";
 import { runCodemapIndex } from "./run-index";
+import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
  * `codemap watch` engine — keeps `.codemap.db` fresh on file edits so
@@ -31,19 +33,43 @@ const INDEXED_EXTENSIONS = new Set([
   ".css",
 ]);
 
+/** Default project-recipes prefix when runtime is not initialised. */
+export const DEFAULT_RECIPES_WATCH_PREFIX = `${STATE_DIR_DEFAULT}/recipes/`;
+
+/**
+ * Project-root-relative POSIX prefix for `<state-dir>/recipes/` edits
+ * the watcher should react to. Uses `getStateDir()` when the runtime
+ * root matches `projectRoot`; otherwise falls back to `.codemap/recipes/`.
+ */
+export function resolveRecipesWatchPrefix(projectRoot: string): string {
+  try {
+    if (resolve(getProjectRoot()) !== resolve(projectRoot)) {
+      return DEFAULT_RECIPES_WATCH_PREFIX;
+    }
+    const rel = relative(projectRoot, getStateDir());
+    if (rel.startsWith("..")) return DEFAULT_RECIPES_WATCH_PREFIX;
+    const base = rel === "" ? STATE_DIR_DEFAULT : rel.split(sep).join("/");
+    return `${base}/recipes/`;
+  } catch {
+    return DEFAULT_RECIPES_WATCH_PREFIX;
+  }
+}
+
 /**
  * True if `relPath` (project-root-relative, POSIX-separated) is something
  * the indexer cares about: matches an indexed extension AND no path
  * segment is in the exclude set (`node_modules`, `.git`, `dist`, etc.).
  *
  * Pure — same predicate the watcher applies to every chokidar event
- * before queueing a reindex. Recipe paths
- * (`<root>/.codemap/recipes/<id>.{sql,md}`) are also returned (caller
- * uses `runCodemapIndex` which handles them out-of-band).
+ * before queueing a reindex. Recipe paths under
+ * `<state-dir>/recipes/<id>.{sql,md}` (default `.codemap/recipes/`) are
+ * also returned (caller uses `runCodemapIndex` which handles them
+ * out-of-band).
  */
 export function shouldIndexPath(
   relPath: string,
   excludeDirNames: ReadonlySet<string>,
+  recipesPrefix: string = DEFAULT_RECIPES_WATCH_PREFIX,
 ): boolean {
   if (relPath === "" || relPath === ".") return false;
   // Path-segment scan: bail if any segment is excluded. Hand-rolled (no
@@ -62,17 +88,8 @@ export function shouldIndexPath(
   // Check extension last (cheaper bail above).
   const ext = extname(relPath);
   if (INDEXED_EXTENSIONS.has(ext)) return true;
-  // Project-local recipes: <root>/.codemap/recipes/<id>.{sql,md}.
-  // The path-segment scan above doesn't exclude `.codemap` since it's
-  // not in excludeDirNames (the whole .codemap.db dir lives under it).
-  // `relPath` is always POSIX (toRelativePosix normalizes Windows
-  // backslashes); compare with a literal `/` prefix so Windows recipe
-  // changes match too. (Earlier sep-built prefix mismatched on Windows
-  // — caught by CodeRabbit on PR #47.)
-  if (
-    (ext === ".sql" || ext === ".md") &&
-    relPath.startsWith(".codemap/recipes/")
-  ) {
+  // Project-local recipes under `<state-dir>/recipes/`.
+  if ((ext === ".sql" || ext === ".md") && relPath.startsWith(recipesPrefix)) {
     return true;
   }
   return false;
@@ -252,6 +269,11 @@ export interface WatchLoopOpts {
   /** Coalesced reindex callback. Path set is project-relative POSIX. */
   onChange: (paths: ReadonlySet<string>) => void | Promise<void>;
   /**
+   * Project-root-relative POSIX prefix for `<state-dir>/recipes/` file
+   * events. Defaults to `.codemap/recipes/` when omitted.
+   */
+  recipesWatchPrefix?: string;
+  /**
    * Optional priming callback — runs after `backend.start()` but BEFORE
    * `isWatchActive()` flips to `true`. Embedders that want
    * `handleAudit` to skip its incremental-index prelude MUST supply
@@ -298,6 +320,8 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   stop: () => Promise<void>;
 } {
   const debounceMs = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const recipesPrefix = opts.recipesWatchPrefix ?? DEFAULT_RECIPES_WATCH_PREFIX;
+  const stateDirRel = recipesPrefix.replace(/\/recipes\/$/, "");
 
   // Track in-flight onChange so stop() can drain. Serialise rather than
   // overlap — concurrent reindexes against the same DB are pointless and
@@ -315,13 +339,14 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       });
   }, debounceMs);
 
-  const backend: WatchBackend = opts.backend ?? createChokidarBackend();
+  const backend: WatchBackend =
+    opts.backend ?? createChokidarBackend({ recipesPrefix, stateDirRel });
 
   backend.start({
     root: opts.root,
     onEvent: (_kind, absPath) => {
       const rel = toRelativePosix(opts.root, absPath);
-      if (!shouldIndexPath(rel, opts.excludeDirNames)) return;
+      if (!shouldIndexPath(rel, opts.excludeDirNames, recipesPrefix)) return;
       debouncer.trigger(rel);
     },
     onError: (err) => {
@@ -400,7 +425,10 @@ function toRelativePosix(root: string, absPath: string): string {
  * write detection — handles editors that write large files in chunks)
  * and `atomic` (mv-replace editors don't trigger spurious unlink+add).
  */
-function createChokidarBackend(): WatchBackend {
+function createChokidarBackend(opts: {
+  recipesPrefix: string;
+  stateDirRel: string;
+}): WatchBackend {
   let watcher: FSWatcher | undefined;
   return {
     start({ root, onEvent, onError }) {
@@ -419,17 +447,23 @@ function createChokidarBackend(): WatchBackend {
         ignored: (path, stats) => {
           if (stats === undefined) return false; // dir not yet stat'd
           if (!stats.isFile()) return false;
-          // Cheapest filter: skip anything inside a dot-dir other than
-          // .codemap/recipes (which we want to watch for project recipes).
-          // chokidar passes absolute paths; convert to root-relative.
           const rel = toRelativePosix(root, path);
-          return !rel.startsWith(".codemap/recipes/")
-            ? rel.includes("/node_modules/") ||
-                rel.includes("/.git/") ||
-                rel.startsWith("node_modules/") ||
-                rel.startsWith(".git/") ||
-                rel.startsWith(".codemap/")
-            : false;
+          if (rel.startsWith(opts.recipesPrefix)) return false;
+          if (
+            rel.includes("/node_modules/") ||
+            rel.includes("/.git/") ||
+            rel.startsWith("node_modules/") ||
+            rel.startsWith(".git/")
+          ) {
+            return true;
+          }
+          if (
+            rel.startsWith(`${opts.stateDirRel}/`) ||
+            rel === opts.stateDirRel
+          ) {
+            return true;
+          }
+          return false;
         },
       });
       watcher.on("add", (p) => onEvent("add", p));

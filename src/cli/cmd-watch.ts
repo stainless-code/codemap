@@ -2,6 +2,7 @@ import {
   createPrimeIndex,
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
+  resolveRecipesWatchPrefix,
   runWatchLoop,
 } from "../application/watcher";
 import { getExcludeDirNames, getProjectRoot } from "../runtime";
@@ -80,7 +81,8 @@ export function parseWatchRest(rest: string[]):
  * stdout. Safe to call before bootstrap.
  */
 export function printWatchCmdHelp(): void {
-  console.log(`Usage: codemap watch [--debounce <ms>] [--quiet]
+  console.log(
+    `Usage: codemap watch [--debounce <ms>] [--quiet]
 
 Long-running process that re-indexes changed files in real time so every
 \`codemap query\` (CLI / MCP / HTTP) reads live data without per-query
@@ -103,13 +105,15 @@ Examples:
   codemap watch --quiet                  # for IDE-launched background use
 
 What gets watched: same files the indexer cares about (TS / TSX / JS /
-JSX / CSS + project-local recipes under .codemap/recipes/). node_modules
-/ .git / dist / build (and the configured excludeDirNames) are skipped.
+JSX / CSS + project-local recipes under \`<state-dir>/recipes/\`, default
+\`.codemap/recipes/\`). node_modules / .git / dist / build (and the
+configured excludeDirNames) are skipped.
 
 The process runs until SIGINT/SIGTERM (drains pending edits + closes the
 file watcher). Tracer 4 lands an optimization: when watcher is active,
 \`codemap mcp audit\` skips its incremental-index prelude.
-`);
+`,
+  );
 }
 
 /**
@@ -131,6 +135,7 @@ export async function runWatchCmd(opts: WatchOpts): Promise<void> {
     const handle = runWatchLoop({
       root,
       excludeDirNames: getExcludeDirNames(),
+      recipesWatchPrefix: resolveRecipesWatchPrefix(root),
       debounceMs: opts.debounceMs,
       onPrime: createPrimeIndex({ quiet: opts.quiet }),
       onChange: createReindexOnChange({ quiet: opts.quiet }),

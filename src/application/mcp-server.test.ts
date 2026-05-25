@@ -727,7 +727,7 @@ describe("MCP server — resources", () => {
         (t) => t.uriTemplate,
       );
       expect(templateUris).toContain("codemap://files/{+path}");
-      expect(templateUris).toContain("codemap://symbols/{name}");
+      expect(templateUris).toContain("codemap://symbols/{name}{?in}");
     } finally {
       await server.close();
     }
@@ -836,23 +836,24 @@ describe("MCP server — resources", () => {
     try {
       db.run(
         `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
-         VALUES ('src/a.ts', 'A', 'const', 1, 1, 'const A', 1, 0)`,
+         VALUES ('src/a.ts', 'A', 'const', 1, 1, 'const A', 1, 0),
+                ('src/b.ts', 'A', 'const', 1, 1, 'const A', 1, 0)`,
       );
     } finally {
       closeDb(db);
     }
     const { client, server } = await makeClient();
     try {
-      const r = await client.readResource({ uri: "codemap://symbols/A" });
+      const r = await client.readResource({
+        uri: "codemap://symbols/A?in=src/a.ts",
+      });
       const parsed = JSON.parse(readResourceText(r));
-      expect(parsed.matches).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: "A",
-            file_path: "src/a.ts",
-          }),
-        ]),
-      );
+      expect(parsed.matches).toEqual([
+        expect.objectContaining({
+          name: "A",
+          file_path: "src/a.ts",
+        }),
+      ]);
     } finally {
       await server.close();
     }

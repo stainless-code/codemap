@@ -12,7 +12,7 @@ Alphabetical, lowercase. Disambiguation pairs link to each other.
 
 - **TS shape** = a TypeScript interface or type alias.
 - **SQLite table** = an actual on-disk table in `.codemap/index.db`.
-- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (project-local). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
+- **Recipe** = a cataloged SQL recipe loaded by `src/application/recipes-loader.ts` from `templates/recipes/<id>.{sql,md}` (bundled) or `<state-dir>/recipes/<id>.{sql,md}` (project-local; default `.codemap/recipes/`). Exposed via `codemap query --recipe <id>` and the `codemap://recipes` MCP resource. See [§ R recipe](#recipe).
 - **Query** = any SQL run against the index (recipe or ad-hoc).
 
 ---
@@ -460,7 +460,7 @@ See **recipe**.
 A SQL file (plus optional sibling `.md` description) loaded into the catalog by `src/application/recipes-loader.ts`. Two sources, same shape:
 
 - **Bundled** — ships in the npm package as `templates/recipes/<id>.{sql,md}`. Examples: `fan-in`, `deprecated-symbols`, `files-hashes`.
-- **Project-local** — loaded from `<projectRoot>/.codemap/recipes/<id>.{sql,md}` (root-only resolution; not gitignored — meant to be checked in for team review).
+- **Project-local** — loaded from `<state-dir>/recipes/<id>.{sql,md}` (default `.codemap/recipes/`; honors `--state-dir` / `CODEMAP_STATE_DIR`; root-only resolution; not gitignored — meant to be checked in for team review).
 
 Run via `codemap query --recipe <id>` (alias `-r`). Project recipes win on id collision with bundled ones (entries carry `shadows: true` in the catalog so agents reading `codemap://recipes` at session start see when a recipe behaves differently from the documented bundled version). Per-row `actions` templates (kebab-case verb + description) live in YAML frontmatter on each `<id>.md` — uniform between bundled and project. Load-time validation rejects empty SQL and DML / DDL keywords; runtime `PRAGMA query_only=1` on `queryRows`, `executeQuery`, and `printQueryResult` (ad-hoc CLI SQL) is the parser-proof backstop. Distinct from an ad-hoc **query** (any SQL string the agent composes itself; ad-hoc SQL never carries actions).
 

@@ -747,6 +747,7 @@ describe("extractFileData", () => {
         "  set label(value: string) { this._label = value; }",
         "}",
         "export const add = (a: number, b: number): number => a + b;",
+        "export const bind = function (x: number): number { return x; }",
       ].join("\n");
       const d = extractFileData("/proj/x.ts", src, "x.ts");
       const byOwner = (owner: string, kind: string) =>
@@ -762,6 +763,7 @@ describe("extractFileData", () => {
       expect(byOwner("run", "method")?.name).toBe("id");
       expect(byOwner("label", "setter")?.name).toBe("value");
       expect(byOwner("add", "arrow")?.name).toBe("a");
+      expect(byOwner("bind", "function")?.name).toBe("x");
     });
   });
 });

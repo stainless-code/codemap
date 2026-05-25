@@ -67,17 +67,6 @@ Soft constraints — describe shipped reality. Decided-but-unshipped flips live 
 
   Architectural follow-ups (plan-PR-first): parse → insert pipeline overlap and AST cache — see [`plans/perf-triangulation-rollout.md`](./plans/perf-triangulation-rollout.md) Phase 3.
 
----
-
-## Closed audits (pointers)
-
-Closed audit content is consolidated into its canonical home (plan, reference doc, or `.agents/lessons.md`) per [docs/README.md Rule 8](./README.md). Recover full text via `git log --follow` on the deleted path.
-
-| Topic                                                      | Canonical home                                                                                                                                                                                                                                     | Closed                 |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| Full `.md` fact-check (May 2026)                           | Shipped: audit fixes `e6ab158`–`14d3efc` on `main`, R.1–R.3 in this PR. R.10–R.12 always in [`roadmap.md` Backlog](./roadmap.md#backlog) / plans. Recover deleted audit: `git log --follow -- docs/audits/2026-05-24-docs-fact-check-residuals.md` | 2026-05-24             |
-| Perf triangulation (per-model audits + triangulation file) | [`plans/perf-triangulation-rollout.md`](./plans/perf-triangulation-rollout.md) Phase 5                                                                                                                                                             | 2026-05-18 (`cc28bce`) |
-
 - [ ] **Repo-structure conversion (codemap itself: flat → monorepo)** — tracked decision, not a backlog item to ship. Default bias: stay flat until a trigger fires (C.9 community plugins ship as separate packages, OR a user asks for `codemap-core` library export, OR a second distro emerges). Full analysis + three options + reference layouts (oxc / knip / biome / vitest) + revisit triggers in [`plans/lsp-diagnostic-push.md § Repo-structure tradeoffs`](./plans/lsp-diagnostic-push.md#repo-structure-tradeoffs-canonical-home-for-the-monorepo-vs-flat-decision). Don't convert preemptively.
 - [ ] **Monorepo / workspace awareness** — discover workspaces from `pnpm-workspace.yaml` / `package.json` and index per-workspace dependency graphs (separate from the codemap-itself repo-structure decision above; this is about indexing user repos)
 - [ ] **Cross-agent handoff artifact** — _speculative_; layered prefix/delta JSON written on session-stop, read on session-start. Complementary to indexing rather than core to it; revisit if user demand emerges
@@ -86,3 +75,14 @@ Closed audit content is consolidated into its canonical home (plan, reference do
 - [ ] Optional **GitHub Actions** `workflow_dispatch` — run golden/benchmark against a **public** corpus only (never private app code)
 - [ ] **Sass / Less / SCSS:** [Lightning CSS](https://lightningcss.dev/) is CSS-only; preprocessors need a compile step before CSS parsing — see [architecture.md § CSS](./architecture.md#css--css-parserts-lightningcss)
 - [ ] **[UnJS](https://unjs.io) adoption** — candidates: [`citty`](https://unjs.io/packages/citty) (CLI builder), [`pathe`](https://unjs.io/packages/pathe) (cross-platform paths), [`consola`](https://unjs.io/packages/consola) (structured logging), [`pkg-types`](https://unjs.io/packages/pkg-types) (typed `package.json`/`tsconfig.json`), [`c12`](https://unjs.io/packages/c12) (config loader — see config loader item above)
+
+---
+
+## Closed audits (pointers)
+
+Closed audit content is consolidated into its canonical home (plan, reference doc, or `.agents/lessons.md`) per the [Audit lifecycle](./README.md#file-ownership) row in [docs/README.md](./README.md). Recover full text via `git log --follow` on the deleted path.
+
+| Topic                            | Canonical home                                                                                                                                                               | Closed     |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Full `.md` fact-check (May 2026) | Shipped `e6ab158`–`14d3efc` + [#124](https://github.com/stainless-code/codemap/pull/124). Recover: `git log --follow -- docs/audits/2026-05-24-docs-fact-check-residuals.md` | 2026-05-24 |
+| Perf triangulation               | [`plans/perf-triangulation-rollout.md`](./plans/perf-triangulation-rollout.md) Phase 5                                                                                       | 2026-05-18 |

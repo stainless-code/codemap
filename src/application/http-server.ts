@@ -46,6 +46,7 @@ import {
   createPrimeIndex,
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
+  resolveRecipesWatchPrefix,
   runWatchLoop,
 } from "./watcher";
 
@@ -131,6 +132,7 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       const handle = runWatchLoop({
         root: getProjectRoot(),
         excludeDirNames: getExcludeDirNames(),
+        recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
         debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
         onPrime: createPrimeIndex({ quiet: false, label: "codemap serve" }),
         onChange: createReindexOnChange({

@@ -173,10 +173,10 @@ codemap query --recipes-json
 codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
 
-# Project-local recipes — drop SQL files into .codemap/recipes/ to make them discoverable across the team
+# Project-local recipes — drop SQL files into `<state-dir>/recipes/` (default `.codemap/recipes/`) to make them discoverable across the team
 # Bundled recipes live in templates/recipes/ in the npm package; project recipes win on id collision
 # (shadowing is signalled via a `shadows: true` field in --recipes-json so agents notice the override)
-mkdir -p .codemap/recipes
+mkdir -p .codemap/recipes   # or: codemap --state-dir .cm --full && mkdir -p .cm/recipes
 echo "SELECT path FROM files WHERE language IN ('ts', 'tsx') AND line_count > 500" \
   > .codemap/recipes/big-ts-files.sql
 codemap query --recipe big-ts-files                              # auto-discovered alongside bundled

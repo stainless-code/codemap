@@ -97,7 +97,8 @@ let stateDirOverride: string | undefined;
  * argv parse, giving the loader a project root before bootstrap.
  *
  * Single source of truth: same `root` value `bootstrapCodemap` resolves to
- * — no parallel walk-up heuristic. Cache invalidates when root changes.
+ * — no parallel walk-up heuristic. Cache invalidates when root or
+ * `stateDir` changes.
  */
 export function setQueryRecipesProjectRoot(
   root: string | undefined,

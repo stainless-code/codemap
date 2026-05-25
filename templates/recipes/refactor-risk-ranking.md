@@ -19,7 +19,7 @@ Three correctness fixes baked into the formula:
 
 The output columns `exported_count`, `fan_in`, `avg_coverage_pct`, `measured_symbols`, `risk_score` give agents enough context to triage without re-running queries: count of exports + how many files import this one + average coverage of measured symbols + how many symbols had measurements.
 
-**v1 trade-off (linear-in-fan_in, accepted):** `fan_in = 100, avg_coverage = 99%` and `fan_in = 1, avg_coverage = 0%` both score `100` — equivalent by formula but obviously not equivalent in practice. v1 ships the simple formula; tune via project-local recipe override at `<projectRoot>/.codemap/recipes/refactor-risk-ranking.sql`.
+**v1 trade-off (linear-in-fan_in, accepted):** `fan_in = 100, avg_coverage = 99%` and `fan_in = 1, avg_coverage = 0%` both score `100` — equivalent by formula but obviously not equivalent in practice. v1 ships the simple formula; tune via project-local recipe override at `<state-dir>/recipes/refactor-risk-ranking.sql` (default `.codemap/recipes/`).
 
 Suggested tuning axes for project-local overrides:
 
