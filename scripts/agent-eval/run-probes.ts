@@ -178,6 +178,13 @@ export function summarize(
   };
 }
 
+export function allProbesSucceeded(
+  successCount: number,
+  probeCount: number,
+): boolean {
+  return successCount === probeCount;
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -233,6 +240,10 @@ Options:
   console.log(
     `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls} (${report.summary.successCount}/${probes.length} scenarios ok)\n`,
   );
+
+  if (!allProbesSucceeded(report.summary.successCount, probes.length)) {
+    process.exitCode = 1;
+  }
 }
 
 export function averageSamples(

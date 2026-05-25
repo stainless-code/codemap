@@ -283,7 +283,7 @@ bun run dev --full
 bun run benchmark
 ```
 
-**CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
+**CI:** the **Test** job runs `bun run test:agent-eval` (~50s probe smoke on `fixtures/minimal`); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
 
 ### Agent eval harness
 
@@ -294,9 +294,10 @@ Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shi
 ```bash
 bash scripts/agent-eval/run-arms.sh
 # default output: .agent-eval/comparison.json
+# exits non-zero when any probe's scenarioSuccess is false
 ```
 
-Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, and `resultCount`; `toolSequence` stays from the first run. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded); `toolSequence` stays from the first run. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
 
 **Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload — MCP-on includes SQL + JSON rows; MCP-off includes bytes read + grep hits), per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed. Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
 
@@ -306,7 +307,7 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`. **`AGENT_
 - **Log mode** parses exported agent transcripts (entries / messages / line formats) when you run live A/B sessions with MCP on vs off.
 - External public repos (zod, fastify, etc.) are a follow-up: point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree and extend probe definitions — same harness, not duplicated fixtures.
 
-Plan: [`docs/plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). CI nightly / `workflow_dispatch` is optional and not wired yet.
+Plan: [`docs/plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). PR CI runs `bun run test:agent-eval` in the **Test** job (~50s smoke on `fixtures/minimal`); optional nightly / `workflow_dispatch` for external fixtures is not wired yet.
 
 **Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 

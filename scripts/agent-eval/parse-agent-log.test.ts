@@ -8,7 +8,12 @@ import {
   mcpOffPayloadChars,
   mcpOnPayloadChars,
 } from "./probe-tokens";
-import { averageSamples, runProbeOnce, summarize } from "./run-probes";
+import {
+  allProbesSucceeded,
+  averageSamples,
+  runProbeOnce,
+  summarize,
+} from "./run-probes";
 import type { ArmRunMetrics, ScenarioComparison } from "./run-probes";
 import { traditionalToolSequence } from "./traditional-probe";
 
@@ -185,6 +190,11 @@ describe("run-probes helpers", () => {
       scenario({ id: "b", scenarioSuccess: false }),
     ]);
     expect(summary.successCount).toBe(1);
+  });
+
+  it("allProbesSucceeded requires every scenario", () => {
+    expect(allProbesSucceeded(3, 3)).toBe(true);
+    expect(allProbesSucceeded(2, 3)).toBe(false);
   });
 
   it("traditionalToolSequence includes glob and grep with zero reads", () => {

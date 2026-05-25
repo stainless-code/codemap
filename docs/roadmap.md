@@ -71,7 +71,7 @@ Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-a
 - [ ] **Index lock + error log** — cross-process lock, `unlock`, `errors.log`. Plan: [`plans/index-lock-and-error-log.md`](./plans/index-lock-and-error-log.md). Effort: M.
 - [ ] **Parse worker hardening** — per-file timeout + worker recycle. Plan: [`plans/parse-worker-hardening.md`](./plans/parse-worker-hardening.md). Effort: M.
 - [x] **Field-qualified search** — `kind:` / `path:` / `name:` → SQL. Plan: [`plans/field-qualified-search.md`](./plans/field-qualified-search.md). [#138](https://github.com/stainless-code/codemap/pull/138). Effort: M.
-- [ ] **Agent eval harness** — probe-mode A/B shipped ([#139](https://github.com/stainless-code/codemap/pull/139)); live MCP arms + CI job still open. Plan: [`plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). Effort: M.
+- [ ] **Agent eval harness** — probe-mode A/B + PR CI gate shipped ([#139](https://github.com/stainless-code/codemap/pull/139)); live MCP arms + optional external nightly CI still open. Plan: [`plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). Effort: M.
 
 **P2 — strategic (trigger-gated where noted)**
 
