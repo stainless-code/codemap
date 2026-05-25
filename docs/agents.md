@@ -27,7 +27,7 @@ This repo also has [`.agents/`](../.agents/) for Codemap development (CLI from s
 codemap agents init
 codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
-codemap agents init --mcp             # Cursor + Claude project MCP config
+codemap agents init --mcp             # project MCP config for all supported integrations
 codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
@@ -109,12 +109,20 @@ Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
 ## MCP wiring via `agents init`
 
-**`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown:
+**`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown. Registry source of truth: **`src/agents-init-mcp-registry.ts`** (`AGENTS_INIT_MCP_REGISTRY`).
 
-| Target      | Files written                                                                          |
-| ----------- | -------------------------------------------------------------------------------------- |
-| Cursor      | `.cursor/mcp.json` — `codemap mcp --watch --root ${workspaceFolder}`                   |
-| Claude Code | `.mcp.json` + `.claude/settings.json` — `permissions.allow` includes `mcp__codemap__*` |
+| Target             | Files written                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cursor             | `.cursor/mcp.json` — `codemap mcp --watch --root ${workspaceFolder}`                                                                                                      |
+| Claude Code        | `.mcp.json` + `.claude/settings.json` — `permissions.allow` includes `mcp__codemap__*`                                                                                    |
+| VS Code / Copilot  | `.vscode/mcp.json` — `servers.codemap` with `type: stdio`                                                                                                                 |
+| Continue           | `.continue/mcpServers/codemap-mcp.json` (JSON `mcpServers`; also accepted from Cursor/Cline exports)                                                                      |
+| Amazon Q Developer | `.amazonq/mcp.json` (legacy workspace MCP file; GUI may also use `.amazonq/default.json`)                                                                                 |
+| Gemini CLI         | `.gemini/settings.json` — top-level `mcpServers.codemap`                                                                                                                  |
+| Cline              | `.cline/mcp.json` ([Cline CLI reference](https://docs.cline.bot/cli/cli-reference); global IDE settings may also use `~/.cline/data/settings/cline_mcp_settings.json`)    |
+| Windsurf (Cascade) | `~/.codeium/windsurf/mcp_config.json` ([Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp) — user-global only; written when Windsurf integration is selected) |
+
+With **`--mcp`** and no `--target` filter, all **project-local** rows above are written except **Windsurf**, which has no documented workspace MCP path.
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. Requires `codemap` on `PATH` (global install or dev dependency binary).
 
@@ -163,7 +171,8 @@ Warning goes to stderr only so `codemap skill > file.md` stays clean.
 | Source                                     | Role                                                                                                                                                                                                                                                                             |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`src/agents-init.ts`**                   | **`runAgentsInit`**, **`upsertCodemapPointerFile`**, **`listRegularFilesRecursive`**, **`applyAgentsInitTargets`** (per-file **`copyFileSync`** / **`symlinkFilesGranular`**), **`ensureGitignoreCodemapPattern`** (writes `<state-dir>/.gitignore`), **`targetsNeedLinkMode`**. |
-| **`src/agents-init-mcp.ts`**               | **`applyAgentsInitMcp`**, JSON merge for Cursor **`.cursor/mcp.json`**, Claude **`.mcp.json`** + **`.claude/settings.json`** (`--mcp` side effect).                                                                                                                              |
+| **`src/agents-init-mcp-registry.ts`**      | **`AGENTS_INIT_MCP_REGISTRY`** — paths, formats, defaults, docs URLs (source of truth for the MCP table below).                                                                                                                                                                  |
+| **`src/agents-init-mcp.ts`**               | **`applyAgentsInitMcp`**, JSON merge + post-write verify; **`--mcp`** side effect.                                                                                                                                                                                               |
 | **`src/agents-init-interactive.ts`**       | **`@clack/prompts`** flow; calls **`runAgentsInit`**.                                                                                                                                                                                                                            |
 | **`src/cli/cmd-agents.ts`**                | Lazy-loaded from **`src/cli/main.ts`**.                                                                                                                                                                                                                                          |
 | **`src/cli/cmd-skill.ts`**                 | `codemap skill` / `codemap rule` verbs; thin wrapper over `assembleAgentContent(kind)`.                                                                                                                                                                                          |

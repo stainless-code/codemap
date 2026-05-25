@@ -132,6 +132,24 @@ describe("CLI unknown / invalid args", () => {
     expect(err).toContain("interactive");
   });
 
+  test("agents init -i rejects --git-hooks combination", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-i-hooks-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "-i",
+        "--git-hooks",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("cannot be combined with --interactive");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("agents init --force --mcp writes .cursor/mcp.json under --root", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-"));
     try {

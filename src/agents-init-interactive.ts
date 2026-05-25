@@ -9,8 +9,9 @@ import {
   select,
 } from "@clack/prompts";
 
-import type { AgentsInitLinkMode, AgentsInitTarget } from "./agents-init";
+import type { AgentsInitLinkMode } from "./agents-init";
 import { runAgentsInit, targetsNeedLinkMode } from "./agents-init";
+import type { AgentsInitTarget } from "./agents-init-targets";
 import { watchDisabledReason } from "./application/watch-policy";
 
 export interface RunAgentsInitInteractiveOptions {
@@ -172,7 +173,7 @@ export async function runAgentsInitInteractive(
   if (mcp === undefined) {
     const offerMcp = await confirm({
       message:
-        "Write MCP config (Cursor .cursor/mcp.json + Claude .mcp.json / permissions)?",
+        "Write MCP config for selected integrations (Cursor, Claude, VS Code, Continue, …)?",
       initialValue: true,
     });
     if (isCancel(offerMcp)) {

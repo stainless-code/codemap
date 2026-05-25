@@ -30,7 +30,7 @@ export async function runAgentsInitCmd(opts: {
       }
       const { runAgentsInitInteractive } =
         await import("../agents-init-interactive.js");
-      return runAgentsInitInteractive(opts);
+      return await runAgentsInitInteractive(opts);
     }
     return runAgentsInit({
       projectRoot: opts.projectRoot,

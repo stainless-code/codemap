@@ -84,7 +84,7 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with mcp writes Cursor and Claude project MCP files", () => {
+  it("runAgentsInit with mcp writes default project-local MCP configs", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(runAgentsInit({ projectRoot: dir, force: true, mcp: true })).toBe(
@@ -97,6 +97,7 @@ describe("runAgentsInit", () => {
       expect(cursor.mcpServers.codemap?.command).toBe("codemap");
 
       expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".claude", "settings.json"))).toBe(true);
       const settings = JSON.parse(
         readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),

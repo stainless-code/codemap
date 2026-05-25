@@ -138,7 +138,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;
     console.error(
-      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force] [--interactive|-i] [--mcp]`,
+      `codemap: unknown agents command "${rest[1] ?? "(missing)"}". Expected: codemap agents init [--force] [--interactive|-i] [--mcp] [--git-hooks] [--no-git-hooks]`,
     );
     process.exit(1);
   }

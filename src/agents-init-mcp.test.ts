@@ -17,7 +17,11 @@ import {
   buildCodemapMcpServerEntry,
   mergeClaudeCodemapPermissions,
   mergeCodemapMcpServer,
+  mergeCodemapVsCodeServer,
   normalizeExistingMcpServersFile,
+  normalizeExistingVsCodeMcpFile,
+  resolveAgentsInitMcpTargets,
+  verifyCodemapMcpServersFile,
 } from "./agents-init-mcp";
 
 describe("buildCodemapMcpServerEntry", () => {
@@ -118,9 +122,157 @@ describe("mergeClaudeCodemapPermissions", () => {
       ),
     ).toHaveLength(1);
   });
+
+  it("coerces non-array permissions.allow to empty before append", () => {
+    const merged = mergeClaudeCodemapPermissions({
+      permissions: { allow: "not-an-array" as unknown as string[] },
+    });
+    expect(merged.permissions?.allow).toEqual([CODEMAP_MCP_PERMISSION_ALLOW]);
+  });
+});
+
+describe("resolveAgentsInitMcpTargets", () => {
+  it("defaults to all project-local MCP targets when integrations omitted", () => {
+    expect(resolveAgentsInitMcpTargets()).toEqual([
+      "cursor",
+      "claude-code",
+      "vscode",
+      "continue",
+      "cline",
+      "amazon-q",
+      "gemini",
+    ]);
+  });
+
+  it("maps integration picks and includes Windsurf only when selected", () => {
+    expect(resolveAgentsInitMcpTargets(["cursor", "copilot"])).toEqual([
+      "cursor",
+      "vscode",
+    ]);
+    expect(resolveAgentsInitMcpTargets(["windsurf"])).toEqual(["windsurf"]);
+    expect(resolveAgentsInitMcpTargets(["cline"])).toEqual(["cline"]);
+    expect(resolveAgentsInitMcpTargets(["agents-md"])).toEqual([]);
+  });
+});
+
+describe("mergeCodemapVsCodeServer", () => {
+  it("preserves foreign servers and sets stdio type", () => {
+    const merged = mergeCodemapVsCodeServer(
+      {
+        servers: {
+          other: { command: "npx", args: ["-y", "other"] },
+        },
+      },
+      buildCodemapMcpServerEntry(),
+    );
+    expect(merged.servers?.other?.command).toBe("npx");
+    expect(merged.servers?.[CODEMAP_MCP_SERVER_KEY]).toEqual({
+      type: "stdio",
+      command: "codemap",
+      args: ["mcp", "--watch"],
+    });
+  });
+});
+
+describe("normalizeExistingVsCodeMcpFile", () => {
+  it("rejects non-object servers without force", () => {
+    expect(() =>
+      normalizeExistingVsCodeMcpFile(
+        { servers: "bad" },
+        { label: ".vscode/mcp.json", force: false },
+      ),
+    ).toThrow(/servers must be a JSON object/);
+  });
+});
+
+describe("verifyCodemapMcpServersFile", () => {
+  it("throws when codemap entry is missing after write", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-verify-"));
+    const path = join(dir, "mcp.json");
+    try {
+      writeFileSync(
+        path,
+        `${JSON.stringify({ mcpServers: { other: { command: "x", args: [] } } }, null, 2)}\n`,
+        "utf-8",
+      );
+      expect(() =>
+        verifyCodemapMcpServersFile({
+          path,
+          label: "test mcp.json",
+          expectedEntry: buildCodemapMcpServerEntry(),
+        }),
+      ).toThrow(/missing codemap entry/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("applyAgentsInitMcp", () => {
+  it("writes all default project MCP files", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-all-"));
+    const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-home-"));
+    try {
+      applyAgentsInitMcp({ projectRoot: dir, homeDir: fakeHome });
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(
+        existsSync(join(dir, ".continue", "mcpServers", "codemap-mcp.json")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".gemini", "settings.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cline", "mcp.json"))).toBe(true);
+      expect(existsSync(join(fakeHome, ".cline", "mcp.json"))).toBe(false);
+
+      const vscode = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as { servers: Record<string, { type: string; command: string }> };
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it("writes project .cline/mcp.json when cline target selected", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-"));
+    const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-home-"));
+    try {
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        homeDir: fakeHome,
+        targets: ["cline"],
+      });
+      expect(existsSync(join(dir, ".cline", "mcp.json"))).toBe(true);
+      expect(existsSync(join(fakeHome, ".cline", "mcp.json"))).toBe(false);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it("writes Windsurf global config only when windsurf target selected", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-ws-"));
+    const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-ws-home-"));
+    try {
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        homeDir: fakeHome,
+        targets: ["windsurf"],
+      });
+      expect(
+        existsSync(join(fakeHome, ".codeium", "windsurf", "mcp_config.json")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
   it("writes Cursor and Claude project MCP files", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
@@ -421,6 +573,23 @@ describe("applyAgentsInitMcp", () => {
         CODEMAP_MCP_PERMISSION_ALLOW,
       );
       expect(settings.permissions.deny).toEqual(["WebFetch"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects malformed permissions.allow without --force", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    try {
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(dir, ".claude", "settings.json"),
+        `${JSON.stringify({ permissions: { allow: "bad" } }, null, 2)}\n`,
+        "utf-8",
+      );
+      expect(() =>
+        applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] }),
+      ).toThrow(/permissions\.allow must be a string\[\]/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -12,7 +12,11 @@ import {
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { applyAgentsInitMcp } from "./agents-init-mcp";
+import {
+  applyAgentsInitMcp,
+  resolveAgentsInitMcpTargets,
+} from "./agents-init-mcp";
+import type { AgentsInitTarget } from "./agents-init-targets";
 import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
@@ -124,34 +128,11 @@ function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
   }
 }
 
-/**
- * Optional integrations after canonical `.agents/` is written.
- * - Symlink/copy: `cursor`, `windsurf`, `continue`, `cline`, `amazon-q` (per-file symlinks or copies from `.agents/rules`; Cursor also `.agents/skills`).
- * - Pointer files: `copilot`, `claude-md`, `agents-md`, `gemini-md`.
- */
-export type AgentsInitTarget =
-  | "cursor"
-  | "claude-md"
-  | "copilot"
-  | "windsurf"
-  | "continue"
-  | "cline"
-  | "amazon-q"
-  | "agents-md"
-  | "gemini-md";
-
-/** Targets that mirror `.agents/rules` (and Cursor also `.agents/skills`) via per-file symlink or copy. */
-export const AGENTS_INIT_SYMLINK_TARGETS: readonly AgentsInitTarget[] = [
-  "cursor",
-  "windsurf",
-  "continue",
-  "cline",
-  "amazon-q",
-] as const;
-
-export function targetsNeedLinkMode(targets: AgentsInitTarget[]): boolean {
-  return targets.some((t) => AGENTS_INIT_SYMLINK_TARGETS.includes(t));
-}
+export type { AgentsInitTarget } from "./agents-init-targets";
+export {
+  AGENTS_INIT_SYMLINK_TARGETS,
+  targetsNeedLinkMode,
+} from "./agents-init-targets";
 
 /** Per-file symlinks vs full file copies into IDE paths. */
 export type AgentsInitLinkMode = "symlink" | "copy";
@@ -292,7 +273,7 @@ export interface AgentsInitOptions {
   linkMode?: AgentsInitLinkMode;
   /** Install or remove opt-in git hooks for background incremental index. */
   gitHooks?: "install" | "uninstall";
-  /** Write MCP config (Cursor `.cursor/mcp.json`, Claude `.mcp.json` + permissions). */
+  /** Write MCP config for supported integrations (see `docs/agents.md`). */
   mcp?: boolean;
 }
 
@@ -521,6 +502,7 @@ function maybeApplyAgentsInitMcp(options: AgentsInitOptions): void {
     applyAgentsInitMcp({
       projectRoot: options.projectRoot,
       force: !!options.force,
+      targets: resolveAgentsInitMcpTargets(options.targets),
     });
   }
 }

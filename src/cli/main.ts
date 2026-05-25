@@ -64,7 +64,7 @@ export async function main(): Promise<void> {
 Copies bundled agent templates into .agents/ under the project root.
   --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
   --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
-  --mcp          Write MCP config (.cursor/mcp.json, Claude .mcp.json + permissions)
+  --mcp          Write MCP config for supported IDEs (see docs/agents.md)
   --git-hooks    Install background incremental index hooks (post-commit, post-merge, post-checkout)
   --no-git-hooks Remove codemap blocks from git hooks
 `);
@@ -99,7 +99,10 @@ Copies bundled agent templates into .agents/ under the project root.
       : rest.includes("--git-hooks")
         ? "install"
         : undefined;
-    if (gitHooks !== undefined && rest.includes("--interactive")) {
+    if (
+      gitHooks !== undefined &&
+      (rest.includes("--interactive") || rest.includes("-i"))
+    ) {
       console.error(
         "codemap: --git-hooks / --no-git-hooks cannot be combined with --interactive.",
       );
