@@ -326,7 +326,7 @@ function registerTraceTool(server: McpServer, opts: ServerOpts): void {
     "trace",
     {
       description:
-        "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads (cross-file callee lookup). Args: from, to, max_depth?, via (calls|dependencies|all), budget_chars (default 15000, snippet source text only). Returns {from, to, via?, path, snippets, truncated, truncation?, snippets_skipped_reason?}. `truncated` is true when snippet budget or explore row cap hit; dependency hops omit auto-snippets. Fall back to `query_recipe` call-path when unsure.",
+        "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads (cross-file callee lookup). Args: from, to, max_depth?, via (calls|dependencies|all), budget_chars (default 15000, snippet source text only). Returns {from, to, via?, path, snippets, truncated, truncation?, snippets_skipped_reason?}. `truncated` is true when snippet budget hit (`truncation.snippets`); dependency hops omit auto-snippets (`snippets_skipped_reason`). Fall back to `query_recipe` call-path when unsure.",
       inputSchema: traceArgsSchema,
     },
     (args) => wrapToolResult(handleTrace(args, opts.root)),
@@ -350,7 +350,7 @@ function registerNodeTool(server: McpServer, opts: ServerOpts): void {
     "node",
     {
       description:
-        "One-hop symbol survey: `show` center + scoped depth-1 `symbol-neighborhood` + optional inline snippets. When center is unique (`in` or single match), neighborhood filters to that instance's connected files. Args: name, kind?, in?, include_snippets (default false), budget_chars? (default 15000 when snippets enabled; snippet source only). Returns {center, neighborhood, snippets, truncated, truncation?}.",
+        "One-hop symbol survey: `show` center + scoped depth-1 `symbol-neighborhood` + optional inline snippets. When center is unique (`in` or single match), neighborhood filters to that instance's connected files. Args: name, kind?, in?, include_snippets (default false), budget_chars? (default 15000 when snippets enabled; snippet source only). Returns {center, neighborhood, snippets, truncated, truncation?}. `truncated` only when `include_snippets: true` and snippet budget hit.",
       inputSchema: nodeArgsSchema,
     },
     (args) => wrapToolResult(handleNode(args, opts.root)),

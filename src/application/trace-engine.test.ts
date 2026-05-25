@@ -285,4 +285,18 @@ describe("composeExploreResult dedupe", () => {
     if (!r.ok) return;
     expect(r.result.names).toEqual(["foo"]);
   });
+
+  it("sets truncation.rows when rowLimit exceeded", () => {
+    seedCallGraph();
+    const r = composeExploreResult({
+      root: benchDir,
+      names: ["foo", "bar"],
+      rowLimit: 1,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result.rows).toHaveLength(1);
+    expect(r.result.truncated).toBe(true);
+    expect(r.result.truncation?.rows).toBe(true);
+  });
 });

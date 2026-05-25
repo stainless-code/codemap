@@ -25,7 +25,7 @@ import type { ShowResult, SnippetMatch, SymbolMatch } from "./show-engine";
 
 export type TraceFailureKind = "param" | "query" | "internal";
 
-/** Default row cap for explore before `rows_truncated` (structural payload guard). */
+/** Default row cap for explore before `truncation.rows` (structural payload guard). */
 export const DEFAULT_EXPLORE_ROW_LIMIT = 500;
 
 export interface CallPathHop {

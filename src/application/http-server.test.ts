@@ -521,6 +521,26 @@ describe("http-server — POST /tool/{other tools}", () => {
     }
   });
 
+  it("records recipe recency after explore", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", {
+      names: ["alpha"],
+    });
+    expect(r.status).toBe(200);
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'symbol-neighborhood'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("list_baselines returns array (empty when none saved)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "list_baselines", {});
@@ -705,6 +725,14 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
     expect(r.status).toBe(400);
     expect(r.json.error).toContain('"trace"');
     expect(r.json.error).toContain("from");
+  });
+
+  it("trace without to → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", { from: "foo" });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+    expect(r.json.error).toContain("to");
   });
 
   it("node with name=number → 400 (not deep handler crash)", async () => {

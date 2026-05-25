@@ -1532,6 +1532,32 @@ describe("MCP server — trace / explore / node tools", () => {
     }
   });
 
+  it("trace returns isError when from is missing (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "trace",
+        arguments: { to: "b" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("trace returns isError when to is missing (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "trace",
+        arguments: { from: "a" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("explore returns isError on empty names array", async () => {
     const { client, server } = await makeClient();
     try {

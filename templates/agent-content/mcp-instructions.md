@@ -30,7 +30,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 ## Chains
 
 - Rename: `find-symbol-definitions` → `find-symbol-references` (both via **`query_recipe`**).
-- Call path: **`trace`** (`from`, `to`) or **`query_recipe`** `call-path`; add snippets via **`trace`** / **`node`** / **`explore`** (budget-capped) or **`snippet`** per row.
+- Call path: **`trace`** (`from`, `to`) or **`query_recipe`** `call-path`; add snippets via **`trace`** / **`node`** / **`explore`** (budget-capped) or **`snippet`** per row. Dependency hops may return `snippets_skipped_reason` — fall back to **`query_recipe`** + **`snippet`** per hop.
 - Refactor risk: `fan-in` + `refactor-risk-ranking`.
 - Edit path: **`show`** → **`snippet`**; if `stale: true`, line range may have drifted.
 

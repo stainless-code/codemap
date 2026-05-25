@@ -7,7 +7,9 @@ import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
  * Write-path imports (`tryRecordRecipeRun` / `recordRecipeRun`) are restricted
- * to `tool-handlers.ts` + `cli/cmd-query.ts` + `cli/cmd-affected.ts` (+ the test file). Re-runnable
+ * to `tool-handlers.ts` (`handleQueryRecipe`, `handleAffected`, `handleTrace`,
+ * `handleExplore`, `handleNode`) + `cli/cmd-query.ts` + `cli/cmd-affected.ts`
+ * (+ the test file). Re-runnable
  * forbidden-edge query lives at [`docs/architecture.md` § Boundary verification —
  * `recipe_recency` write path](../../docs/architecture.md#boundary-verification--recipe_recency-write-path).
  * Read-path imports (`enrichWithRecency` / `loadRecipeRecency`) are unrestricted.
@@ -55,8 +57,9 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
 }
 
 /**
- * Orchestration-layer wrapper (`handleQueryRecipe`, `handleAffected`, `runQueryCmd`,
- * `runAffectedCmd`). Opens its own DB because `executeQuery` runs with
+ * Orchestration-layer wrapper (`handleQueryRecipe`, `handleAffected`,
+ * `handleTrace`, `handleExplore`, `handleNode`, `runQueryCmd`, `runAffectedCmd`).
+ * Opens its own DB because `executeQuery` runs with
  * `PRAGMA query_only = 1` and can't double as the writer. Swallows every error —
  * recency-write failures NEVER block the recipe response.
  *
