@@ -10,13 +10,14 @@ export type AgentsInitMcpTarget =
   | "continue"
   | "cline"
   | "amazon-q"
+  | "amazon-q-default"
   | "gemini"
   | "windsurf";
 
 export type McpConfigScope = "project" | "user-global";
 
 /** JSON shape the host expects for the codemap server entry. */
-export type McpConfigFormat = "mcpServers" | "vscode-servers";
+export type McpConfigFormat = "mcpServers" | "vscode-servers" | "amazon-q-ide";
 
 export interface AgentsInitMcpTargetDef {
   readonly id: AgentsInitMcpTarget;
@@ -102,11 +103,23 @@ export const AGENTS_INIT_MCP_REGISTRY: readonly AgentsInitMcpTargetDef[] =
     },
     {
       id: "amazon-q",
-      displayName: "Amazon Q Developer",
+      displayName: "Amazon Q Developer (legacy MCP)",
       scope: "project",
       format: "mcpServers",
       label: ".amazonq/mcp.json (Amazon Q legacy MCP)",
       pathSegments: [".amazonq", "mcp.json"],
+      docsUrl:
+        "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html",
+      defaultOnMcp: true,
+      integrationTarget: "amazon-q",
+    },
+    {
+      id: "amazon-q-default",
+      displayName: "Amazon Q Developer (IDE)",
+      scope: "project",
+      format: "amazon-q-ide",
+      label: ".amazonq/default.json (Amazon Q IDE)",
+      pathSegments: [".amazonq", "default.json"],
       docsUrl:
         "https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html",
       defaultOnMcp: true,
@@ -143,12 +156,18 @@ const REGISTRY_BY_ID = new Map(
   AGENTS_INIT_MCP_REGISTRY.map((def) => [def.id, def]),
 );
 
-const INTEGRATION_TO_MCP = new Map(
-  AGENTS_INIT_MCP_REGISTRY.flatMap((def) =>
-    def.integrationTarget !== undefined
-      ? ([[def.integrationTarget, def.id]] as const)
-      : [],
-  ),
+const INTEGRATION_TO_MCP = new Map<AgentsInitTarget, AgentsInitMcpTarget[]>(
+  AGENTS_INIT_MCP_REGISTRY.reduce((acc, def) => {
+    if (def.integrationTarget === undefined) {
+      return acc;
+    }
+    const list = acc.get(def.integrationTarget) ?? [];
+    if (!list.includes(def.id)) {
+      list.push(def.id);
+    }
+    acc.set(def.integrationTarget, list);
+    return acc;
+  }, new Map<AgentsInitTarget, AgentsInitMcpTarget[]>()),
 );
 
 /** Project-local MCP targets written by default when `--mcp` has no integration filter. */
@@ -190,9 +209,14 @@ export function resolveAgentsInitMcpTargets(
   }
   const out: AgentsInitMcpTarget[] = [];
   for (const t of agentsTargets) {
-    const mcp = INTEGRATION_TO_MCP.get(t);
-    if (mcp !== undefined && !out.includes(mcp)) {
-      out.push(mcp);
+    const mcps = INTEGRATION_TO_MCP.get(t);
+    if (mcps === undefined) {
+      continue;
+    }
+    for (const mcp of mcps) {
+      if (!out.includes(mcp)) {
+        out.push(mcp);
+      }
     }
   }
   return out;

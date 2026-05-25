@@ -15,6 +15,7 @@ import {
   CODEMAP_MCP_SERVER_KEY,
   applyAgentsInitMcp,
   buildCodemapMcpServerEntry,
+  buildMcpServerEntryForDef,
   mergeClaudeCodemapPermissions,
   mergeCodemapMcpServer,
   mergeCodemapVsCodeServer,
@@ -22,6 +23,7 @@ import {
   normalizeExistingVsCodeMcpFile,
   verifyCodemapMcpServersFile,
 } from "./agents-init-mcp";
+import { getAgentsInitMcpTargetDef } from "./agents-init-mcp-registry";
 
 describe("buildCodemapMcpServerEntry", () => {
   it("includes workspace root for Cursor", () => {
@@ -35,6 +37,18 @@ describe("buildCodemapMcpServerEntry", () => {
     expect(buildCodemapMcpServerEntry()).toEqual({
       command: "codemap",
       args: ["mcp", "--watch"],
+    });
+  });
+
+  it("adds Amazon Q IDE transport fields for default.json", () => {
+    expect(
+      buildMcpServerEntryForDef(getAgentsInitMcpTargetDef("amazon-q-default")),
+    ).toEqual({
+      command: "codemap",
+      args: ["mcp", "--watch"],
+      transportType: "stdio",
+      disabled: false,
+      timeout: 60,
     });
   });
 });
@@ -196,6 +210,7 @@ describe("applyAgentsInitMcp", () => {
         existsSync(join(dir, ".continue", "mcpServers", "codemap-mcp.json")),
       ).toBe(true);
       expect(existsSync(join(dir, ".amazonq", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "default.json"))).toBe(true);
       expect(existsSync(join(dir, ".gemini", "settings.json"))).toBe(true);
       expect(existsSync(join(dir, ".cline", "mcp.json"))).toBe(true);
       expect(existsSync(join(fakeHome, ".cline", "mcp.json"))).toBe(false);
@@ -205,6 +220,28 @@ describe("applyAgentsInitMcp", () => {
       ) as { servers: Record<string, { type: string; command: string }> };
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("codemap");
+
+      const amazonDefault = JSON.parse(
+        readFileSync(join(dir, ".amazonq", "default.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<
+          string,
+          {
+            command: string;
+            args?: string[];
+            transportType?: string;
+            disabled?: boolean;
+            timeout?: number;
+          }
+        >;
+      };
+      expect(amazonDefault.mcpServers[CODEMAP_MCP_SERVER_KEY]).toEqual({
+        command: "codemap",
+        args: ["mcp", "--watch"],
+        transportType: "stdio",
+        disabled: false,
+        timeout: 60,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
       rmSync(fakeHome, { recursive: true, force: true });
@@ -565,6 +602,53 @@ describe("applyAgentsInitMcp", () => {
       expect(() =>
         applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] }),
       ).toThrow(/permissions\.allow must be a string\[\]/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("merges Amazon Q default.json without clobbering foreign keys", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-q-"));
+    try {
+      mkdirSync(join(dir, ".amazonq"), { recursive: true });
+      writeFileSync(
+        join(dir, ".amazonq", "default.json"),
+        `${JSON.stringify(
+          {
+            mcpServers: {
+              foreign: {
+                command: "node",
+                args: ["other.js"],
+                transportType: "stdio",
+              },
+            },
+            someAgentSetting: true,
+          },
+          null,
+          2,
+        )}\n`,
+        "utf-8",
+      );
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["amazon-q-default"],
+      });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".amazonq", "default.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<string, unknown>;
+        someAgentSetting?: boolean;
+      };
+      expect(parsed.someAgentSetting).toBe(true);
+      expect(parsed.mcpServers.foreign).toEqual({
+        command: "node",
+        args: ["other.js"],
+        transportType: "stdio",
+      });
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]).toMatchObject({
+        command: "codemap",
+        transportType: "stdio",
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

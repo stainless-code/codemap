@@ -10,14 +10,19 @@ import {
 } from "./agents-init-mcp-registry";
 
 describe("AGENTS_INIT_MCP_REGISTRY", () => {
-  it("has unique ids and integration targets", () => {
+  it("has unique ids", () => {
     const ids = AGENTS_INIT_MCP_REGISTRY.map((def) => def.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
 
-    const integrations = AGENTS_INIT_MCP_REGISTRY.flatMap((def) =>
-      def.integrationTarget !== undefined ? [def.integrationTarget] : [],
+  it("allows multiple MCP writers per integration target", () => {
+    const amazonQ = AGENTS_INIT_MCP_REGISTRY.filter(
+      (def) => def.integrationTarget === "amazon-q",
     );
-    expect(new Set(integrations).size).toBe(integrations.length);
+    expect(amazonQ.map((def) => def.id)).toEqual([
+      "amazon-q",
+      "amazon-q-default",
+    ]);
   });
 
   it("default targets match registry defaultOnMcp flags", () => {
@@ -57,12 +62,17 @@ describe("AGENTS_INIT_MCP_REGISTRY", () => {
       "continue",
       "cline",
       "amazon-q",
+      "amazon-q-default",
       "gemini",
     ]);
     expect(resolveAgentsInitMcpTargets([])).toEqual([]);
     expect(resolveAgentsInitMcpTargets(["cursor", "copilot"])).toEqual([
       "cursor",
       "vscode",
+    ]);
+    expect(resolveAgentsInitMcpTargets(["amazon-q"])).toEqual([
+      "amazon-q",
+      "amazon-q-default",
     ]);
     expect(resolveAgentsInitMcpTargets(["windsurf"])).toEqual(["windsurf"]);
     expect(resolveAgentsInitMcpTargets(["agents-md"])).toEqual([]);

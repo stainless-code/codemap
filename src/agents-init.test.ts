@@ -116,6 +116,7 @@ describe("runAgentsInit", () => {
 
       expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "default.json"))).toBe(true);
       expect(existsSync(join(dir, ".claude", "settings.json"))).toBe(true);
       const settings = JSON.parse(
         readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),

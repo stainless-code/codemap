@@ -111,16 +111,16 @@ Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
 **`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown. Registry source of truth: **`src/agents-init-mcp-registry.ts`** (`AGENTS_INIT_MCP_REGISTRY`).
 
-| Target             | Files written                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cursor             | `.cursor/mcp.json` — `codemap mcp --watch --root ${workspaceFolder}`                                                                                                      |
-| Claude Code        | `.mcp.json` + `.claude/settings.json` — `permissions.allow` includes `mcp__codemap__*`                                                                                    |
-| VS Code / Copilot  | `.vscode/mcp.json` — `servers.codemap` with `type: stdio`                                                                                                                 |
-| Continue           | `.continue/mcpServers/codemap-mcp.json` (JSON `mcpServers`; also accepted from Cursor/Cline exports)                                                                      |
-| Amazon Q Developer | `.amazonq/mcp.json` (legacy workspace MCP file; GUI may also use `.amazonq/default.json`)                                                                                 |
-| Gemini CLI         | `.gemini/settings.json` — top-level `mcpServers.codemap`                                                                                                                  |
-| Cline              | `.cline/mcp.json` ([Cline CLI reference](https://docs.cline.bot/cli/cli-reference); global IDE settings may also use `~/.cline/data/settings/cline_mcp_settings.json`)    |
-| Windsurf (Cascade) | `~/.codeium/windsurf/mcp_config.json` ([Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp) — user-global only; written when Windsurf integration is selected) |
+| Target             | Files written                                                                                                                                                                                                                                        |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cursor             | `.cursor/mcp.json` — `codemap mcp --watch --root ${workspaceFolder}`                                                                                                                                                                                 |
+| Claude Code        | `.mcp.json` + `.claude/settings.json` — `permissions.allow` includes `mcp__codemap__*`                                                                                                                                                               |
+| VS Code / Copilot  | `.vscode/mcp.json` — `servers.codemap` with `type: stdio`                                                                                                                                                                                            |
+| Continue           | `.continue/mcpServers/codemap-mcp.json` (JSON `mcpServers`; also accepted from Cursor/Cline exports)                                                                                                                                                 |
+| Amazon Q Developer | **`.amazonq/default.json`** (IDE canonical) + **`.amazonq/mcp.json`** (legacy workspace; still read when global `useLegacyMcpJson` is true — AWS default). [AWS MCP IDE docs](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html) |
+| Gemini CLI         | `.gemini/settings.json` — top-level `mcpServers.codemap`                                                                                                                                                                                             |
+| Cline              | `.cline/mcp.json` ([Cline CLI reference](https://docs.cline.bot/cli/cli-reference); global IDE settings may also use `~/.cline/data/settings/cline_mcp_settings.json`)                                                                               |
+| Windsurf (Cascade) | `~/.codeium/windsurf/mcp_config.json` ([Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp) — user-global only; written when Windsurf integration is selected)                                                                            |
 
 With **`--mcp`** and no `--target` filter, all **project-local** rows above are written except **Windsurf**, which has no documented workspace MCP path.
 

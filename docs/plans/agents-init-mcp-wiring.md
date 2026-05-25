@@ -21,36 +21,53 @@
 
 ## Shipped (PR #135)
 
-| Target            | Config path                                                             | Notes                                                                                            |
-| ----------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Cursor            | project **`.cursor/mcp.json`**                                          | `--root ${workspaceFolder}`                                                                      |
-| Claude Code       | project **`.mcp.json`** + **`.claude/settings.json`**                   | cwd-based MCP; `permissions.allow`                                                               |
-| VS Code / Copilot | project **`.vscode/mcp.json`** (`servers` key)                          | [VS Code MCP reference](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)  |
-| Continue          | project **`.continue/mcpServers/codemap-mcp.json`**                     | JSON `mcpServers` block file                                                                     |
-| Amazon Q          | project **`.amazonq/mcp.json`** (legacy workspace MCP)                  | [AWS MCP IDE docs](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html)        |
-| Gemini CLI        | project **`.gemini/settings.json`** (`mcpServers`)                      | [Gemini CLI MCP](https://github.com/google-gemini/gemini-cli/blob/HEAD/docs/tools/mcp-server.md) |
-| Cline             | project **`.cline/mcp.json`**                                           | [Cline CLI reference](https://docs.cline.bot/cli/cli-reference)                                  |
-| Windsurf          | user **`~/.codeium/windsurf/mcp_config.json`** when `windsurf` selected | User-global only per [Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp)             |
+| Target            | Config path                                                             | Notes                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Cursor            | project **`.cursor/mcp.json`**                                          | `--root ${workspaceFolder}`                                                                           |
+| Claude Code       | project **`.mcp.json`** + **`.claude/settings.json`**                   | cwd-based MCP; `permissions.allow`                                                                    |
+| VS Code / Copilot | project **`.vscode/mcp.json`** (`servers` key)                          | [VS Code MCP reference](https://code.visualstudio.com/docs/copilot/reference/mcp-configuration)       |
+| Continue          | project **`.continue/mcpServers/codemap-mcp.json`**                     | JSON `mcpServers` block file                                                                          |
+| Amazon Q          | project **`.amazonq/default.json`** + **`.amazonq/mcp.json`**           | [AWS MCP IDE docs](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html) — see below |
+| Gemini CLI        | project **`.gemini/settings.json`** (`mcpServers`)                      | [Gemini CLI MCP](https://github.com/google-gemini/gemini-cli/blob/HEAD/docs/tools/mcp-server.md)      |
+| Cline             | project **`.cline/mcp.json`**                                           | [Cline CLI reference](https://docs.cline.bot/cli/cli-reference)                                       |
+| Windsurf          | user **`~/.codeium/windsurf/mcp_config.json`** when `windsurf` selected | User-global only per [Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp)                  |
 
 Default **`--mcp`** (no `--target` filter) writes all **project-local** rows. **Windsurf** runs only when that integration is explicitly selected.
 
 Side-effect-only re-runs: **`--mcp`**, **`--git-hooks`**, **`--no-git-hooks --mcp`** work when `.agents/` already exists without **`--force`**.
 
+### Amazon Q (IDE + legacy)
+
+Per [AWS MCP configuration for Q Developer in the IDE](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp-ide.html):
+
+| Scope     | Canonical (GUI)               | Legacy (still supported, default-on) |
+| --------- | ----------------------------- | ------------------------------------ |
+| Workspace | **`.amazonq/default.json`**   | **`.amazonq/mcp.json`**              |
+| Global    | `~/.aws/amazonq/default.json` | `~/.aws/amazonq/mcp.json`            |
+
+**Codemap writes both workspace files** when Amazon Q is in scope:
+
+- **`.amazonq/default.json`** — canonical IDE store; codemap entry includes `transportType: "stdio"`, `timeout: 60`, `disabled: false` per Q IDE examples.
+- **`.amazonq/mcp.json`** — legacy path; plain `{ command, args }` in `mcpServers`. Still read when global `useLegacyMcpJson` is true (AWS default).
+
+Workspace config takes precedence over global. Global paths are **not** written by `agents init --mcp` (team check-in / project-local scope).
+
 ---
 
 ## Deferred (v2+)
 
-| Item                                                  | Notes                                                |
-| ----------------------------------------------------- | ---------------------------------------------------- |
-| Global `~/.cursor/mcp.json` / `~/.claude.json`        | Project config preferred for team check-in           |
-| Marker-based uninstall (`<!-- CODEMAP_MCP_START -->`) | No `--no-mcp` strip path yet                         |
-| Amazon Q `.amazonq/default.json` GUI format           | Legacy `.amazonq/mcp.json` wired for workspace scope |
+| Item                                                  | Notes                                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------------- |
+| Global `~/.cursor/mcp.json` / `~/.claude.json`        | Project config preferred for team check-in                          |
+| Global `~/.aws/amazonq/default.json` / `mcp.json`     | Amazon Q global MCP — same rationale as other global-only deferrals |
+| Marker-based uninstall (`<!-- CODEMAP_MCP_START -->`) | No `--no-mcp` strip path yet                                        |
 
 ---
 
 ## Acceptance
 
 - [x] `codemap agents init --mcp` writes all default project-local MCP targets ([#135](https://github.com/stainless-code/codemap/pull/135))
+- [x] Amazon Q writes **both** workspace `.amazonq/default.json` and `.amazonq/mcp.json`
 - [x] Interactive `-i` writes MCP only for selected integrations (empty selection skips MCP)
 - [x] Re-run is idempotent (merge preserves foreign servers)
 - [x] Pointer skill/rule unchanged in content shape (JSON only)

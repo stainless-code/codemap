@@ -7,7 +7,10 @@ import {
   getAgentsInitMcpTargetDef,
   resolveMcpConfigPath,
 } from "./agents-init-mcp-registry";
-import type { AgentsInitMcpTarget } from "./agents-init-mcp-registry";
+import type {
+  AgentsInitMcpTarget,
+  AgentsInitMcpTargetDef,
+} from "./agents-init-mcp-registry";
 
 /** MCP server key in Cursor / Claude / Windsurf `mcpServers` maps and VS Code `servers`. */
 export const CODEMAP_MCP_SERVER_KEY = "codemap";
@@ -19,6 +22,10 @@ export interface McpServerEntry {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  /** Amazon Q IDE `default.json` stdio transport. */
+  transportType?: string;
+  disabled?: boolean;
+  timeout?: number;
 }
 
 export interface McpServersFile {
@@ -47,6 +54,24 @@ export function buildCodemapMcpServerEntry(opts?: {
     args.push("--root", "${workspaceFolder}");
   }
   return { command: "codemap", args };
+}
+
+/** Host-specific codemap MCP entry (Cursor root arg, Amazon Q IDE transport fields, …). */
+export function buildMcpServerEntryForDef(
+  def: Pick<AgentsInitMcpTargetDef, "format" | "workspaceRootArg">,
+): McpServerEntry {
+  const base = buildCodemapMcpServerEntry({
+    includeWorkspaceRoot: def.workspaceRootArg === true,
+  });
+  if (def.format === "amazon-q-ide") {
+    return {
+      ...base,
+      transportType: "stdio",
+      disabled: false,
+      timeout: 60,
+    };
+  }
+  return base;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -503,7 +528,6 @@ export function applyAgentsInitMcp(opts: ApplyAgentsInitMcpOptions): void {
     return;
   }
   const force = opts.force === true;
-  const cwdEntry = buildCodemapMcpServerEntry();
   const roots = {
     projectRoot: opts.projectRoot,
     homeDir: opts.homeDir ?? homedir(),
@@ -511,23 +535,21 @@ export function applyAgentsInitMcp(opts: ApplyAgentsInitMcpOptions): void {
 
   for (const id of targets) {
     const def = getAgentsInitMcpTargetDef(id);
-    const entry = buildCodemapMcpServerEntry({
-      includeWorkspaceRoot: def.workspaceRootArg === true,
-    });
+    const entry = buildMcpServerEntryForDef(def);
     const path = resolveMcpConfigPath(def, roots);
 
     if (def.format === "vscode-servers") {
       upsertVsCodeMcpFile({
         path,
         label: def.label,
-        entry: cwdEntry,
+        entry: buildCodemapMcpServerEntry(),
         force,
       });
     } else {
       upsertMcpServersFile({
         path,
         label: def.label,
-        entry: def.workspaceRootArg === true ? entry : cwdEntry,
+        entry,
         force,
       });
     }
