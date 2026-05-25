@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { createTables } from "../db";
+import { createTables, upsertSourceFts } from "../db";
 import type { CodemapDatabase } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   buildSymbolSearchSql,
+  formatFtsMatchQuery,
   formatSymbolSearchSqlForDisplay,
   searchSymbols,
 } from "./search-engine";
@@ -58,6 +59,27 @@ describe("buildSymbolSearchSql", () => {
     expect(built.params).toEqual(["function", "%Auth%"]);
     expect(built.sql).toContain("kind = ?");
     expect(built.sql).toContain("name LIKE ?");
+  });
+
+  it("golden SQL for kind + name + path matches skill doc", () => {
+    const built = buildSymbolSearchSql({
+      parsed: {
+        kind: "function",
+        namePatterns: ["Auth"],
+        freeText: [],
+        path: "src/",
+      },
+    });
+    const rendered = formatSymbolSearchSqlForDisplay(built);
+    expect(rendered).toContain("kind = 'function'");
+    expect(rendered).toContain("name LIKE '%Auth%'");
+    expect(rendered).toContain("file_path LIKE 'src/%'");
+    expect(rendered).toContain("ORDER BY file_path ASC, line_start ASC");
+  });
+
+  it("formatFtsMatchQuery quotes phrases for literal FTS match", () => {
+    expect(formatFtsMatchQuery(["hello OR world"])).toBe('"hello OR world"');
+    expect(formatFtsMatchQuery(["a", "b"])).toBe('"a" "b"');
   });
 
   it("--print-sql inlines literals safely", () => {
@@ -120,5 +142,26 @@ describe("searchSymbols", () => {
       withFts: false,
     });
     expect(rows.map((r) => r.name)).toEqual(["AuthContext"]);
+  });
+
+  it("free text uses source_fts when FTS on", () => {
+    upsertSourceFts(db, "src/api/auth.ts", "uniqueSecretTokenInBody");
+    upsertSourceFts(db, "src/cli/cmd-show.ts", "nothing relevant here");
+    const built = buildSymbolSearchSql({
+      parsed: {
+        namePatterns: [],
+        freeText: ["uniqueSecretTokenInBody"],
+      },
+      withFts: true,
+    });
+    expect(built.params[0]).toBe('"uniqueSecretTokenInBody"');
+    const rows = searchSymbols(db, {
+      parsed: {
+        namePatterns: [],
+        freeText: ["uniqueSecretTokenInBody"],
+      },
+      withFts: true,
+    });
+    expect(rows.every((r) => r.file_path === "src/api/auth.ts")).toBe(true);
   });
 });

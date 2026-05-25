@@ -84,9 +84,15 @@ describe("parseShowRest", () => {
     if (r.kind === "error") expect(r.message).toContain("--print-sql");
   });
 
-  it("errors on unknown field would surface at runtime via parser", () => {
-    const r = parseShowRest(["show", "--query", "bogus:x"]);
-    expect(r.kind).toBe("run");
+  it("errors when --kind used with --query", () => {
+    const r = parseShowRest([
+      "show",
+      "--query",
+      "name:foo",
+      "--kind",
+      "function",
+    ]);
+    expect(r.kind).toBe("error");
   });
 
   it("parses name + flags in any order", () => {

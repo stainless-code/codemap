@@ -53,6 +53,13 @@ describe("parseSearchQuery", () => {
     const r = parseSearchQuery("kind:function kind:const");
     expect(r.ok).toBe(false);
   });
+
+  it("rejects unclosed quoted values", () => {
+    const r = parseSearchQuery('name:"unclosed');
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toContain("unclosed quoted");
+  });
 });
 
 describe("tokenizeSearchQuery", () => {

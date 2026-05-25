@@ -1,6 +1,6 @@
 # Field-qualified search — plan
 
-> **Status:** shipped · **Priority:** P1 · **Effort:** M (~1 week)
+> **Status:** open (in review) · **PR:** [#138](https://github.com/stainless-code/codemap/pull/138) · **Priority:** P1 · **Effort:** M (~1 week)
 >
 > **Motivator:** Agents often search with partial constraints (`kind:function`, `path:src/api`, `name:Auth`). Today they must write SQL or use exact `show` — higher friction for discovery queries.
 >

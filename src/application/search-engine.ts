@@ -1,7 +1,7 @@
 import type { CodemapDatabase } from "../db";
 import type { ParsedSearchQuery } from "./search-query-parser";
 import type { SymbolMatch } from "./show-engine";
-import { escapeLikeLiteral } from "./show-engine";
+import { escapeLikeLiteral, looksLikeDirectory } from "./show-engine";
 
 export interface BuildSymbolSearchSqlOpts {
   parsed: ParsedSearchQuery;
@@ -33,7 +33,7 @@ export function buildSymbolSearchSql(
   if (useFts) {
     fromClause = "symbols s JOIN source_fts fts ON fts.file_path = s.file_path";
     clauses.push("source_fts MATCH ?");
-    params.push(opts.parsed.freeText.join(" "));
+    params.push(formatFtsMatchQuery(opts.parsed.freeText));
   }
 
   const nameColumn = alias !== undefined ? `${alias}.name` : "name";
@@ -131,9 +131,7 @@ function appendPathFilter(
   params.push(pathValue);
 }
 
-function looksLikeDirectory(p: string): boolean {
-  if (p.endsWith("/")) return true;
-  const lastSlash = p.lastIndexOf("/");
-  const tail = lastSlash === -1 ? p : p.slice(lastSlash + 1);
-  return !tail.includes(".");
+/** Quote each free-text token as an FTS5 phrase (literal match, not operators). */
+export function formatFtsMatchQuery(terms: string[]): string {
+  return terms.map((term) => `"${term.replace(/"/g, '""')}"`).join(" ");
 }

@@ -38,7 +38,14 @@ export function parseSearchQuery(input: string): ParseSearchQueryResult {
     freeText: [],
   };
 
-  for (const token of tokenizeSearchQuery(trimmed)) {
+  let tokens: string[];
+  try {
+    tokens = tokenizeSearchQuery(trimmed);
+  } catch {
+    return { ok: false, error: "unclosed quoted value in search query." };
+  }
+
+  for (const token of tokens) {
     const colon = token.indexOf(":");
     if (colon <= 0) {
       const value = unquoteSearchValue(token);

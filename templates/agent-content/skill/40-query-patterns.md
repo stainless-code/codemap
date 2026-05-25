@@ -21,6 +21,14 @@ WHERE kind = 'function'
   AND file_path LIKE 'src/%' ESCAPE '\'
 ORDER BY file_path ASC, line_start ASC;
 
+-- Same query with FTS free text (--with-fts / fts5: true when source_fts populated):
+-- `codemap show --query 'Auth' --with-fts --print-sql`
+SELECT s.name, s.kind, s.file_path, s.line_start, s.line_end, s.signature,
+       s.is_exported, s.parent_name, s.visibility
+FROM symbols s JOIN source_fts fts ON fts.file_path = s.file_path
+WHERE source_fts MATCH '"Auth"'
+ORDER BY s.file_path ASC, s.line_start ASC;
+
 -- All exported symbols from a file
 SELECT name, kind, signature
 FROM symbols WHERE file_path LIKE '%settings-provider%' AND is_exported = 1;

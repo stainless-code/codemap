@@ -1080,6 +1080,32 @@ describe("MCP server — show + snippet tools", () => {
     }
   });
 
+  it("show errors when kind and query are both passed", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:foo", kind: "function" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("show errors on unknown query field", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "bogus:x" },
+      });
+      expect(r.isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("snippet returns source text from disk + stale: false on fresh file", async () => {
     // Write a real file matching the seeded `files` row in the bench setup
     // (src/a.ts already exists with hash 'h1' but content "export const A = 1;\n").

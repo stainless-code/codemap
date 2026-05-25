@@ -1,15 +1,17 @@
 import {
   buildSymbolSearchSql,
   formatSymbolSearchSqlForDisplay,
-  isSourceFtsPopulated,
   searchSymbols,
 } from "../application/search-engine";
-import { parseSearchQuery } from "../application/search-query-parser";
 import { buildShowResult, findSymbolsByName } from "../application/show-engine";
 import type { ShowResult, SymbolMatch } from "../application/show-engine";
+import {
+  parseAndNormalizeSearchQuery,
+  resolveSearchWithFts,
+} from "../application/show-search-mode";
 import { toProjectRelative } from "../application/validate-engine";
 import { closeDb, openDb } from "../db";
-import { getFts5Enabled, getProjectRoot } from "../runtime";
+import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ShowOpts {
@@ -41,8 +43,8 @@ Field-qualified search (--query):
   name:<pattern>     Case-sensitive substring on symbols.name (LIKE).
   path:<path>        File scope — directory prefix or exact file path.
   in:<glob>          SQLite GLOB on file_path (e.g. in:src/**/*.ts).
-  Free text          Unqualified tokens → name LIKE (or source_fts MATCH
-                     with --with-fts when FTS5 is indexed).
+  Free text          Unqualified tokens → name LIKE, or source_fts phrase
+                     search when FTS5 is indexed (--with-fts or fts5: true).
 
 Args:
   <name>             Exact symbol name (case-sensitive). Omit when using
@@ -50,9 +52,10 @@ Args:
 
 Flags:
   --query <q>        Field-qualified discovery search (see above).
-  --with-fts         For --query free-text tokens, search file bodies via
-                     source_fts when the index was built with FTS5.
-  --print-sql        With --query, print generated SQL and exit (no DB read).
+  --with-fts         Force FTS for free-text tokens (also on when fts5: true
+                     in config and source_fts is populated).
+  --print-sql        With --query, print generated SQL and exit (opens DB
+                     only when --with-fts needs to probe source_fts).
   --kind <kind>      Filter by symbols.kind (exact-name mode only).
   --in <path>        Filter by file scope (exact-name mode only).
   --json             Emit the JSON envelope (always wrapped in {matches}).
@@ -60,7 +63,8 @@ Flags:
 
 Output (JSON, all cases):
   { "matches": [ {name, kind, file_path, line_start, line_end, signature, ...}, ... ],
-    "disambiguation"?: { "n": <count>, "by_kind": {...}, "files": [...], "hint": "..." } }
+    "disambiguation"?: { "n": <count>, "by_kind": {...}, "files": [...], "hint": "..." },
+    "warning"?: "<fts fallback message>" }
 
 Examples:
   codemap show runQueryCmd
@@ -218,15 +222,14 @@ export function parseShowRest(rest: string[]):
  */
 export async function runShowCmd(opts: ShowOpts): Promise<void> {
   try {
-    if (opts.printSql && opts.query !== undefined) {
-      await bootstrapCodemap(opts);
-      runShowPrintSql(opts.query, opts.withFts);
-      return;
-    }
-
     await bootstrapCodemap(opts);
 
     const projectRoot = getProjectRoot();
+
+    if (opts.printSql && opts.query !== undefined) {
+      runShowPrintSql(opts.query, projectRoot, opts.withFts);
+      return;
+    }
 
     if (opts.query !== undefined) {
       await runShowQueryMode(opts, projectRoot);
@@ -264,29 +267,27 @@ async function runShowQueryMode(
   opts: ShowOpts,
   projectRoot: string,
 ): Promise<void> {
-  const parsedQuery = parseSearchQuery(opts.query!);
+  const parsedQuery = parseAndNormalizeSearchQuery(opts.query!, projectRoot);
   if (!parsedQuery.ok) {
     emitErrorMaybeJson(`codemap show: ${parsedQuery.error}`, opts.json);
     return;
   }
 
-  let path = parsedQuery.parsed.path;
-  if (path !== undefined) {
-    path = toProjectRelative(projectRoot, path);
-    parsedQuery.parsed.path = path;
-  }
-
   const db = openDb();
   let matches: SymbolMatch[];
+  let warning: string | undefined;
   try {
-    const useFts = resolveSearchWithFts(
-      db,
-      opts.withFts,
-      parsedQuery.parsed.freeText.length,
-    );
+    const fts = resolveSearchWithFts(db, {
+      withFtsCli: opts.withFts,
+      freeTextCount: parsedQuery.parsed.freeText.length,
+    });
+    if (fts.warning !== undefined) {
+      console.error(`codemap show: ${fts.warning}`);
+      warning = fts.warning;
+    }
     matches = searchSymbols(db, {
       parsed: parsedQuery.parsed,
-      withFts: useFts,
+      withFts: fts.useFts,
     });
   } finally {
     closeDb(db, { readonly: true });
@@ -294,37 +295,42 @@ async function runShowQueryMode(
 
   renderShowMatches(matches, {
     json: opts.json,
+    warning,
     emptyMessage: `codemap show: no symbols matched --query "${opts.query}". Try --print-sql to inspect the generated SQL.`,
   });
 }
 
-function runShowPrintSql(query: string, withFtsCli: boolean): void {
-  const parsedQuery = parseSearchQuery(query);
+function runShowPrintSql(
+  query: string,
+  projectRoot: string,
+  withFtsCli: boolean,
+): void {
+  const parsedQuery = parseAndNormalizeSearchQuery(query, projectRoot);
   if (!parsedQuery.ok) {
     console.error(`codemap show: ${parsedQuery.error}`);
     process.exitCode = 1;
     return;
   }
 
-  let useFts = withFtsCli;
-  if (useFts && parsedQuery.parsed.freeText.length > 0) {
+  let useFts = false;
+  if (parsedQuery.parsed.freeText.length > 0) {
     try {
       const db = openDb();
       try {
-        if (!isSourceFtsPopulated(db)) {
-          console.error(
-            "codemap show: --with-fts ignored — source_fts is empty. Re-index with --with-fts or fts5: true.",
-          );
-          useFts = false;
+        const fts = resolveSearchWithFts(db, {
+          withFtsCli,
+          freeTextCount: parsedQuery.parsed.freeText.length,
+        });
+        if (fts.warning !== undefined) {
+          console.error(`codemap show: ${fts.warning}`);
         }
+        useFts = fts.useFts;
       } finally {
         closeDb(db, { readonly: true });
       }
     } catch {
       useFts = false;
     }
-  } else {
-    useFts = false;
   }
 
   const built = buildSymbolSearchSql({
@@ -334,28 +340,9 @@ function runShowPrintSql(query: string, withFtsCli: boolean): void {
   console.log(formatSymbolSearchSqlForDisplay(built));
 }
 
-function resolveSearchWithFts(
-  db: ReturnType<typeof openDb>,
-  withFtsCli: boolean,
-  freeTextCount: number,
-): boolean {
-  if (freeTextCount === 0) return false;
-  const wantFts = withFtsCli || getFts5Enabled();
-  if (!wantFts) return false;
-  if (!isSourceFtsPopulated(db)) {
-    if (withFtsCli) {
-      console.error(
-        "codemap show: --with-fts ignored — source_fts is empty. Re-index with --with-fts or fts5: true.",
-      );
-    }
-    return false;
-  }
-  return true;
-}
-
 function renderShowMatches(
   matches: SymbolMatch[],
-  opts: { json: boolean; emptyMessage: string },
+  opts: { json: boolean; emptyMessage: string; warning?: string | undefined },
 ): void {
   if (matches.length === 0) {
     emitErrorMaybeJson(opts.emptyMessage, opts.json);
@@ -363,6 +350,7 @@ function renderShowMatches(
   }
 
   const result = buildShowResult(matches);
+  if (opts.warning !== undefined) result.warning = opts.warning;
   if (opts.json) {
     console.log(JSON.stringify(result));
     return;

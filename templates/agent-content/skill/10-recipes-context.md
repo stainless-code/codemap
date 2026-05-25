@@ -45,7 +45,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`context`** — `{compact?, intent?}`. Session-start project envelope (one call replaces 4-5 `query`s).
 - **`validate`** — `{paths?: string[]}`. SHA-256 vs `files.content_hash`; rows return `ok` / `stale` / `missing` / `unindexed`.
 - **`show`** — `{name, kind?, in?}` or `{query, with_fts?}`. Exact symbol lookup or field-qualified search (`kind:`, `name:`, `path:`, `in:` + free text) → `{matches, disambiguation?}`. CLI: `codemap show --query '…' [--print-sql]`.
-- **`snippet`** — same shape as `show` but each match also carries `source` (file text) + `stale` / `missing` flags. No reindex side-effects.
+- **`snippet`** — same as `show` (`{name, kind?, in?}` or `{query, with_fts?}`) but each match also carries `source` (file text) + `stale` / `missing` flags. No reindex side-effects.
 - **`impact`** — `{target, direction?, via?, depth?, limit?, summary?}`. Symbol/file blast-radius walker (replaces hand-composed `WITH RECURSIVE`). Auto-resolves symbol vs file target; `via` defaults to every backend compatible with the kind.
 - **`trace`** — `{from, to, max_depth?, via?, budget_chars?}`. Shortest call path + budget-capped snippets (`call-path` recipe twin). `truncated` when snippet budget hit (`truncation.snippets`); dependency hops set `snippets_skipped_reason` instead of auto-snippets.
 - **`explore`** — `{names, depth?, kind?, budget_chars?}`. Multi-name neighborhood survey + snippets (`symbol-neighborhood` per deduped name). `truncated` when row cap (500) and/or snippet budget hit (`truncation.rows` / `truncation.snippets`).

@@ -28,7 +28,7 @@ import {
 import { getFilesChangedSince } from "../git-changed";
 import type { GroupByMode } from "../group-by";
 import { GROUP_BY_MODES } from "../group-by";
-import { getFts5Enabled, getProjectRoot } from "../runtime";
+import { getProjectRoot } from "../runtime";
 import {
   executeAffectedTests,
   resolveAffectedChangedPaths,
@@ -62,14 +62,16 @@ import { resolveRecipeParams } from "./recipe-params";
 import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
 import { tryRecordRecipeRun } from "./recipe-recency";
 import { runCodemapIndex } from "./run-index";
-import { isSourceFtsPopulated, searchSymbols } from "./search-engine";
-import { parseSearchQuery } from "./search-query-parser";
-import type { ParsedSearchQuery } from "./search-query-parser";
+import { searchSymbols } from "./search-engine";
 import {
   buildShowResult,
   buildSnippetResult,
   findSymbolsByName,
 } from "./show-engine";
+import {
+  resolveSearchWithFts,
+  resolveShowLookupMode,
+} from "./show-search-mode";
 import {
   composeExploreResult,
   composeNodeResult,
@@ -692,27 +694,33 @@ export interface ShowArgs {
 
 export function handleShow(args: ShowArgs, root: string): ToolResult {
   try {
-    const mode = resolveShowMode(args, root);
+    const mode = resolveShowLookupMode(args, root);
     if (!mode.ok) return err(mode.error, 400);
 
     const db = openDb();
     try {
+      let warning: string | undefined;
       const matches =
         mode.kind === "query"
-          ? searchSymbols(db, {
-              parsed: mode.parsed,
-              withFts: resolveSearchWithFtsForAgent(
-                db,
-                args.with_fts === true,
-                mode.parsed.freeText.length,
-              ),
-            })
+          ? (() => {
+              const fts = resolveSearchWithFts(db, {
+                withFtsCli: args.with_fts === true,
+                freeTextCount: mode.parsed.freeText.length,
+              });
+              warning = fts.warning;
+              return searchSymbols(db, {
+                parsed: mode.parsed,
+                withFts: fts.useFts,
+              });
+            })()
           : findSymbolsByName(db, {
               name: mode.name,
               kind: args.kind,
               inPath: mode.inPath,
             });
-      return ok(buildShowResult(matches));
+      const result = buildShowResult(matches);
+      if (warning !== undefined) result.warning = warning;
+      return ok(result);
     } finally {
       closeDb(db, { readonly: true });
     }
@@ -721,82 +729,53 @@ export function handleShow(args: ShowArgs, root: string): ToolResult {
   }
 }
 
-function resolveShowMode(
-  args: ShowArgs,
-  root: string,
-):
-  | { ok: true; kind: "exact"; name: string; inPath: string | undefined }
-  | { ok: true; kind: "query"; parsed: ParsedSearchQuery }
-  | { ok: false; error: string } {
-  const hasName = args.name !== undefined && args.name.length > 0;
-  const hasQuery = args.query !== undefined && args.query.length > 0;
-  if (hasName && hasQuery) {
-    return { ok: false, error: "pass either name or query, not both." };
-  }
-  if (!hasName && !hasQuery) {
-    return { ok: false, error: "name or query is required." };
-  }
-  if (hasQuery) {
-    if (args.kind !== undefined || args.in !== undefined) {
-      return {
-        ok: false,
-        error:
-          "kind / in apply to exact-name lookup only; use kind: / path: / in: inside query.",
-      };
-    }
-    const parsed = parseSearchQuery(args.query!);
-    if (!parsed.ok) return { ok: false, error: parsed.error };
-    const queryParsed = { ...parsed.parsed };
-    if (queryParsed.path !== undefined) {
-      queryParsed.path = toProjectRelative(root, queryParsed.path);
-    }
-    return { ok: true, kind: "query", parsed: queryParsed };
-  }
-  const inPath =
-    args.in !== undefined && args.in.length > 0
-      ? toProjectRelative(root, args.in)
-      : undefined;
-  return { ok: true, kind: "exact", name: args.name!, inPath };
-}
-
-function resolveSearchWithFtsForAgent(
-  db: ReturnType<typeof openDb>,
-  withFtsCli: boolean,
-  freeTextCount: number,
-): boolean {
-  if (freeTextCount === 0) return false;
-  if (!withFtsCli && !getFts5Enabled()) return false;
-  return isSourceFtsPopulated(db);
-}
-
 // === snippet ================================================================
 
 export const snippetArgsSchema = {
-  name: z.string().min(1, "name must be a non-empty string"),
+  name: z.string().min(1, "name must be a non-empty string").optional(),
   kind: z.string().optional(),
   in: z.string().optional(),
+  query: z.string().min(1, "query must be a non-empty string").optional(),
+  with_fts: z.boolean().optional(),
 };
 
 export interface SnippetArgs {
-  name: string;
+  name?: string;
   kind?: string;
   in?: string;
+  query?: string;
+  with_fts?: boolean;
 }
 
 export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
   try {
+    const mode = resolveShowLookupMode(args, root);
+    if (!mode.ok) return err(mode.error, 400);
+
     const db = openDb();
     try {
-      const inPath =
-        args.in !== undefined && args.in.length > 0
-          ? toProjectRelative(root, args.in)
-          : undefined;
-      const matches = findSymbolsByName(db, {
-        name: args.name,
-        kind: args.kind,
-        inPath,
-      });
-      return ok(buildSnippetResult({ db, matches, projectRoot: root }));
+      let warning: string | undefined;
+      const matches =
+        mode.kind === "query"
+          ? (() => {
+              const fts = resolveSearchWithFts(db, {
+                withFtsCli: args.with_fts === true,
+                freeTextCount: mode.parsed.freeText.length,
+              });
+              warning = fts.warning;
+              return searchSymbols(db, {
+                parsed: mode.parsed,
+                withFts: fts.useFts,
+              });
+            })()
+          : findSymbolsByName(db, {
+              name: mode.name,
+              kind: args.kind,
+              inPath: mode.inPath,
+            });
+      const result = buildSnippetResult({ db, matches, projectRoot: root });
+      if (warning !== undefined) result.warning = warning;
+      return ok(result);
     } finally {
       closeDb(db, { readonly: true });
     }

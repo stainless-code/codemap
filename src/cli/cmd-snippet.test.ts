@@ -41,6 +41,8 @@ describe("parseSnippetRest", () => {
       name: "foo",
       kindFilter: undefined,
       inPath: undefined,
+      query: undefined,
+      withFts: false,
       json: false,
     });
   });
@@ -60,6 +62,8 @@ describe("parseSnippetRest", () => {
       name: "foo",
       kindFilter: "function",
       inPath: "src/cli",
+      query: undefined,
+      withFts: false,
       json: true,
     });
   });

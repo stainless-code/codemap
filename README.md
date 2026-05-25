@@ -185,6 +185,8 @@ codemap query --recipe big-ts-files                              # auto-discover
 # Targeted reads — precise lookup by symbol name without composing SQL
 codemap show runQueryCmd                                        # metadata: file:line + signature
 codemap show foo --kind function --in src/cli                   # narrow ambiguous matches
+codemap show --query 'kind:function name:Auth path:src/'        # field-qualified discovery
+codemap show --query 'kind:function name:foo' --print-sql       # Moat-A SQL transparency
 codemap snippet runQueryCmd                                     # same lookup + source text from disk
 codemap snippet foo --json                                      # {matches: [{...metadata, source, stale, missing}]}
 # Output envelope is always {matches, disambiguation?} — single match → {matches: [{...}]};
