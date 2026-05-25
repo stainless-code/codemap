@@ -122,6 +122,29 @@ Other "AI-friendly code intelligence" tools occupy different points in the desig
 
 **Why this matters:** Codemap deliberately **doesn't try to be smart**. Other tools predict what context an agent will need; Codemap lets the agent decide and just makes each decision cheap. The same agent can use Codemap **and** a verdict-shaped linter **and** an LSP — they don't compete for the same slot.
 
+### SQLite-backed code-index cohort
+
+Several tools pre-index repos for AI agents (tree-sitter or AST parsers → SQLite or graph DB → MCP/CLI). The cohort includes srclight, ctxpp, KotaDB, codemogger, `@squirrelsoft/code-index`, QuickAST, and others. None share all three codemap axes at once:
+
+| Axis             | Codemap                                         | Typical cohort peer                                            |
+| ---------------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| Query API        | **SQL + recipes** (predicate-as-API)            | Pre-baked MCP graph verbs or GraphRAG → Cypher                 |
+| Semantic layer   | **Pure structural** — no LLM in the box         | Task-context bundling or NL Q&A over the index                 |
+| Extraction depth | **JS/TS/CSS-ecosystem** via oxc + Lightning CSS | Broader language count; often shallower per-language substrate |
+| CI substrate     | SARIF, audit, baselines, GitHub Action          | Usually absent                                                 |
+
+| Scenario                                            | Reach for                                               |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| Compose a custom structural lint as SQL             | **Codemap**                                             |
+| CI boundary enforcement + SARIF                     | **Codemap**                                             |
+| Coverage-aware export analysis                      | **Codemap**                                             |
+| Polyglot "who calls X" across many languages        | Multi-language index tools (outside codemap's TS focus) |
+| Express/Next route inventory from framework plugins | Framework-aware index tools; codemap backlog (C.9)      |
+| Explore codebase in a 3D graph UI                   | Graph visualization products (different lane)           |
+| Ask NL questions over the whole repo                | Agent host + embeddings (not codemap)                   |
+
+Backlog items for test-impact selection and framework route extraction are trigger-gated in [roadmap § Backlog](./roadmap.md#backlog) — not committed work.
+
 For more on what Codemap deliberately does **not** do, see [When to reach for something else](#when-to-reach-for-something-else) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
 
 ## Cost Summary
