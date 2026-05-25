@@ -123,6 +123,7 @@ describe("http-server — health + tools catalog", () => {
     const body = (await r.json()) as { tools: { name: string }[] };
     expect(body.tools.map((t) => t.name)).toContain("query");
     expect(body.tools.map((t) => t.name)).toContain("audit");
+    expect(body.tools.map((t) => t.name)).toContain("affected");
   });
 
   it("404 for unknown route", async () => {
@@ -318,6 +319,23 @@ describe("http-server — POST /tool/{other tools}", () => {
     });
     expect(r.status).toBe(400);
     expect(r.json.error).toContain('"affected"');
+  });
+
+  it("affected with paths: [] returns empty array", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "affected", { paths: [] });
+    expect(r.status).toBe(200);
+    expect(r.json).toEqual([]);
+  });
+
+  it("affected git error uses changed_since label", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "affected", {
+      changed_since: "not-a-real-ref-xyz",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("changed_since");
+    expect(r.json.error).not.toContain("--changed-since");
   });
 
   it("list_baselines returns array (empty when none saved)", async () => {

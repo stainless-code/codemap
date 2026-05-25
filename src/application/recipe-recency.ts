@@ -7,7 +7,7 @@ import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
  * Write-path imports (`tryRecordRecipeRun` / `recordRecipeRun`) are restricted
- * to `tool-handlers.ts` + `cmd-query.ts` (+ the test file). Re-runnable
+ * to `tool-handlers.ts` + `cli/cmd-query.ts` + `cli/cmd-affected.ts` (+ the test file). Re-runnable
  * forbidden-edge query lives at [`docs/architecture.md` § Boundary verification —
  * `recipe_recency` write path](../../docs/architecture.md#boundary-verification--recipe_recency-write-path).
  * Read-path imports (`enrichWithRecency` / `loadRecipeRecency`) are unrestricted.

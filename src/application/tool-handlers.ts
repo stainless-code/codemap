@@ -757,6 +757,7 @@ export function handleAffected(args: AffectedArgs, root: string): ToolResult {
       root,
       paths: args.paths,
       changedSince: args.changed_since,
+      errorStyle: "agent",
     });
     if (!pathsResult.ok) return err(pathsResult.error);
 
@@ -766,7 +767,12 @@ export function handleAffected(args: AffectedArgs, root: string): ToolResult {
       testGlob: args.test_glob,
       maxDepth: args.max_depth,
     });
-    if (!result.ok) return err(result.error, 500);
+    if (!result.ok) {
+      return err(result.error, result.kind === "internal" ? 500 : undefined);
+    }
+    if (pathsResult.paths.length > 0) {
+      tryRecordRecipeRun("affected-tests");
+    }
     return ok(result.rows);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);

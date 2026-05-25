@@ -1306,4 +1306,71 @@ describe("MCP server — affected tool", () => {
       await server.close();
     }
   });
+
+  it("excludes affected when not in CODEMAP_MCP_TOOLS", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,show",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).not.toContain("affected");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected with paths: [] returns empty array without git", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: [] },
+      });
+      const json = readJson(r);
+      expect(json).toEqual([]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected reports changed_since in git errors", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { changed_since: "not-a-real-ref-xyz" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      const json = readJson(r);
+      expect(json.error).toContain("changed_since");
+      expect(json.error).not.toContain("--changed-since");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("records recipe recency after a successful affected run", async () => {
+    seedAffectedGraph();
+    const { client, server } = await makeClient();
+    try {
+      await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/lib/util.ts"] },
+      });
+      const db = openDb();
+      try {
+        const row = db
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get();
+        expect(row?.run_count).toBeGreaterThanOrEqual(1);
+      } finally {
+        closeDb(db);
+      }
+    } finally {
+      await server.close();
+    }
+  });
 });

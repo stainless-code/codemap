@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +16,44 @@ import {
 } from "./affected-engine";
 
 let benchDir: string;
+let gitRoot: string | undefined;
+
+function fixtureEnv(): NodeJS.ProcessEnv {
+  const e: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.startsWith("GIT_") || k.startsWith("HUSKY")) continue;
+    e[k] = v;
+  }
+  e.GIT_AUTHOR_DATE = "2026-01-01T00:00:00Z";
+  e.GIT_COMMITTER_DATE = "2026-01-01T00:00:00Z";
+  return e;
+}
+
+function git(args: string[], root: string): string {
+  const r = spawnSync("git", args, { cwd: root, env: fixtureEnv() });
+  if (r.status !== 0) {
+    throw new Error(`git ${args.join(" ")}: ${r.stderr.toString().trim()}`);
+  }
+  return r.stdout.toString().trim();
+}
+
+function seedAffectedGraph(db: ReturnType<typeof openDb>): void {
+  db.run(
+    `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+     VALUES
+       ('src/lib/util.ts', 'h1', 10, 1, 'typescript', 1, 1),
+       ('src/__tests__/util.test.ts', 'h2', 10, 1, 'typescript', 1, 1),
+       ('src/other.spec.ts', 'h3', 10, 1, 'typescript', 1, 1)`,
+  );
+  db.run(
+    `INSERT INTO dependencies (from_path, to_path)
+     VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
+  );
+  db.run(
+    `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
+     VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
+  );
+}
 
 beforeEach(() => {
   benchDir = mkdtempSync(join(tmpdir(), "affected-engine-"));
@@ -24,20 +63,7 @@ beforeEach(() => {
   const db = openDb();
   try {
     createTables(db);
-    db.run(
-      `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
-       VALUES
-         ('src/lib/util.ts', 'h1', 10, 1, 'typescript', 1, 1),
-         ('src/__tests__/util.test.ts', 'h2', 10, 1, 'typescript', 1, 1)`,
-    );
-    db.run(
-      `INSERT INTO dependencies (from_path, to_path)
-       VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
-    );
-    db.run(
-      `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
-       VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
-    );
+    seedAffectedGraph(db);
   } finally {
     closeDb(db);
   }
@@ -45,6 +71,10 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(benchDir, { recursive: true, force: true });
+  if (gitRoot !== undefined) {
+    rmSync(gitRoot, { recursive: true, force: true });
+    gitRoot = undefined;
+  }
 });
 
 describe("normalizeChangedPathList / joinChangedPaths", () => {
@@ -83,6 +113,43 @@ describe("resolveAffectedChangedPaths", () => {
       paths: [],
     });
   });
+
+  it("uses changed_since agent error labels", () => {
+    const r = resolveAffectedChangedPaths({
+      root: benchDir,
+      changedSince: "not-a-real-ref-xyz",
+      errorStyle: "agent",
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toContain("changed_since");
+      expect(r.error).not.toContain("--changed-since");
+    }
+  });
+
+  describe("temp git repo", () => {
+    beforeEach(() => {
+      gitRoot = mkdtempSync(join(tmpdir(), "affected-engine-git-"));
+      git(["init", "-q", "-b", "main", "--template="], gitRoot);
+      git(["config", "user.email", "t@example.com"], gitRoot);
+      git(["config", "user.name", "T"], gitRoot);
+      git(["config", "commit.gpgsign", "false"], gitRoot);
+      mkdirSync(join(gitRoot, "src"), { recursive: true });
+      writeFileSync(join(gitRoot, "src", "util.ts"), "export const x = 1;\n");
+      git(["add", "."], gitRoot);
+      git(["commit", "-m", "base", "--no-gpg-sign"], gitRoot);
+    });
+
+    it("discovers working-tree changes when paths omitted", () => {
+      if (gitRoot === undefined) {
+        throw new Error("gitRoot not initialised");
+      }
+      writeFileSync(join(gitRoot, "src", "util.ts"), "export const x = 2;\n");
+      const r = resolveAffectedChangedPaths({ root: gitRoot });
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.paths).toContain("src/util.ts");
+    });
+  });
 });
 
 describe("executeAffectedTests", () => {
@@ -114,5 +181,31 @@ describe("executeAffectedTests", () => {
       ok: true,
       rows: [],
     });
+  });
+
+  it("respects max_depth=0 (no transitive expansion)", () => {
+    const result = executeAffectedTests({
+      root: benchDir,
+      changedPaths: ["src/lib/util.ts"],
+      maxDepth: 0,
+    });
+    expect(result).toEqual({ ok: true, rows: [] });
+  });
+
+  it("respects test_glob filter", () => {
+    const result = executeAffectedTests({
+      root: benchDir,
+      changedPaths: ["src/other.spec.ts"],
+      testGlob: "src/other.spec.ts",
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.rows).toEqual([
+        expect.objectContaining({
+          test_path: "src/other.spec.ts",
+          impact_depth: 0,
+        }),
+      ]);
+    }
   });
 });

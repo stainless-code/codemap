@@ -5,6 +5,7 @@ import {
   normalizeChangedPathList,
   resolveAffectedChangedPaths,
 } from "../application/affected-engine";
+import { tryRecordRecipeRun } from "../application/recipe-recency";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
@@ -52,7 +53,7 @@ Path sources (first match wins):
 Flags:
   --params key=value    Pass recipe params (repeatable). Supported: test_glob,
                         max_depth. changed_files is built automatically.
-  --json                Emit JSON array of {test_path, impact_depth}.
+  --json                Emit JSON array of {test_path, impact_depth, actions?}.
   --help, -h            Show this help.
 
 Examples:
@@ -128,10 +129,10 @@ export function parseAffectedRest(rest: string[]):
         if (key === "test_glob") testGlob = value;
         else if (key === "max_depth") {
           const n = Number(value);
-          if (!Number.isFinite(n) || n < 0) {
+          if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
             return {
               kind: "error",
-              message: `codemap affected: --params max_depth="${value}" must be a non-negative number.`,
+              message: `codemap affected: --params max_depth="${value}" must be a non-negative integer.`,
             };
           }
           maxDepth = n;
@@ -211,6 +212,10 @@ export async function runAffectedCmd(opts: AffectedOpts): Promise<void> {
     });
     if (!result.ok) {
       throw new Error(result.error);
+    }
+
+    if (opts.changedPaths.length > 0) {
+      tryRecordRecipeRun("affected-tests");
     }
 
     const rows = result.rows;

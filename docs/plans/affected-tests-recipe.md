@@ -10,12 +10,12 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                                                                                                                                             | Source                                     |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| L.1 | **Moat-A clean** — `affected-tests` recipe satisfies the agent surface; **`query_recipe`** is the MCP/HTTP path. Optional dedicated CLI verb **`codemap affected`** for CI (`stdin` / git path discovery) — not a 6th outcome alias. | [Moat A](../roadmap.md#moats-load-bearing) |
-| L.2 | Algorithm: reverse BFS on `dependencies` from changed files → filter test paths via `test_suites.file_path` and configurable globs.                                                                                                  | Uses existing substrate                    |
-| L.3 | **Stdin support** — accept changed paths from `git diff --name-only` (same ergonomics as CI scripts).                                                                                                                                | CLI ergonomics                             |
-| L.4 | Not a verdict — output is file paths only; CI composes exit policy.                                                                                                                                                                  | Moat A                                     |
+| #   | Decision                                                                                                                                                                                                              | Source                                     |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| L.1 | **Moat-A clean** — `affected-tests` recipe is the substrate; **`query_recipe`** remains the Moat-A path. Optional **`codemap affected`** CLI + MCP/HTTP **`affected`** tool for ergonomics — not a 6th outcome alias. | [Moat A](../roadmap.md#moats-load-bearing) |
+| L.2 | Algorithm: reverse BFS on `dependencies` from changed files → filter test paths via `test_suites.file_path` and configurable globs.                                                                                   | Uses existing substrate                    |
+| L.3 | **Stdin support** — accept changed paths from `git diff --name-only` (same ergonomics as CI scripts).                                                                                                                 | CLI ergonomics                             |
+| L.4 | Not a verdict — output is file paths only; CI composes exit policy.                                                                                                                                                   | Moat A                                     |
 
 ---
 
@@ -48,7 +48,9 @@ Dedicated `cmd-affected.ts` (not an outcome alias — 5-alias cap unchanged). Sh
 
 ## Agent surface (Moat A)
 
-No dedicated MCP tool required — agents call **`query_recipe`** with `recipe: "affected-tests"` and `params.changed_files` (ASCII RS between paths when multiple). The recipe is the Moat-A substrate; the CLI verb is CI ergonomics only.
+**Substrate:** **`query_recipe`** with `recipe: "affected-tests"` and `params.changed_files` (ASCII RS between paths when multiple).
+
+**Convenience surfaces (Phase 2):** MCP/HTTP **`affected`** (`paths?`, `changed_since?`, …) and CLI **`codemap affected`** — thin composers over the same engine + recipe. Moat-A reviewers still verify via `query --recipe affected-tests`.
 
 ---
 

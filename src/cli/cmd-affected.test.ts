@@ -2,11 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  CHANGED_PATH_DELIM,
-  joinChangedPaths,
-  parseAffectedRest,
-} from "./cmd-affected";
+import { parseAffectedRest } from "./cmd-affected";
 
 const repoRoot = join(import.meta.dir, "..", "..");
 const indexTs = join(repoRoot, "src", "index.ts");
@@ -53,20 +49,6 @@ beforeAll(() => {
       `cmd-affected.test: cannot locate Bun (${bunBin}) or src entry (${indexTs}).`,
     );
   }
-});
-
-describe("joinChangedPaths", () => {
-  it("joins unique trimmed paths with RS delimiter", () => {
-    expect(
-      joinChangedPaths([
-        "src/a.ts",
-        "./src/b.ts",
-        "src/a.ts",
-        "",
-        "  src/c.ts  ",
-      ]),
-    ).toBe(["src/a.ts", "src/b.ts", "src/c.ts"].join(CHANGED_PATH_DELIM));
-  });
 });
 
 describe("parseAffectedRest", () => {
@@ -150,6 +132,12 @@ describe("parseAffectedRest", () => {
       "max_depth=not-a-number",
     ]);
     expect(r.kind).toBe("error");
+  });
+
+  it("rejects non-integer max_depth in --params", () => {
+    const r = parseAffectedRest(["affected", "--params", "max_depth=1.5"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toMatch(/integer/);
   });
 });
 

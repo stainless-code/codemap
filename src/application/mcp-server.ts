@@ -293,7 +293,7 @@ function registerAffectedTool(server: McpServer, opts: ServerOpts): void {
     "affected",
     {
       description:
-        "List test files transitively impacted by changed source files (reverse BFS on `dependencies`). Same preprocessor as `codemap affected` → `affected-tests` recipe. Args: paths (explicit project-relative paths; when set, skips git discovery), changed_since (git ref when paths omitted; default HEAD), test_glob (SQLite GLOB; replaces default suffix globs when set), max_depth (optional BFS cap). Returns JSON array of {test_path, impact_depth, actions?} — file paths only; CI composes the runner command.",
+        "List test files transitively impacted by changed source files (reverse BFS on `dependencies`). Same preprocessor as `codemap affected` → `affected-tests` recipe. Args: paths (explicit project-relative paths; when set, skips git — `paths: []` is explicit empty, omit paths for git discovery), changed_since (git ref when paths omitted; default HEAD; wins only when paths omitted), test_glob (SQLite GLOB; replaces default suffix globs when set), max_depth (non-negative integer BFS cap). Returns JSON array of {test_path, impact_depth, actions?} — file paths only; CI composes the runner command.",
       inputSchema: affectedArgsSchema,
     },
     (args) => wrapToolResult(handleAffected(args, opts.root)),

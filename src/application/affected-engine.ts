@@ -11,10 +11,11 @@ import {
   getQueryRecipeSql,
 } from "./query-recipes";
 import { resolveRecipeParams } from "./recipe-params";
-import { tryRecordRecipeRun } from "./recipe-recency";
 
 /** Delimiter for `affected-tests.changed_files` (ASCII RS). */
 export const CHANGED_PATH_DELIM = "\u001e";
+
+export type AffectedTestsFailureKind = "param" | "query" | "internal";
 
 /** Trim, drop `./`, dedupe; preserve first-occurrence order. */
 export function normalizeChangedPathList(paths: Iterable<string>): string[] {
@@ -34,21 +35,40 @@ export function joinChangedPaths(paths: Iterable<string>): string {
   return normalizeChangedPathList(paths).join(CHANGED_PATH_DELIM);
 }
 
+function formatChangedSinceError(
+  error: string,
+  errorStyle: "cli" | "agent",
+): string {
+  if (errorStyle === "agent") {
+    return error.replaceAll("--changed-since", "changed_since");
+  }
+  return error;
+}
+
 /**
  * Resolve changed paths for agent transports: explicit `paths` wins;
  * otherwise git diff + working tree vs `changedSince` (default `HEAD`).
+ *
+ * `paths: []` skips git (explicit empty). Omit `paths` to discover via git.
  */
 export function resolveAffectedChangedPaths(opts: {
   root: string;
   paths?: string[] | undefined;
   changedSince?: string | undefined;
+  /** Git error prefix: CLI `--changed-since` vs MCP `changed_since`. */
+  errorStyle?: "cli" | "agent";
 }): { ok: true; paths: string[] } | { ok: false; error: string } {
   if (opts.paths !== undefined) {
     return { ok: true, paths: normalizeChangedPathList(opts.paths) };
   }
   const ref = opts.changedSince ?? "HEAD";
   const result = getFilesChangedSince(ref, opts.root);
-  if (!result.ok) return { ok: false, error: result.error };
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: formatChangedSinceError(result.error, opts.errorStyle ?? "cli"),
+    };
+  }
   return { ok: true, paths: normalizeChangedPathList(result.files) };
 }
 
@@ -57,7 +77,9 @@ export function executeAffectedTests(opts: {
   changedPaths: string[];
   testGlob?: string | undefined;
   maxDepth?: number | undefined;
-}): { ok: true; rows: unknown[] } | { ok: false; error: string } {
+}):
+  | { ok: true; rows: unknown[] }
+  | { ok: false; error: string; kind: AffectedTestsFailureKind } {
   const changedRaw = joinChangedPaths(opts.changedPaths);
   if (changedRaw.length === 0) {
     return { ok: true, rows: [] };
@@ -74,7 +96,7 @@ export function executeAffectedTests(opts: {
     },
   });
   if (!resolved.ok) {
-    return { ok: false, error: resolved.error };
+    return { ok: false, error: resolved.error, kind: "param" };
   }
 
   const sql = getQueryRecipeSql("affected-tests");
@@ -82,6 +104,7 @@ export function executeAffectedTests(opts: {
     return {
       ok: false,
       error: 'codemap affected: bundled recipe "affected-tests" missing',
+      kind: "internal",
     };
   }
 
@@ -98,9 +121,12 @@ export function executeAffectedTests(opts: {
     !Array.isArray(payload) &&
     "error" in payload
   ) {
-    return { ok: false, error: String((payload as { error: string }).error) };
+    return {
+      ok: false,
+      error: String((payload as { error: string }).error),
+      kind: "query",
+    };
   }
 
-  tryRecordRecipeRun("affected-tests");
   return { ok: true, rows: payload as unknown[] };
 }
