@@ -196,10 +196,10 @@ This audit follows [docs/README.md Rule 6](../../../docs/README.md) (no inventor
 
 Once findings are shipped (or deferred to `roadmap.md`):
 
-1. **Update Status header**: `Status: Closed (YYYY-MM-DD) — N findings shipped on commits <hash>, <hash>, <hash>; M deferred to roadmap.md § <section>.`
-2. **If the audit file is deleted**, cite the shipping PR or commit in the closure PR description — do not add tombstone rows for deleted paths in living docs (see [`docs/README.md` § Closing audits](../../../docs/README.md#closing-audits)).
-3. **Apply [`docs-governance`](../docs-governance/SKILL.md) § Closing an audit re-derivable test.** If the audit has no source-cites, no unique policy, no rejected-alternatives rationale → digest deferred items into `roadmap.md`, then **delete the audit file** (no tombstones). Otherwise slim per the keep-criteria.
-4. **Run [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md)** if the closure changes the audit substrate (new topic file, retired old topic) so the rest of the audits/ folder stays evaluated.
+1. **Update Status header** (only if the file stays): `Status: Closed (YYYY-MM-DD) — N findings shipped; M deferred to roadmap.md § <section>.` Prefer the closure PR as the durable anchor — not a growing commit-hash list in the doc body.
+2. **If the audit file is deleted**, cite the shipping PR in the closure PR description — do not add tombstone rows or deleted-path recovery instructions in living docs (see [`docs/README.md` § Closing audits](../../../docs/README.md#closing-audits)).
+3. **Apply [`docs-governance`](../docs-governance/SKILL.md) § Closing an audit re-derivable test.** If the audit has no source-cites, no unique policy, no rejected-alternatives rationale → digest deferred items into `roadmap.md`, then **delete the audit file** (no tombstones). Otherwise slim to cited sections only — not full findings prose.
+4. **Run [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md)** only when closure leaves other files in `docs/audits/` or `docs/research/` that fail the existence test — not as a mandatory post-step on every closure.
 
 ## Anti-patterns
 

@@ -21,13 +21,13 @@ The canonical Rules (1–10) live in [`docs/README.md`](../../docs/README.md) �
 
 ## Five lifecycle types (universal)
 
-| Type          | Folder                                                | Closing                                                             |
-| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
-| **Reference** | root (`architecture.md`, `glossary.md`, etc.)         | Lives forever; kept current                                         |
-| **Roadmap**   | root (`roadmap.md`, single file)                      | Lives forever                                                       |
-| **Plan**      | `plans/<name>.md`                                     | **Delete + lift** when work ships (no "Slim & keep in plans/")      |
-| **Audit**     | `audit.md` (single) OR `audits/<topic>.md` (multi)    | Substrate variants — see skill                                      |
-| **Research**  | `research/<tool>.md` OR `research/<topic>-YYYY-MM.md` | Adopted (lift + delete) / Rejected (keep with status header) / Open |
+| Type          | Folder                                                | Closing                                                                                                     |
+| ------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Reference** | root (`architecture.md`, `glossary.md`, etc.)         | Lives forever; kept current                                                                                 |
+| **Roadmap**   | root (`roadmap.md`, single file)                      | Lives forever                                                                                               |
+| **Plan**      | `plans/<name>.md`                                     | **Delete + lift** when work ships (no "Slim & keep in plans/")                                              |
+| **Audit**     | `audit.md` (single) OR `audits/<topic>.md` (multi)    | Substrate variants — see skill                                                                              |
+| **Research**  | `research/<tool>.md` OR `research/<topic>-YYYY-MM.md` | Adopted → lift + **delete** (unless inbound cites require slim stub) / Rejected → status header only / Open |
 
 ## Top three disciplines
 
@@ -41,8 +41,8 @@ A file earns its place if it meets at least one of:
 
 1. Source code cites it (JSDoc, error message, comment grep-anchor)
 2. It documents durable policy unavailable elsewhere
-3. It tracks open work (audit findings, plan, roadmap items, evaluation)
-4. It carries unique historical context that `git log` + reference docs can't reconstruct
+3. It tracks open work (audit findings, in-flight plan, roadmap items, evaluation with unresolved items)
+4. Inbound source cites require a slim stub — deletion would orphan a live citation (not "interesting history")
 
 If none → fold + delete.
 
