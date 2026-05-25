@@ -54,7 +54,7 @@ Soft constraints — describe shipped reality. Decided-but-unshipped flips live 
 
 ### Agent & indexing ops
 
-Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-and-ops.md`](./plans/agent-surface-and-ops.md).
+Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-and-ops.md`](./plans/agent-surface-and-ops.md). PR tracker: [`plans/agent-surface-delivery.md`](./plans/agent-surface-delivery.md).
 
 **P0 — quick wins**
 
