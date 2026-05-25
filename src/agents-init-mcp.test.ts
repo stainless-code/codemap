@@ -20,7 +20,6 @@ import {
   mergeCodemapVsCodeServer,
   normalizeExistingMcpServersFile,
   normalizeExistingVsCodeMcpFile,
-  resolveAgentsInitMcpTargets,
   verifyCodemapMcpServersFile,
 } from "./agents-init-mcp";
 
@@ -128,30 +127,6 @@ describe("mergeClaudeCodemapPermissions", () => {
       permissions: { allow: "not-an-array" as unknown as string[] },
     });
     expect(merged.permissions?.allow).toEqual([CODEMAP_MCP_PERMISSION_ALLOW]);
-  });
-});
-
-describe("resolveAgentsInitMcpTargets", () => {
-  it("defaults to all project-local MCP targets when integrations omitted", () => {
-    expect(resolveAgentsInitMcpTargets()).toEqual([
-      "cursor",
-      "claude-code",
-      "vscode",
-      "continue",
-      "cline",
-      "amazon-q",
-      "gemini",
-    ]);
-  });
-
-  it("maps integration picks and includes Windsurf only when selected", () => {
-    expect(resolveAgentsInitMcpTargets(["cursor", "copilot"])).toEqual([
-      "cursor",
-      "vscode",
-    ]);
-    expect(resolveAgentsInitMcpTargets(["windsurf"])).toEqual(["windsurf"]);
-    expect(resolveAgentsInitMcpTargets(["cline"])).toEqual(["cline"]);
-    expect(resolveAgentsInitMcpTargets(["agents-md"])).toEqual([]);
   });
 });
 

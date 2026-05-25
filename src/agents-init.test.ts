@@ -84,6 +84,24 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit with mcp and empty targets skips MCP writes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      expect(
+        runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          mcp: true,
+          targets: [],
+        }),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runAgentsInit with mcp writes default project-local MCP configs", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {

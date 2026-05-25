@@ -50,7 +50,8 @@ Side-effect-only re-runs: **`--mcp`**, **`--git-hooks`**, **`--no-git-hooks --mc
 
 ## Acceptance
 
-- [x] `codemap agents init --mcp` (and `-i` confirm) writes MCP config for all supported integrations ([#135](https://github.com/stainless-code/codemap/pull/135))
+- [x] `codemap agents init --mcp` writes all default project-local MCP targets ([#135](https://github.com/stainless-code/codemap/pull/135))
+- [x] Interactive `-i` writes MCP only for selected integrations (empty selection skips MCP)
 - [x] Re-run is idempotent (merge preserves foreign servers)
 - [x] Pointer skill/rule unchanged in content shape (JSON only)
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { countDefaultMcpTargets } from "./agents-init-mcp";
+import { countDefaultMcpTargets } from "./agents-init-mcp-registry";
 import {
   AGENTS_INIT_MCP_REGISTRY,
   DEFAULT_AGENTS_INIT_MCP_TARGETS,
@@ -50,6 +50,16 @@ describe("AGENTS_INIT_MCP_REGISTRY", () => {
   });
 
   it("resolveAgentsInitMcpTargets maps integration picks", () => {
+    expect(resolveAgentsInitMcpTargets(undefined)).toEqual([
+      "cursor",
+      "claude-code",
+      "vscode",
+      "continue",
+      "cline",
+      "amazon-q",
+      "gemini",
+    ]);
+    expect(resolveAgentsInitMcpTargets([])).toEqual([]);
     expect(resolveAgentsInitMcpTargets(["cursor", "copilot"])).toEqual([
       "cursor",
       "vscode",

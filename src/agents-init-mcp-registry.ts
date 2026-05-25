@@ -180,19 +180,25 @@ export function resolveMcpConfigPath(
 /**
  * Map `agents init` integration picks to MCP writers. When integrations are
  * omitted (non-interactive `--mcp`), all `defaultOnMcp` registry entries apply.
+ * An empty array means the user selected no integrations — write nothing.
  */
 export function resolveAgentsInitMcpTargets(
   agentsTargets?: AgentsInitTarget[] | undefined,
 ): AgentsInitMcpTarget[] {
-  if (agentsTargets !== undefined && agentsTargets.length > 0) {
-    const out: AgentsInitMcpTarget[] = [];
-    for (const t of agentsTargets) {
-      const mcp = INTEGRATION_TO_MCP.get(t);
-      if (mcp !== undefined && !out.includes(mcp)) {
-        out.push(mcp);
-      }
-    }
-    return out;
+  if (agentsTargets === undefined) {
+    return [...DEFAULT_AGENTS_INIT_MCP_TARGETS];
   }
-  return [...DEFAULT_AGENTS_INIT_MCP_TARGETS];
+  const out: AgentsInitMcpTarget[] = [];
+  for (const t of agentsTargets) {
+    const mcp = INTEGRATION_TO_MCP.get(t);
+    if (mcp !== undefined && !out.includes(mcp)) {
+      out.push(mcp);
+    }
+  }
+  return out;
+}
+
+/** Count of registry entries with `defaultOnMcp` — useful for docs/tests drift checks. */
+export function countDefaultMcpTargets(): number {
+  return AGENTS_INIT_MCP_REGISTRY.filter((def) => def.defaultOnMcp).length;
 }

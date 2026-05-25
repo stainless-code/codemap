@@ -12,10 +12,8 @@ import {
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  applyAgentsInitMcp,
-  resolveAgentsInitMcpTargets,
-} from "./agents-init-mcp";
+import { applyAgentsInitMcp } from "./agents-init-mcp";
+import { resolveAgentsInitMcpTargets } from "./agents-init-mcp-registry";
 import type { AgentsInitTarget } from "./agents-init-targets";
 import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";

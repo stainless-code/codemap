@@ -3,24 +3,11 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import {
-  AGENTS_INIT_MCP_REGISTRY,
   DEFAULT_AGENTS_INIT_MCP_TARGETS,
   getAgentsInitMcpTargetDef,
   resolveMcpConfigPath,
 } from "./agents-init-mcp-registry";
 import type { AgentsInitMcpTarget } from "./agents-init-mcp-registry";
-
-export {
-  AGENTS_INIT_MCP_REGISTRY,
-  DEFAULT_AGENTS_INIT_MCP_TARGETS,
-  getAgentsInitMcpTargetDef,
-  resolveAgentsInitMcpTargets,
-  resolveMcpConfigPath,
-  type AgentsInitMcpTarget,
-  type AgentsInitMcpTargetDef,
-  type McpConfigFormat,
-  type McpConfigScope,
-} from "./agents-init-mcp-registry";
 
 /** MCP server key in Cursor / Claude / Windsurf `mcpServers` maps and VS Code `servers`. */
 export const CODEMAP_MCP_SERVER_KEY = "codemap";
@@ -474,6 +461,9 @@ export function upsertClaudeSettingsPermissions(opts: {
         replacedUnparseable = true;
       }
     } catch (err) {
+      if (err instanceof Error && err.message.startsWith("Codemap:")) {
+        throw err;
+      }
       if (!opts.force) {
         throw new Error(
           `Codemap: could not parse .claude/settings.json — fix JSON or use --force (${String(err)})`,
@@ -553,9 +543,4 @@ export function applyAgentsInitMcp(opts: ApplyAgentsInitMcpOptions): void {
       console.log(`  Note: ${def.postWriteNote}`);
     }
   }
-}
-
-/** Count of registry entries with `defaultOnMcp` — useful for docs/tests drift checks. */
-export function countDefaultMcpTargets(): number {
-  return AGENTS_INIT_MCP_REGISTRY.filter((def) => def.defaultOnMcp).length;
 }
