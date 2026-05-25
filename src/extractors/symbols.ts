@@ -402,6 +402,7 @@ function registerSymbolHandlers(
           ctx,
           jsDocComments,
           source,
+          "constructor",
         );
       }
       extractClassMembers(

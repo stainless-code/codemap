@@ -14,6 +14,7 @@ import {
   listQueryRecipeIds,
   resolveProjectRecipesDir,
 } from "./query-recipes";
+import { resolveStateDir } from "./state-dir";
 
 let projectRoot: string;
 
@@ -44,6 +45,13 @@ describe("resolveProjectRecipesDir", () => {
     writeFileSync(join(projectRoot, ".codemap", "recipes"), "not a dir");
     expect(resolveProjectRecipesDir(projectRoot)).toBeUndefined();
   });
+
+  it("honors a custom --state-dir for recipes discovery", () => {
+    const recipesDir = join(projectRoot, ".cm", "recipes");
+    mkdirSync(recipesDir, { recursive: true });
+    expect(resolveProjectRecipesDir(projectRoot)).toBeUndefined();
+    expect(resolveProjectRecipesDir(projectRoot, ".cm")).toBe(recipesDir);
+  });
 });
 
 describe("query-recipes shim — project recipes via runtime root", () => {
@@ -68,6 +76,23 @@ describe("query-recipes shim — project recipes via runtime root", () => {
 
     expect(listQueryRecipeIds()).toContain("internal-flaky-tests");
     expect(getQueryRecipeSql("internal-flaky-tests")).toContain("WHERE 1=0");
+  });
+
+  it("loads project recipes from a custom state-dir via initCodemap", () => {
+    const stateRoot = resolveStateDir({ root: projectRoot, cliFlag: ".cm" });
+    const recipesDir = join(stateRoot, "recipes");
+    mkdirSync(recipesDir, { recursive: true });
+    writeFileSync(
+      join(recipesDir, "custom-state-recipe.sql"),
+      "SELECT 'cm' AS marker\n",
+    );
+    initCodemap(
+      resolveCodemapConfig(projectRoot, undefined, { stateDir: stateRoot }),
+    );
+    _resetRecipesCacheForTests();
+
+    expect(listQueryRecipeIds()).toContain("custom-state-recipe");
+    expect(getQueryRecipeSql("custom-state-recipe")).toContain("'cm'");
   });
 
   it("project recipe shadows bundled — getQueryRecipeSql returns project version", () => {

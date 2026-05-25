@@ -213,8 +213,8 @@ codemap mcp                                                     # JSON-RPC on st
 # Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
 #        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact, apply
 # Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
-#            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh)
-# HTTP-only resources (via `codemap serve` GET /resources/{uri}): codemap://files/{path}, codemap://symbols/{name}
+#            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
+#            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.
 
 # Another project

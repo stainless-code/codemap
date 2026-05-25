@@ -736,4 +736,32 @@ describe("extractFileData", () => {
       );
     });
   });
+
+  describe("function_params.owner_kind", () => {
+    it("records distinct owner kinds for functions, methods, arrows, and constructors", () => {
+      const src = [
+        "export function greet(name: string): string { return name; }",
+        "export class Svc {",
+        "  constructor(host: string) { this.host = host; }",
+        "  run(id: string): void {}",
+        "  set label(value: string) { this._label = value; }",
+        "}",
+        "export const add = (a: number, b: number): number => a + b;",
+      ].join("\n");
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const byOwner = (owner: string, kind: string) =>
+        d.functionParams.find(
+          (p) =>
+            p.owner_name === owner &&
+            p.name !== undefined &&
+            p.owner_kind === kind,
+        );
+
+      expect(byOwner("greet", "function")?.name).toBe("name");
+      expect(byOwner("Svc", "constructor")?.name).toBe("host");
+      expect(byOwner("run", "method")?.name).toBe("id");
+      expect(byOwner("label", "setter")?.name).toBe("value");
+      expect(byOwner("add", "arrow")?.name).toBe("a");
+    });
+  });
 });

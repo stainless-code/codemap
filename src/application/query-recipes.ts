@@ -2,9 +2,10 @@ import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-init";
-import { getProjectRoot } from "../runtime";
+import { getProjectRoot, getStateDir } from "../runtime";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
+import { resolveStateDir } from "./state-dir";
 
 export type { RecipeAction, RecipeParam } from "./recipes-loader";
 import type { RecipeAction, RecipeParam } from "./recipes-loader";
@@ -17,7 +18,7 @@ import type { RecipeAction, RecipeParam } from "./recipes-loader";
  * - **`body`** — full Markdown body of the sibling `<id>.md` (when present);
  *   description is the first non-empty line of that body.
  * - **`source`** — `"bundled"` (ships with the npm package) or `"project"`
- *   (loaded from `<projectRoot>/.codemap/recipes/`).
+ *   (loaded from `<state-dir>/recipes/`).
  * - **`shadows`** — `true` when a project recipe overrides a bundled recipe
  *   of the same id (per plan §9 Q-E — agents read this at session start to
  *   know when a recipe behaves differently from the documented bundled
@@ -51,14 +52,21 @@ export function resolveBundledRecipesDir(): string {
 }
 
 /**
- * Returns `<projectRoot>/.codemap/recipes/` if it exists as a directory,
- * else `undefined`. Per plan §9 Q-C, root-only — no walk-up; same root
- * the CLI's `--root` / `CODEMAP_ROOT` resolves to.
+ * Returns `<state-dir>/recipes/` if it exists as a directory, else
+ * `undefined`. Per plan §9 Q-C, root-only — no walk-up; same root the
+ * CLI's `--root` / `CODEMAP_ROOT` resolves to. Honors `--state-dir` /
+ * `CODEMAP_STATE_DIR` via {@link resolveStateDir} when `stateDir` is
+ * passed (relative flag) or when the runtime config is initialised.
  */
 export function resolveProjectRecipesDir(
   projectRoot: string,
+  stateDir?: string | undefined,
 ): string | undefined {
-  const dir = join(projectRoot, ".codemap", "recipes");
+  const stateRoot =
+    stateDir !== undefined
+      ? resolveStateDir({ root: projectRoot, cliFlag: stateDir })
+      : resolveStateDir({ root: projectRoot });
+  const dir = join(stateRoot, "recipes");
   if (!existsSync(dir)) return undefined;
   if (!statSync(dir).isDirectory()) return undefined;
   return dir;
@@ -77,6 +85,7 @@ export function resolveProjectRecipesDir(
 let cachedRegistry: LoadedRecipe[] | undefined;
 let cachedRegistryProjectDir: string | undefined;
 let projectRootOverride: string | undefined;
+let stateDirOverride: string | undefined;
 
 /**
  * Resolve the project root for project-recipe discovery without requiring
@@ -90,11 +99,32 @@ let projectRootOverride: string | undefined;
  * Single source of truth: same `root` value `bootstrapCodemap` resolves to
  * — no parallel walk-up heuristic. Cache invalidates when root changes.
  */
-export function setQueryRecipesProjectRoot(root: string | undefined): void {
-  if (projectRootOverride === root) return;
+export function setQueryRecipesProjectRoot(
+  root: string | undefined,
+  stateDir?: string | undefined,
+): void {
+  if (projectRootOverride === root && stateDirOverride === stateDir) return;
   projectRootOverride = root;
+  stateDirOverride = stateDir;
   cachedRegistry = undefined;
   cachedRegistryProjectDir = undefined;
+}
+
+function resolveRecipesProjectDir(root: string): string | undefined {
+  if (stateDirOverride !== undefined) {
+    return resolveProjectRecipesDir(root, stateDirOverride);
+  }
+  try {
+    if (getProjectRoot() === root) {
+      const dir = join(getStateDir(), "recipes");
+      if (!existsSync(dir)) return undefined;
+      if (!statSync(dir).isDirectory()) return undefined;
+      return dir;
+    }
+  } catch {
+    // Runtime not initialised — fall back to default `.codemap`.
+  }
+  return resolveProjectRecipesDir(root);
 }
 
 function resolveCurrentProjectRoot(): string | undefined {
@@ -109,7 +139,7 @@ function resolveCurrentProjectRoot(): string | undefined {
 function getRegistry(): LoadedRecipe[] {
   const root = resolveCurrentProjectRoot();
   const projectDir =
-    root !== undefined ? resolveProjectRecipesDir(root) : undefined;
+    root !== undefined ? resolveRecipesProjectDir(root) : undefined;
 
   if (cachedRegistry !== undefined && cachedRegistryProjectDir === projectDir) {
     return cachedRegistry;
@@ -130,6 +160,7 @@ export function _resetRecipesCacheForTests(): void {
   cachedRegistry = undefined;
   cachedRegistryProjectDir = undefined;
   projectRootOverride = undefined;
+  stateDirOverride = undefined;
 }
 
 /**

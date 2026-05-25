@@ -14,6 +14,7 @@ import {
 } from "../runtime";
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
+import type { ResourcePayload } from "./resource-handlers";
 import {
   applyArgsSchema,
   auditArgsSchema,
@@ -359,6 +360,72 @@ function registerResources(server: McpServer): void {
       };
     },
   );
+
+  server.registerResource(
+    "file",
+    new ResourceTemplate("codemap://files/{+path}", { list: undefined }),
+    {
+      description:
+        "Per-file roll-up: symbols, imports, exports, coverage. Encode `{path}` URI-style. Reads live (no caching).",
+      mimeType: "application/json",
+    },
+    (uri, variables) => {
+      const path = decodeURIComponent(
+        typeof variables.path === "string"
+          ? variables.path
+          : String(variables.path),
+      );
+      const payload = readResource(
+        `codemap://files/${encodeURIComponent(path)}`,
+      );
+      return readTemplateResource(uri.toString(), payload, "file");
+    },
+  );
+
+  server.registerResource(
+    "symbol",
+    new ResourceTemplate("codemap://symbols/{name}", { list: undefined }),
+    {
+      description:
+        "Symbol lookup by exact name. Returns {matches, disambiguation?} envelope. Optional `?in=<path-prefix>` filter (mirrors `show --in`). Reads live (no caching).",
+      mimeType: "application/json",
+    },
+    (uri, variables) => {
+      const name =
+        typeof variables.name === "string"
+          ? variables.name
+          : String(variables.name);
+      const parsed = new URL(uri.toString());
+      const resourceUri =
+        parsed.search.length > 0
+          ? `codemap://symbols/${encodeURIComponent(name)}${parsed.search}`
+          : `codemap://symbols/${encodeURIComponent(name)}`;
+      return readTemplateResource(
+        uri.toString(),
+        readResource(resourceUri),
+        "symbol",
+      );
+    },
+  );
+}
+
+function readTemplateResource(
+  uri: string,
+  payload: ResourcePayload | undefined,
+  label: string,
+): { contents: Array<{ uri: string; mimeType: string; text: string }> } {
+  if (payload === undefined) {
+    throw new Error(`codemap: unknown ${label} resource "${uri}".`);
+  }
+  return {
+    contents: [
+      {
+        uri,
+        mimeType: payload.mimeType,
+        text: payload.text,
+      },
+    ],
+  };
 }
 
 function registerStaticResource(
