@@ -314,7 +314,6 @@ Slices 1-4 are in-tree; Slice 5 is a sequenced manual runbook that requires a me
 
 ## Cross-references
 
-- [`docs/research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical) — pick-order rationale + the 2026-05 impact-vs-cadence amendment that surfaced this pick.
 - [`docs/roadmap.md § Backlog`](../roadmap.md#backlog) — backlog entry + audit-verdict trigger that this Action's adoption is likely to fire.
 - [`docs/plans/lsp-diagnostic-push.md`](./lsp-diagnostic-push.md) — sibling plan rendering same recipe substrate to IDE / VSCode surface; complementary, not competitive (see "Relationship to (d) LSP plan" section above).
 - [`docs/README.md` Rule 3](../README.md) — plan-file convention (this file's location).

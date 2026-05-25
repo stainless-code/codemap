@@ -1,24 +1,36 @@
 # C.9 Framework plugin layer — plan
 
-> **Status:** open · ships last in the cadence after § 1.5 / § 1.10 / § 1.9 / § 1.6 — per [`research/non-goals-reassessment-2026-05.md § 5`](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical) Rationale 4 (orthogonality of small picks). Closed-dead-subgraph caveat motivating this plan: [`research note § 2.3`](../research/non-goals-reassessment-2026-05.md#23-no-static-analysis).
+> **Status:** open · ships last in the impact-vs-cadence sequence after boundary / parametrised-recipe / recency / type-member picks — orthogonal to those items (none query reachability). **Closed-dead-subgraph caveat:** N-file packs with sibling imports but no real entry point; `fan-in` / `fan-out` rank hotspots, they do not detect unreachable files.
 >
 > **Motivator:** **closed-dead-subgraph case** — N-file packs where every file imports a sibling (non-zero `dependencies` fan-in for all) but none is reachable from a real entry point. Today's `untested-and-dead` recipe false-positives Next.js `app/**/page.tsx` files for the same reason: framework entry points aren't recognized as live without per-framework awareness. This plan proposes the smallest plugin contract that closes the gap.
 >
-> **Tier:** XL effort (per the research note's § 5 (b) row). Shipping cadence is sequential after (a) + (c); this plan iterates in parallel so impl is unblocked when its slot arrives.
+> **Tier:** XL effort. Ships last in the impact-vs-cadence sequence — parallel iteration unblocks impl before the slot opens.
 
 ---
 
-## Pre-locked decisions (from non-goals-reassessment grill)
+## Shipping cadence (decisions of record)
+
+C.9 ships **last** because it only sharpens **reachability-predicate** recipes: `untested-and-dead`, `unimported-exports`, and (Slice 2) `dead-files-by-reachability`. Boundary, parametrised-recipe, recency, type-member, complexity, hotspot, call, marker, and CSS recipes do not ask "is this file/symbol live?" — they do not inherit C.9's false-positive class.
+
+**Orthogonal picks ship first:** boundary violations (own `boundary_rules` table), rename-preview / parametrised recipes (query `calls`, not reachability), recipe-recency (own table), unused type members (`type_members` × import specifiers).
+
+**C.9 before LSP diagnostic-push:** entry-point hints reduce false-positive squigglies on framework files for the two live-predicate recipes. Not a hard block — [`lsp-diagnostic-push.md`](./lsp-diagnostic-push.md) can ship without C.9; diagnostics carry the same caveats those recipes document today.
+
+**If this plan is abandoned:** close as `Status: Rejected (YYYY-MM-DD) — <reason>`. Design surface captured either way. The two live-predicate recipes keep framework-file caveats permanently.
+
+---
+
+## Pre-locked decisions
 
 These are committed to v1. Questions opened against them must justify against the linked decisions.
 
-| #   | Decision                                                                                                                                                     | Source                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| L.1 | **Entry-point hints only** (Shape A — `glob → is_entry: true` annotations on `files`). No arbitrary `dependencies` edge injection.                           | Q4 resolved (lifted); [§ 2.3 caveat](../research/non-goals-reassessment-2026-05.md#23-no-static-analysis) |
-| L.2 | **Static config only** — plugins describe rules in static config (globs, glob → annotation mappings). No JS evaluation at index time.                        | [Floor "No JS execution at index time"](../roadmap.md#floors-v1-product-shape)                            |
-| L.3 | **Moat-A clean** — recipes consume the new substrate via SQL; no new verdict-shaped CLI verbs.                                                               | [Moat A](../roadmap.md#moats-load-bearing)                                                                |
-| L.4 | **Moat-B aligned** — `is_entry` annotation IS substrate growth (richer extracted structure on `files`). New schema column or table.                          | [Moat B](../roadmap.md#moats-load-bearing)                                                                |
-| L.5 | **No edge injection in v1** — defer to v2 if a real recipe demands it; backwards-compat preserved (additive). Mirrors `query_baselines` deferral discipline. | Q4 resolved (lifted)                                                                                      |
+| #   | Decision                                                                                                                                                     | Source                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| L.1 | **Entry-point hints only** (Shape A — `glob → is_entry: true` annotations on `files`). No arbitrary `dependencies` edge injection.                           | This plan § Motivator; § What C.9 sharpens                                     |
+| L.2 | **Static config only** — plugins describe rules in static config (globs, glob → annotation mappings). No JS evaluation at index time.                        | [Floor "No JS execution at index time"](../roadmap.md#floors-v1-product-shape) |
+| L.3 | **Moat-A clean** — recipes consume the new substrate via SQL; no new verdict-shaped CLI verbs.                                                               | [Moat A](../roadmap.md#moats-load-bearing)                                     |
+| L.4 | **Moat-B aligned** — `is_entry` annotation IS substrate growth (richer extracted structure on `files`). New schema column or table.                          | [Moat B](../roadmap.md#moats-load-bearing)                                     |
+| L.5 | **No edge injection in v1** — defer to v2 if a real recipe demands it; backwards-compat preserved (additive). Mirrors `query_baselines` deferral discipline. | Q4 resolved (lifted)                                                           |
 
 ---
 
@@ -52,7 +64,7 @@ No CLI changes. No new verb. Recipes consume the new substrate.
 
 ## What C.9 sharpens — and what it doesn't
 
-Per the [research note § 5 errata (2026-05)](../research/non-goals-reassessment-2026-05.md#8-triangulation-errata-2026-05): the original framing claimed C.9 "sharpens every shipped recipe" and that the LSP shim (§ 2.5 / item (d)) blocks on C.9's entry-point awareness. Both were wrong. (d) was reframed across three revisions (v1 "thin shim, agent UX" → v2 "orthogonal, ship before (b)" → v2.5 "dropped" → v3 "diagnostic-push server + VSCode extension, ships after (b)"); see same errata for the full evolution. Accurate scope:
+Per the 2026-05 errata pass: the original framing claimed C.9 "sharpens every shipped recipe" and that the LSP plan blocked on C.9's entry-point awareness. Both were wrong. (d) was reframed across three revisions (v1 "thin shim, agent UX" → v2 "orthogonal, ship before (b)" → v2.5 "dropped" → v3 "diagnostic-push server + VSCode extension, ships after (b)"). Accurate scope:
 
 **C.9 sharpens (recipe layer):**
 
@@ -69,7 +81,7 @@ Per the [research note § 5 errata (2026-05)](../research/non-goals-reassessment
 - Call recipes (`calls`) — query who-calls-what; orthogonal.
 - Marker / CSS recipes — orthogonal substrates.
 
-This narrowing is why the research-note ship sequence pushes (b) C.9 last: every other planned item ships against substrate that doesn't depend on C.9.
+This narrowing is why C.9 ships last: every other planned item in the cadence does not depend on entry-point hints.
 
 ---
 
@@ -111,7 +123,6 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) — ship one verti
 
 ## Cross-references
 
-- [`docs/research/non-goals-reassessment-2026-05.md § 2.3`](../research/non-goals-reassessment-2026-05.md#23-no-static-analysis) — closed-dead-subgraph caveat (analytical history). Moats lifted to [`roadmap.md § Non-goals (v1) → Moats`](../roadmap.md#moats-load-bearing); pick-order rationale (especially the (b) before (d) reasoning) at [`§ 5`](../research/non-goals-reassessment-2026-05.md#5-pick-order-rationale-historical).
 - [`docs/architecture.md`](../architecture.md) — schema reference (where `is_entry` lands)
 - [`docs/golden-queries.md`](../golden-queries.md) — golden-query test pattern
 - [`docs/roadmap.md § Strategy`](../roadmap.md#strategy) — community-adapter precedent (Q2 / Q8 use the same lever)

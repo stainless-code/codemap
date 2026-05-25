@@ -56,7 +56,7 @@ Map each file to one of the 5 lifecycle types per [docs-governance § 1](../docs
 
 ### 2. Apply the existence test
 
-Per [docs-governance § 2](../docs-governance/SKILL.md#2-existence-test-apply-on-every-doc-touching-pr), each file earns its place if it meets ≥1 of: source cite / durable policy / open work / unique historical context.
+Per [docs-governance § 2](../docs-governance/SKILL.md#2-existence-test-apply-on-every-doc-touching-pr), each file earns its place if it meets ≥1 of: source cite / durable policy / open work / inbound cites require slim stub.
 
 For each file, run the cite-check evidence command:
 

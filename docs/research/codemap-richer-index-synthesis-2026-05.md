@@ -1,10 +1,8 @@
 # Codemap richer-index — consolidated triangulation across 5 model perspectives — 2026-05
 
-> **Status:** Open research note · consolidated 2026-05-06 by `claude-opus-4.7` from five independent strategic positions on the same prompt: "fully unlock codemap's potential and bypass the 'no fix engine' premise." The five sources have been merged into this single document; their unique substrate proposals, recipe candidates, engine extensions, argumentation chains, and reference views are inlined below with author attribution preserved.
+> **Status:** Open research archive — **canonical open work** for apply-engine steps lives in [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md); substrate tiers in [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). This note retains consensus / disagreement matrices and per-source argumentation until all synthesis steps close.
 >
-> **Purpose:** Single canonical strategy doc for the codemap-richer-index direction. Captures (a) the consensus all sources reached, (b) the disagreements with per-axis verdicts and full argumentation, (c) the consolidated substrate / recipe / engine / workflow catalogs, (d) the synthesised path with open implementation questions per step, (e) the reference views (leverage-ranked, agent-angle, safety-loop, architecture diagram) that serve as design context, (f) the rejected items with trigger conditions, (g) preserved moats. Designed to stand alone without the source notes.
->
-> **Lifecycle:** Open. Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance/SKILL.md#closing-research). When any item lifts to a plan PR, slim the corresponding section here to a one-line "What shipped" appendix per [`docs/README.md` Rule 8](../README.md). When all items resolve, retire per the same rule.
+> **Purpose:** Triangulation record (five model perspectives, May 2026). Do not treat this file as the implementation checklist — use the plans above.
 >
 > **Authoring discipline:** Per [`agents-tier-system`](../../.agents/rules/agents-tier-system.md) durability rules — no source-line citations, no specific commit hashes; symbol references and design intent only. Per [`docs-governance § 7`](../../.agents/skills/docs-governance/SKILL.md#7-cross-reference-preservation-discipline) all cross-references in this doc point at durable reference docs (`architecture.md`, `glossary.md`, `roadmap.md`) and rule numbers, not at mortal source notes (which were merged into this doc).
 
@@ -12,7 +10,7 @@
 
 ## What shipped (fact-checked 2026-05-19) — appendix per § 9 lifecycle
 
-The substrate-growth half of this synthesis lifted to a dedicated plan PR — [`plans/substrate-extraction.md`](../plans/substrate-extraction.md) — which generalised § 4.1 / § 4.2 / § 5.3 items 1, 3 into a 13-tier sequenced plan. Per § 9's discipline ("when the synthesis path ships any step, add a 'What shipped' appendix; slim duplicated prose"), the canonical live status is **the substrate plan's per-tier headings**, not this note.
+The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half lifted to [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md). **Live status = those plan headings**, not this note.
 
 **Shipped via the substrate plan:**
 
@@ -703,8 +701,8 @@ The "no fix engine" line was right about the **product class**; it was wrong abo
 
 Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance/SKILL.md#closing-research):
 
-- **When the synthesis path ships any step:** add a one-line "What shipped" appendix under that step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) linking to the lift destination (`architecture.md` / `glossary.md` / `roadmap.md`); slim duplicated prose.
-- **When all 12 steps ship or close:** retire this note per [`docs/README.md` Rule 8](../README.md). Lift any durable strategic claim (Path A vs B framing; agent-in-the-loop substrate positioning) into [`why-codemap.md`](../why-codemap.md) or [`research/non-goals-reassessment-2026-05.md`](./non-goals-reassessment-2026-05.md) before deletion.
+- **Open implementation** → [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
+- **When all 12 steps ship or close:** retire this note per [`docs/README.md` Rule 8](../README.md). Lift any remaining durable strategic claim into [`why-codemap.md`](../why-codemap.md) before deletion.
 - **When a deferred / rejected item triggers** (per § 7 trigger conditions): open a plan PR with this note as the rationale anchor; this synthesis is the disagreement record that justifies the trigger.
 - **Annual re-evaluation** — re-run the triangulation against the substrate / recipe count of the day; update verdicts with current data.
 
@@ -734,7 +732,7 @@ Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance
 - [`architecture.md` Apply wiring](../architecture.md#cli-usage) — the engine the synthesis path grows the substrate around
 - [`glossary.md` Substrate-shaped fix executor](../glossary.md) — current canonical definition (preserved)
 - [`why-codemap.md` § When to reach for something else](../why-codemap.md#when-to-reach-for-something-else) — verdict/autofix vs predicate-as-API (Step 1 shipped)
-- [`research/non-goals-reassessment-2026-05.md`](./non-goals-reassessment-2026-05.md) — precedent for floor-flips after architectural reality outpaces docs
+- [`roadmap.md § Moats`](../roadmap.md#moats-load-bearing) — floor-flip decisions of record (non-goals reassessment lifted here)
 - [`docs/plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md) — C.9 entry-point work; orthogonal to synthesis path
 - [`docs/plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md) — sibling plan; Steps 8–9 (agent-in-the-loop) and the LSP `code_action` shape converge naturally
 

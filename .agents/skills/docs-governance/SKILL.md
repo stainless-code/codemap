@@ -85,7 +85,7 @@ Same applies to ownership-table rows — a row exists when the file or folder it
 
 **Codemap-wide tool evaluations + adoption** (e.g. oxlint, future plugins) belong directly in `.agents/rules/` + `.agents/skills/` — not in `docs/research/`. The artifact that earns a permanent home isn't the evaluation; it's the rule + skill.
 
-A `docs/research/` file may **motivate** adoption of a repo-level tool, but the _adoption itself_ is repo-level — the rule lands under `.agents/rules/`, not as a permanent doc under `docs/research/`. The research note then slims to "what shipped" (per [`docs/README.md` Rule 8](../../../docs/README.md)). **Per-tool tracker notes are an anti-pattern** — peer-tool framing goes off-mission fast; positioning lives in [`docs/why-codemap.md`](../../../docs/why-codemap.md) and [`research/non-goals-reassessment-2026-05.md`](../../../docs/research/non-goals-reassessment-2026-05.md), not in tracker files.
+A `docs/research/` file may **motivate** adoption of a repo-level tool, but the _adoption itself_ is repo-level — the rule lands under `.agents/rules/`, not as a permanent doc under `docs/research/`. The research note is **deleted** after lift (per [`docs/README.md` Rule 8](../../../docs/README.md)). **Per-tool tracker notes are an anti-pattern** — peer-tool framing goes off-mission fast; positioning lives in [`docs/why-codemap.md`](../../../docs/why-codemap.md), not in tracker files.
 
 ### 7. Cross-reference preservation discipline
 

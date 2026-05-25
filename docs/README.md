@@ -130,7 +130,7 @@ When an audit closes, lift shipped work into canonical homes (`architecture.md`,
 ## Naming Conventions
 
 - **`plans/` files**: `<feature-name>.md` — the folder provides "plan" context, don't add a `-plan` suffix.
-- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots (e.g. `non-goals-reassessment-2026-05.md`); `<tool-name>.md` for ongoing tool evaluations.
+- **`research/` files**: `<topic>-YYYY-MM.md` for dated snapshots; `<tool-name>.md` for ongoing tool evaluations. **Delete after lift** when adopted (Rule 8).
 - **Top-level files**: descriptive domain noun (`architecture.md`, `glossary.md`, `roadmap.md`) — no prefix or suffix.
 
 ---
