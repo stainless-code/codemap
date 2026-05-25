@@ -10,6 +10,7 @@ import {
 } from "./probe-tokens";
 import {
   allProbesSucceeded,
+  applyProbeExitCode,
   averageSamples,
   runProbeOnce,
   summarize,
@@ -195,6 +196,15 @@ describe("run-probes helpers", () => {
   it("allProbesSucceeded requires every scenario", () => {
     expect(allProbesSucceeded(3, 3)).toBe(true);
     expect(allProbesSucceeded(2, 3)).toBe(false);
+  });
+
+  it("applyProbeExitCode sets process exitCode on partial failure", () => {
+    process.exitCode = 0;
+    applyProbeExitCode(2, 3);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = 0;
+    applyProbeExitCode(3, 3);
+    expect(process.exitCode).toBe(0);
   });
 
   it("traditionalToolSequence includes glob and grep with zero reads", () => {

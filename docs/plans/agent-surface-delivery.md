@@ -10,11 +10,11 @@
 
 ## Quick resume
 
-| Next action         | Detail                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **In review**       | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval harness (PR 9) on `feat/agent-eval-harness` |
-| **Recently merged** | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                          |
-|                     | [#135](https://github.com/stainless-code/codemap/pull/135) — agents init `--mcp` (PR 8)                             |
+| Next action         | Detail                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Merge-ready**     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval harness (PR 9); CI green, review gate only |
+| **Recently merged** | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                         |
+|                     | [#135](https://github.com/stainless-code/codemap/pull/135) — agents init `--mcp` (PR 8)                            |
 
 Update the table below when a PR merges or a new branch opens.
 
