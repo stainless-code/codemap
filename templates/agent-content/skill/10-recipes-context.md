@@ -47,9 +47,9 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`show`** — `{name, kind?, in?}`. Exact symbol lookup → `{matches, disambiguation?}`. Fuzzy lookup belongs in `query` with `LIKE`.
 - **`snippet`** — same shape as `show` but each match also carries `source` (file text) + `stale` / `missing` flags. No reindex side-effects.
 - **`impact`** — `{target, direction?, via?, depth?, limit?, summary?}`. Symbol/file blast-radius walker (replaces hand-composed `WITH RECURSIVE`). Auto-resolves symbol vs file target; `via` defaults to every backend compatible with the kind.
-- **`trace`** — `{from, to, max_depth?, via?, budget_chars?}`. Shortest call path + budget-capped snippets (`call-path` recipe twin).
-- **`explore`** — `{names, depth?, kind?, budget_chars?}`. Multi-name neighborhood survey + snippets (`symbol-neighborhood` per name).
-- **`node`** — `{name, kind?, in?, include_snippets?, budget_chars?}`. `show` center + depth-1 neighborhood; optional inline snippets.
+- **`trace`** — `{from, to, max_depth?, via?, budget_chars?}`. Shortest call path + budget-capped snippets (`call-path` recipe twin). `truncated` when snippet budget hit; dependency hops omit auto-snippets.
+- **`explore`** — `{names, depth?, kind?, budget_chars?}`. Multi-name neighborhood survey + snippets (`symbol-neighborhood` per deduped name). `truncation.rows` when row cap (500) hit; `truncation.snippets` when budget hit.
+- **`node`** — `{name, kind?, in?, include_snippets?, budget_chars?}`. `show` center + scoped depth-1 neighborhood; optional center+neighbor snippets when `include_snippets: true`.
 - **`affected`** — `{paths?, changed_since?, test_glob?, max_depth?}`. Reverse-dependency walk from changed files to test paths (same preprocessor as **`codemap affected`** → **`affected-tests`** recipe). Explicit `paths` (including `paths: []` for empty — skips git) wins over git discovery; omit `paths` for working tree vs `changed_since` (default `HEAD`). When both `paths` and `changed_since` are sent, `paths` wins (mirrors CLI positional + `--changed-since`).
 - **`apply`** — `{recipe, params?, dry_run?, yes?}`. Executes the diff hunks a recipe row produces (`{file_path, line_start, before_pattern, after_pattern}`). **All-or-nothing**: any conflict aborts before any file is written. Over MCP/HTTP `yes: true` is required for the write path; `dry_run` and `yes` are mutually exclusive.
 

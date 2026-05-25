@@ -1518,4 +1518,98 @@ describe("MCP server — trace / explore / node tools", () => {
       await server.close();
     }
   });
+
+  it("trace returns isError on non-integer max_depth (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "trace",
+        arguments: { from: "a", to: "b", max_depth: 1.5 },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("explore returns isError on empty names array", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "explore",
+        arguments: { names: [] },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("trace sets truncated when budget_chars is tiny", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "trace",
+        arguments: { from: "foo", to: "bar", budget_chars: 1 },
+      });
+      const json = readJson(r) as {
+        truncated: boolean;
+        truncation?: { snippets?: boolean };
+      };
+      expect(json.truncated).toBe(true);
+      expect(json.truncation?.snippets).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("records recipe recency after trace and explore", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      await client.callTool({
+        name: "trace",
+        arguments: { from: "foo", to: "bar" },
+      });
+      await client.callTool({
+        name: "explore",
+        arguments: { names: ["foo"] },
+      });
+      const db = openDb();
+      try {
+        const callPath = db
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'call-path'",
+          )
+          .get();
+        const neighborhood = db
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'symbol-neighborhood'",
+          )
+          .get();
+        expect(callPath?.run_count).toBeGreaterThanOrEqual(1);
+        expect(neighborhood?.run_count).toBeGreaterThanOrEqual(1);
+      } finally {
+        closeDb(db);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("respects CODEMAP_MCP_TOOLS allowlist for trace tools", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,trace",
+    });
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("trace");
+      expect(names).not.toContain("explore");
+      expect(names).not.toContain("node");
+    } finally {
+      await server.close();
+    }
+  });
 });

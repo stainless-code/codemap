@@ -3,6 +3,7 @@
  * over bundled `call-path` / `symbol-neighborhood` recipes plus `show` / snippet reads.
  */
 
+import type { CodemapDatabase } from "../db";
 import { closeDb, openDb } from "../db";
 import {
   applySourceCharBudget,
@@ -24,6 +25,9 @@ import type { ShowResult, SnippetMatch, SymbolMatch } from "./show-engine";
 
 export type TraceFailureKind = "param" | "query" | "internal";
 
+/** Default row cap for explore before `rows_truncated` (structural payload guard). */
+export const DEFAULT_EXPLORE_ROW_LIMIT = 500;
+
 export interface CallPathHop {
   file_path: string;
   caller_name: string;
@@ -43,6 +47,11 @@ export interface SymbolNeighborhoodRow {
   edge: string;
   depth: number;
   via: string;
+}
+
+export interface TraceTruncation {
+  snippets?: boolean;
+  rows?: boolean;
 }
 
 function executeBundledRecipe(opts: {
@@ -142,6 +151,18 @@ export function executeSymbolNeighborhood(opts: {
   return { ok: true, rows: result.rows as unknown as SymbolNeighborhoodRow[] };
 }
 
+/** Preserve first-occurrence order; drop duplicate seed names. */
+export function dedupeNames(names: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of names) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
 function symbolKey(name: string, filePath: string): string {
   return `${name}\0${filePath}`;
 }
@@ -151,10 +172,11 @@ function isCallHopSnippetEligible(hop: CallPathHop): boolean {
 }
 
 function snippetsForSymbolMatches(opts: {
-  db: ReturnType<typeof openDb>;
+  db: CodemapDatabase;
   matches: SymbolMatch[];
   projectRoot: string;
 }): SnippetMatch[] {
+  if (opts.matches.length === 0) return [];
   return buildSnippetResult({
     db: opts.db,
     matches: opts.matches,
@@ -163,7 +185,7 @@ function snippetsForSymbolMatches(opts: {
 }
 
 function lookupSymbolInFile(
-  db: ReturnType<typeof openDb>,
+  db: CodemapDatabase,
   name: string,
   filePath: string,
 ): SymbolMatch | undefined {
@@ -171,8 +193,21 @@ function lookupSymbolInFile(
   return matches[0];
 }
 
+/** Prefer `preferredFile`, then fall back to global name lookup (cross-file callees). */
+function lookupSymbolForName(
+  db: CodemapDatabase,
+  name: string,
+  preferredFile?: string,
+): SymbolMatch | undefined {
+  if (preferredFile !== undefined && preferredFile.length > 0) {
+    const local = lookupSymbolInFile(db, name, preferredFile);
+    if (local !== undefined) return local;
+  }
+  return findSymbolsByName(db, { name })[0];
+}
+
 function snippetsForNeighborhoodRows(opts: {
-  db: ReturnType<typeof openDb>;
+  db: CodemapDatabase;
   rows: SymbolNeighborhoodRow[];
   projectRoot: string;
 }): SnippetMatch[] {
@@ -201,6 +236,91 @@ function snippetsForNeighborhoodRows(opts: {
   });
 }
 
+function mergeSnippetMatches(
+  primary: SnippetMatch[],
+  secondary: SnippetMatch[],
+): SnippetMatch[] {
+  const seen = new Set<string>();
+  const out: SnippetMatch[] = [];
+  for (const item of [...primary, ...secondary]) {
+    const key = symbolKey(item.name, item.file_path);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+/** Files connected to a scoped center symbol (call sites + definition files + deps). */
+function collectNeighborFilesForCenter(
+  db: CodemapDatabase,
+  center: SymbolMatch,
+): Set<string> {
+  const files = new Set<string>([center.file_path]);
+  const calls = db
+    .query<{ file_path: string; caller_name: string; callee_name: string }>(
+      `SELECT file_path, caller_name, callee_name FROM calls
+       WHERE file_path = ? AND (caller_name = ? OR callee_name = ?)`,
+    )
+    .all(center.file_path, center.name, center.name) as {
+    file_path: string;
+    caller_name: string;
+    callee_name: string;
+  }[];
+  for (const call of calls) {
+    files.add(call.file_path);
+    for (const otherName of [call.caller_name, call.callee_name]) {
+      if (otherName === center.name) continue;
+      for (const def of findSymbolsByName(db, { name: otherName })) {
+        files.add(def.file_path);
+      }
+    }
+  }
+  const deps = db
+    .query<{ from_path: string; to_path: string }>(
+      `SELECT from_path, to_path FROM dependencies
+       WHERE from_path = ? OR to_path = ?`,
+    )
+    .all(center.file_path, center.file_path) as {
+    from_path: string;
+    to_path: string;
+  }[];
+  for (const dep of deps) {
+    files.add(dep.from_path);
+    files.add(dep.to_path);
+  }
+  return files;
+}
+
+function filterNeighborhoodForCenter(
+  db: CodemapDatabase,
+  centerMatches: SymbolMatch[],
+  rows: SymbolNeighborhoodRow[],
+): SymbolNeighborhoodRow[] {
+  if (centerMatches.length !== 1) return rows;
+  const allowed = collectNeighborFilesForCenter(db, centerMatches[0]!);
+  return rows.filter((row) => allowed.has(row.file_path));
+}
+
+function traceSnippetsSkippedReason(
+  path: CallPathHop[],
+  snippetCount: number,
+): string | undefined {
+  if (path.length === 0 || snippetCount > 0) return undefined;
+  if (path.every((hop) => !isCallHopSnippetEligible(hop))) {
+    return "Path uses file-level dependency hops; use query_recipe call-path rows with show/snippet per hop.";
+  }
+  return "No indexed symbol definitions matched hop names; path rows are still valid.";
+}
+
+function applyRowCap<T>(
+  rows: T[],
+  limit: number,
+): { rows: T[]; rowsTruncated: boolean } {
+  if (rows.length <= limit) return { rows, rowsTruncated: false };
+  return { rows: rows.slice(0, limit), rowsTruncated: true };
+}
+
 export interface TraceComposeResult {
   from: string;
   to: string;
@@ -208,6 +328,8 @@ export interface TraceComposeResult {
   path: CallPathHop[];
   snippets: SnippetMatch[];
   truncated: boolean;
+  truncation?: TraceTruncation;
+  snippets_skipped_reason?: string;
 }
 
 export function composeTraceResult(opts: {
@@ -228,9 +350,10 @@ export function composeTraceResult(opts: {
       for (const name of [hop.caller_name, hop.callee_name]) {
         const key = symbolKey(name, hop.file_path);
         if (seen.has(key)) continue;
-        seen.add(key);
-        const match = lookupSymbolInFile(db, name, hop.file_path);
-        if (match !== undefined) matches.push(match);
+        const match = lookupSymbolForName(db, name, hop.file_path);
+        if (match === undefined) continue;
+        seen.add(symbolKey(match.name, match.file_path));
+        matches.push(match);
       }
     }
     const allSnippets = snippetsForSymbolMatches({
@@ -239,6 +362,10 @@ export function composeTraceResult(opts: {
       projectRoot: opts.root,
     });
     const budgeted = applySourceCharBudget(allSnippets, budget);
+    const snippetsSkippedReason = traceSnippetsSkippedReason(
+      opts.path,
+      budgeted.items.length,
+    );
     return {
       from: opts.from,
       to: opts.to,
@@ -246,6 +373,12 @@ export function composeTraceResult(opts: {
       path: opts.path,
       snippets: budgeted.items,
       truncated: budgeted.truncated,
+      ...(budgeted.truncated
+        ? { truncation: { snippets: true } satisfies TraceTruncation }
+        : {}),
+      ...(snippetsSkippedReason !== undefined
+        ? { snippets_skipped_reason: snippetsSkippedReason }
+        : {}),
     };
   } finally {
     closeDb(db, { readonly: true });
@@ -257,6 +390,7 @@ export interface ExploreComposeResult {
   rows: SymbolNeighborhoodRow[];
   snippets: SnippetMatch[];
   truncated: boolean;
+  truncation?: TraceTruncation;
 }
 
 export function composeExploreResult(opts: {
@@ -265,12 +399,14 @@ export function composeExploreResult(opts: {
   depth?: number | undefined;
   kind?: string | undefined;
   budgetChars?: number | undefined;
+  rowLimit?: number | undefined;
 }):
   | { ok: true; result: ExploreComposeResult }
   | { ok: false; error: string; kind: TraceFailureKind } {
+  const names = dedupeNames(opts.names);
   const merged: SymbolNeighborhoodRow[] = [];
   const seenRows = new Set<string>();
-  for (const name of opts.names) {
+  for (const name of names) {
     const neighborhood = executeSymbolNeighborhood({
       root: opts.root,
       name,
@@ -286,22 +422,29 @@ export function composeExploreResult(opts: {
     }
   }
 
+  const rowLimit = opts.rowLimit ?? DEFAULT_EXPLORE_ROW_LIMIT;
+  const rowCapped = applyRowCap(merged, rowLimit);
+
   const budget = opts.budgetChars ?? DEFAULT_OUTPUT_CHAR_BUDGET;
   const db = openDb();
   try {
     const allSnippets = snippetsForNeighborhoodRows({
       db,
-      rows: merged,
+      rows: rowCapped.rows,
       projectRoot: opts.root,
     });
     const budgeted = applySourceCharBudget(allSnippets, budget);
+    const truncation: TraceTruncation = {};
+    if (budgeted.truncated) truncation.snippets = true;
+    if (rowCapped.rowsTruncated) truncation.rows = true;
     return {
       ok: true,
       result: {
-        names: opts.names,
-        rows: merged,
+        names,
+        rows: rowCapped.rows,
         snippets: budgeted.items,
-        truncated: budgeted.truncated,
+        truncated: budgeted.truncated || rowCapped.rowsTruncated,
+        ...(Object.keys(truncation).length > 0 ? { truncation } : {}),
       },
     };
   } finally {
@@ -314,6 +457,7 @@ export interface NodeComposeResult {
   neighborhood: SymbolNeighborhoodRow[];
   snippets: SnippetMatch[];
   truncated: boolean;
+  truncation?: TraceTruncation;
 }
 
 export function composeNodeResult(opts: {
@@ -342,17 +486,28 @@ export function composeNodeResult(opts: {
       inPath: opts.inPath,
     });
     const center = buildShowResult(matches);
+    const scopedNeighborhood = filterNeighborhoodForCenter(
+      db,
+      matches,
+      neighborhood.rows,
+    );
 
     let snippets: SnippetMatch[] = [];
     let truncated = false;
     if (opts.includeSnippets === true) {
       const budget = opts.budgetChars ?? DEFAULT_OUTPUT_CHAR_BUDGET;
-      const allSnippets = snippetsForNeighborhoodRows({
+      const centerSnippets = snippetsForSymbolMatches({
         db,
-        rows: neighborhood.rows,
+        matches,
         projectRoot: opts.root,
       });
-      const budgeted = applySourceCharBudget(allSnippets, budget);
+      const neighborSnippets = snippetsForNeighborhoodRows({
+        db,
+        rows: scopedNeighborhood,
+        projectRoot: opts.root,
+      });
+      const merged = mergeSnippetMatches(centerSnippets, neighborSnippets);
+      const budgeted = applySourceCharBudget(merged, budget);
       snippets = budgeted.items;
       truncated = budgeted.truncated;
     }
@@ -361,9 +516,10 @@ export function composeNodeResult(opts: {
       ok: true,
       result: {
         center,
-        neighborhood: neighborhood.rows,
+        neighborhood: scopedNeighborhood,
         snippets,
         truncated,
+        ...(truncated ? { truncation: { snippets: true } } : {}),
       },
     };
   } finally {

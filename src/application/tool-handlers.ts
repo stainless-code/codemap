@@ -863,7 +863,6 @@ export function handleTrace(args: TraceArgs, root: string): ToolResult {
         pathResult.kind === "internal" ? 500 : undefined,
       );
     }
-    tryRecordRecipeRun("call-path");
     const payload = composeTraceResult({
       root,
       from: args.from,
@@ -872,6 +871,7 @@ export function handleTrace(args: TraceArgs, root: string): ToolResult {
       path: pathResult.rows,
       budgetChars: args.budget_chars,
     });
+    tryRecordRecipeRun("call-path");
     return ok(payload);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);

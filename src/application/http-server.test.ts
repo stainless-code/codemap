@@ -469,6 +469,58 @@ describe("http-server — POST /tool/{other tools}", () => {
     ).toBe(true);
   });
 
+  it("trace with non-integer max_depth → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "a",
+      to: "b",
+      max_depth: 1.5,
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+  });
+
+  it("explore with empty names → 400 (Zod rejects)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", { names: [] });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"explore"');
+  });
+
+  it("trace sets truncated when budget_chars is tiny", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+      budget_chars: 1,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.truncated).toBe(true);
+    expect(r.json.truncation?.snippets).toBe(true);
+  });
+
+  it("records recipe recency after trace", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+    });
+    expect(r.status).toBe(200);
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'call-path'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("list_baselines returns array (empty when none saved)", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "list_baselines", {});
@@ -645,6 +697,21 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
       direction: "sideways",
     });
     expect(r.status).toBe(400);
+  });
+
+  it("trace without from → 400 with structured error", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", { to: "bar" });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain('"trace"');
+    expect(r.json.error).toContain("from");
+  });
+
+  it("node with name=number → 400 (not deep handler crash)", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "node", { name: 1 });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("name");
   });
 });
 
