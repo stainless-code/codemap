@@ -222,11 +222,11 @@ The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is on
 
 ### Tuning knobs
 
-| Env var                       | Default | Effect                                                             |
-| ----------------------------- | ------- | ------------------------------------------------------------------ |
-| `CODEMAP_PERF_RUNS`           | 3       | How many `--full --performance` runs to take median over           |
-| `CODEMAP_PERF_REGRESSION_PCT` | 25      | Percent over baseline median that fails the check                  |
-| `CODEMAP_PERF_NOISE_FLOOR_MS` | 10      | Baseline phases under this median are not gated (jitter dominates) |
+| Env var                       | Default     | Effect                                                             |
+| ----------------------------- | ----------- | ------------------------------------------------------------------ |
+| `CODEMAP_PERF_RUNS`           | 3 (5 in CI) | How many `--full --performance` runs to take median over           |
+| `CODEMAP_PERF_REGRESSION_PCT` | 25          | Percent over baseline median that fails the check                  |
+| `CODEMAP_PERF_NOISE_FLOOR_MS` | 10          | Baseline phases under this median are not gated (jitter dominates) |
 
 ### Updating the baseline
 
@@ -247,6 +247,16 @@ Implication for local devs:
 - Local `bun run check:perf-baseline` should show **wide negative deltas** (you're faster than CI). That's expected — passes the check.
 - Local `bun run check:perf-baseline:update` will write **dev-machine** numbers. **Do not commit those.** If you need to refresh the baseline because of an intentional perf change, let CI capture the numbers and copy them in, OR open a PR with the baseline update and trust CI to validate it.
 - Future improvement: a `workflow_dispatch` job that re-captures + commits the baseline from CI itself, removing the manual copy step.
+
+#### CI runner variance (bimodal)
+
+GitHub Actions `ubuntu-latest` runners are **not homogeneous**. On the same commit, perf-baseline can land on a fast tier (~630 ms `total_ms`) or a slow tier (~1117 ms) — a ~75% spread with no code change. Within a single job, 3–5 consecutive runs on one runner stay tight; cross-job variance dominates.
+
+**Symptom:** `index_create_ms` or `parse_ms` fails at +25–35% while `total_ms` is only +15% (under gate). Recent example: [CI run 26409304578](https://github.com/stainless-code/codemap/actions/runs/26409304578) — `index_create_ms` 104→137 (+31.7%) on a slow runner; an earlier run the same day passed at 633 ms total on a fast runner.
+
+**Baseline strategy:** capture medians from the **slow tier** (copy from a failing or borderline CI log, not from local dev). Fast-tier runs then show negative deltas (pass). The +25% gate still catches real regressions on the slow tier. CI uses `CODEMAP_PERF_RUNS=5` for a stabler median within one job.
+
+**When refreshing:** aggregate medians from 2–3 slow-tier CI logs on `main`, not a single lucky fast run.
 
 #### Where the index doesn't help
 

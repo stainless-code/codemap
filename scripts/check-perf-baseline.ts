@@ -172,13 +172,17 @@ async function main() {
     "├─────────────────────┼──────────┼──────────┼─────────┼──────────┤",
   );
 
+  const regressionPct =
+    process.env.CODEMAP_PERF_REGRESSION_PCT != null
+      ? REGRESSION_PCT
+      : baseline.regression_pct;
+
   let regressed = false;
   for (const phase of GATED_PHASES) {
     const base = baseline.phases[phase];
     const cur = stats[phase].median;
     const gated = base >= baseline.noise_floor_ms;
-    const overBudget =
-      gated && cur > base * (1 + baseline.regression_pct / 100);
+    const overBudget = gated && cur > base * (1 + regressionPct / 100);
     if (overBudget) regressed = true;
     const flag = gated ? (overBudget ? "REGRESS" : "ok") : "skip(noise)";
     console.log(
@@ -192,7 +196,7 @@ async function main() {
     `\nBaseline: ${baseline.commit.slice(0, 8)} @ ${baseline.captured_at}`,
   );
   console.log(
-    `Threshold: +${baseline.regression_pct}%; noise floor: ${baseline.noise_floor_ms}ms`,
+    `Threshold: +${regressionPct}%; noise floor: ${baseline.noise_floor_ms}ms`,
   );
 
   if (regressed) {
