@@ -16,7 +16,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { resolveAgentsTemplateDir } from "../agents-init";
+import { resolveAgentsTemplateDir } from "../agents-template-path";
 import { createTables } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
 import { listQueryRecipeCatalog } from "./query-recipes";

@@ -10,25 +10,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { applyAgentsInitMcp } from "./agents-init-mcp";
 import { resolveAgentsInitMcpTargets } from "./agents-init-mcp-registry";
 import type { AgentsInitTarget } from "./agents-init-targets";
+import { resolveAgentsTemplateDir } from "./agents-template-path";
 import { installGitHooks, uninstallGitHooks } from "./application/git-hooks";
 import { ensureStateGitignore, resolveStateDir } from "./application/state-dir";
 
-/**
- * Directory containing `rules/` and `skills/` (next to `dist/` in published packages).
- */
-export function resolveAgentsTemplateDir(): string {
-  return join(
-    dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "templates",
-    "agents",
-  );
-}
+export { resolveAgentsTemplateDir } from "./agents-template-path";
 
 /**
  * Every regular file path under `dir` relative to `dir` (POSIX-style `/`).

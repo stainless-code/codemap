@@ -17,12 +17,12 @@ import {
   ensureGitignoreCodemapPattern,
   listRegularFilesRecursive,
   relPathToAbsSegments,
-  resolveAgentsTemplateDir,
   runAgentsInit,
   targetsNeedLinkMode,
   upsertCodemapPointerFile,
 } from "./agents-init";
 import { CODEMAP_MCP_PERMISSION_ALLOW } from "./agents-init-mcp";
+import { resolveAgentsTemplateDir } from "./agents-template-path";
 import {
   buildHookBlock,
   isCodemapHookInstalled,
