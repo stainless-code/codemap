@@ -57,6 +57,7 @@ import {
   getFts5Enabled,
   getIncludePatterns,
   getProjectRoot,
+  getStateDir,
   isPathExcluded,
 } from "../runtime";
 import { parseFilesParallel } from "../worker-pool";
@@ -67,6 +68,7 @@ import {
   resolveBindings,
 } from "./bindings-engine";
 import { persistModuleCycles } from "./cycles-engine";
+import { appendIndexError } from "./error-log";
 import { persistFileBarrelFlags } from "./file-graph-flags";
 import { persistJsxElementsAndAttributes } from "./jsx-persist";
 import type { QueryBindValue } from "./query-engine";
@@ -273,6 +275,15 @@ export function getCurrentCommit(): string {
   return result.stdout.toString().trim();
 }
 
+function reportParseError(relPath: string, reason: string): void {
+  console.error(`  Parse error in ${relPath}: ${reason}`);
+  try {
+    appendIndexError(getStateDir(), relPath, reason);
+  } catch {
+    // logging must not fail the index run
+  }
+}
+
 function insertParsedResults(
   db: CodemapDatabase,
   results: ParsedFile[],
@@ -283,7 +294,14 @@ function insertParsedResults(
 
   const transaction = db.transaction(() => {
     for (const parsed of results) {
-      if (parsed.error) continue;
+      if (parsed.error) {
+        reportParseError(parsed.relPath, "file read failed");
+        continue;
+      }
+
+      if (parsed.parseError) {
+        reportParseError(parsed.relPath, parsed.parseError);
+      }
 
       if (parsed.hasSideEffects) {
         parsed.fileRow.has_side_effects = parsed.hasSideEffects;
@@ -364,8 +382,9 @@ function insertParsedResults(
         if (parsed.suppressions?.length)
           insertSuppressions(db, parsed.suppressions);
       } catch (err) {
-        console.error(
-          `  Parse error in ${parsed.relPath}: ${err instanceof Error ? err.message : err}`,
+        reportParseError(
+          parsed.relPath,
+          err instanceof Error ? err.message : String(err),
         );
       }
 
@@ -600,8 +619,9 @@ export async function indexFiles(
           const suppressions = extractSuppressions(source, relPath);
           if (suppressions.length) insertSuppressions(db, suppressions);
         } catch (err) {
-          console.error(
-            `  Parse error in ${relPath}: ${err instanceof Error ? err.message : err}`,
+          reportParseError(
+            relPath,
+            err instanceof Error ? err.message : String(err),
           );
         }
 

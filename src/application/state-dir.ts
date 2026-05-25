@@ -53,6 +53,8 @@ export const STATE_GITIGNORE_BODY = `# Managed by codemap — overwritten on nex
 index.db
 index.db-shm
 index.db-wal
+index.lock
+errors.log
 audit-cache/
 `;
 
