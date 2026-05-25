@@ -102,6 +102,25 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit with amazon-q target writes both Amazon Q MCP files", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      expect(
+        runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["amazon-q"],
+          mcp: true,
+        }),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "default.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runAgentsInit with mcp writes default project-local MCP configs", () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
@@ -116,6 +135,7 @@ describe("runAgentsInit", () => {
 
       expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".amazonq", "mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".amazonq", "default.json"))).toBe(true);
       expect(existsSync(join(dir, ".claude", "settings.json"))).toBe(true);
       const settings = JSON.parse(

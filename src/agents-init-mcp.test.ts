@@ -242,9 +242,55 @@ describe("applyAgentsInitMcp", () => {
         disabled: false,
         timeout: 60,
       });
+
+      const amazonLegacy = JSON.parse(
+        readFileSync(join(dir, ".amazonq", "mcp.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<
+          string,
+          { command: string; args: string[]; transportType?: string }
+        >;
+      };
+      expect(amazonLegacy.mcpServers[CODEMAP_MCP_SERVER_KEY]).toEqual({
+        command: "codemap",
+        args: ["mcp", "--watch"],
+      });
+      expect(
+        amazonLegacy.mcpServers[CODEMAP_MCP_SERVER_KEY]?.transportType,
+      ).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
       rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it("is idempotent for Amazon Q dual MCP files on re-run", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-q-idem-"));
+    try {
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["amazon-q", "amazon-q-default"],
+      });
+      const beforeLegacy = readFileSync(
+        join(dir, ".amazonq", "mcp.json"),
+        "utf-8",
+      );
+      const beforeDefault = readFileSync(
+        join(dir, ".amazonq", "default.json"),
+        "utf-8",
+      );
+      applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["amazon-q", "amazon-q-default"],
+      });
+      expect(readFileSync(join(dir, ".amazonq", "mcp.json"), "utf-8")).toBe(
+        beforeLegacy,
+      );
+      expect(readFileSync(join(dir, ".amazonq", "default.json"), "utf-8")).toBe(
+        beforeDefault,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 

@@ -27,7 +27,7 @@ This repo also has [`.agents/`](../.agents/) for Codemap development (CLI from s
 codemap agents init
 codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
-codemap agents init --mcp             # project MCP config for all supported integrations
+codemap agents init --mcp             # project MCP config (default project-local targets; Windsurf opt-in via -i)
 codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```

@@ -33,7 +33,7 @@ export interface AgentsInitMcpTargetDef {
   readonly defaultOnMcp: boolean;
   /** Cursor: inject `--root ${workspaceFolder}`. */
   readonly workspaceRootArg?: boolean | undefined;
-  /** Matching `agents init --target` value, when any. */
+  /** Matching `agents init --interactive` integration pick, when any. */
   readonly integrationTarget?: AgentsInitTarget | undefined;
   readonly postWriteNote?: string | undefined;
 }
