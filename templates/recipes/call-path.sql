@@ -63,7 +63,7 @@ call_best AS (
   FROM call_paths cp
   CROSS JOIN params p
   WHERE cp.current = p."to"
-  ORDER BY cp.hop ASC
+  ORDER BY cp.hop ASC, cp.visited ASC
   LIMIT 1
 ),
 from_files AS (
@@ -140,15 +140,16 @@ dep_best AS (
   JOIN to_files tf ON dp.current = tf.file_path
   CROSS JOIN params p
   WHERE p.via_mode = 'dependencies' OR p.via_mode = 'all'
-  ORDER BY dp.hop ASC
+  ORDER BY dp.hop ASC, dp.visited ASC
   LIMIT 1
 ),
 chosen AS (
-  SELECT edges, json_array_length(edges) AS hop_count, 'calls' AS backend
+  SELECT edges
   FROM call_best
   UNION ALL
-  SELECT edges, json_array_length(edges) AS hop_count, 'dependencies' AS backend
+  SELECT edges
   FROM dep_best
+  WHERE NOT EXISTS (SELECT 1 FROM call_best)
 )
 SELECT
   json_extract(e.value, '$.file_path') AS file_path,
@@ -160,7 +161,6 @@ SELECT
 FROM (
   SELECT edges
   FROM chosen
-  ORDER BY hop_count ASC
   LIMIT 1
 ) best,
 json_each(best.edges) e

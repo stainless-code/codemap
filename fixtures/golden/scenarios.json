@@ -107,10 +107,80 @@
       "params": { "from": "createClient", "to": "handshake" }
     },
     {
+      "id": "call-path-via-all",
+      "prompt": "via=all prefers call path when both backends could apply",
+      "recipe": "call-path",
+      "params": {
+        "from": "run",
+        "to": "handshake",
+        "via": "all"
+      }
+    },
+    {
+      "id": "call-path-via-dependencies",
+      "prompt": "File-import path from run to handshake (file-level edges)",
+      "recipe": "call-path",
+      "params": {
+        "from": "run",
+        "to": "handshake",
+        "via": "dependencies"
+      }
+    },
+    {
+      "id": "call-path-via-dependencies-same-file",
+      "prompt": "Same-file symbols have no import hop",
+      "recipe": "call-path",
+      "params": {
+        "from": "createClient",
+        "to": "handshake",
+        "via": "dependencies"
+      }
+    },
+    {
+      "id": "call-path-max-depth",
+      "prompt": "max_depth=1 truncates a 2-hop call path to empty",
+      "recipe": "call-path",
+      "params": {
+        "from": "createClient",
+        "to": "handshake",
+        "max_depth": 1
+      }
+    },
+    {
+      "id": "call-path-no-path",
+      "prompt": "Unknown target symbol returns empty",
+      "recipe": "call-path",
+      "params": { "from": "createClient", "to": "nonexistentSymbol" }
+    },
+    {
       "id": "symbol-neighborhood",
-      "prompt": "Direct call neighbors of createClient (depth 1)",
+      "prompt": "Call + file-import neighbors of createClient at depth 1",
       "recipe": "symbol-neighborhood",
       "params": { "name": "createClient", "depth": 1 }
+    },
+    {
+      "id": "symbol-neighborhood-depth-0",
+      "prompt": "depth=0 returns empty",
+      "recipe": "symbol-neighborhood",
+      "params": { "name": "createClient", "depth": 0 }
+    },
+    {
+      "id": "symbol-neighborhood-depth-2",
+      "prompt": "Transitive call neighbors at depth 2 include indirect edges",
+      "recipe": "symbol-neighborhood",
+      "params": { "name": "createClient", "depth": 2 }
+    },
+    {
+      "id": "symbol-neighborhood-kind-filter",
+      "prompt": "kind filter excludes non-matching symbols",
+      "recipe": "symbol-neighborhood",
+      "params": { "name": "createClient", "depth": 1, "kind": "interface" }
+    },
+    {
+      "id": "symbol-neighborhood-unknown",
+      "prompt": "Unknown center symbol returns empty",
+      "recipe": "symbol-neighborhood",
+      "params": { "name": "nonexistentSymbol", "depth": 1 }
     },
     {
       "id": "find-async-functions",

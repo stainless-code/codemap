@@ -20,11 +20,15 @@ actions:
 
 # symbol-neighborhood
 
-Budget-capped bidirectional survey around a symbol: callers and callees from `calls`, plus one-hop file dependencies when reachable within depth.
+Budget-capped bidirectional survey around a symbol: callers and callees from `calls`, plus one-hop file dependencies (export names from adjacent files via `dependencies`).
+
+**Depth semantics:** `depth=0` → `[]`. `depth=1` → direct call neighbors plus file-import neighbors. `depth>1` → expands transitively through the call graph; rows at hop ≥ 2 use `edge=indirect`. File-dependency rows are always `depth=1` when included.
+
+**Homonyms:** joins `symbols` by `name` only — multiple definitions of the same name each appear as separate rows (same as `find-call-sites`).
 
 ```bash
 codemap query --recipe symbol-neighborhood --params name=createClient
 codemap query --recipe symbol-neighborhood --params name=createClient,depth=2,kind=function
 ```
 
-Each row is a `symbols` row plus `edge` (`caller` | `callee` | `depends_on` | `depended_on_by`), `depth`, and `via` (`calls` | `dependencies`).
+Each row is a `symbols` row plus `edge` (`caller` | `callee` | `indirect` | `depends_on` | `depended_on_by`), `depth`, and `via` (`calls` | `dependencies`).

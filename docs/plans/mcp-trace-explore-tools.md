@@ -23,7 +23,7 @@
 
 ### `call-path`
 
-- Params: `from_name`, `to_name`, optional `max_depth`, `via` (`calls` | `dependencies` | `all`)
+- Params: `from`, `to`, optional `max_depth`, `via` (`calls` | `dependencies` | `all`)
 - SQL: recursive CTE on `calls` (+ optional `dependencies` UNION)
 - Output: ordered path rows `{file_path, caller_name, callee_name, line_start}`
 

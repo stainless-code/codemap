@@ -25,11 +25,20 @@ actions:
 
 # call-path
 
-Shortest call path between two symbols via a cycle-safe recursive walk on `calls` (and optional `dependencies` when `via=dependencies|all`).
+Shortest path between two symbols via a cycle-safe recursive walk on `calls`, with optional file-import fallback.
+
+**`via` modes:**
+
+- **`calls`** (default) — symbol-level call edges only. Each row is a real `calls` site with a source line.
+- **`dependencies`** — file-level import path between files that define `from` and `to`. Rows use **file paths** as `caller_name` / `callee_name` and `line_start = 0`. Returns `[]` when both symbols live in the same file (no import hop).
+- **`all`** — call path when one exists; otherwise the shortest file-import path. Never mixes backends in one result.
+
+Empty `[]` means no path within `max_depth`, unknown symbol names, or `from = to` with no self-call edge.
 
 ```bash
 codemap query --recipe call-path --params from=createClient,to=handshake
-codemap query --recipe call-path --params from=createClient,to=handshake,max_depth=5,via=calls
+codemap query --recipe call-path --params from=run,to=handshake,via=all
+codemap query --recipe call-path --params from=run,to=handshake,via=dependencies
 ```
 
 Returns one row per hop: `file_path`, `caller_name`, `callee_name`, `line_start`, `hop`, `via`.

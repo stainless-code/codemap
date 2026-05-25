@@ -1,0 +1,178 @@
+[
+  {
+    "name": "setupTransport",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 27,
+    "line_end": 31,
+    "signature": "setupTransport(baseUrl): Transport",
+    "edge": "callee",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "legacyClient",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 46,
+    "line_end": 48,
+    "signature": "legacyClient()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "function",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "line_end": 7,
+    "signature": "ApiBridge()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "run",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 22,
+    "line_end": 31,
+    "signature": "run()",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "function",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "line_end": 7,
+    "signature": "ApiBridge()",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  },
+  {
+    "name": "prefetch",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 15,
+    "line_end": 20,
+    "signature": "prefetch(): Promise<void>",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  },
+  {
+    "name": "run",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 22,
+    "line_end": 31,
+    "signature": "run()",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
+  },
+  {
+    "name": "openSocket",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 33,
+    "line_end": 35,
+    "signature": "openSocket(baseUrl): string",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "handshake",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 37,
+    "line_end": 40,
+    "signature": "handshake(socketUrl): number",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "ApiCache",
+    "kind": "class",
+    "file_path": "src/api/decorated.ts",
+    "line_start": 4,
+    "line_end": 4,
+    "signature": "class ApiCache",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "optionalPing",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 33,
+    "line_end": 35,
+    "signature": "optionalPing(target)",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "spreadLog",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 37,
+    "line_end": 39,
+    "signature": "spreadLog(items): void",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "get",
+    "kind": "function",
+    "file_path": "src/lib/cache.ts",
+    "line_start": 8,
+    "line_end": 14,
+    "signature": "get(key): string | undefined",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "labyrinth",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 22,
+    "line_end": 83,
+    "signature": "labyrinth(seed): number",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "now",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 5,
+    "line_end": 7,
+    "signature": "now(): number",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  },
+  {
+    "name": "epochMs",
+    "kind": "function",
+    "file_path": "src/utils/format.ts",
+    "line_start": 5,
+    "line_end": 8,
+    "signature": "epochMs(): number",
+    "edge": "indirect",
+    "depth": 2,
+    "via": "calls"
+  }
+]
