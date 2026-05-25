@@ -1,0 +1,6 @@
+[
+  {
+    "test_path": "src/__tests__/smoke.test.ts",
+    "impact_depth": 1
+  }
+]

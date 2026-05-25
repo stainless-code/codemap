@@ -2,6 +2,7 @@ import { stdin as input } from "node:process";
 
 import { executeQuery } from "../application/query-engine";
 import {
+  getQueryRecipeActions,
   getQueryRecipeParams,
   getQueryRecipeSql,
 } from "../application/query-recipes";
@@ -255,7 +256,7 @@ export async function runAffectedCmd(opts: AffectedOpts): Promise<void> {
       sql,
       bindValues: resolved.values,
       root: getProjectRoot(),
-      recipeActions: undefined,
+      recipeActions: getQueryRecipeActions("affected-tests"),
     });
 
     if (

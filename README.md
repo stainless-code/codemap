@@ -198,6 +198,13 @@ codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fa
 # (default 3, --depth 0 = unbounded), limit-capped (default 500). Result envelope:
 # {target, matches: [{depth, edge, kind, name?, file_path}], summary: {nodes, terminated_by}}.
 
+# Affected tests — reverse dependency walk from changed sources → test files to run
+codemap affected --json                                         # working-tree changes vs HEAD (git status + diff)
+git diff --name-only origin/main | codemap affected --stdin --json
+codemap affected src/lib/cache.ts --json                        # explicit changed paths
+codemap affected --changed-since origin/main --json               # committed delta + working tree vs ref
+# Moat-A twin: `affected-tests` recipe. Output: [{test_path, impact_depth}] — CI composes the runner command.
+
 # Apply — substrate-shaped fix executor (recipe SQL describes hunks; codemap validates + writes)
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes

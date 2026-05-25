@@ -1,10 +1,50 @@
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   CHANGED_PATH_DELIM,
   joinChangedPaths,
   parseAffectedRest,
 } from "./cmd-affected";
+
+const repoRoot = join(import.meta.dir, "..", "..");
+const indexTs = join(repoRoot, "src", "index.ts");
+const minimalRoot = join(repoRoot, "fixtures", "minimal");
+let bunBin: string | null = null;
+
+async function runCli(
+  args: string[],
+  opts: {
+    env?: Record<string, string>;
+    stdin?: string;
+  } = {},
+): Promise<{ exitCode: number; out: string; err: string }> {
+  if (bunBin === null) {
+    throw new Error("cmd-affected.test: bunBin not initialised by beforeAll.");
+  }
+  const proc = Bun.spawn([bunBin, indexTs, ...args], {
+    cwd: repoRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin:
+      opts.stdin === undefined ? "ignore" : new Blob([opts.stdin]).stream(),
+    env: { ...process.env, ...opts.env },
+  });
+  const exitCode = await proc.exited;
+  const out = await new Response(proc.stdout).text();
+  const err = await new Response(proc.stderr).text();
+  return { exitCode, out, err };
+}
+
+beforeAll(() => {
+  bunBin = Bun.which("bun");
+  if (!bunBin || !existsSync(indexTs)) {
+    throw new Error(
+      `cmd-affected.test: cannot locate Bun (${bunBin}) or src entry (${indexTs}).`,
+    );
+  }
+});
 
 describe("joinChangedPaths", () => {
   it("joins unique trimmed paths with RS delimiter", () => {
@@ -87,5 +127,68 @@ describe("parseAffectedRest", () => {
     ]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toMatch(/changed_files/);
+  });
+
+  it("rejects --changed-since without ref", () => {
+    const r = parseAffectedRest(["affected", "--changed-since"]);
+    expect(r.kind).toBe("error");
+  });
+
+  it("rejects invalid max_depth in --params", () => {
+    const r = parseAffectedRest([
+      "affected",
+      "--params",
+      "max_depth=not-a-number",
+    ]);
+    expect(r.kind).toBe("error");
+  });
+});
+
+describe("codemap affected — fixtures/minimal e2e", () => {
+  it("returns transitive test file for a changed source path", async () => {
+    const r = await runCli(
+      ["affected", "src/lib/complexity-fixture.ts", "--json"],
+      { env: { CODEMAP_ROOT: minimalRoot } },
+    );
+    expect(r.exitCode).toBe(0);
+    const rows = JSON.parse(r.out) as Array<{
+      test_path: string;
+      impact_depth: number;
+      actions?: unknown[];
+    }>;
+    expect(rows).toEqual([
+      {
+        test_path: "src/__tests__/smoke.test.ts",
+        impact_depth: 1,
+        actions: [
+          {
+            type: "run-affected-tests",
+            description:
+              "Test file paths only — CI composes the exit policy and runner command.",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("reads changed paths from stdin pipeline", async () => {
+    const r = await runCli(["affected", "--stdin", "--json"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+      stdin: "src/lib/complexity-fixture.ts\n",
+    });
+    expect(r.exitCode).toBe(0);
+    const rows = JSON.parse(r.out) as Array<{ test_path: string }>;
+    expect(rows.map((row) => row.test_path)).toEqual([
+      "src/__tests__/smoke.test.ts",
+    ]);
+  });
+
+  it("returns empty array when stdin has no paths", async () => {
+    const r = await runCli(["affected", "--stdin", "--json"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+      stdin: "\n\n",
+    });
+    expect(r.exitCode).toBe(0);
+    expect(JSON.parse(r.out)).toEqual([]);
   });
 });
