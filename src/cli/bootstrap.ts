@@ -56,6 +56,9 @@ Targeted reads (precise lookup by symbol name):
 Impact analysis (graph walk for refactor blast-radius):
   codemap impact <target> [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]
 
+Affected tests (reverse dep walk → test files to run):
+  codemap affected [--stdin] [--changed-since <ref>] [--json] [<path>...]
+
 Apply (substrate-shaped fix executor; consumes the diff-json row contract):
   codemap apply <recipe-id> [--params k=v[,k=v]] [--dry-run] [--yes] [--json]
 
@@ -127,6 +130,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "show") return;
   if (rest[0] === "snippet") return;
   if (rest[0] === "impact") return;
+  if (rest[0] === "affected") return;
   if (rest[0] === "apply") return;
   if (rest[0] === "ingest-coverage") return;
   if (rest[0] === "pr-comment") return;

@@ -322,6 +322,27 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "affected") {
+    const { parseAffectedRest, printAffectedCmdHelp, runAffectedFromParsed } =
+      await import("./cmd-affected.js");
+    const parsed = parseAffectedRest(rest);
+    if (parsed.kind === "help") {
+      printAffectedCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runAffectedFromParsed({
+      root,
+      configFile,
+      stateDir,
+      parsed,
+    });
+    return;
+  }
+
   if (rest[0] === "apply") {
     const { parseApplyRest, printApplyCmdHelp, runApplyCmd } =
       await import("./cmd-apply.js");

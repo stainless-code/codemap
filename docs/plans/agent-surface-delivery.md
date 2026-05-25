@@ -10,11 +10,11 @@
 
 ## Quick resume
 
-| Next action          | Detail                                                                              |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| **Review / merge**   | PR 4 — trace recipes ([#131](https://github.com/stainless-code/codemap/pull/131))   |
-| **Start next**       | **PR 5** — `affected-tests-recipe` or **PR 6** — MCP trace tools (after PR 4 lands) |
-| **Do not start yet** | PR 6 until PR 4 lands; PR 9 (eval harness) until PR 8                               |
+| Next action          | Detail                                                    |
+| -------------------- | --------------------------------------------------------- |
+| **Review / merge**   | PR 5 — affected tests (`feat/affected-tests-recipe`)      |
+| **Start next**       | **PR 6** — MCP trace tools (`trace` / `explore` / `node`) |
+| **Do not start yet** | PR 9 (eval harness) until PR 8                            |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -38,8 +38,8 @@ Max **3 parallel tracks** at once.
 | PR    | Plans                                                                                                                         | Status  | Blocked by                                                                                                             | Parallel with                     |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
 | **3** | [`index-lock-and-error-log`](./index-lock-and-error-log.md) → [`parse-worker-hardening`](./parse-worker-hardening.md) (stack) | merged  | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5                              |
-| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)     | open    | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5                              |
-| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md)                                                                         | planned | —                                                                                                                      | 3, 4                              |
+| **4** | Recipe half of [`mcp-trace-explore-tools`](./mcp-trace-explore-tools.md) (`call-path`, `symbol-neighborhood` SQL + tests)     | merged  | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5                              |
+| **5** | [`affected-tests-recipe`](./affected-tests-recipe.md)                                                                         | open    | `feat/affected-tests-recipe`                                                                                           | 3, 4                              |
 | **6** | MCP half of trace (`trace` / `explore` / `node` tools) + update instructions                                                  | planned | PR 1, PR 4                                                                                                             | —                                 |
 | **7** | [`field-qualified-search`](./field-qualified-search.md)                                                                       | planned | PR 1                                                                                                                   | 4, 5 if `mcp-server.ts` untouched |
 | **8** | [`agents-init-mcp-wiring`](./agents-init-mcp-wiring.md)                                                                       | planned | PR 1                                                                                                                   | 3–5                               |
