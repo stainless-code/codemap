@@ -278,17 +278,18 @@ Tooling: **Oxfmt**, **Oxlint**, **tsgo** (`@typescript/native-preview`).
 | Command                              | Purpose                                                                                                                                                                            |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run dev`                        | Run the CLI from source (same as `bun src/index.ts`)                                                                                                                               |
-| `bun run check`                      | Build, format check, lint, tests, typecheck, golden queries — run before pushing                                                                                                   |
+| `bun run check`                      | Build, format check, lint, tests, typecheck, golden queries + agent-eval probe smoke — run before pushing                                                                          |
 | `bun run fix`                        | Apply lint fixes, then format                                                                                                                                                      |
 | `bun run test` / `bun run typecheck` | Focused checks                                                                                                                                                                     |
 | `bun run test:golden`                | SQL snapshot regression on `fixtures/minimal` (included in `check`)                                                                                                                |
+| `bun run test:agent-eval`            | Probe A/B harness smoke on `fixtures/minimal` (included in `check`; [docs/benchmark.md § Agent eval harness](docs/benchmark.md#agent-eval-harness))                                |
 | `bun run test:golden:external`       | Tier B: local tree via `CODEMAP_*` / `--root` (not in default `check`)                                                                                                             |
 | `bun run benchmark:query`            | Compare `console.table` vs `--json` stdout size (needs local `.codemap/index.db`; [docs/benchmark.md § Query stdout](docs/benchmark.md#query-stdout-table-vs-json-benchmarkquery)) |
 | `bun run qa:external`                | Index + sanity checks + benchmark on `CODEMAP_ROOT` / `CODEMAP_TEST_BENCH`                                                                                                         |
 
 ```bash
 bun install
-bun run check    # build + format:check + lint:ci + test + typecheck + test:golden
+bun run check    # build + format:check + lint:ci + test + typecheck + test:golden + test:agent-eval
 bun run fix      # oxlint --fix, then oxfmt
 ```
 

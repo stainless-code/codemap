@@ -80,6 +80,23 @@ function collectPayloadCharsFromEntry(entry: JsonRecord): number {
   return chars;
 }
 
+function textCharsFromContent(content: unknown): number {
+  if (typeof content === "string") {
+    return Buffer.byteLength(content, "utf-8");
+  }
+  if (!Array.isArray(content)) return 0;
+  let chars = 0;
+  for (const part of content) {
+    if (!isRecord(part)) continue;
+    if (typeof part.text === "string") {
+      chars += Buffer.byteLength(part.text, "utf-8");
+    } else if (typeof part.content === "string") {
+      chars += Buffer.byteLength(part.content, "utf-8");
+    }
+  }
+  return chars;
+}
+
 function collectFromEntries(entries: unknown[]): {
   tools: string[];
   promptChars: number;
@@ -110,6 +127,15 @@ function collectFromEntries(entries: unknown[]): {
         promptChars += Buffer.byteLength(text, "utf-8");
       } else {
         outputChars += Buffer.byteLength(text, "utf-8");
+      }
+    } else {
+      const contentChars = textCharsFromContent(entry.content);
+      if (contentChars > 0) {
+        if (entry.role === "user" || kind === "user") {
+          promptChars += contentChars;
+        } else {
+          outputChars += contentChars;
+        }
       }
     }
     if (typeof entry.wallMs === "number") {

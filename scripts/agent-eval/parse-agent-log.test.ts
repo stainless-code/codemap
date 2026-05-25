@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -139,6 +139,27 @@ ASSISTANT: found 3 call sites`;
     expect(parsed.toolCallCount).toBe(3);
   });
 
+  it("counts structured content part arrays in token estimate", () => {
+    const plain = parseAgentLog(
+      JSON.stringify({
+        messages: [{ role: "user", content: "short" }],
+      }),
+    );
+    const parts = parseAgentLog(
+      JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Where is usePermissions defined?" },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(parts.estTokens).toBeGreaterThan(plain.estTokens);
+  });
+
   it("throws on invalid JSON", () => {
     expect(() => parseAgentLog("{not json")).toThrow(/invalid JSON/);
   });
@@ -247,6 +268,26 @@ describe("run-probes helpers", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("averageSamples re-ceils averaged estTokens", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ estTokens: 10 }),
+        mcpOff: arm({ estTokens: 11, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ estTokens: 11 }),
+        mcpOff: arm({ estTokens: 12, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(Number.isInteger(avg.mcpOn.estTokens)).toBe(true);
+    expect(Number.isInteger(avg.mcpOff.estTokens)).toBe(true);
+    expect(avg.mcpOn.estTokens).toBe(11);
+    expect(avg.mcpOff.estTokens).toBe(12);
+  });
+
   it("averageSamples delta uses unrounded arm averages", () => {
     const samples = [
       scenario({
@@ -298,20 +339,23 @@ describe("parseProbesJson", () => {
 describe("run-probes smoke", () => {
   it("indexes fixtures/minimal and compares three probes", async () => {
     const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
     const tmp = mkdtempSync(join(tmpdir(), "agent-eval-smoke-"));
     const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
     try {
-      const result = spawnSync(
-        "bun",
-        [
-          join(import.meta.dir, "run-probes.ts"),
-          "--output",
-          out,
-          "--fixture-root",
-          join(import.meta.dir, "../../fixtures/minimal"),
-        ],
-        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
-      );
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+      });
       expect(result.status).toBe(0);
       const parsed = JSON.parse(await Bun.file(out).text()) as {
         scenarios: ScenarioComparison[];

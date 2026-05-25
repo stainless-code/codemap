@@ -283,11 +283,11 @@ bun run dev --full
 bun run benchmark
 ```
 
-**CI:** the **Test** job runs `bun run test:agent-eval` (probe smoke on `fixtures/minimal`; typically ~1–2 min including a full reindex) and `bun run test:golden` (separate full reindex); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
+**CI:** the **Test** job runs `bun run test:agent-eval` after `test:golden` (probe smoke reuses the golden index via `--skip-index` when present; typically ~1–2 min combined); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
 
 ### Agent eval harness
 
-Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Indexes the fixture corpus once, then compares an **indexed query arm** (one simulated `query` tool call per probe via `queryRows`, not an MCP transport round-trip) against an **MCP-off** arm that simulates agent discovery without the index (`glob` → `read` × N → `grep`). Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId` (override with `--scenarios` / `AGENT_EVAL_SCENARIOS` when using an external corpus); the MCP-off **traditional** regex/globs in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) approximate naive file discovery (not byte-identical to golden SQL).
+Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Indexes the fixture corpus once, then compares an **indexed query arm** (one simulated `query` tool call per probe via `queryRows`, not an MCP transport round-trip) against an **MCP-off** arm that simulates agent discovery without the index (`glob` → `read` × N → `grep`). Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId` (override with `--scenarios` / `AGENT_EVAL_SCENARIOS` when using an external corpus); probe definitions live in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) (override with `--probes` / `AGENT_EVAL_PROBES`). The MCP-off **traditional** regex/globs in each probe approximate naive file discovery (not byte-identical to golden SQL).
 
 **One-command local run:**
 
@@ -297,15 +297,15 @@ bash scripts/agent-eval/run-arms.sh
 # exits non-zero when any probe's scenarioSuccess is false
 ```
 
-Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded); `toolSequence` stays from the first run. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`). Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
 
 **Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload — MCP-on includes SQL, bind values, and JSON rows; MCP-off includes bytes read + grep hits), per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed. Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
 
 **Methodology notes:**
 
 - **Probe mode** is deterministic (no LLM): it measures structural cost of indexed SQL vs traditional file scan on the same corpus. Use it for regression guardrails and fixture tuning.
-- **Log mode** parses exported agent transcripts (entries / messages / line formats) when you run live A/B sessions with MCP on vs off. Token estimates include tool `args` / `arguments` payloads where present (not just tool names); `wallMs` sums per-entry timings when exported.
-- External public repos (zod, fastify, etc.): point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree, pass matching `--scenarios` (or `AGENT_EVAL_SCENARIOS`), and extend probe definitions — same harness, not duplicated fixtures.
+- **Log mode** parses exported agent transcripts (entries / messages / line formats) when you run live A/B sessions with MCP on vs off. Token estimates include tool `args` / `arguments` payloads and structured `content` part arrays where present; `wallMs` sums per-entry timings when exported.
+- External public repos (zod, fastify, etc.): point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree, pass matching `--scenarios` / `--probes` overrides, and extend probe definitions — same harness, not duplicated fixtures.
 
 Plan: [`docs/plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). PR CI runs `bun run test:agent-eval` in the **Test** job; optional nightly / `workflow_dispatch` for external fixtures is not wired yet.
 
