@@ -5,14 +5,17 @@
 > **Purpose:** Prioritized work queue for agent UX, MCP ergonomics, indexing reliability, and TS/JS graph substrate gaps. Each item has its own plan file; this index links priority tiers and recommended ship order.
 >
 > **Roadmap home:** [§ Backlog — Agent & indexing ops](../roadmap.md#agent--indexing-ops)
+>
+> **PR tracker (pause/resume):** [agent-surface-delivery.md](./agent-surface-delivery.md)
 
 ---
 
 ## Recommended ship order
 
 ```
-P0 (ops polish, ~2 weeks total)
-  mcp-server-instructions → wsl-watch-policy → git-hook-auto-sync → mcp-tool-allowlist
+P0 (ops polish, ~2 weeks total — see delivery tracker for PR bundling)
+  PR1: mcp-server-instructions + mcp-tool-allowlist
+  PR2: wsl-watch-policy → git-hook-auto-sync
 
 P1 (agent + reliability, parallel tracks)
   Track A: mcp-trace-explore-tools (+ call-path recipes)
