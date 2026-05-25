@@ -1334,6 +1334,52 @@ describe("MCP server — affected tool", () => {
     }
   });
 
+  it("does not record recency when paths: []", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const dbBefore = openDb();
+      let before = 0;
+      try {
+        before =
+          dbBefore
+            .query<{ run_count: number }>(
+              "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+            )
+            .get()?.run_count ?? 0;
+      } finally {
+        closeDb(dbBefore);
+      }
+      await client.callTool({ name: "affected", arguments: { paths: [] } });
+      const dbAfter = openDb();
+      try {
+        const after =
+          dbAfter
+            .query<{ run_count: number }>(
+              "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+            )
+            .get()?.run_count ?? 0;
+        expect(after).toBe(before);
+      } finally {
+        closeDb(dbAfter);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("affected returns isError on non-integer max_depth (Zod rejects)", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "affected",
+        arguments: { paths: ["src/a.ts"], max_depth: 1.5 },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("affected reports changed_since in git errors", async () => {
     const { client, server } = await makeClient();
     try {

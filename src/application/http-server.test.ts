@@ -328,6 +328,73 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json).toEqual([]);
   });
 
+  it("does not record recency when paths: []", async () => {
+    serverHandle = await startServer();
+    const dbBefore = openDb();
+    let before = 0;
+    try {
+      before =
+        dbBefore
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get()?.run_count ?? 0;
+    } finally {
+      closeDb(dbBefore);
+    }
+    const r = await postTool(serverHandle.port, "affected", { paths: [] });
+    expect(r.status).toBe(200);
+    const dbAfter = openDb();
+    try {
+      const after =
+        dbAfter
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get()?.run_count ?? 0;
+      expect(after).toBe(before);
+    } finally {
+      closeDb(dbAfter);
+    }
+  });
+
+  it("records recipe recency after a successful affected run", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/lib/util.ts', 'h3', 10, 1, 'typescript', 1, 1),
+                ('src/__tests__/util.test.ts', 'h4', 10, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO dependencies (from_path, to_path)
+         VALUES ('src/__tests__/util.test.ts', 'src/lib/util.ts')`,
+      );
+      db.run(
+        `INSERT INTO test_suites (file_path, name, kind, line_start, line_end, framework)
+         VALUES ('src/__tests__/util.test.ts', 'util', 'describe', 1, 10, 'bun-test')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "affected", {
+      paths: ["src/lib/util.ts"],
+    });
+    expect(r.status).toBe(200);
+    const dbAfter = openDb();
+    try {
+      const row = dbAfter
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(dbAfter);
+    }
+  });
+
   it("affected git error uses changed_since label", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "affected", {

@@ -55,12 +55,14 @@ export function recordRecipeRun(opts: RecordRunOpts): void {
 }
 
 /**
- * The wrapper both write sites call (`handleQueryRecipe` for MCP/HTTP +
- * `runQueryCmd` for CLI). Opens its own DB because `executeQuery` runs
- * with `PRAGMA query_only = 1` and can't double as the writer. Swallows
- * every error — recency-write failures NEVER block the recipe response.
+ * Orchestration-layer wrapper (`handleQueryRecipe`, `handleAffected`, `runQueryCmd`,
+ * `runAffectedCmd`). Opens its own DB because `executeQuery` runs with
+ * `PRAGMA query_only = 1` and can't double as the writer. Swallows every error —
+ * recency-write failures NEVER block the recipe response.
  *
- * Caller contract: only call AFTER recipe execution returns successfully.
+ * Caller contract: only call AFTER recipe execution returns successfully. Convenience
+ * tools (`affected`, `codemap affected`) skip the call when no changed paths were
+ * resolved (empty `paths` / stdin / git discovery) — no SQL ran, so no recency bump.
  *
  * `_openDb` is a test seam — production omits it.
  */

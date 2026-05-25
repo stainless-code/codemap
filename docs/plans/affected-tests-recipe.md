@@ -1,10 +1,10 @@
 # Affected tests recipe — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~1–2 weeks)
+> **Status:** shipped · **Priority:** P1 · **Effort:** M (~1–2 weeks)
 >
 > **Motivator:** CI can skip full test suites if only a subgraph changed. Codemap already has `dependencies` and `test_suites` — missing a recipe + CLI alias to list test files transitively impacted by changed sources.
 >
-> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (test-impact item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1)
+> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (test-impact item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1) · **Shipped:** [#132](https://github.com/stainless-code/codemap/pull/132) (recipe + CLI), [#133](https://github.com/stainless-code/codemap/pull/133) (MCP/HTTP `affected` tool)
 
 ---
 
@@ -26,8 +26,8 @@
 **Params (frontmatter):**
 
 - `changed_files` — multiline or repeated (from `--params` or stdin preprocessor)
-- `test_glob` — default `**/*.{test,spec}.{ts,tsx,js,jsx}`
-- `max_depth` — optional cap on BFS
+- `test_glob` — optional SQLite GLOB; when set, replaces default suffix globs (`test_suites` always included)
+- `max_depth` — optional non-negative integer BFS cap (default 50)
 
 **SQL shape:**
 
@@ -65,9 +65,9 @@ Dedicated `cmd-affected.ts` (not an outcome alias — 5-alias cap unchanged). Sh
 
 ---
 
-## Phase 2 (optional, shipped)
+## Phase 2 (shipped)
 
-MCP/HTTP **`affected`** — `{ paths?, changed_since?, test_glob?, max_depth? }` → shared `affected-engine` → `affected-tests` recipe. Documented in `mcp-instructions`; respects `CODEMAP_MCP_TOOLS` allowlist.
+MCP/HTTP **`affected`** — `{ paths?, changed_since?, test_glob?, max_depth? }` → shared `affected-engine` → `affected-tests` recipe. Documented in `mcp-instructions`; respects `CODEMAP_MCP_TOOLS` allowlist. [#133](https://github.com/stainless-code/codemap/pull/133).
 
 ---
 
@@ -76,6 +76,7 @@ MCP/HTTP **`affected`** — `{ paths?, changed_since?, test_glob?, max_depth? }`
 - [x] Recipe returns test file paths for a known fixture delta
 - [x] Stdin mode works in shell pipeline
 - [x] Documented in README + skill
+- [x] MCP/HTTP `affected` tool (Phase 2)
 
 ---
 

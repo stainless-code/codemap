@@ -2,6 +2,9 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { resolveCodemapConfig } from "../config";
+import { closeDb, openDb } from "../db";
+import { initCodemap } from "../runtime";
 import { parseAffectedRest } from "./cmd-affected";
 
 const repoRoot = join(import.meta.dir, "..", "..");
@@ -194,5 +197,58 @@ describe("codemap affected — fixtures/minimal e2e", () => {
     });
     expect(r.exitCode).toBe(0);
     expect(JSON.parse(r.out)).toEqual([]);
+  });
+
+  it("records recipe recency after a successful run", async () => {
+    const r = await runCli(
+      ["affected", "src/lib/complexity-fixture.ts", "--json"],
+      { env: { CODEMAP_ROOT: minimalRoot } },
+    );
+    expect(r.exitCode).toBe(0);
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const db = openDb();
+    try {
+      const row = db
+        .query<{ run_count: number }>(
+          "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+        )
+        .get();
+      expect(row?.run_count).toBeGreaterThanOrEqual(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("does not record recency when stdin has no paths", async () => {
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    let before = 0;
+    const dbBefore = openDb();
+    try {
+      before =
+        dbBefore
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get()?.run_count ?? 0;
+    } finally {
+      closeDb(dbBefore);
+    }
+    const r = await runCli(["affected", "--stdin", "--json"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+      stdin: "\n\n",
+    });
+    expect(r.exitCode).toBe(0);
+    const dbAfter = openDb();
+    try {
+      const after =
+        dbAfter
+          .query<{ run_count: number }>(
+            "SELECT run_count FROM recipe_recency WHERE recipe_id = 'affected-tests'",
+          )
+          .get()?.run_count ?? 0;
+      expect(after).toBe(before);
+    } finally {
+      closeDb(dbAfter);
+    }
   });
 });

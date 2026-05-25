@@ -123,6 +123,16 @@ describe("resolveRecipeParams", () => {
     expect(badBoolean.ok).toBe(false);
   });
 
+  it("rejects non-integer number params", () => {
+    const r = resolveRecipeParams({
+      recipeId: "affected-tests",
+      declared: [{ name: "max_depth", type: "number", required: false }],
+      provided: { max_depth: 1.5 },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/integer/);
+  });
+
   it("rejects params passed to a recipe that declares none", () => {
     const r = resolveRecipeParams({
       recipeId: "plain",
