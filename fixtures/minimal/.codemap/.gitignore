@@ -3,4 +3,6 @@
 index.db
 index.db-shm
 index.db-wal
+index.lock
+errors.log
 audit-cache/

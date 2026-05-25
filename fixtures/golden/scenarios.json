@@ -101,6 +101,18 @@
       "params": { "callee": "createClient" }
     },
     {
+      "id": "call-path",
+      "prompt": "Shortest call path from createClient to handshake",
+      "recipe": "call-path",
+      "params": { "from": "createClient", "to": "handshake" }
+    },
+    {
+      "id": "symbol-neighborhood",
+      "prompt": "Direct call neighbors of createClient (depth 1)",
+      "recipe": "symbol-neighborhood",
+      "params": { "name": "createClient", "depth": 1 }
+    },
+    {
       "id": "find-async-functions",
       "prompt": "Parametrised recipe: list async function-shaped symbols with return_type",
       "recipe": "find-async-functions"
