@@ -145,6 +145,13 @@ describe("parseAffectedRest", () => {
 });
 
 describe("codemap affected — fixtures/minimal e2e", () => {
+  beforeAll(async () => {
+    const idx = await runCli(["--full"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(idx.exitCode).toBe(0);
+  }, 120_000);
+
   it("returns transitive test file for a changed source path", async () => {
     const r = await runCli(
       ["affected", "src/lib/complexity-fixture.ts", "--json"],
