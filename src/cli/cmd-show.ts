@@ -1,18 +1,19 @@
 import {
   buildSymbolSearchSql,
   formatSymbolSearchSqlForDisplay,
-  searchSymbols,
 } from "../application/search-engine";
-import { buildShowResult, findSymbolsByName } from "../application/show-engine";
-import type { ShowResult, SymbolMatch } from "../application/show-engine";
+import { buildShowResult } from "../application/show-engine";
+import type { ShowResult } from "../application/show-engine";
 import {
+  executeShowLookup,
   parseAndNormalizeSearchQuery,
   resolveSearchWithFts,
+  resolveShowLookupMode,
 } from "../application/show-search-mode";
-import { toProjectRelative } from "../application/validate-engine";
 import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { parseShowSnippetRest } from "./show-snippet-args";
 
 interface ShowOpts {
   root: string;
@@ -55,7 +56,7 @@ Flags:
   --with-fts         Force FTS for free-text tokens (also on when fts5: true
                      in config and source_fts is populated).
   --print-sql        With --query, print generated SQL and exit (opens DB
-                     only when --with-fts needs to probe source_fts).
+                     only when FTS probe needs source_fts).
   --kind <kind>      Filter by symbols.kind (exact-name mode only).
   --in <path>        Filter by file scope (exact-name mode only).
   --json             Emit the JSON envelope (always wrapped in {matches}).
@@ -76,142 +77,9 @@ Examples:
 `);
 }
 
-/**
- * Parse `argv` after the bootstrap split: `rest[0]` must be `"show"`.
- */
-export function parseShowRest(rest: string[]):
-  | { kind: "help" }
-  | { kind: "error"; message: string }
-  | {
-      kind: "run";
-      name: string | undefined;
-      kindFilter: string | undefined;
-      inPath: string | undefined;
-      query: string | undefined;
-      withFts: boolean;
-      printSql: boolean;
-      json: boolean;
-    } {
-  if (rest[0] !== "show") {
-    throw new Error("parseShowRest: expected show");
-  }
-
-  let json = false;
-  let name: string | undefined;
-  let kindFilter: string | undefined;
-  let inPath: string | undefined;
-  let query: string | undefined;
-  let withFts = false;
-  let printSql = false;
-
-  for (let i = 1; i < rest.length; i++) {
-    const a = rest[i]!;
-    if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
-    if (a === "--with-fts") {
-      withFts = true;
-      continue;
-    }
-    if (a === "--print-sql") {
-      printSql = true;
-      continue;
-    }
-    if (a === "--query") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap show: "--query" requires a value.`,
-        };
-      }
-      query = next;
-      i++;
-      continue;
-    }
-    if (a === "--kind") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap show: "--kind" requires a value.`,
-        };
-      }
-      kindFilter = next;
-      i++;
-      continue;
-    }
-    if (a === "--in") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap show: "--in" requires a value.`,
-        };
-      }
-      inPath = next;
-      i++;
-      continue;
-    }
-    if (a.startsWith("-")) {
-      return {
-        kind: "error",
-        message: `codemap show: unknown option "${a}". Run \`codemap show --help\` for usage.`,
-      };
-    }
-    if (name !== undefined) {
-      return {
-        kind: "error",
-        message: `codemap show: unexpected extra argument "${a}". Pass exactly one symbol name or use --query.`,
-      };
-    }
-    name = a;
-  }
-
-  if (query !== undefined && name !== undefined) {
-    return {
-      kind: "error",
-      message: "codemap show: pass either <name> or --query, not both.",
-    };
-  }
-
-  if (query === undefined && name === undefined) {
-    return {
-      kind: "error",
-      message: `codemap show: missing <name> or --query. Run \`codemap show --help\` for usage.`,
-    };
-  }
-
-  if (printSql && query === undefined) {
-    return {
-      kind: "error",
-      message: `codemap show: "--print-sql" requires --query.`,
-    };
-  }
-
-  if (
-    query !== undefined &&
-    (kindFilter !== undefined || inPath !== undefined)
-  ) {
-    return {
-      kind: "error",
-      message:
-        "codemap show: --kind / --in apply to exact-name mode only; use kind: / path: / in: inside --query.",
-    };
-  }
-
-  return {
-    kind: "run",
-    name,
-    kindFilter,
-    inPath,
-    query,
-    withFts,
-    printSql,
-    json,
-  };
+/** Parse `argv` after the bootstrap split: `rest[0]` must be `"show"`. */
+export function parseShowRest(rest: string[]) {
+  return parseShowSnippetRest(rest, { verb: "show", allowPrintSql: true });
 }
 
 /**
@@ -223,7 +91,6 @@ export function parseShowRest(rest: string[]):
 export async function runShowCmd(opts: ShowOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-
     const projectRoot = getProjectRoot();
 
     if (opts.printSql && opts.query !== undefined) {
@@ -231,73 +98,50 @@ export async function runShowCmd(opts: ShowOpts): Promise<void> {
       return;
     }
 
-    if (opts.query !== undefined) {
-      await runShowQueryMode(opts, projectRoot);
+    const mode = resolveShowLookupMode(
+      {
+        name: opts.name,
+        query: opts.query,
+        kind: opts.kind,
+        in: opts.inPath,
+      },
+      projectRoot,
+    );
+    if (!mode.ok) {
+      emitErrorMaybeJson(`codemap show: ${mode.error}`, opts.json);
       return;
     }
 
-    const inPath =
-      opts.inPath !== undefined
-        ? toProjectRelative(projectRoot, opts.inPath)
-        : undefined;
-
     const db = openDb();
-    let matches: SymbolMatch[];
     try {
-      matches = findSymbolsByName(db, {
-        name: opts.name!,
-        kind: opts.kind,
-        inPath,
+      const { matches, warning } = executeShowLookup(db, mode, {
+        withFtsCli: opts.withFts,
+        exactKind: opts.kind,
+      });
+      if (warning !== undefined) {
+        console.error(`codemap show: ${warning}`);
+      }
+
+      const isQuery = mode.kind === "query";
+      renderShowMatches(matches, {
+        json: opts.json,
+        warning,
+        isQuery,
+        emptyMessage: isQuery
+          ? `codemap show: no symbols matched --query "${opts.query}". Try --print-sql to inspect the generated SQL.`
+          : buildExactEmptyMessage(
+              opts.name!,
+              opts.kind,
+              mode.kind === "exact" ? mode.inPath : undefined,
+            ),
       });
     } finally {
       closeDb(db, { readonly: true });
     }
-
-    renderShowMatches(matches, {
-      json: opts.json,
-      emptyMessage: buildExactEmptyMessage(opts.name!, opts.kind, inPath),
-    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
   }
-}
-
-async function runShowQueryMode(
-  opts: ShowOpts,
-  projectRoot: string,
-): Promise<void> {
-  const parsedQuery = parseAndNormalizeSearchQuery(opts.query!, projectRoot);
-  if (!parsedQuery.ok) {
-    emitErrorMaybeJson(`codemap show: ${parsedQuery.error}`, opts.json);
-    return;
-  }
-
-  const db = openDb();
-  let matches: SymbolMatch[];
-  let warning: string | undefined;
-  try {
-    const fts = resolveSearchWithFts(db, {
-      withFtsCli: opts.withFts,
-      freeTextCount: parsedQuery.parsed.freeText.length,
-    });
-    if (fts.warning !== undefined) {
-      console.error(`codemap show: ${fts.warning}`);
-      warning = fts.warning;
-    }
-    matches = searchSymbols(db, {
-      parsed: parsedQuery.parsed,
-      withFts: fts.useFts,
-    });
-  } finally {
-    closeDb(db, { readonly: true });
-  }
-
-  renderShowMatches(matches, {
-    json: opts.json,
-    warning,
-    emptyMessage: `codemap show: no symbols matched --query "${opts.query}". Try --print-sql to inspect the generated SQL.`,
-  });
 }
 
 function runShowPrintSql(
@@ -341,10 +185,26 @@ function runShowPrintSql(
 }
 
 function renderShowMatches(
-  matches: SymbolMatch[],
-  opts: { json: boolean; emptyMessage: string; warning?: string | undefined },
+  matches: ReturnType<typeof executeShowLookup>["matches"],
+  opts: {
+    json: boolean;
+    emptyMessage: string;
+    warning?: string | undefined;
+    isQuery: boolean;
+  },
 ): void {
   if (matches.length === 0) {
+    if (opts.isQuery) {
+      const empty = buildShowResult([]);
+      if (opts.warning !== undefined) empty.warning = opts.warning;
+      if (opts.json) {
+        console.log(JSON.stringify(empty));
+        return;
+      }
+      console.error(opts.emptyMessage);
+      process.exitCode = 1;
+      return;
+    }
     emitErrorMaybeJson(opts.emptyMessage, opts.json);
     return;
   }

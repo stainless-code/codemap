@@ -1,17 +1,13 @@
-import { searchSymbols } from "../application/search-engine";
+import { buildSnippetResult } from "../application/show-engine";
+import type { SnippetResult } from "../application/show-engine";
 import {
-  buildSnippetResult,
-  findSymbolsByName,
-} from "../application/show-engine";
-import type { SnippetResult, SymbolMatch } from "../application/show-engine";
-import {
-  parseAndNormalizeSearchQuery,
-  resolveSearchWithFts,
+  executeShowLookup,
+  resolveShowLookupMode,
 } from "../application/show-search-mode";
-import { toProjectRelative } from "../application/validate-engine";
 import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { parseShowSnippetRest } from "./show-snippet-args";
 
 interface SnippetOpts {
   root: string;
@@ -49,134 +45,24 @@ Flags:
   --json             Emit the JSON envelope (always wrapped in {matches}).
   --help, -h         Show this help.
 
+Output (JSON): same {matches, disambiguation?, warning?} as show; each match
+adds source / stale / missing.
+
 Examples:
   codemap snippet runQueryCmd
   codemap snippet --query 'kind:function name:run' --json
 `);
 }
 
-/**
- * Parse `argv` after the bootstrap split: `rest[0]` must be `"snippet"`.
- */
-export function parseSnippetRest(rest: string[]):
-  | { kind: "help" }
-  | { kind: "error"; message: string }
-  | {
-      kind: "run";
-      name: string | undefined;
-      kindFilter: string | undefined;
-      inPath: string | undefined;
-      query: string | undefined;
-      withFts: boolean;
-      json: boolean;
-    } {
-  if (rest[0] !== "snippet") {
-    throw new Error("parseSnippetRest: expected snippet");
-  }
-
-  let json = false;
-  let name: string | undefined;
-  let kindFilter: string | undefined;
-  let inPath: string | undefined;
-  let query: string | undefined;
-  let withFts = false;
-
-  for (let i = 1; i < rest.length; i++) {
-    const a = rest[i]!;
-    if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
-    if (a === "--with-fts") {
-      withFts = true;
-      continue;
-    }
-    if (a === "--query") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap snippet: "--query" requires a value.`,
-        };
-      }
-      query = next;
-      i++;
-      continue;
-    }
-    if (a === "--kind") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap snippet: "--kind" requires a value.`,
-        };
-      }
-      kindFilter = next;
-      i++;
-      continue;
-    }
-    if (a === "--in") {
-      const next = rest[i + 1];
-      if (next === undefined || next.startsWith("-")) {
-        return {
-          kind: "error",
-          message: `codemap snippet: "--in" requires a value.`,
-        };
-      }
-      inPath = next;
-      i++;
-      continue;
-    }
-    if (a.startsWith("-")) {
-      return {
-        kind: "error",
-        message: `codemap snippet: unknown option "${a}". Run \`codemap snippet --help\` for usage.`,
-      };
-    }
-    if (name !== undefined) {
-      return {
-        kind: "error",
-        message: `codemap snippet: unexpected extra argument "${a}". Pass exactly one symbol name or use --query.`,
-      };
-    }
-    name = a;
-  }
-
-  if (query !== undefined && name !== undefined) {
-    return {
-      kind: "error",
-      message: "codemap snippet: pass either <name> or --query, not both.",
-    };
-  }
-
-  if (query === undefined && name === undefined) {
-    return {
-      kind: "error",
-      message: `codemap snippet: missing <name> or --query. Run \`codemap snippet --help\` for usage.`,
-    };
-  }
-
-  if (
-    query !== undefined &&
-    (kindFilter !== undefined || inPath !== undefined)
-  ) {
-    return {
-      kind: "error",
-      message:
-        "codemap snippet: --kind / --in apply to exact-name mode only; use kind: / path: / in: inside --query.",
-    };
-  }
-
-  return {
-    kind: "run",
-    name,
-    kindFilter,
-    inPath,
-    query,
-    withFts,
-    json,
-  };
+/** Parse `argv` after the bootstrap split: `rest[0]` must be `"snippet"`. */
+export function parseSnippetRest(rest: string[]) {
+  const parsed = parseShowSnippetRest(rest, {
+    verb: "snippet",
+    allowPrintSql: false,
+  });
+  if (parsed.kind !== "run") return parsed;
+  const { printSql: _printSql, ...run } = parsed;
+  return run;
 }
 
 /**
@@ -188,60 +74,55 @@ export function parseSnippetRest(rest: string[]):
 export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-
     const projectRoot = getProjectRoot();
+
+    const mode = resolveShowLookupMode(
+      {
+        name: opts.name,
+        query: opts.query,
+        kind: opts.kind,
+        in: opts.inPath,
+      },
+      projectRoot,
+    );
+    if (!mode.ok) {
+      emitErrorMaybeJson(`codemap snippet: ${mode.error}`, opts.json);
+      return;
+    }
+
     const db = openDb();
-    let matches: SymbolMatch[];
-    let warning: string | undefined;
     try {
-      if (opts.query !== undefined) {
-        const parsedQuery = parseAndNormalizeSearchQuery(
-          opts.query,
-          projectRoot,
-        );
-        if (!parsedQuery.ok) {
-          emitErrorMaybeJson(
-            `codemap snippet: ${parsedQuery.error}`,
-            opts.json,
-          );
-          return;
-        }
-        const fts = resolveSearchWithFts(db, {
-          withFtsCli: opts.withFts,
-          freeTextCount: parsedQuery.parsed.freeText.length,
-        });
-        if (fts.warning !== undefined) {
-          console.error(`codemap snippet: ${fts.warning}`);
-          warning = fts.warning;
-        }
-        matches = searchSymbols(db, {
-          parsed: parsedQuery.parsed,
-          withFts: fts.useFts,
-        });
-        if (matches.length === 0) {
-          emitErrorMaybeJson(
+      const { matches, warning } = executeShowLookup(db, mode, {
+        withFtsCli: opts.withFts,
+        exactKind: opts.kind,
+      });
+      if (warning !== undefined) {
+        console.error(`codemap snippet: ${warning}`);
+      }
+
+      const isQuery = mode.kind === "query";
+      if (matches.length === 0) {
+        if (isQuery) {
+          const empty = buildSnippetResult({ db, matches, projectRoot });
+          if (warning !== undefined) empty.warning = warning;
+          if (opts.json) {
+            console.log(JSON.stringify(empty));
+            return;
+          }
+          console.error(
             `codemap snippet: no symbols matched --query "${opts.query}". Try \`codemap show --query '${opts.query}' --print-sql\`.`,
-            opts.json,
           );
+          process.exitCode = 1;
           return;
         }
-      } else {
-        const inPath =
-          opts.inPath !== undefined
-            ? toProjectRelative(projectRoot, opts.inPath)
-            : undefined;
-        matches = findSymbolsByName(db, {
-          name: opts.name!,
-          kind: opts.kind,
-          inPath,
-        });
-        if (matches.length === 0) {
-          const filterDesc = describeFilter(opts.kind, inPath);
-          const safeName = opts.name!.replace(/'/g, "''");
-          const message = `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap show --query 'name:${safeName}'\` for fuzzy lookup.`;
-          emitErrorMaybeJson(message, opts.json);
-          return;
-        }
+        const inPath = mode.kind === "exact" ? mode.inPath : undefined;
+        const filterDesc = describeFilter(opts.kind, inPath);
+        const safeName = opts.name!.replace(/'/g, "''");
+        emitErrorMaybeJson(
+          `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap show --query 'name:${safeName}'\` for fuzzy lookup.`,
+          opts.json,
+        );
+        return;
       }
 
       const result = buildSnippetResult({ db, matches, projectRoot });

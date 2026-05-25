@@ -10,12 +10,12 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                           | Source                                     |
-| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| L.1 | **Moat-A clean** — parser translates to SQL WHERE clauses; always log/return equivalent SQL in `--print-sql` mode. | [Moat A](../roadmap.md#moats-load-bearing) |
-| L.2 | Fields v1: `kind:`, `name:`, `path:`, `in:` (file glob). Optional FTS join when `--with-fts`.                      | Minimal surface                            |
-| L.3 | Surface on **`show` convenience** and MCP `show` / new `search` tool — not a separate verdict engine.              | Thin layer                                 |
-| L.4 | Document SQL equivalents in bundled skill.                                                                         | Transparency                               |
+| #   | Decision                                                                                                                          | Source                                     |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| L.1 | **Moat-A clean** — parser translates to SQL WHERE clauses; always log/return equivalent SQL in `--print-sql` mode.                | [Moat A](../roadmap.md#moats-load-bearing) |
+| L.2 | Fields v1: `kind:`, `name:`, `path:`, `in:` (file glob). Optional FTS join when `--with-fts`.                                     | Minimal surface                            |
+| L.3 | Surface on **`show` convenience** and MCP **`show`** / **`snippet`** — not a separate verdict engine or standalone `search` tool. | Thin layer                                 |
+| L.4 | Document SQL equivalents in bundled skill.                                                                                        | Transparency                               |
 
 ---
 

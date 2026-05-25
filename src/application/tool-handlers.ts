@@ -62,16 +62,8 @@ import { resolveRecipeParams } from "./recipe-params";
 import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
 import { tryRecordRecipeRun } from "./recipe-recency";
 import { runCodemapIndex } from "./run-index";
-import { searchSymbols } from "./search-engine";
-import {
-  buildShowResult,
-  buildSnippetResult,
-  findSymbolsByName,
-} from "./show-engine";
-import {
-  resolveSearchWithFts,
-  resolveShowLookupMode,
-} from "./show-search-mode";
+import { buildShowResult, buildSnippetResult } from "./show-engine";
+import { executeShowLookup, resolveShowLookupMode } from "./show-search-mode";
 import {
   composeExploreResult,
   composeNodeResult,
@@ -693,40 +685,11 @@ export interface ShowArgs {
 }
 
 export function handleShow(args: ShowArgs, root: string): ToolResult {
-  try {
-    const mode = resolveShowLookupMode(args, root);
-    if (!mode.ok) return err(mode.error, 400);
-
-    const db = openDb();
-    try {
-      let warning: string | undefined;
-      const matches =
-        mode.kind === "query"
-          ? (() => {
-              const fts = resolveSearchWithFts(db, {
-                withFtsCli: args.with_fts === true,
-                freeTextCount: mode.parsed.freeText.length,
-              });
-              warning = fts.warning;
-              return searchSymbols(db, {
-                parsed: mode.parsed,
-                withFts: fts.useFts,
-              });
-            })()
-          : findSymbolsByName(db, {
-              name: mode.name,
-              kind: args.kind,
-              inPath: mode.inPath,
-            });
-      const result = buildShowResult(matches);
-      if (warning !== undefined) result.warning = warning;
-      return ok(result);
-    } finally {
-      closeDb(db, { readonly: true });
-    }
-  } catch (e) {
-    return err(e instanceof Error ? e.message : String(e), 500);
-  }
+  return handleShowLike(args, root, (lookup) => {
+    const result = buildShowResult(lookup.matches);
+    if (lookup.warning !== undefined) result.warning = lookup.warning;
+    return result;
+  });
 }
 
 // === snippet ================================================================
@@ -748,34 +711,36 @@ export interface SnippetArgs {
 }
 
 export function handleSnippet(args: SnippetArgs, root: string): ToolResult {
+  return handleShowLike(args, root, (lookup, db) => {
+    const result = buildSnippetResult({
+      db,
+      matches: lookup.matches,
+      projectRoot: root,
+    });
+    if (lookup.warning !== undefined) result.warning = lookup.warning;
+    return result;
+  });
+}
+
+function handleShowLike<T>(
+  args: ShowArgs,
+  root: string,
+  build: (
+    lookup: ReturnType<typeof executeShowLookup>,
+    db: ReturnType<typeof openDb>,
+  ) => T,
+): ToolResult {
   try {
     const mode = resolveShowLookupMode(args, root);
     if (!mode.ok) return err(mode.error, 400);
 
     const db = openDb();
     try {
-      let warning: string | undefined;
-      const matches =
-        mode.kind === "query"
-          ? (() => {
-              const fts = resolveSearchWithFts(db, {
-                withFtsCli: args.with_fts === true,
-                freeTextCount: mode.parsed.freeText.length,
-              });
-              warning = fts.warning;
-              return searchSymbols(db, {
-                parsed: mode.parsed,
-                withFts: fts.useFts,
-              });
-            })()
-          : findSymbolsByName(db, {
-              name: mode.name,
-              kind: args.kind,
-              inPath: mode.inPath,
-            });
-      const result = buildSnippetResult({ db, matches, projectRoot: root });
-      if (warning !== undefined) result.warning = warning;
-      return ok(result);
+      const lookup = executeShowLookup(db, mode, {
+        withFtsCli: args.with_fts === true,
+        exactKind: args.kind,
+      });
+      return ok(build(lookup, db));
     } finally {
       closeDb(db, { readonly: true });
     }

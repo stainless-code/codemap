@@ -47,6 +47,35 @@ describe("parseSnippetRest", () => {
     });
   });
 
+  it("parses --query field search", () => {
+    const r = parseSnippetRest([
+      "snippet",
+      "--query",
+      "kind:function name:run",
+      "--json",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      name: undefined,
+      kindFilter: undefined,
+      inPath: undefined,
+      query: "kind:function name:run",
+      withFts: false,
+      json: true,
+    });
+  });
+
+  it("errors when --print-sql is passed (show-only flag)", () => {
+    const r = parseSnippetRest([
+      "snippet",
+      "--query",
+      "name:foo",
+      "--print-sql",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--print-sql");
+  });
+
   it("parses name + flags in any order", () => {
     const r = parseSnippetRest([
       "snippet",

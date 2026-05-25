@@ -1,17 +1,61 @@
 import type { CodemapDatabase } from "../db";
 import { getFts5Enabled } from "../runtime";
-import { isSourceFtsPopulated } from "./search-engine";
+import { isSourceFtsPopulated, searchSymbols } from "./search-engine";
 import { parseSearchQuery } from "./search-query-parser";
 import type {
   ParsedSearchQuery,
   ParseSearchQueryResult,
 } from "./search-query-parser";
+import { findSymbolsByName } from "./show-engine";
+import type { SymbolMatch } from "./show-engine";
 import { toProjectRelative } from "./validate-engine";
 
 export type ShowLookupMode =
   | { ok: true; kind: "exact"; name: string; inPath: string | undefined }
   | { ok: true; kind: "query"; parsed: ParsedSearchQuery }
   | { ok: false; error: string };
+
+export type ResolvedShowLookupMode = Extract<ShowLookupMode, { ok: true }>;
+
+export interface ExecuteShowLookupOpts {
+  withFtsCli: boolean;
+  /** Exact-name mode only — `kind` from `--kind` / MCP `kind`. */
+  exactKind?: string | undefined;
+}
+
+export interface ExecuteShowLookupResult {
+  matches: SymbolMatch[];
+  warning?: string;
+}
+
+/** Run exact-name or field-qualified lookup (shared by CLI, MCP, HTTP). */
+export function executeShowLookup(
+  db: CodemapDatabase,
+  mode: ResolvedShowLookupMode,
+  opts: ExecuteShowLookupOpts,
+): ExecuteShowLookupResult {
+  if (mode.kind === "exact") {
+    return {
+      matches: findSymbolsByName(db, {
+        name: mode.name,
+        kind: opts.exactKind,
+        inPath: mode.inPath,
+      }),
+    };
+  }
+
+  const fts = resolveSearchWithFts(db, {
+    withFtsCli: opts.withFtsCli,
+    freeTextCount: mode.parsed.freeText.length,
+  });
+  return {
+    matches: searchSymbols(db, {
+      parsed: mode.parsed,
+      withFts: fts.useFts,
+    }),
+    warning: fts.warning,
+  };
+}
 
 /** Parse `--query` and normalize `path:` to project-relative keys. */
 export function parseAndNormalizeSearchQuery(
@@ -45,14 +89,11 @@ export function resolveSearchWithFts(
   const wantFts = opts.withFtsCli || getFts5Enabled();
   if (!wantFts) return { useFts: false };
   if (!isSourceFtsPopulated(db)) {
-    if (opts.withFtsCli) {
-      return {
-        useFts: false,
-        warning:
-          "with_fts ignored — source_fts is empty. Re-index with --with-fts or fts5: true.",
-      };
-    }
-    return { useFts: false };
+    return {
+      useFts: false,
+      warning:
+        "FTS requested (fts5 config or with_fts / --with-fts) but source_fts is empty. Re-index with --with-fts or fts5: true.",
+    };
   }
   return { useFts: true };
 }

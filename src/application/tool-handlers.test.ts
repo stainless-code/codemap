@@ -13,7 +13,12 @@ import { join } from "node:path";
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
-import { handleApply, handleQueryRecipe } from "./tool-handlers";
+import {
+  handleApply,
+  handleQueryRecipe,
+  handleShow,
+  handleSnippet,
+} from "./tool-handlers";
 
 let projectRoot: string;
 
@@ -81,6 +86,34 @@ describe("handleQueryRecipe params", () => {
       ok: false,
       error: expect.stringContaining('missing required param "name_pattern"'),
     });
+  });
+});
+
+describe("handleShow / handleSnippet — field-qualified query", () => {
+  it("show query zero-match returns {matches:[]} not error", () => {
+    const result = handleShow({ query: "name:NoSuchSymbol" }, projectRoot);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toEqual({ matches: [] });
+  });
+
+  it("show with_fts on empty source_fts returns warning", () => {
+    const result = handleShow(
+      { query: "freeTextToken", with_fts: true },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const payload = result.payload as { matches: unknown[]; warning?: string };
+    expect(payload.matches).toEqual([]);
+    expect(payload.warning).toContain("source_fts is empty");
+  });
+
+  it("snippet query zero-match returns {matches:[]} not error", () => {
+    const result = handleSnippet({ query: "name:NoSuchSymbol" }, projectRoot);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toEqual({ matches: [] });
   });
 });
 
