@@ -1,9 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { extname, join } from "node:path";
 
 import { LANG_MAP } from "../constants";
-import { extractCssData } from "../css-parser";
 import {
   openDb,
   closeDb,
@@ -43,14 +42,11 @@ import {
   META_FTS5_ENABLED_KEY,
   SCHEMA_VERSION,
 } from "../db";
-import type { CodemapDatabase, DynamicImportRow, FileRow } from "../db";
-import { countLines } from "../extractors/offsets";
+import type { CodemapDatabase, DynamicImportRow } from "../db";
 import { filterRowsByChangedFiles } from "../git-changed";
 import { globSync } from "../glob-sync";
 import { hashContent } from "../hash";
-import { extractMarkers, extractSuppressions } from "../markers";
 import type { ParsedFile } from "../parse-worker";
-import { extractFileData } from "../parser";
 import { resolveImports, resolveModuleSpecifier } from "../resolver";
 import {
   getExcludeDirNames,
@@ -79,29 +75,6 @@ import type {
 } from "./types";
 
 export const VALID_EXTENSIONS = new Set(Object.keys(LANG_MAP));
-
-const TS_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".mts",
-  ".cts",
-  ".js",
-  ".jsx",
-  ".mjs",
-  ".cjs",
-]);
-const CSS_EXTENSIONS = new Set([".css"]);
-
-function langFromExt(ext: string): string {
-  return LANG_MAP[ext.toLowerCase()] ?? "text";
-}
-
-function fileCategory(path: string): "ts" | "css" | "text" {
-  const ext = extname(path).toLowerCase();
-  if (TS_EXTENSIONS.has(ext)) return "ts";
-  if (CSS_EXTENSIONS.has(ext)) return "css";
-  return "text";
-}
 
 function persistTierSubstrate(
   db: CodemapDatabase,
@@ -282,6 +255,14 @@ function reportParseError(relPath: string, reason: string): void {
   } catch {
     // logging must not fail the index run
   }
+}
+
+function countParseFailures(results: readonly ParsedFile[]): number {
+  let failures = 0;
+  for (const parsed of results) {
+    if (parsed.error || parsed.parseError) failures++;
+  }
+  return failures;
 }
 
 function insertParsedResults(
@@ -480,11 +461,13 @@ export async function indexFiles(
 
   let indexed = 0;
   let skipped = 0;
+  let parseFailures = 0;
 
   if (fullRebuild) {
     const parseStart = performance.now();
     const results = await parseFilesParallel(filePaths);
     parseMs = performance.now() - parseStart;
+    parseFailures = countParseFailures(results);
     // relPath is always POSIX-normalized ASCII (toRelativePosix upstream); byte order suffices
     // for architecture.md § Sorted inserts' B-tree locality and skips the Intl-collator tax.
     results.sort((a, b) =>
@@ -504,129 +487,48 @@ export async function indexFiles(
     const existingHashes = options?.existingHashes ?? getAllFileHashes(db);
     const root = getProjectRoot();
     const sourceCache = options?.sourceCache;
+    const toParse: string[] = [];
+    const readFailed: string[] = [];
+
+    for (const relPath of filePaths) {
+      const absPath = join(root, relPath);
+      let hash: string;
+      const cached = sourceCache?.get(relPath);
+      if (cached !== undefined) {
+        hash = cached.hash;
+      } else {
+        try {
+          hash = hashContent(readFileSync(absPath, "utf-8"));
+        } catch {
+          readFailed.push(relPath);
+          continue;
+        }
+      }
+
+      if (existingHashes.get(relPath) === hash) {
+        skipped++;
+      } else {
+        toParse.push(relPath);
+      }
+    }
+
+    const parseStart = performance.now();
+    const parsedResults = await parseFilesParallel(toParse);
+    parseMs = performance.now() - parseStart;
+    parseFailures = countParseFailures(parsedResults);
 
     const transaction = db.transaction(() => {
       const deleted = options?.deletedPaths ?? [];
       if (deleted.length > 0) {
         deleteFilesFromIndex(db, deleted, quiet);
       }
-      for (const relPath of filePaths) {
-        const absPath = join(root, relPath);
-        let source: string;
-        let hash: string;
-        // `--files` targeted reindex + cache-less callers fall through to read+hash.
-        const cached = sourceCache?.get(relPath);
-        if (cached !== undefined) {
-          source = cached.source;
-          hash = cached.hash;
-        } else {
-          try {
-            source = readFileSync(absPath, "utf-8");
-          } catch {
-            deleteFileData(db, relPath);
-            continue;
-          }
-          hash = hashContent(source);
-        }
-
-        if (existingHashes.get(relPath) === hash) {
-          skipped++;
-          continue;
-        }
-
+      for (const relPath of readFailed) {
         deleteFileData(db, relPath);
-
-        const stat = statSync(absPath);
-        const lineCount = countLines(source);
-
-        const fileRow: FileRow = {
-          path: relPath,
-          content_hash: hash,
-          size: stat.size,
-          line_count: lineCount,
-          language: langFromExt(extname(relPath)),
-          last_modified: Math.floor(stat.mtimeMs),
-          indexed_at: Date.now(),
-        };
-        insertFile(db, fileRow);
-
-        if (getFts5Enabled()) {
-          upsertSourceFts(db, relPath, source);
-        }
-
-        try {
-          const category = fileCategory(relPath);
-
-          if (category === "text") {
-            const markers = extractMarkers(source, relPath);
-            if (markers.length) insertMarkers(db, markers);
-          } else if (category === "css") {
-            const cssData = extractCssData(absPath, source, relPath);
-            if (cssData.variables.length) {
-              insertCssVariables(db, cssData.variables);
-            }
-            if (cssData.classes.length) insertCssClasses(db, cssData.classes);
-            if (cssData.keyframes.length) {
-              insertCssKeyframes(db, cssData.keyframes);
-            }
-            if (cssData.markers.length) insertMarkers(db, cssData.markers);
-            if (cssData.importSources.length) {
-              insertImports(
-                db,
-                cssData.importSources.map((importSource) => ({
-                  file_path: relPath,
-                  source: importSource,
-                  resolved_path: null,
-                  specifiers: "[]",
-                  is_type_only: 0,
-                  line_number: 0,
-                })),
-              );
-            }
-          } else {
-            const data = extractFileData(absPath, source, relPath);
-            if (data.symbols.length) insertSymbols(db, data.symbols);
-            const deps = resolveImports(absPath, data.imports, indexedPaths);
-            insertImportsWithSpecifiers(
-              db,
-              data.imports,
-              data.importSpecifiers,
-            );
-            if (data.scopes.length) insertScopes(db, data.scopes);
-            if (data.references.length) insertReferences(db, data.references);
-            if (data.fileMetrics) insertFileMetrics(db, [data.fileMetrics]);
-            if (data.functionParams.length)
-              insertFunctionParams(db, data.functionParams);
-            if (data.runtimeMarkers.length)
-              insertRuntimeMarkers(db, data.runtimeMarkers);
-            if (data.testSuites.length) insertTestSuites(db, data.testSuites);
-            if (deps.length) insertDependencies(db, deps);
-            if (data.exports.length) insertExports(db, data.exports);
-            if (data.components.length) insertComponents(db, data.components);
-            if (data.markers.length) insertMarkers(db, data.markers);
-            if (data.typeMembers.length)
-              insertTypeMembers(db, data.typeMembers);
-            if (data.calls.length) insertCalls(db, data.calls);
-            persistDynamicImports(db, absPath, data.dynamicImports);
-            persistTierSubstrate(db, relPath, data);
-            if (data.hasSideEffects) {
-              db.run("UPDATE files SET has_side_effects = 1 WHERE path = ?", [
-                relPath,
-              ]);
-            }
-          }
-          // Category-agnostic: one regex pass over raw source, no AST needed.
-          const suppressions = extractSuppressions(source, relPath);
-          if (suppressions.length) insertSuppressions(db, suppressions);
-        } catch (err) {
-          reportParseError(
-            relPath,
-            err instanceof Error ? err.message : String(err),
-          );
-        }
-
-        indexed++;
       }
+      for (const parsed of parsedResults) {
+        deleteFileData(db, parsed.relPath);
+      }
+      indexed += insertParsedResults(db, parsedResults, indexedPaths);
     });
 
     transaction();
@@ -718,7 +620,7 @@ export async function indexFiles(
       `\n  Codemap ${fullRebuild ? "(full rebuild)" : "(incremental)"}`,
     );
     console.log(
-      `  ${indexed} files indexed, ${skipped} unchanged, ${elapsed}ms`,
+      `  ${indexed} files indexed, ${skipped} unchanged${parseFailures > 0 ? `, ${parseFailures} parse failures` : ""}, ${elapsed}ms`,
     );
     console.log(`  ───────────────────────────────────`);
     for (const [key, value] of Object.entries(stats)) {

@@ -1,10 +1,18 @@
+import { statSync } from "node:fs";
 import { cpus } from "node:os";
-import { basename, dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker as NodeWorker } from "node:worker_threads";
 
+import {
+  ParseTimeoutError,
+  computeParseTimeoutMs,
+  delay,
+  parseParseTimeoutMsOverride,
+} from "./application/parse-timeout";
 import { CODEMAP_BUILD_OUTPUT_DIR } from "./build-output";
 import type { ParsedFile, WorkerInput, WorkerOutput } from "./parse-worker";
+import { parseWorkerInput } from "./parse-worker-core";
 import { getFts5Enabled, getProjectRoot } from "./runtime";
 
 const fromDist =
@@ -21,6 +29,13 @@ const WORKER_URL_NODE = new URL(
 );
 
 const PARSE_WORKER_COUNT_RE = /^\d+$/;
+const RECYCLE_EVERY_RE = /^\d+$/;
+
+const DEFAULT_WORKER_RECYCLE_EVERY = 250;
+/** Avoid worker spawn tax on tiny targeted/incremental batches. */
+const INLINE_PARSE_MAX = 12;
+/** Cap a single worker message budget so one hung file cannot block a huge chunk until sum(timeouts). */
+const CHUNK_TIMEOUT_CAP_MS = 120_000;
 
 /** Returns clamped override [1, 32], or `null` when unset/empty/invalid. */
 export function parseParseWorkerCountOverride(
@@ -33,7 +48,26 @@ export function parseParseWorkerCountOverride(
   return Math.min(parsed, 32);
 }
 
-// Override via `CODEMAP_PARSE_WORKERS` (clamped [1, 32]); default formula unchanged when unset.
+export function parseWorkerRecycleEvery(
+  env: string | undefined = process.env.CODEMAP_WORKER_RECYCLE_EVERY,
+): number {
+  if (env === undefined || env === "") return DEFAULT_WORKER_RECYCLE_EVERY;
+  if (!RECYCLE_EVERY_RE.test(env)) {
+    console.error(
+      `[worker-pool] ignoring invalid CODEMAP_WORKER_RECYCLE_EVERY=${JSON.stringify(env)} (expected positive integer)`,
+    );
+    return DEFAULT_WORKER_RECYCLE_EVERY;
+  }
+  const parsed = Number(env);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    console.error(
+      `[worker-pool] ignoring invalid CODEMAP_WORKER_RECYCLE_EVERY=${JSON.stringify(env)} (expected positive integer)`,
+    );
+    return DEFAULT_WORKER_RECYCLE_EVERY;
+  }
+  return parsed;
+}
+
 function resolveWorkerCount(): number {
   const env = process.env.CODEMAP_PARSE_WORKERS;
   const override = parseParseWorkerCountOverride(env);
@@ -50,51 +84,316 @@ const WORKER_COUNT = resolveWorkerCount();
 const IS_BUN = typeof Bun !== "undefined";
 const NODE_WORKER_PATH = IS_BUN ? "" : fileURLToPath(WORKER_URL_NODE);
 
-export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
-  if (filePaths.length === 0) return Promise.resolve([]);
+interface ParseWorkerSession {
+  parse(input: WorkerInput, timeoutMs: number): Promise<WorkerOutput>;
+  dispose(): void;
+}
+
+function createParseWorkerSession(): ParseWorkerSession {
+  let generation = 0;
+  let pending:
+    | {
+        gen: number;
+        resolve: (value: WorkerOutput) => void;
+        reject: (err: Error) => void;
+      }
+    | undefined;
+
+  if (IS_BUN) {
+    let worker = new Worker(WORKER_URL_BUN);
+    const attach = (): void => {
+      worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
+        if (!pending || pending.gen !== generation) return;
+        const { resolve } = pending;
+        pending = undefined;
+        resolve(event.data);
+      };
+      worker.onerror = (event: ErrorEvent) => {
+        if (!pending || pending.gen !== generation) return;
+        const { reject } = pending;
+        pending = undefined;
+        reject(event.error ?? new Error(event.message));
+      };
+    };
+    attach();
+
+    return {
+      parse(input, timeoutMs) {
+        const gen = generation;
+        return Promise.race([
+          new Promise<WorkerOutput>((resolve, reject) => {
+            pending = { gen, resolve, reject };
+            worker.postMessage(input);
+          }),
+          delay(timeoutMs).then(() => {
+            throw new ParseTimeoutError(timeoutMs);
+          }),
+        ]).catch((err) => {
+          if (err instanceof ParseTimeoutError) {
+            generation++;
+            pending = undefined;
+            worker.terminate();
+            worker = new Worker(WORKER_URL_BUN);
+            attach();
+          }
+          throw err;
+        });
+      },
+      dispose() {
+        pending = undefined;
+        generation++;
+        worker.terminate();
+      },
+    };
+  }
+
+  let worker = new NodeWorker(NODE_WORKER_PATH, {
+    type: "module",
+  } as import("node:worker_threads").WorkerOptions);
+
+  const attachNode = (): void => {
+    worker.on("message", (data: WorkerOutput) => {
+      if (!pending || pending.gen !== generation) return;
+      const { resolve } = pending;
+      pending = undefined;
+      resolve(data);
+    });
+    worker.on("error", (err: Error) => {
+      if (!pending || pending.gen !== generation) return;
+      const { reject } = pending;
+      pending = undefined;
+      reject(err);
+    });
+  };
+  attachNode();
+
+  return {
+    parse(input, timeoutMs) {
+      const gen = generation;
+      return Promise.race([
+        new Promise<WorkerOutput>((resolve, reject) => {
+          pending = { gen, resolve, reject };
+          worker.postMessage(input);
+        }),
+        delay(timeoutMs).then(() => {
+          throw new ParseTimeoutError(timeoutMs);
+        }),
+      ]).catch((err) => {
+        if (err instanceof ParseTimeoutError) {
+          generation++;
+          pending = undefined;
+          void worker.terminate();
+          worker = new NodeWorker(NODE_WORKER_PATH, {
+            type: "module",
+          } as import("node:worker_threads").WorkerOptions);
+          attachNode();
+        }
+        throw err;
+      });
+    },
+    dispose() {
+      pending = undefined;
+      generation++;
+      void worker.terminate();
+    },
+  };
+}
+
+function fileSizeBytes(projectRoot: string, relPath: string): number {
+  try {
+    return statSync(join(projectRoot, relPath)).size;
+  } catch {
+    return 0;
+  }
+}
+
+function chunkBudgetMs(
+  files: readonly string[],
+  projectRoot: string,
+  timeoutEnv: string | undefined,
+): number {
+  let sum = 0;
+  for (const relPath of files) {
+    sum += computeParseTimeoutMs(
+      fileSizeBytes(projectRoot, relPath),
+      timeoutEnv,
+    );
+  }
+  return Math.min(sum, CHUNK_TIMEOUT_CAP_MS);
+}
+
+function timeoutParsedFile(
+  relPath: string,
+  projectRoot: string,
+  timeoutMs: number,
+): ParsedFile {
+  const reason = `parse timed out after ${timeoutMs}ms`;
+  try {
+    const stat = statSync(join(projectRoot, relPath));
+    return {
+      relPath,
+      parseError: reason,
+      fileRow: {
+        path: relPath,
+        content_hash: "",
+        size: stat.size,
+        line_count: 0,
+        language: "text",
+        last_modified: Math.floor(stat.mtimeMs),
+        indexed_at: Date.now(),
+      },
+      category: "text",
+    };
+  } catch {
+    return {
+      relPath,
+      error: true,
+      fileRow: {} as ParsedFile["fileRow"],
+      category: "text",
+    };
+  }
+}
+
+async function parseOneFile(
+  session: ParseWorkerSession,
+  relPath: string,
+  projectRoot: string,
+  fts5Enabled: boolean,
+  timeoutEnv: string | undefined,
+): Promise<ParsedFile> {
+  const timeoutMs = computeParseTimeoutMs(
+    fileSizeBytes(projectRoot, relPath),
+    timeoutEnv,
+  );
+  const input: WorkerInput = {
+    files: [relPath],
+    projectRoot,
+    fts5Enabled,
+  };
+  try {
+    const output = await session.parse(input, timeoutMs);
+    return (
+      output.results[0] ?? timeoutParsedFile(relPath, projectRoot, timeoutMs)
+    );
+  } catch (err) {
+    if (err instanceof ParseTimeoutError) {
+      return timeoutParsedFile(relPath, projectRoot, err.timeoutMs);
+    }
+    throw err;
+  }
+}
+
+async function parseChunkFiles(
+  session: ParseWorkerSession,
+  files: readonly string[],
+  projectRoot: string,
+  fts5Enabled: boolean,
+  timeoutEnv: string | undefined,
+): Promise<ParsedFile[]> {
+  if (files.length === 0) return [];
+  if (files.length === 1) {
+    return [
+      await parseOneFile(
+        session,
+        files[0]!,
+        projectRoot,
+        fts5Enabled,
+        timeoutEnv,
+      ),
+    ];
+  }
+
+  const timeoutMs = chunkBudgetMs(files, projectRoot, timeoutEnv);
+  const input: WorkerInput = { files: [...files], projectRoot, fts5Enabled };
+  try {
+    const output = await session.parse(input, timeoutMs);
+    return output.results;
+  } catch (err) {
+    if (!(err instanceof ParseTimeoutError)) throw err;
+    const mid = Math.ceil(files.length / 2);
+    const left = await parseChunkFiles(
+      session,
+      files.slice(0, mid),
+      projectRoot,
+      fts5Enabled,
+      timeoutEnv,
+    );
+    const right = await parseChunkFiles(
+      session,
+      files.slice(mid),
+      projectRoot,
+      fts5Enabled,
+      timeoutEnv,
+    );
+    return [...left, ...right];
+  }
+}
+
+function splitWorkerChunks(filePaths: readonly string[]): string[][] {
   const chunkSize = Math.ceil(filePaths.length / WORKER_COUNT);
   const chunks: string[][] = [];
   for (let i = 0; i < filePaths.length; i += chunkSize) {
     chunks.push(filePaths.slice(i, i + chunkSize));
   }
+  return chunks;
+}
+
+export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
+  if (filePaths.length === 0) return Promise.resolve([]);
 
   const projectRoot = getProjectRoot();
   const fts5Enabled = getFts5Enabled();
+  const timeoutEnv = process.env.CODEMAP_PARSE_TIMEOUT_MS;
+  if (
+    timeoutEnv !== undefined &&
+    timeoutEnv !== "" &&
+    parseParseTimeoutMsOverride(timeoutEnv) === null
+  ) {
+    console.error(
+      `[worker-pool] ignoring invalid CODEMAP_PARSE_TIMEOUT_MS=${JSON.stringify(timeoutEnv)} (expected positive integer)`,
+    );
+  }
+
+  if (filePaths.length <= INLINE_PARSE_MAX) {
+    return Promise.resolve(
+      parseWorkerInput({ files: [...filePaths], projectRoot, fts5Enabled })
+        .results,
+    );
+  }
+
+  const recycleEvery = parseWorkerRecycleEvery();
+  const chunks = splitWorkerChunks(filePaths);
 
   return Promise.all(
-    chunks.map(
-      (chunk) =>
-        new Promise<ParsedFile[]>((resolve, reject) => {
-          const input: WorkerInput = {
-            files: chunk,
-            projectRoot,
-            fts5Enabled,
-          };
-
-          if (IS_BUN) {
-            const worker = new Worker(WORKER_URL_BUN);
-            worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
-              resolve(event.data.results);
-              worker.terminate();
-            };
-            worker.onerror = (event: ErrorEvent) => {
-              reject(event.error ?? new Error(event.message));
-              worker.terminate();
-            };
-            worker.postMessage(input);
-            return;
+    chunks.map(async (chunk) => {
+      let session = createParseWorkerSession();
+      let processed = 0;
+      try {
+        const results: ParsedFile[] = [];
+        for (let i = 0; i < chunk.length; ) {
+          const sliceEnd = Math.min(i + recycleEvery, chunk.length);
+          const slice = chunk.slice(i, sliceEnd);
+          results.push(
+            ...(await parseChunkFiles(
+              session,
+              slice,
+              projectRoot,
+              fts5Enabled,
+              timeoutEnv,
+            )),
+          );
+          processed += slice.length;
+          i = sliceEnd;
+          if (processed >= recycleEvery && i < chunk.length) {
+            session.dispose();
+            session = createParseWorkerSession();
+            processed = 0;
           }
-
-          const worker = new NodeWorker(NODE_WORKER_PATH, {
-            type: "module",
-          } as import("node:worker_threads").WorkerOptions);
-          worker.on("message", (data: WorkerOutput) => {
-            resolve(data.results);
-            void worker.terminate();
-          });
-          worker.on("error", reject);
-          worker.postMessage(input);
-        }),
-    ),
+        }
+        return results;
+      } finally {
+        session.dispose();
+      }
+    }),
   ).then((parts) => parts.flat());
 }
