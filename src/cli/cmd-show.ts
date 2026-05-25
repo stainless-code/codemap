@@ -1,19 +1,18 @@
-import {
-  buildSymbolSearchSql,
-  formatSymbolSearchSqlForDisplay,
-} from "../application/search-engine";
 import { buildShowResult } from "../application/show-engine";
 import type { ShowResult } from "../application/show-engine";
 import {
   executeShowLookup,
-  parseAndNormalizeSearchQuery,
-  resolveSearchWithFts,
+  formatShowSearchSqlForQuery,
   resolveShowLookupMode,
 } from "../application/show-search-mode";
 import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 import { parseShowSnippetRest } from "./show-snippet-args";
+import {
+  buildExactNameEmptyMessage,
+  emitErrorMaybeJson,
+} from "./show-snippet-render";
 
 interface ShowOpts {
   root: string;
@@ -131,7 +130,8 @@ export async function runShowCmd(opts: ShowOpts): Promise<void> {
         isQuery,
         emptyMessage: isQuery
           ? `codemap show: no symbols matched --query "${opts.query}". Try --print-sql to inspect the generated SQL.`
-          : buildExactEmptyMessage(
+          : buildExactNameEmptyMessage(
+              "show",
               opts.name!,
               opts.kind,
               mode.kind === "exact" ? mode.inPath : undefined,
@@ -151,39 +151,32 @@ function runShowPrintSql(
   projectRoot: string,
   withFtsCli: boolean,
 ): void {
-  const parsedQuery = parseAndNormalizeSearchQuery(query, projectRoot);
-  if (!parsedQuery.ok) {
-    console.error(`codemap show: ${parsedQuery.error}`);
-    process.exitCode = 1;
-    return;
+  let db: ReturnType<typeof openDb> | undefined;
+  try {
+    db = openDb();
+  } catch {
+    db = undefined;
   }
 
-  let useFts = false;
-  if (parsedQuery.parsed.freeText.length > 0) {
-    try {
-      const db = openDb();
-      try {
-        const fts = resolveSearchWithFts(db, {
-          withFtsCli,
-          freeTextCount: parsedQuery.parsed.freeText.length,
-        });
-        if (fts.warning !== undefined) {
-          console.error(`codemap show: ${fts.warning}`);
-        }
-        useFts = fts.useFts;
-      } finally {
-        closeDb(db, { readonly: true });
-      }
-    } catch {
-      useFts = false;
+  try {
+    const result = formatShowSearchSqlForQuery(query, projectRoot, {
+      withFtsCli,
+      db,
+    });
+    if (!result.ok) {
+      console.error(`codemap show: ${result.error}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (result.warning !== undefined) {
+      console.error(`codemap show: ${result.warning}`);
+    }
+    console.log(result.sql);
+  } finally {
+    if (db !== undefined) {
+      closeDb(db, { readonly: true });
     }
   }
-
-  const built = buildSymbolSearchSql({
-    parsed: parsedQuery.parsed,
-    withFts: useFts,
-  });
-  console.log(formatSymbolSearchSqlForDisplay(built));
 }
 
 function renderShowMatches(
@@ -220,26 +213,6 @@ function renderShowMatches(
   renderTerminal(result);
 }
 
-function buildExactEmptyMessage(
-  name: string,
-  kind: string | undefined,
-  inPath: string | undefined,
-): string {
-  const filterDesc = describeFilter(kind, inPath);
-  const safeName = name.replace(/'/g, "''");
-  return `codemap show: no symbol named "${name}"${filterDesc}. Try \`codemap show --query 'name:${safeName}'\` or \`codemap query --json "SELECT name, file_path FROM symbols WHERE name LIKE '%${safeName}%'"\` for fuzzy lookup.`;
-}
-
-function describeFilter(
-  kind: string | undefined,
-  inPath: string | undefined,
-): string {
-  const parts: string[] = [];
-  if (kind !== undefined) parts.push(`kind = "${kind}"`);
-  if (inPath !== undefined) parts.push(`in = "${inPath}"`);
-  return parts.length === 0 ? "" : ` (filters: ${parts.join(", ")})`;
-}
-
 function renderTerminal(result: ShowResult): void {
   for (let i = 0; i < result.matches.length; i++) {
     const m = result.matches[i]!;
@@ -252,13 +225,4 @@ function renderTerminal(result: ShowResult): void {
       `\n# ${result.disambiguation.n} matches — ${result.disambiguation.hint}`,
     );
   }
-}
-
-function emitErrorMaybeJson(message: string, json: boolean): void {
-  if (json) {
-    console.log(JSON.stringify({ error: message }));
-  } else {
-    console.error(message);
-  }
-  process.exitCode = 1;
 }

@@ -5,10 +5,12 @@ import type { CodemapDatabase } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   executeShowLookup,
+  formatShowSearchSqlForQuery,
   normalizeSearchInGlob,
   parseAndNormalizeSearchQuery,
   resolveSearchWithFts,
   resolveShowLookupMode,
+  validateShowSnippetLookupArgs,
 } from "./show-search-mode";
 
 describe("parseAndNormalizeSearchQuery", () => {
@@ -44,6 +46,58 @@ describe("normalizeSearchInGlob", () => {
     expect(
       normalizeSearchInGlob("/tmp/project", "/tmp/project/src/api/*.ts"),
     ).toBe("src/api/*.ts");
+  });
+});
+
+describe("validateShowSnippetLookupArgs", () => {
+  it("rejects name and query together", () => {
+    expect(
+      validateShowSnippetLookupArgs({ name: "foo", query: "name:foo" }),
+    ).toEqual({
+      ok: false,
+      error: "pass either name or query, not both.",
+    });
+  });
+
+  it("rejects kind/in with query", () => {
+    expect(
+      validateShowSnippetLookupArgs({
+        query: "name:foo",
+        kind: "function",
+      }),
+    ).toEqual({
+      ok: false,
+      error:
+        "kind / in apply to exact-name lookup only; use kind: / path: / in: inside query.",
+    });
+  });
+});
+
+describe("formatShowSearchSqlForQuery", () => {
+  let db: CodemapDatabase;
+
+  beforeEach(() => {
+    db = openCodemapDatabase(":memory:");
+    createTables(db);
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it("returns rendered SQL for kind + name query", () => {
+    const result = formatShowSearchSqlForQuery(
+      "kind:function name:entry",
+      "/tmp",
+      {
+        withFtsCli: false,
+        db,
+      },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.sql).toContain("kind = 'function'");
+    expect(result.sql).toContain("name LIKE '%entry%'");
   });
 });
 

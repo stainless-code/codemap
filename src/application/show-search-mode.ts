@@ -2,7 +2,12 @@ import { isAbsolute } from "node:path";
 
 import type { CodemapDatabase } from "../db";
 import { getFts5Enabled } from "../runtime";
-import { isSourceFtsPopulated, searchSymbols } from "./search-engine";
+import {
+  buildSymbolSearchSql,
+  formatSymbolSearchSqlForDisplay,
+  isSourceFtsPopulated,
+  searchSymbols,
+} from "./search-engine";
 import { parseSearchQuery } from "./search-query-parser";
 import type {
   ParsedSearchQuery,
@@ -18,6 +23,72 @@ export type ShowLookupMode =
   | { ok: false; error: string };
 
 export type ResolvedShowLookupMode = Extract<ShowLookupMode, { ok: true }>;
+
+export interface ShowSnippetLookupArgs {
+  name?: string | undefined;
+  query?: string | undefined;
+  kind?: string | undefined;
+  in?: string | undefined;
+}
+
+/** Shared name/query/kind/in rules for CLI argv finalization and MCP/HTTP handlers. */
+export function validateShowSnippetLookupArgs(
+  args: ShowSnippetLookupArgs,
+): { ok: true } | { ok: false; error: string } {
+  const hasName = args.name !== undefined && args.name.length > 0;
+  const hasQuery = args.query !== undefined && args.query.length > 0;
+  if (hasName && hasQuery) {
+    return { ok: false, error: "pass either name or query, not both." };
+  }
+  if (!hasName && !hasQuery) {
+    return { ok: false, error: "name or query is required." };
+  }
+  if (hasQuery && (args.kind !== undefined || args.in !== undefined)) {
+    return {
+      ok: false,
+      error:
+        "kind / in apply to exact-name lookup only; use kind: / path: / in: inside query.",
+    };
+  }
+  return { ok: true };
+}
+
+export interface FormatShowSearchSqlResult {
+  ok: true;
+  sql: string;
+  warning?: string;
+}
+
+/** Moat-A SQL preview for `--print-sql` (shared FTS resolution + SQL builder). */
+export function formatShowSearchSqlForQuery(
+  query: string,
+  projectRoot: string,
+  opts: { withFtsCli: boolean; db?: CodemapDatabase | undefined },
+): FormatShowSearchSqlResult | { ok: false; error: string } {
+  const parsedQuery = parseAndNormalizeSearchQuery(query, projectRoot);
+  if (!parsedQuery.ok) return parsedQuery;
+
+  let useFts = false;
+  let warning: string | undefined;
+  if (parsedQuery.parsed.freeText.length > 0 && opts.db !== undefined) {
+    const fts = resolveSearchWithFts(opts.db, {
+      withFtsCli: opts.withFtsCli,
+      freeTextCount: parsedQuery.parsed.freeText.length,
+    });
+    warning = fts.warning;
+    useFts = fts.useFts;
+  }
+
+  const built = buildSymbolSearchSql({
+    parsed: parsedQuery.parsed,
+    withFts: useFts,
+  });
+  return {
+    ok: true,
+    sql: formatSymbolSearchSqlForDisplay(built),
+    warning,
+  };
+}
 
 export interface ExecuteShowLookupOpts {
   withFtsCli: boolean;
@@ -122,30 +193,14 @@ export function resolveSearchWithFts(
 }
 
 export function resolveShowLookupMode(
-  args: {
-    name?: string | undefined;
-    query?: string | undefined;
-    kind?: string | undefined;
-    in?: string | undefined;
-  },
+  args: ShowSnippetLookupArgs,
   root: string,
 ): ShowLookupMode {
-  const hasName = args.name !== undefined && args.name.length > 0;
+  const validation = validateShowSnippetLookupArgs(args);
+  if (!validation.ok) return validation;
+
   const hasQuery = args.query !== undefined && args.query.length > 0;
-  if (hasName && hasQuery) {
-    return { ok: false, error: "pass either name or query, not both." };
-  }
-  if (!hasName && !hasQuery) {
-    return { ok: false, error: "name or query is required." };
-  }
   if (hasQuery) {
-    if (args.kind !== undefined || args.in !== undefined) {
-      return {
-        ok: false,
-        error:
-          "kind / in apply to exact-name lookup only; use kind: / path: / in: inside query.",
-      };
-    }
     const parsed = parseAndNormalizeSearchQuery(args.query!, root);
     if (!parsed.ok) return parsed;
     return { ok: true, kind: "query", parsed: parsed.parsed };

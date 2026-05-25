@@ -28,4 +28,17 @@ describe("parseShowSnippetRest", () => {
       json: true,
     });
   });
+
+  it("delegates kind/in + query conflict to shared validation", () => {
+    const r = parseShowSnippetRest(
+      ["show", "--query", "name:foo", "--kind", "function"],
+      { verb: "show", allowPrintSql: true },
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.message).toContain(
+        "--kind / --in apply to exact-name mode only",
+      );
+    }
+  });
 });

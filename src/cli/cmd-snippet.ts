@@ -8,6 +8,10 @@ import { closeDb, openDb } from "../db";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 import { parseShowSnippetRest } from "./show-snippet-args";
+import {
+  buildExactNameEmptyMessage,
+  emitErrorMaybeJson,
+} from "./show-snippet-render";
 
 interface SnippetOpts {
   root: string;
@@ -118,10 +122,8 @@ export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
           return;
         }
         const inPath = mode.kind === "exact" ? mode.inPath : undefined;
-        const filterDesc = describeFilter(opts.kind, inPath);
-        const safeName = opts.name!.replace(/'/g, "''");
         emitErrorMaybeJson(
-          `codemap snippet: no symbol named "${opts.name}"${filterDesc}. Try \`codemap show --query 'name:${safeName}'\` for fuzzy lookup.`,
+          buildExactNameEmptyMessage("snippet", opts.name!, opts.kind, inPath),
           opts.json,
         );
         return;
@@ -141,16 +143,6 @@ export async function runSnippetCmd(opts: SnippetOpts): Promise<void> {
     const msg = err instanceof Error ? err.message : String(err);
     emitErrorMaybeJson(msg, opts.json);
   }
-}
-
-function describeFilter(
-  kind: string | undefined,
-  inPath: string | undefined,
-): string {
-  const parts: string[] = [];
-  if (kind !== undefined) parts.push(`kind = "${kind}"`);
-  if (inPath !== undefined) parts.push(`in = "${inPath}"`);
-  return parts.length === 0 ? "" : ` (filters: ${parts.join(", ")})`;
 }
 
 export function renderSnippetTerminal(result: SnippetResult): void {
@@ -177,13 +169,4 @@ export function renderSnippetTerminal(result: SnippetResult): void {
       `\n# Some snippets are stale (file changed since last index). Run \`codemap\` or \`codemap --files <path>\` to refresh.`,
     );
   }
-}
-
-function emitErrorMaybeJson(message: string, json: boolean): void {
-  if (json) {
-    console.log(JSON.stringify({ error: message }));
-  } else {
-    console.error(message);
-  }
-  process.exitCode = 1;
 }

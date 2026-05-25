@@ -278,7 +278,7 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
     "show",
     {
       description:
-        "Look up symbol(s) by exact name or field-qualified --query search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed). Use `snippet` for source text; use `query` for arbitrary SQL.",
+        "Look up symbol(s) by exact name or field-qualified --query search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` for arbitrary SQL.",
       inputSchema: showArgsSchema,
     },
     (args) => wrapToolResult(handleShow(args, opts.root)),
@@ -290,7 +290,7 @@ function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
     "snippet",
     {
       description:
-        "Same lookup as `show` (exact `{name}` or field-qualified `{query}` with kind:/name:/path:/in: tokens + optional `with_fts` for free text) but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Returns `{matches, disambiguation?, warning?}`; source/stale/missing are additive fields on each match.",
+        "Same lookup as `show` (exact `{name}` or field-qualified `{query}` with kind:/name:/path:/in: tokens + optional `with_fts` for free text — FTS matches file bodies and returns every symbol in matching files) but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Returns `{matches, disambiguation?, warning?}`; source/stale/missing are additive fields on each match.",
       inputSchema: snippetArgsSchema,
     },
     (args) => wrapToolResult(handleSnippet(args, opts.root)),

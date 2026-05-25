@@ -1,3 +1,5 @@
+import { validateShowSnippetLookupArgs } from "../application/show-search-mode";
+
 export interface ShowSnippetRunArgs {
   name: string | undefined;
   kindFilter: string | undefined;
@@ -106,20 +108,6 @@ export function parseShowSnippetRest(
     name = a;
   }
 
-  if (query !== undefined && name !== undefined) {
-    return {
-      kind: "error",
-      message: `${prefix}: pass either <name> or --query, not both.`,
-    };
-  }
-
-  if (query === undefined && name === undefined) {
-    return {
-      kind: "error",
-      message: `${prefix}: missing <name> or --query. Run \`${prefix} --help\` for usage.`,
-    };
-  }
-
   if (printSql && query === undefined) {
     return {
       kind: "error",
@@ -127,13 +115,16 @@ export function parseShowSnippetRest(
     };
   }
 
-  if (
-    query !== undefined &&
-    (kindFilter !== undefined || inPath !== undefined)
-  ) {
+  const validation = validateShowSnippetLookupArgs({
+    name,
+    query,
+    kind: kindFilter,
+    in: inPath,
+  });
+  if (!validation.ok) {
     return {
       kind: "error",
-      message: `${prefix}: --kind / --in apply to exact-name mode only; use kind: / path: / in: inside --query.`,
+      message: formatShowSnippetCliValidationError(prefix, validation.error),
     };
   }
 
@@ -147,4 +138,23 @@ export function parseShowSnippetRest(
     printSql,
     json,
   };
+}
+
+function formatShowSnippetCliValidationError(
+  prefix: string,
+  error: string,
+): string {
+  if (error === "name or query is required.") {
+    return `${prefix}: missing <name> or --query. Run \`${prefix} --help\` for usage.`;
+  }
+  if (error === "pass either name or query, not both.") {
+    return `${prefix}: pass either <name> or --query, not both.`;
+  }
+  if (
+    error ===
+    "kind / in apply to exact-name lookup only; use kind: / path: / in: inside query."
+  ) {
+    return `${prefix}: --kind / --in apply to exact-name mode only; use kind: / path: / in: inside --query.`;
+  }
+  return `${prefix}: ${error}`;
 }
