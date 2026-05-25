@@ -12,6 +12,7 @@ import {
 } from "./application/parse-timeout";
 import { CODEMAP_BUILD_OUTPUT_DIR } from "./build-output";
 import type { ParsedFile, WorkerInput, WorkerOutput } from "./parse-worker";
+import { parseWorkerInput } from "./parse-worker-core";
 import { getFts5Enabled, getProjectRoot } from "./runtime";
 
 const fromDist =
@@ -31,6 +32,10 @@ const PARSE_WORKER_COUNT_RE = /^\d+$/;
 const RECYCLE_EVERY_RE = /^\d+$/;
 
 const DEFAULT_WORKER_RECYCLE_EVERY = 250;
+/** Avoid worker spawn tax on tiny targeted/incremental batches. */
+const INLINE_PARSE_MAX = 12;
+/** Cap a single worker message budget so one hung file cannot block a huge chunk until sum(timeouts). */
+const CHUNK_TIMEOUT_CAP_MS = 120_000;
 
 /** Returns clamped override [1, 32], or `null` when unset/empty/invalid. */
 export function parseParseWorkerCountOverride(
@@ -202,6 +207,21 @@ function fileSizeBytes(projectRoot: string, relPath: string): number {
   }
 }
 
+function chunkBudgetMs(
+  files: readonly string[],
+  projectRoot: string,
+  timeoutEnv: string | undefined,
+): number {
+  let sum = 0;
+  for (const relPath of files) {
+    sum += computeParseTimeoutMs(
+      fileSizeBytes(projectRoot, relPath),
+      timeoutEnv,
+    );
+  }
+  return Math.min(sum, CHUNK_TIMEOUT_CAP_MS);
+}
+
 function timeoutParsedFile(
   relPath: string,
   projectRoot: string,
@@ -263,6 +283,61 @@ async function parseOneFile(
   }
 }
 
+async function parseChunkFiles(
+  session: ParseWorkerSession,
+  files: readonly string[],
+  projectRoot: string,
+  fts5Enabled: boolean,
+  timeoutEnv: string | undefined,
+): Promise<ParsedFile[]> {
+  if (files.length === 0) return [];
+  if (files.length === 1) {
+    return [
+      await parseOneFile(
+        session,
+        files[0]!,
+        projectRoot,
+        fts5Enabled,
+        timeoutEnv,
+      ),
+    ];
+  }
+
+  const timeoutMs = chunkBudgetMs(files, projectRoot, timeoutEnv);
+  const input: WorkerInput = { files: [...files], projectRoot, fts5Enabled };
+  try {
+    const output = await session.parse(input, timeoutMs);
+    return output.results;
+  } catch (err) {
+    if (!(err instanceof ParseTimeoutError)) throw err;
+    const mid = Math.ceil(files.length / 2);
+    const left = await parseChunkFiles(
+      session,
+      files.slice(0, mid),
+      projectRoot,
+      fts5Enabled,
+      timeoutEnv,
+    );
+    const right = await parseChunkFiles(
+      session,
+      files.slice(mid),
+      projectRoot,
+      fts5Enabled,
+      timeoutEnv,
+    );
+    return [...left, ...right];
+  }
+}
+
+function splitWorkerChunks(filePaths: readonly string[]): string[][] {
+  const chunkSize = Math.ceil(filePaths.length / WORKER_COUNT);
+  const chunks: string[][] = [];
+  for (let i = 0; i < filePaths.length; i += chunkSize) {
+    chunks.push(filePaths.slice(i, i + chunkSize));
+  }
+  return chunks;
+}
+
 export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
   if (filePaths.length === 0) return Promise.resolve([]);
 
@@ -278,47 +353,47 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
       `[worker-pool] ignoring invalid CODEMAP_PARSE_TIMEOUT_MS=${JSON.stringify(timeoutEnv)} (expected positive integer)`,
     );
   }
-  const recycleEvery = parseWorkerRecycleEvery();
-  return runPool(filePaths, projectRoot, fts5Enabled, timeoutEnv, recycleEvery);
-}
 
-async function runPool(
-  filePaths: string[],
-  projectRoot: string,
-  fts5Enabled: boolean,
-  timeoutEnv: string | undefined,
-  recycleEvery: number,
-): Promise<ParsedFile[]> {
-  const results: ParsedFile[] = Array.from({ length: filePaths.length });
-  let nextIndex = 0;
-
-  async function workerLoop(): Promise<void> {
-    let session = createParseWorkerSession();
-    let processed = 0;
-    try {
-      while (true) {
-        const index = nextIndex++;
-        if (index >= filePaths.length) break;
-        const relPath = filePaths[index]!;
-        results[index] = await parseOneFile(
-          session,
-          relPath,
-          projectRoot,
-          fts5Enabled,
-          timeoutEnv,
-        );
-        processed++;
-        if (processed >= recycleEvery) {
-          session.dispose();
-          session = createParseWorkerSession();
-          processed = 0;
-        }
-      }
-    } finally {
-      session.dispose();
-    }
+  if (filePaths.length <= INLINE_PARSE_MAX) {
+    return Promise.resolve(
+      parseWorkerInput({ files: [...filePaths], projectRoot, fts5Enabled })
+        .results,
+    );
   }
 
-  await Promise.all(Array.from({ length: WORKER_COUNT }, () => workerLoop()));
-  return results;
+  const recycleEvery = parseWorkerRecycleEvery();
+  const chunks = splitWorkerChunks(filePaths);
+
+  return Promise.all(
+    chunks.map(async (chunk) => {
+      let session = createParseWorkerSession();
+      let processed = 0;
+      try {
+        const results: ParsedFile[] = [];
+        for (let i = 0; i < chunk.length; ) {
+          const sliceEnd = Math.min(i + recycleEvery, chunk.length);
+          const slice = chunk.slice(i, sliceEnd);
+          results.push(
+            ...(await parseChunkFiles(
+              session,
+              slice,
+              projectRoot,
+              fts5Enabled,
+              timeoutEnv,
+            )),
+          );
+          processed += slice.length;
+          i = sliceEnd;
+          if (processed >= recycleEvery && i < chunk.length) {
+            session.dispose();
+            session = createParseWorkerSession();
+            processed = 0;
+          }
+        }
+        return results;
+      } finally {
+        session.dispose();
+      }
+    }),
+  ).then((parts) => parts.flat());
 }
