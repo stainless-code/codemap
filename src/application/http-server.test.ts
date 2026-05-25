@@ -665,7 +665,7 @@ describe("http-server — Zod input validation at HTTP boundary", () => {
 
   it("validation error message names the offending tool + path", async () => {
     serverHandle = await startServer();
-    const r = await postTool(serverHandle.port, "snippet", {});
+    const r = await postTool(serverHandle.port, "snippet", { name: 1 });
     expect(r.status).toBe(400);
     expect(r.json.error).toContain('"snippet"');
     expect(r.json.error).toContain("name");
