@@ -23,7 +23,7 @@
 ## Implementation steps
 
 1. **`scripts/agent-eval/run-arms.sh`** — orchestrate N runs per arm ✅
-2. **Probe scripts** — structured tasks mirroring golden queries ("find symbol X", "who imports Y", "fan-in top 10") ✅ (3 probes shipped)
+2. **Probe scripts** — structured tasks mirroring golden queries ("find symbol X", "who imports Y", "find call sites") ✅ (3 probes shipped)
 3. **Parser for agent logs** — extract tool names from Claude/Cursor export format ✅
 4. **Summary reporter** — markdown table for docs/benchmark.md
 5. **PR CI probe gate** — `test:agent-eval` in Test job on `fixtures/minimal` ✅

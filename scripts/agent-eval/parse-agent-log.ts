@@ -53,21 +53,51 @@ function collectToolsFromEntry(entry: JsonRecord): string[] {
   return [];
 }
 
+function collectPayloadCharsFromEntry(entry: JsonRecord): number {
+  let chars = 0;
+  if (entry.args !== undefined) {
+    chars += jsonCharLength(entry.args);
+  }
+  if (typeof entry.result === "string") {
+    chars += Buffer.byteLength(entry.result, "utf-8");
+  } else if (entry.result !== undefined) {
+    chars += jsonCharLength(entry.result);
+  }
+  const toolCalls = entry.tool_calls ?? entry.toolCalls;
+  if (Array.isArray(toolCalls)) {
+    for (const call of toolCalls) {
+      if (!isRecord(call)) continue;
+      const fn = call.function;
+      if (isRecord(fn)) {
+        if (typeof fn.arguments === "string") {
+          chars += Buffer.byteLength(fn.arguments, "utf-8");
+        } else if (fn.arguments !== undefined) {
+          chars += jsonCharLength(fn.arguments);
+        }
+      }
+    }
+  }
+  return chars;
+}
+
 function collectFromEntries(entries: unknown[]): {
   tools: string[];
   promptChars: number;
   outputChars: number;
+  payloadChars: number;
   wallMs?: number;
 } {
   const tools: string[] = [];
   let promptChars = 0;
   let outputChars = 0;
+  let payloadChars = 0;
   let wallMsTotal = 0;
   let wallMsCount = 0;
 
   for (const entry of entries) {
     if (!isRecord(entry)) continue;
     tools.push(...collectToolsFromEntry(entry));
+    payloadChars += collectPayloadCharsFromEntry(entry);
     const kind = entry.kind ?? entry.type;
     const text =
       typeof entry.text === "string"
@@ -95,7 +125,8 @@ function collectFromEntries(entries: unknown[]): {
     tools,
     promptChars,
     outputChars,
-    wallMs: wallMsCount > 0 ? wallMsTotal / wallMsCount : undefined,
+    payloadChars,
+    wallMs: wallMsCount > 0 ? wallMsTotal : undefined,
   };
 }
 
@@ -108,9 +139,10 @@ function normalizeToolName(name: string): string {
 
 function parseJsonLog(data: unknown): ParsedAgentLog {
   if (Array.isArray(data)) {
-    const { tools, promptChars, outputChars, wallMs } =
+    const { tools, promptChars, outputChars, payloadChars, wallMs } =
       collectFromEntries(data);
-    const estChars = promptChars + outputChars + jsonCharLength(tools);
+    const estChars =
+      promptChars + outputChars + payloadChars + jsonCharLength(tools);
     return {
       format: "array-transcript",
       toolSequence: tools,
@@ -125,10 +157,10 @@ function parseJsonLog(data: unknown): ParsedAgentLog {
     throw new Error("agent log: expected JSON object or array");
   }
   if (Array.isArray(data.entries)) {
-    const { tools, promptChars, outputChars, wallMs } = collectFromEntries(
-      data.entries,
-    );
-    const estChars = promptChars + outputChars + jsonCharLength(tools);
+    const { tools, promptChars, outputChars, payloadChars, wallMs } =
+      collectFromEntries(data.entries);
+    const estChars =
+      promptChars + outputChars + payloadChars + jsonCharLength(tools);
     return {
       format: "entries-transcript",
       toolSequence: tools,
@@ -140,10 +172,10 @@ function parseJsonLog(data: unknown): ParsedAgentLog {
     };
   }
   if (Array.isArray(data.messages)) {
-    const { tools, promptChars, outputChars, wallMs } = collectFromEntries(
-      data.messages,
-    );
-    const estChars = promptChars + outputChars + jsonCharLength(tools);
+    const { tools, promptChars, outputChars, payloadChars, wallMs } =
+      collectFromEntries(data.messages);
+    const estChars =
+      promptChars + outputChars + payloadChars + jsonCharLength(tools);
     return {
       format: "messages-transcript",
       toolSequence: tools,

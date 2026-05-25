@@ -58,18 +58,18 @@ Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-a
 
 **P0 — quick wins**
 
-- [ ] **MCP server instructions** — tool-selection playbook in MCP `initialize`. Plan: [`plans/mcp-server-instructions.md`](./plans/mcp-server-instructions.md). Effort: S.
-- [ ] **WSL watch policy** — disable unreliable watcher on `/mnt/*`; env overrides. Plan: [`plans/wsl-watch-policy.md`](./plans/wsl-watch-policy.md). Effort: S.
-- [ ] **Git hook auto-sync** — opt-in background incremental index when watcher off. Plan: [`plans/git-hook-auto-sync.md`](./plans/git-hook-auto-sync.md). Effort: S.
-- [ ] **MCP tool allowlist** — `CODEMAP_MCP_TOOLS` env for subset registration. Plan: [`plans/mcp-tool-allowlist.md`](./plans/mcp-tool-allowlist.md). Effort: S.
+- [x] **MCP server instructions** — tool-selection playbook in MCP `initialize`. Plan: [`plans/mcp-server-instructions.md`](./plans/mcp-server-instructions.md). [#126](https://github.com/stainless-code/codemap/pull/126). Effort: S.
+- [x] **WSL watch policy** — disable unreliable watcher on `/mnt/*`; env overrides. Plan: [`plans/wsl-watch-policy.md`](./plans/wsl-watch-policy.md). [#127](https://github.com/stainless-code/codemap/pull/127). Effort: S.
+- [x] **Git hook auto-sync** — opt-in background incremental index when watcher off. Plan: [`plans/git-hook-auto-sync.md`](./plans/git-hook-auto-sync.md). [#127](https://github.com/stainless-code/codemap/pull/127). Effort: S.
+- [x] **MCP tool allowlist** — `CODEMAP_MCP_TOOLS` env for subset registration. Plan: [`plans/mcp-tool-allowlist.md`](./plans/mcp-tool-allowlist.md). [#126](https://github.com/stainless-code/codemap/pull/126). Effort: S.
 
 **P1 — medium**
 
 - [x] **MCP trace / explore / node** — recipe twins + thin MCP composers. Plan: [`plans/mcp-trace-explore-tools.md`](./plans/mcp-trace-explore-tools.md). [#134](https://github.com/stainless-code/codemap/pull/134). Effort: M.
 - [x] **Agents init MCP wiring** — `agents init --mcp` + permissions. Plan: [`plans/agents-init-mcp-wiring.md`](./plans/agents-init-mcp-wiring.md). [#135](https://github.com/stainless-code/codemap/pull/135). Effort: M.
 - [x] **Affected tests recipe** — dep-graph test selection + stdin + MCP `affected` tool. Plan: [`plans/affected-tests-recipe.md`](./plans/affected-tests-recipe.md). Shipped #132 + #133.
-- [ ] **Index lock + error log** — cross-process lock, `unlock`, `errors.log`. Plan: [`plans/index-lock-and-error-log.md`](./plans/index-lock-and-error-log.md). Effort: M.
-- [ ] **Parse worker hardening** — per-file timeout + worker recycle. Plan: [`plans/parse-worker-hardening.md`](./plans/parse-worker-hardening.md). Effort: M.
+- [x] **Index lock + error log** — cross-process lock, `unlock`, `errors.log`. Plan: [`plans/index-lock-and-error-log.md`](./plans/index-lock-and-error-log.md). [#129](https://github.com/stainless-code/codemap/pull/129). Effort: M.
+- [x] **Parse worker hardening** — per-file timeout + worker recycle. Plan: [`plans/parse-worker-hardening.md`](./plans/parse-worker-hardening.md). [#130](https://github.com/stainless-code/codemap/pull/130). Effort: M.
 - [x] **Field-qualified search** — `kind:` / `path:` / `name:` → SQL. Plan: [`plans/field-qualified-search.md`](./plans/field-qualified-search.md). [#138](https://github.com/stainless-code/codemap/pull/138). Effort: M.
 - [ ] **Agent eval harness** — probe-mode A/B + PR CI gate shipped ([#139](https://github.com/stainless-code/codemap/pull/139)); live MCP arms + optional external nightly CI still open. Plan: [`plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). Effort: M.
 

@@ -12,5 +12,6 @@ describe("package.json publish scripts", () => {
     expect(pkg.scripts.check).toContain("typecheck");
     expect(pkg.scripts.check).toContain("test");
     expect(pkg.scripts.check).toContain("test:golden");
+    expect(pkg.scripts.check).toContain("test:agent-eval");
   });
 });

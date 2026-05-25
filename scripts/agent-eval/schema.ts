@@ -34,5 +34,16 @@ export const probesFileSchema = z.object({
 export type ProbesFile = z.infer<typeof probesFileSchema>;
 
 export function parseProbesJson(raw: string): ProbesFile {
-  return probesFileSchema.parse(JSON.parse(raw));
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`agent-eval: invalid probes JSON: ${msg}`);
+  }
+  const parsed = probesFileSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error(`agent-eval: invalid probes file: ${parsed.error.message}`);
+  }
+  return parsed.data;
 }

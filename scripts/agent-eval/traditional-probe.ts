@@ -41,9 +41,9 @@ function runRegexTraditional(spec: {
       }
     }
   } else {
-    const re = new RegExp(spec.regex);
     for (const [path, content] of contents) {
-      if (re.test(content)) results.push({ file_path: path });
+      if (new RegExp(spec.regex).test(content))
+        results.push({ file_path: path });
     }
   }
   return { results, filesRead: files.length, bytesRead: totalBytes };

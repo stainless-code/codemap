@@ -23,15 +23,23 @@ import {
 const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(EVAL_DIR, "../..");
 
+/** Per-arm metrics for one probe run (MCP-on query or MCP-off glob/read/grep). */
 export interface ArmRunMetrics {
+  /** Elapsed wall time for the arm, in milliseconds. */
   wallMs: number;
+  /** Ordered tool names invoked (e.g. `["query"]` or `["glob","read","grep"]`). */
   toolSequence: string[];
+  /** Length of `toolSequence`. */
   toolCallCount: number;
+  /** Rows or grep hits returned (non-empty ⇒ `success`). */
   resultCount: number;
+  /** Estimated tokens: `(prompt + payload) chars / 4`, rounded up. */
   estTokens: number;
+  /** True when `resultCount > 0`. */
   success: boolean;
 }
 
+/** One probe scenario: both arms plus deltas (`mcpOff − mcpOn`). */
 export interface ScenarioComparison {
   id: string;
   prompt: string;
@@ -46,12 +54,18 @@ export interface ScenarioComparison {
   };
 }
 
+/** Full comparison report written to local JSON (dev/CI only). */
 export interface AgentEvalComparison {
+  /** ISO-8601 timestamp when the report was generated. */
   generatedAt: string;
+  /** Fixed `"probe"` — deterministic harness mode (no LLM). */
   mode: "probe";
+  /** Indexed corpus root passed to `--fixture-root`. */
   fixtureRoot: string;
+  /** Repeat count per probe (`--runs` / `AGENT_EVAL_RUNS`). */
   runs: number;
   scenarios: ScenarioComparison[];
+  /** Per-arm sums across scenarios (`successCount` counts `scenarioSuccess`). */
   summary: {
     mcpOnTotalToolCalls: number;
     mcpOffTotalToolCalls: number;
@@ -76,6 +90,7 @@ function parseArgs(argv: string[]) {
   let runs = 1;
   let help = false;
   let fixtureRoot = join(REPO_ROOT, "fixtures/minimal");
+  let scenariosPath = join(REPO_ROOT, "fixtures/golden/scenarios.json");
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") help = true;
@@ -92,9 +107,12 @@ function parseArgs(argv: string[]) {
     } else if (a === "--fixture-root") {
       fixtureRoot = resolve(optValue(argv, i, a));
       i++;
+    } else if (a === "--scenarios") {
+      scenariosPath = resolve(optValue(argv, i, a));
+      i++;
     } else if (a.startsWith("-")) throw new Error(`Unknown option: ${a}`);
   }
-  return { output, runs, help, fixtureRoot };
+  return { output, runs, help, fixtureRoot, scenariosPath };
 }
 
 function runMcpOnArm(
@@ -111,7 +129,10 @@ function runMcpOnArm(
     toolSequence,
     toolCallCount: toolSequence.length,
     resultCount: rows.length,
-    estTokens: estimateProbeTokens(prompt, mcpOnPayloadChars(sql, rows)),
+    estTokens: estimateProbeTokens(
+      prompt,
+      mcpOnPayloadChars(sql, rows, bindValues),
+    ),
     success: rows.length > 0,
   };
 }
@@ -218,6 +239,7 @@ Options:
   --output FILE       Output JSON path (default: .agent-eval/comparison.json)
   --runs N            Repeat each probe N times; averages wallMs/estTokens (toolSequence from run 1)
   --fixture-root DIR  Corpus to index (default: fixtures/minimal)
+  --scenarios FILE    Golden scenarios JSON for SQL/prompts (default: fixtures/golden/scenarios.json)
   -h, --help
 `);
     process.exit(0);
@@ -225,12 +247,17 @@ Options:
 
   const probesRaw = readFileSync(join(EVAL_DIR, "scenarios.json"), "utf-8");
   const { probes } = parseProbesJson(probesRaw);
-  const goldenRaw = readFileSync(
-    join(REPO_ROOT, "fixtures/golden/scenarios.json"),
-    "utf-8",
-  );
+  const goldenRaw = readFileSync(args.scenariosPath, "utf-8");
   const { scenarios: goldenScenarios } = parseScenariosJson(goldenRaw);
   const goldenById = new Map(goldenScenarios.map((s) => [s.id, s]));
+
+  for (const probe of probes) {
+    if (!goldenById.has(probe.goldenId)) {
+      throw new Error(
+        `Probe "${probe.id}": goldenId "${probe.goldenId}" not found in ${args.scenariosPath}`,
+      );
+    }
+  }
 
   process.env.CODEMAP_ROOT = args.fixtureRoot;
 
@@ -274,6 +301,12 @@ export function averageSamples(
     throw new Error("averageSamples requires at least one sample");
   }
   const prompt = samples[0]!.prompt;
+  let mcpOnWallMs = 0;
+  let mcpOffWallMs = 0;
+  let mcpOnToolCallCount = 0;
+  let mcpOffToolCallCount = 0;
+  let mcpOnEstTokens = 0;
+  let mcpOffEstTokens = 0;
   const avgArm = (
     pick: (s: ScenarioComparison) => ArmRunMetrics,
   ): ArmRunMetrics => {
@@ -300,6 +333,14 @@ export function averageSamples(
       success,
     };
   };
+  for (const s of samples) {
+    mcpOnWallMs += s.mcpOn.wallMs;
+    mcpOffWallMs += s.mcpOff.wallMs;
+    mcpOnToolCallCount += s.mcpOn.toolCallCount;
+    mcpOffToolCallCount += s.mcpOff.toolCallCount;
+    mcpOnEstTokens += s.mcpOn.estTokens;
+    mcpOffEstTokens += s.mcpOff.estTokens;
+  }
   const mcpOn = avgArm((s) => s.mcpOn);
   const mcpOff = avgArm((s) => s.mcpOff);
   const scenarioSuccess = samples.every((s) => s.scenarioSuccess);
@@ -310,9 +351,9 @@ export function averageSamples(
     mcpOff,
     scenarioSuccess,
     delta: {
-      toolCallCount: mcpOff.toolCallCount - mcpOn.toolCallCount,
-      wallMs: mcpOff.wallMs - mcpOn.wallMs,
-      estTokens: mcpOff.estTokens - mcpOn.estTokens,
+      toolCallCount: mcpOffToolCallCount / n - mcpOnToolCallCount / n,
+      wallMs: mcpOffWallMs / n - mcpOnWallMs / n,
+      estTokens: mcpOffEstTokens / n - mcpOnEstTokens / n,
     },
   };
 }

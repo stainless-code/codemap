@@ -9,12 +9,14 @@ cd "$REPO_ROOT"
 OUT="${AGENT_EVAL_OUTPUT:-$REPO_ROOT/.agent-eval/comparison.json}"
 RUNS="${AGENT_EVAL_RUNS:-1}"
 FIXTURE_ROOT="${AGENT_EVAL_FIXTURE_ROOT:-$REPO_ROOT/fixtures/minimal}"
+SCENARIOS="${AGENT_EVAL_SCENARIOS:-$REPO_ROOT/fixtures/golden/scenarios.json}"
 
 echo "=== agent-eval: probe arms (runs=$RUNS) ==="
 bun "$SCRIPT_DIR/run-probes.ts" \
   --output "$OUT" \
   --runs "$RUNS" \
-  --fixture-root "$FIXTURE_ROOT"
+  --fixture-root "$FIXTURE_ROOT" \
+  --scenarios "$SCENARIOS"
 
 if [[ -n "${AGENT_EVAL_LOG:-}" ]]; then
   echo "=== agent-eval: parse agent log $AGENT_EVAL_LOG ==="

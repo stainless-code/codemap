@@ -1,7 +1,12 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { resolveCodemapConfig } from "../../src/config";
+import { initCodemap } from "../../src/runtime";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { jsonCharLength } from "./metrics";
 import { parseAgentLog, parseAgentLogFile } from "./parse-agent-log";
 import {
   estimateProbeTokens,
@@ -16,7 +21,11 @@ import {
   summarize,
 } from "./run-probes";
 import type { ArmRunMetrics, ScenarioComparison } from "./run-probes";
-import { traditionalToolSequence } from "./traditional-probe";
+import { parseProbesJson } from "./schema";
+import {
+  runTraditionalProbe,
+  traditionalToolSequence,
+} from "./traditional-probe";
 
 const sampleLog = join(
   import.meta.dir,
@@ -56,6 +65,19 @@ describe("parse-agent-log", () => {
     expect(parsed.toolCallCount).toBe(1);
     expect(parsed.promptChars).toBeGreaterThan(0);
     expect(parsed.estTokens).toBeGreaterThan(0);
+  });
+
+  it("counts tool args in log-mode token estimate", () => {
+    const withoutArgs = parseAgentLog(
+      JSON.stringify({
+        entries: [
+          { kind: "user", text: "q" },
+          { kind: "tool_call", tool: "query" },
+        ],
+      }),
+    );
+    const withArgs = parseAgentLogFile(sampleLog);
+    expect(withArgs.estTokens).toBeGreaterThan(withoutArgs.estTokens);
   });
 
   it("parses array-transcript JSON", () => {
@@ -128,10 +150,17 @@ ASSISTANT: found 3 call sites`;
 });
 
 describe("probe-tokens", () => {
-  it("counts SQL in MCP-on payload", () => {
-    expect(mcpOnPayloadChars("SELECT 1", [{ n: 1 }])).toBeGreaterThan(8);
+  it("counts SQL and bind values in MCP-on payload", () => {
+    expect(mcpOnPayloadChars("SELECT 1", [1])).toBeGreaterThan(8);
+    const withBinds = mcpOnPayloadChars("SELECT 1", [1], ["createClient"]);
+    const withoutBinds = mcpOnPayloadChars("SELECT 1", [1], []);
+    expect(withBinds).toBeGreaterThan(withoutBinds);
     const emptyRowsPayload = mcpOnPayloadChars("SELECT 1", []);
-    expect(emptyRowsPayload).toBe(Buffer.byteLength("SELECT 1", "utf-8") + 2);
+    expect(emptyRowsPayload).toBe(
+      Buffer.byteLength("SELECT 1", "utf-8") +
+        jsonCharLength([]) +
+        jsonCharLength([]),
+    );
     expect(estimateProbeTokens("task", emptyRowsPayload)).toBe(
       Math.ceil((Buffer.byteLength("task", "utf-8") + emptyRowsPayload) / 4),
     );
@@ -218,35 +247,83 @@ describe("run-probes helpers", () => {
     expect(process.exitCode).toBe(0);
   });
 
+  it("averageSamples delta uses unrounded arm averages", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ toolCallCount: 1 }),
+        mcpOff: arm({ toolCallCount: 2, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ toolCallCount: 1 }),
+        mcpOff: arm({ toolCallCount: 4, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOff.toolCallCount).toBe(3);
+    expect(avg.mcpOn.toolCallCount).toBe(1);
+    expect(avg.delta.toolCallCount).toBe(2);
+  });
+
   it("traditionalToolSequence includes glob and grep with zero reads", () => {
     expect(traditionalToolSequence(0)).toEqual(["glob", "grep"]);
+  });
+
+  it("runTraditionalProbe finds files in fixtures/minimal", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const result = runTraditionalProbe({
+      globs: ["**/*.ts"],
+      regex: "createClient",
+      mode: "files",
+    });
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.filesRead).toBeGreaterThan(0);
+  });
+});
+
+describe("parseProbesJson", () => {
+  it("rejects invalid JSON", () => {
+    expect(() => parseProbesJson("{")).toThrow(/invalid probes JSON/);
+  });
+
+  it("rejects invalid schema", () => {
+    expect(() => parseProbesJson(JSON.stringify({ version: 2 }))).toThrow(
+      /invalid probes file/,
+    );
   });
 });
 
 describe("run-probes smoke", () => {
   it("indexes fixtures/minimal and compares three probes", async () => {
     const { spawnSync } = await import("node:child_process");
-    const out = join(import.meta.dir, "../../.agent-eval/test-comparison.json");
-    const result = spawnSync(
-      "bun",
-      [
-        join(import.meta.dir, "run-probes.ts"),
-        "--output",
-        out,
-        "--fixture-root",
-        join(import.meta.dir, "../../fixtures/minimal"),
-      ],
-      { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
-    );
-    expect(result.status).toBe(0);
-    const parsed = JSON.parse(await Bun.file(out).text()) as {
-      scenarios: ScenarioComparison[];
-      summary: { successCount: number; mcpOffTotalToolCalls: number };
-    };
-    expect(parsed.scenarios).toHaveLength(3);
-    expect(parsed.summary.successCount).toBe(3);
-    expect(parsed.summary.mcpOffTotalToolCalls).toBeGreaterThan(
-      parsed.scenarios.reduce((n, s) => n + s.mcpOn.toolCallCount, 0),
-    );
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-smoke-"));
+    const out = join(tmp, "comparison.json");
+    try {
+      const result = spawnSync(
+        "bun",
+        [
+          join(import.meta.dir, "run-probes.ts"),
+          "--output",
+          out,
+          "--fixture-root",
+          join(import.meta.dir, "../../fixtures/minimal"),
+        ],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(await Bun.file(out).text()) as {
+        scenarios: ScenarioComparison[];
+        summary: { successCount: number; mcpOffTotalToolCalls: number };
+      };
+      expect(parsed.scenarios).toHaveLength(3);
+      expect(parsed.summary.successCount).toBe(3);
+      expect(parsed.summary.mcpOffTotalToolCalls).toBeGreaterThan(
+        parsed.scenarios.reduce((n, s) => n + s.mcpOn.toolCallCount, 0),
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   }, 120_000);
 });
