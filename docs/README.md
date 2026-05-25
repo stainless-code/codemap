@@ -22,7 +22,7 @@ Each topic has exactly one canonical file. Other files cross-reference by relati
 | [packaging.md](./packaging.md)                | **`CHANGELOG.md` / `dist/` / `templates/`** on npm, **engines**, [**Node vs Bun**](./packaging.md#node-vs-bun), [**Releases**](./packaging.md#releases) (Changesets; **`bun run version`** + oxfmt **`CHANGELOG.md`**).                                                                                                                                                                                                                                                                               |
 | [roadmap.md](./roadmap.md)                    | Forward-looking [**Backlog**](./roadmap.md#backlog) and [**Non-goals**](./roadmap.md#non-goals-v1) (not a `src/` inventory).                                                                                                                                                                                                                                                                                                                                                                          |
 | [plans/](./plans/)                            | One `<feature-name>.md` per in-flight plan. Created on demand — don't add the `-plan` suffix; the folder provides context. See folder contents for the current in-flight set; avoid maintaining a duplicate inline list.                                                                                                                                                                                                                                                                              |
-| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. None open; closed audits indexed from [`roadmap.md` § Closed audits (pointers)](./roadmap.md#closed-audits-pointers).                                                                                                                                                                                                                                                                                                                         |
+| [audits/](./audits/)                          | Targeted architecture / performance / lifecycle audits. None open; deleted audits indexed under [Closing audits (pointers)](#closing-audits-pointers) below.                                                                                                                                                                                                                                                                                                                                          |
 | [research/](./research/)                      | Dated, snapshot-style notes (e.g. competitive scans, non-goals reassessments). Each note links shipped items back to canonical homes — see [research/non-goals-reassessment-2026-05.md](./research/non-goals-reassessment-2026-05.md).                                                                                                                                                                                                                                                                |
 
 ---
@@ -116,6 +116,16 @@ Adding a new top-level doc requires:
 3. [File Ownership](#file-ownership) table updated in the same PR.
 
 When in doubt, default to absorbing into the closest existing root-level file (usually `roadmap.md` for forward-looking work, `architecture.md` for shipped behavior, `glossary.md` for terminology, `research/` for snapshot notes).
+
+### Closing audits (pointers)
+
+**Deleted audit files only.** Slimmed files that stay in `audits/` with a `Status: Closed` header, and plans that absorbed audit content, are self-indexing — no row here.
+
+Add a row when an audit file is **deleted** after closure and recovery would be non-obvious. Recover full text: `git log --follow -- <path>`.
+
+| Topic                            | Canonical home                                                               | Deleted path                                          | Closed     |
+| -------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- | ---------- |
+| Full `.md` fact-check (May 2026) | [#124](https://github.com/stainless-code/codemap/pull/124) (R.1–R.9 shipped) | `docs/audits/2026-05-24-docs-fact-check-residuals.md` | 2026-05-24 |
 
 ---
 

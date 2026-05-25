@@ -91,7 +91,7 @@ In dependency order (delete + lift before slimming so cross-refs are correct):
 1. **Lift** orphan-able knowledge to its destination.
 2. **Update** every inbound cross-reference (in-place edits).
 3. **Delete** the source file (Tier C) or apply the slim diff (Tier B).
-4. **Update pointer index** — `roadmap.md § Closed audits (pointers)` for audits; `architecture.md` for newly-promoted reference content; `docs/README.md § File Ownership` table for added/removed top-level docs (per [`docs/README.md` Rule 4](../../../docs/README.md)).
+4. **Update pointer index** — [`docs/README.md` § Closing audits (pointers)](../../../docs/README.md#closing-audits-pointers) when an audit file is deleted; `architecture.md` for newly-promoted reference content; `docs/README.md § File Ownership` table for added/removed top-level docs (per [`docs/README.md` Rule 4](../../../docs/README.md)).
 5. **Re-grep** to confirm zero broken cross-references: `rg "<deleted-filename>"` returns 0 hits outside the deletion commit message.
 
 After execution, the surface is **clean** by definition.
@@ -100,7 +100,7 @@ After execution, the surface is **clean** by definition.
 
 A sweep report is **transient** by design — it lives on the PR / chat where the sweep ran, not in `docs/`. The findings + chosen actions land as commit messages + cross-link updates; the report itself is not a doc to keep.
 
-If the user wants a durable record, promote it to a one-time entry in `roadmap.md § Closed audits (pointers)` or to a slim `audits/<date>-lifecycle-sweep.md` — but only if the rationale would be hard to reconstruct from `git log --follow`. Default is: don't write a meta-doc about the cleanup.
+If the user wants a durable record, promote it to a one-time entry in [`docs/README.md` § Closing audits (pointers)](../../../docs/README.md#closing-audits-pointers) — but only if the rationale would be hard to reconstruct from `git log --follow`. Default is: don't write a meta-doc about the cleanup.
 
 ## Anti-patterns
 

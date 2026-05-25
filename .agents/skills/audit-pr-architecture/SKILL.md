@@ -197,7 +197,7 @@ This audit follows [docs/README.md Rule 6](../../../docs/README.md) (no inventor
 Once findings are shipped (or deferred to `roadmap.md`):
 
 1. **Update Status header**: `Status: Closed (YYYY-MM-DD) — N findings shipped on commits <hash>, <hash>, <hash>; M deferred to roadmap.md § <section>.`
-2. **Add to `roadmap.md` § Closed audits (pointers)** with a one-line summary.
+2. **If the audit file is deleted**, add one row to [`docs/README.md` § Closing audits (pointers)](../../../docs/README.md#closing-audits-pointers) (skip when the plan or slimmed audit self-documents provenance).
 3. **Apply [`docs-governance`](../docs-governance/SKILL.md) § Closing an audit re-derivable test.** If the audit has no source-cites, no unique policy, no rejected-alternatives rationale → digest deferred items into `roadmap.md`, then **delete the audit file** (no tombstones). Otherwise slim per the keep-criteria.
 4. **Run [`docs-lifecycle-sweep`](../docs-lifecycle-sweep/SKILL.md)** if the closure changes the audit substrate (new topic file, retired old topic) so the rest of the audits/ folder stays evaluated.
 
