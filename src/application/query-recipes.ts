@@ -1,7 +1,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { resolveAgentsTemplateDir } from "../agents-init";
+import { resolveAgentsTemplateDir } from "../agents-template-path";
 import { getProjectRoot, getStateDir } from "../runtime";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
