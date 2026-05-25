@@ -10,6 +10,7 @@
 | **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
 | **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
 | **Guardrail full-rebuild per-phase walls against a committed baseline** (local + weekly scheduled)                                                       | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
+| **A/B agent eval** — MCP-on vs discovery-without-index tool-call + token comparison on fixed probes                                                      | [§ Agent eval harness](#agent-eval-harness)                                      |
 
 ---
 
@@ -283,6 +284,29 @@ bun run benchmark
 ```
 
 **CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
+
+### Agent eval harness
+
+Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Compares a **codemap MCP-on** arm (one `query` tool call per probe) against an **MCP-off** arm that simulates agent discovery (`glob` → `read` × N → `grep`). Probes mirror [golden scenarios](../fixtures/golden/scenarios.json); see [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json).
+
+**One-command local run:**
+
+```bash
+bash scripts/agent-eval/run-arms.sh
+# default output: .agent-eval/comparison.json
+```
+
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_RUNS`, `AGENT_EVAL_FIXTURE_ROOT`. Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
+
+**Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4`), success bit (both arms returned rows). Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
+
+**Methodology notes:**
+
+- **Probe mode** is deterministic (no LLM): it measures structural cost of indexed SQL vs traditional file scan on the same corpus. Use it for regression guardrails and fixture tuning.
+- **Log mode** parses exported agent transcripts (entries / messages / line formats) when you run live A/B sessions with MCP on vs off.
+- External public repos (zod, fastify, etc.) are a follow-up: point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree and extend probe definitions — same harness, not duplicated fixtures.
+
+Plan: [`docs/plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). CI nightly / `workflow_dispatch` is optional and not wired yet.
 
 **Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 

@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "kind": "user",
+      "text": "Where is the usePermissions symbol defined?"
+    },
+    {
+      "kind": "tool_call",
+      "tool": "mcp_codemap_query",
+      "args": {
+        "sql": "SELECT name, kind, file_path FROM symbols WHERE name = 'usePermissions'"
+      }
+    },
+    {
+      "kind": "tool_result",
+      "tool": "mcp_codemap_query"
+    },
+    {
+      "kind": "assistant",
+      "text": "usePermissions is defined in src/hooks/usePermissions.ts"
+    }
+  ]
+}

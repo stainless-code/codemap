@@ -33,9 +33,11 @@
 
 ## Acceptance
 
-- [ ] One-command local run produces comparison JSON
-- [ ] At least 3 scenarios covered
-- [ ] Documented methodology section in benchmark.md
+- [x] One-command local run produces comparison JSON (`bash scripts/agent-eval/run-arms.sh`)
+- [x] At least 3 scenarios covered (`scripts/agent-eval/scenarios.json`)
+- [x] Documented methodology section in benchmark.md
+- [ ] CI job — optional nightly or manual `workflow_dispatch` (public fixtures only)
+- [ ] Live agent A/B arms with MCP allowlist subset
 
 ---
 
