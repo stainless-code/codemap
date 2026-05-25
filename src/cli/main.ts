@@ -59,11 +59,13 @@ export async function main(): Promise<void> {
 
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
-      console.log(`Usage: codemap agents init [--force] [--interactive|-i]
+      console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--git-hooks] [--no-git-hooks]
 
 Copies bundled agent templates into .agents/ under the project root.
   --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
   --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
+  --git-hooks    Install background incremental index hooks (post-commit, post-merge, post-checkout)
+  --no-git-hooks Remove codemap blocks from git hooks
 `);
       return;
     }
@@ -72,6 +74,8 @@ Copies bundled agent templates into .agents/ under the project root.
       "--force",
       "--interactive",
       "-i",
+      "--git-hooks",
+      "--no-git-hooks",
       "--help",
       "-h",
     ]);
@@ -88,10 +92,22 @@ Copies bundled agent templates into .agents/ under the project root.
       process.exit(1);
     }
     const { runAgentsInitCmd } = await import("./cmd-agents.js");
+    const gitHooks = rest.includes("--no-git-hooks")
+      ? "uninstall"
+      : rest.includes("--git-hooks")
+        ? "install"
+        : undefined;
+    if (gitHooks !== undefined && rest.includes("--interactive")) {
+      console.error(
+        "codemap: --git-hooks / --no-git-hooks cannot be combined with --interactive.",
+      );
+      process.exit(1);
+    }
     const ok = await runAgentsInitCmd({
       projectRoot: root,
       force: rest.includes("--force"),
       interactive: rest.includes("--interactive") || rest.includes("-i"),
+      gitHooks,
     });
     if (!ok) process.exit(1);
     return;

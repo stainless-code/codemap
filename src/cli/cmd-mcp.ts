@@ -1,4 +1,8 @@
 import { runMcpServer } from "../application/mcp-server";
+import {
+  applyWatchPolicy,
+  envWatchDefaultOn,
+} from "../application/watch-policy";
 import { DEFAULT_DEBOUNCE_MS } from "../application/watcher";
 import { CODEMAP_VERSION } from "../version";
 
@@ -28,10 +32,7 @@ export function parseMcpRest(rest: string[]):
   // out (mirrors --no-watch) for IDE / CI launches that can't easily
   // edit the agent host's tool spawn command. CODEMAP_WATCH=1 / "true"
   // is redundant after the default flip but kept for backwards-compat.
-  const envWatchOff =
-    process.env["CODEMAP_WATCH"] === "0" ||
-    process.env["CODEMAP_WATCH"] === "false";
-  let watch = !envWatchOff;
+  let watch = envWatchDefaultOn(process.env);
   let debounceMs = DEFAULT_DEBOUNCE_MS;
 
   for (let i = 1; i < rest.length; i++) {
@@ -158,12 +159,17 @@ export async function runMcpCmd(opts: {
   watch: boolean;
   debounceMs: number;
 }): Promise<void> {
+  const { watch } = applyWatchPolicy({
+    root: opts.root,
+    requestedWatch: opts.watch,
+    label: "codemap mcp",
+  });
   await runMcpServer({
     version: CODEMAP_VERSION,
     root: opts.root,
     configFile: opts.configFile,
     stateDir: opts.stateDir,
-    watch: opts.watch,
+    watch,
     debounceMs: opts.debounceMs,
   });
 }
