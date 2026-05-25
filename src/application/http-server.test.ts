@@ -124,6 +124,7 @@ describe("http-server — health + tools catalog", () => {
     expect(body.tools.map((t) => t.name)).toContain("query");
     expect(body.tools.map((t) => t.name)).toContain("audit");
     expect(body.tools.map((t) => t.name)).toContain("affected");
+    expect(body.tools.map((t) => t.name)).toContain("trace");
   });
 
   it("404 for unknown route", async () => {
@@ -403,6 +404,69 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.status).toBe(400);
     expect(r.json.error).toContain("changed_since");
     expect(r.json.error).not.toContain("--changed-since");
+  });
+
+  function seedTraceGraph() {
+    writeFileSync(
+      join(benchDir, "src", "trace.ts"),
+      "export function alpha() {\n  return beta();\n}\nexport function beta() {\n  return 1;\n}\n",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/trace.ts', 'ht', 100, 6, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+         VALUES ('alpha', 'function', 'src/trace.ts', 1, 3, 'alpha()', 1, NULL, 'export'),
+                ('beta', 'function', 'src/trace.ts', 4, 6, 'beta()', 1, NULL, 'export')`,
+      );
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ('src/trace.ts', 'alpha', 'alpha', 'beta', 2, 0, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("trace returns path and snippets", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "trace", {
+      from: "alpha",
+      to: "beta",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.path).toHaveLength(1);
+    expect(r.json.snippets.length).toBeGreaterThan(0);
+    expect(r.json.truncated).toBe(false);
+  });
+
+  it("explore merges neighborhoods", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "explore", {
+      names: ["alpha", "beta"],
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.names).toEqual(["alpha", "beta"]);
+    expect(r.json.rows.length).toBeGreaterThan(0);
+  });
+
+  it("node returns center + neighborhood", async () => {
+    seedTraceGraph();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "node", {
+      name: "alpha",
+      include_snippets: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.center.matches[0]?.name).toBe("alpha");
+    expect(
+      r.json.neighborhood.some((row: { name: string }) => row.name === "beta"),
+    ).toBe(true);
   });
 
   it("list_baselines returns array (empty when none saved)", async () => {

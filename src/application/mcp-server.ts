@@ -33,7 +33,13 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  exploreArgsSchema,
+  handleExplore,
   handleImpact,
+  handleNode,
+  handleTrace,
+  nodeArgsSchema,
+  traceArgsSchema,
   handleListBaselines,
   handleQuery,
   handleQueryBatch,
@@ -149,6 +155,9 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("snippet", () => registerSnippetTool(server, opts));
   maybeRegister("impact", () => registerImpactTool(server));
   maybeRegister("affected", () => registerAffectedTool(server, opts));
+  maybeRegister("trace", () => registerTraceTool(server, opts));
+  maybeRegister("explore", () => registerExploreTool(server, opts));
+  maybeRegister("node", () => registerNodeTool(server, opts));
   maybeRegister("apply", () => registerApplyTool(server, opts));
   registerResources(server);
   logMcpToolAllowlist(allowlistResolved, registered);
@@ -309,6 +318,42 @@ function registerImpactTool(server: McpServer): void {
       inputSchema: impactArgsSchema,
     },
     (args) => wrapToolResult(handleImpact(args)),
+  );
+}
+
+function registerTraceTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "trace",
+    {
+      description:
+        "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads. Args: from, to (symbol names), max_depth (optional), via (calls|dependencies|all), budget_chars (default 15000). Returns {from, to, via?, path: [{file_path, caller_name, callee_name, line_start, hop, via}], snippets: [{name, file_path, source, stale, missing, ...}], truncated}. Fall back to `query_recipe` with recipe call-path when unsure.",
+      inputSchema: traceArgsSchema,
+    },
+    (args) => wrapToolResult(handleTrace(args, opts.root)),
+  );
+}
+
+function registerExploreTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "explore",
+    {
+      description:
+        "Multi-symbol neighborhood survey with budget-capped snippets. Composes `symbol-neighborhood` (once per name) + disk reads. Args: names (non-empty array), depth (optional hop budget), kind (optional filter), budget_chars (default 15000). Returns {names, rows: [...], snippets: [...], truncated}. Fall back to `query_recipe` with recipe symbol-neighborhood.",
+      inputSchema: exploreArgsSchema,
+    },
+    (args) => wrapToolResult(handleExplore(args, opts.root)),
+  );
+}
+
+function registerNodeTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "node",
+    {
+      description:
+        "One-hop symbol survey: `show` center match + depth-1 `symbol-neighborhood` + optional inline snippets. Args: name, kind?, in? (path filter), include_snippets (default false), budget_chars (default 15000 when snippets enabled). Returns {center: {matches, disambiguation?}, neighborhood: [...], snippets: [...], truncated}.",
+      inputSchema: nodeArgsSchema,
+    },
+    (args) => wrapToolResult(handleNode(args, opts.root)),
   );
 }
 

@@ -67,6 +67,12 @@ import {
   buildSnippetResult,
   findSymbolsByName,
 } from "./show-engine";
+import {
+  composeExploreResult,
+  composeNodeResult,
+  composeTraceResult,
+  executeCallPath,
+} from "./trace-engine";
 import { computeValidateRows, toProjectRelative } from "./validate-engine";
 import { isWatchActive } from "./watcher";
 
@@ -819,6 +825,135 @@ export function handleImpact(args: ImpactArgs): ToolResult {
     } finally {
       closeDb(db, { readonly: true });
     }
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === trace / explore / node =================================================
+
+export const traceArgsSchema = {
+  from: z.string().min(1, "from must be a non-empty string"),
+  to: z.string().min(1, "to must be a non-empty string"),
+  max_depth: z.number().int().nonnegative().optional(),
+  via: z.enum(["calls", "dependencies", "all"]).optional(),
+  budget_chars: z.number().int().positive().optional(),
+};
+
+export interface TraceArgs {
+  from: string;
+  to: string;
+  max_depth?: number;
+  via?: "calls" | "dependencies" | "all";
+  budget_chars?: number;
+}
+
+export function handleTrace(args: TraceArgs, root: string): ToolResult {
+  try {
+    const pathResult = executeCallPath({
+      root,
+      from: args.from,
+      to: args.to,
+      maxDepth: args.max_depth,
+      via: args.via,
+    });
+    if (!pathResult.ok) {
+      return err(
+        pathResult.error,
+        pathResult.kind === "internal" ? 500 : undefined,
+      );
+    }
+    tryRecordRecipeRun("call-path");
+    const payload = composeTraceResult({
+      root,
+      from: args.from,
+      to: args.to,
+      via: args.via,
+      path: pathResult.rows,
+      budgetChars: args.budget_chars,
+    });
+    return ok(payload);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+export const exploreArgsSchema = {
+  names: z
+    .array(z.string().min(1))
+    .min(1, "names must contain at least one symbol"),
+  depth: z.number().int().nonnegative().optional(),
+  kind: z.string().optional(),
+  budget_chars: z.number().int().positive().optional(),
+};
+
+export interface ExploreArgs {
+  names: string[];
+  depth?: number;
+  kind?: string;
+  budget_chars?: number;
+}
+
+export function handleExplore(args: ExploreArgs, root: string): ToolResult {
+  try {
+    const composed = composeExploreResult({
+      root,
+      names: args.names,
+      depth: args.depth,
+      kind: args.kind,
+      budgetChars: args.budget_chars,
+    });
+    if (!composed.ok) {
+      return err(
+        composed.error,
+        composed.kind === "internal" ? 500 : undefined,
+      );
+    }
+    tryRecordRecipeRun("symbol-neighborhood");
+    return ok(composed.result);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+export const nodeArgsSchema = {
+  name: z.string().min(1, "name must be a non-empty string"),
+  kind: z.string().optional(),
+  in: z.string().optional(),
+  include_snippets: z.boolean().optional(),
+  budget_chars: z.number().int().positive().optional(),
+};
+
+export interface NodeArgs {
+  name: string;
+  kind?: string;
+  in?: string;
+  include_snippets?: boolean;
+  budget_chars?: number;
+}
+
+export function handleNode(args: NodeArgs, root: string): ToolResult {
+  try {
+    const inPath =
+      args.in !== undefined && args.in.length > 0
+        ? toProjectRelative(root, args.in)
+        : undefined;
+    const composed = composeNodeResult({
+      root,
+      name: args.name,
+      kind: args.kind,
+      inPath,
+      includeSnippets: args.include_snippets,
+      budgetChars: args.budget_chars,
+    });
+    if (!composed.ok) {
+      return err(
+        composed.error,
+        composed.kind === "internal" ? 500 : undefined,
+      );
+    }
+    tryRecordRecipeRun("symbol-neighborhood");
+    return ok(composed.result);
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
   }

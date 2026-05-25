@@ -17,6 +17,9 @@ export const MCP_TOOL_NAMES = [
   "snippet",
   "impact",
   "affected",
+  "trace",
+  "explore",
+  "node",
   "apply",
 ] as const;
 

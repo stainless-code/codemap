@@ -1420,3 +1420,102 @@ describe("MCP server — affected tool", () => {
     }
   });
 });
+
+describe("MCP server — trace / explore / node tools", () => {
+  function seedTraceGraph() {
+    writeFileSync(
+      join(benchDir, "src", "trace.ts"),
+      "export function foo() {\n  return bar();\n}\nexport function bar() {\n  return 1;\n}\n",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/trace.ts', 'ht', 100, 6, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+         VALUES ('foo', 'function', 'src/trace.ts', 1, 3, 'foo()', 1, NULL, 'export'),
+                ('bar', 'function', 'src/trace.ts', 4, 6, 'bar()', 1, NULL, 'export')`,
+      );
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ('src/trace.ts', 'foo', 'foo', 'bar', 2, 0, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists trace, explore, and node in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("trace");
+      expect(names).toContain("explore");
+      expect(names).toContain("node");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("trace returns path and snippets", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "trace",
+        arguments: { from: "foo", to: "bar" },
+      });
+      const json = readJson(r) as {
+        path: { callee_name: string }[];
+        snippets: { source?: string }[];
+        truncated: boolean;
+      };
+      expect(json.path).toHaveLength(1);
+      expect(json.path[0]?.callee_name).toBe("bar");
+      expect(json.snippets.length).toBeGreaterThan(0);
+      expect(json.truncated).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("explore merges neighborhoods for multiple names", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "explore",
+        arguments: { names: ["foo", "bar"] },
+      });
+      const json = readJson(r) as { names: string[]; rows: unknown[] };
+      expect(json.names).toEqual(["foo", "bar"]);
+      expect(json.rows.length).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("node returns center + neighborhood", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "node",
+        arguments: { name: "foo", include_snippets: true },
+      });
+      const json = readJson(r) as {
+        center: { matches: { name: string }[] };
+        neighborhood: { name: string }[];
+        snippets: unknown[];
+      };
+      expect(json.center.matches[0]?.name).toBe("foo");
+      expect(json.neighborhood.some((row) => row.name === "bar")).toBe(true);
+      expect(json.snippets.length).toBeGreaterThan(0);
+    } finally {
+      await server.close();
+    }
+  });
+});

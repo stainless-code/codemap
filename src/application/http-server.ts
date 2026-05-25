@@ -19,12 +19,16 @@ import {
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
+  exploreArgsSchema,
   handleApply,
   handleAudit,
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleExplore,
   handleImpact,
+  handleNode,
+  handleTrace,
   handleListBaselines,
   handleQuery,
   handleQueryBatch,
@@ -34,6 +38,8 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  nodeArgsSchema,
+  traceArgsSchema,
   listBaselinesArgsSchema,
   queryArgsSchema,
   queryBatchArgsSchema,
@@ -94,6 +100,9 @@ const TOOL_NAMES = [
   "snippet",
   "impact",
   "affected",
+  "trace",
+  "explore",
+  "node",
   "apply",
   "save_baseline",
   "list_baselines",
@@ -487,6 +496,24 @@ async function dispatchTool(
       const r = validate(affectedArgsSchema, args, "affected");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleAffected(r.value, opts.root);
+      break;
+    }
+    case "trace": {
+      const r = validate(traceArgsSchema, args, "trace");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleTrace(r.value, opts.root);
+      break;
+    }
+    case "explore": {
+      const r = validate(exploreArgsSchema, args, "explore");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleExplore(r.value, opts.root);
+      break;
+    }
+    case "node": {
+      const r = validate(nodeArgsSchema, args, "node");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleNode(r.value, opts.root);
       break;
     }
     case "apply": {
