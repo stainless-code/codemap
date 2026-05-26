@@ -805,6 +805,45 @@ describe("print-comparison-summary", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   });
+
+  it("main rejects log comparison with malformed wall ms totals", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-bad-wall-"));
+    const bad = join(tmp, "bad-wall.json");
+    writeFileSync(
+      bad,
+      JSON.stringify({
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        mode: "log",
+        scenarios: [
+          {
+            id: "session",
+            mcpOn: { toolCallCount: 1, estTokens: 1 },
+            mcpOff: { toolCallCount: 2, estTokens: 2 },
+            delta: { toolCallCount: 1, estTokens: 1 },
+          },
+        ],
+        summary: {
+          mcpOnTotalToolCalls: 1,
+          mcpOffTotalToolCalls: 2,
+          mcpOnTotalEstTokens: 1,
+          mcpOffTotalEstTokens: 2,
+          mcpOnTotalWallMs: "not-a-number",
+          mcpOffTotalWallMs: 100,
+        },
+      }),
+    );
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("compare-live-logs CLI smoke", () => {

@@ -43,14 +43,19 @@ jobs:
 
       - name: Resolve paths
         id: paths
+        env:
+          INPUT_RUNS: ${{ inputs.runs }}
+          INPUT_FIXTURE_ROOT: ${{ inputs.fixture_root }}
+          INPUT_SCENARIOS: ${{ inputs.scenarios }}
+          INPUT_PROBES: ${{ inputs.probes }}
         run: |
           set -euo pipefail
-          RUNS="${{ inputs.runs }}"
+          RUNS="$INPUT_RUNS"
           if ! [[ "$RUNS" =~ ^[1-9][0-9]*$ ]]; then
             echo "runs must be a positive integer (got: $RUNS)" >&2
             exit 1
           fi
-          FIXTURE="${{ inputs.fixture_root }}"
+          FIXTURE="$INPUT_FIXTURE_ROOT"
           if [[ "$FIXTURE" == *".."* ]]; then
             echo "fixture_root must not contain .." >&2
             exit 1
@@ -61,7 +66,7 @@ jobs:
             exit 1
           fi
           echo "fixture=$FIXTURE_ABS" >> "$GITHUB_OUTPUT"
-          SCEN="${{ inputs.scenarios }}"
+          SCEN="$INPUT_SCENARIOS"
           if [[ -n "$SCEN" ]]; then
             if [[ "$SCEN" == *".."* ]]; then exit 1; fi
             SCEN_ABS="${{ github.workspace }}/$SCEN"
@@ -71,7 +76,7 @@ jobs:
             fi
             echo "scenarios=$SCEN_ABS" >> "$GITHUB_OUTPUT"
           fi
-          PROB="${{ inputs.probes }}"
+          PROB="$INPUT_PROBES"
           if [[ -n "$PROB" ]]; then
             if [[ "$PROB" == *".."* ]]; then exit 1; fi
             PROB_ABS="${{ github.workspace }}/$PROB"

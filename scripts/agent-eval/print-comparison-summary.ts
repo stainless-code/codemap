@@ -60,6 +60,12 @@ function isComparisonReport(v: unknown): v is ComparisonReport {
     ) {
       return false;
     }
+    const hasOnWall = summary.mcpOnTotalWallMs !== undefined;
+    const hasOffWall = summary.mcpOffTotalWallMs !== undefined;
+    if (hasOnWall !== hasOffWall) return false;
+    if (hasOnWall && typeof summary.mcpOnTotalWallMs !== "number") return false;
+    if (hasOffWall && typeof summary.mcpOffTotalWallMs !== "number")
+      return false;
     return row.scenarios.every(isLogScenario);
   }
   if (
