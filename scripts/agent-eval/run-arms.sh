@@ -32,6 +32,11 @@ bun "$SCRIPT_DIR/run-probes.ts" \
 PROBE_EXIT=$?
 set -e
 
+if [[ "${AGENT_EVAL_PRINT_SUMMARY:-0}" == "1" && -f "$OUT" ]]; then
+  bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$OUT"
+fi
+
+LOG_EXIT=0
 if [[ -n "${AGENT_EVAL_LOG:-}" ]]; then
   echo "=== agent-eval: parse agent log $AGENT_EVAL_LOG ==="
   bun "$SCRIPT_DIR/print-log-metrics.ts" "$AGENT_EVAL_LOG"
@@ -40,16 +45,20 @@ fi
 if [[ -n "${AGENT_EVAL_LOG_ON:-}" && -n "${AGENT_EVAL_LOG_OFF:-}" ]]; then
   LOG_OUT="${AGENT_EVAL_LOG_OUTPUT:-$REPO_ROOT/.agent-eval/log-comparison.json}"
   echo "=== agent-eval: compare live logs (orthogonal to AGENT_EVAL_MODE) ==="
+  set +e
   bun "$SCRIPT_DIR/compare-live-logs.ts" \
     --mcp-on "$AGENT_EVAL_LOG_ON" \
     --mcp-off "$AGENT_EVAL_LOG_OFF" \
     --output "$LOG_OUT"
-  bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$LOG_OUT"
-fi
-
-if [[ "${AGENT_EVAL_PRINT_SUMMARY:-0}" == "1" && -f "$OUT" ]]; then
-  bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$OUT"
+  LOG_EXIT=$?
+  if [[ "$LOG_EXIT" -eq 0 ]]; then
+    bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$LOG_OUT"
+  fi
+  set -e
 fi
 
 echo "Wrote $OUT"
-exit "$PROBE_EXIT"
+if [[ "$PROBE_EXIT" -ne 0 ]]; then
+  exit "$PROBE_EXIT"
+fi
+exit "$LOG_EXIT"

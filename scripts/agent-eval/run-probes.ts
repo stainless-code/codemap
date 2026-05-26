@@ -187,6 +187,9 @@ function runMcpOffArm(prompt: string, probe: AgentEvalProbe): ArmRunMetrics {
       mcpOffPayloadChars(trad.bytesRead, trad.results),
     ),
     success: trad.results.length > 0,
+    ...(trad.results.length === 0
+      ? { error: "traditional probe returned 0 results" }
+      : {}),
   };
 }
 
