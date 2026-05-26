@@ -45,6 +45,8 @@ export interface ArmRunMetrics {
   estTokens: number;
   /** True when `resultCount > 0`. */
   success: boolean;
+  /** Live MCP handler error when `success` is false and the handler returned `ok: false`. */
+  error?: string;
 }
 
 /** One probe scenario: both arms plus deltas (`mcpOff − mcpOn`). */
@@ -287,11 +289,17 @@ Options:
   --skip-index        Skip full index when .codemap/index.db already exists (CI reuse after test:golden)
   -h, --help
 
-Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset.
+Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset or blank.
 `);
     process.exit(0);
   }
 
+  if (!existsSync(args.probesPath)) {
+    throw new Error(`Probes file not found: ${args.probesPath}`);
+  }
+  if (!existsSync(args.scenariosPath)) {
+    throw new Error(`Scenarios file not found: ${args.scenariosPath}`);
+  }
   const probesRaw = readFileSync(args.probesPath, "utf-8");
   const { probes } = parseProbesJson(probesRaw);
   const goldenRaw = readFileSync(args.scenariosPath, "utf-8");
