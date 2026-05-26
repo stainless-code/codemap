@@ -26,14 +26,9 @@ actions:
 
 Transitive **`extends`** chain plus direct **`implements`** interfaces for a class or interface.
 
-Heritage is parsed from indexed `symbols.signature` (`extends` / `implements` clauses). Generic arguments are stripped for matching (`Base<T>` → `Base`). Unqualified base names resolve with **same-file preference** (parent type in the child's file wins over a homonym elsewhere). Multiple definitions can still appear when the index cannot disambiguate further — same pattern as [`symbol-neighborhood`](./symbol-neighborhood.md) homonyms.
+Heritage edges come from the indexed **`type_heritage`** table (AST extraction + import-aware resolve pass). Generic type arguments are stored in `type_args` but graph walks use `base_simple_name`. Rows with `resolution_kind` of `qualified-unresolved` or `unresolved` are omitted from walks.
 
-**Limits (signature-derived, no dedicated heritage column):**
-
-- Qualified extends (`extends pkg.Type`) and cross-module unqualified extends may miss or fan out.
-- Multi-base `extends A, B` splits on `', '` only — commas inside generic args can mis-split.
-- `extends A,B` without a space after the comma is not split.
-- Direct `implements` edges are depth 1 only (not transitive).
+**Gaps:** qualified namespace extends (`pkg.Type`) stay unresolved until a namespace map exists. Direct `implements` edges are depth 1 only (not transitive).
 
 ```bash
 codemap query --recipe type-ancestors --params symbol_name=Dog

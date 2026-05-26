@@ -9,6 +9,14 @@
   },
   {
     "depth": 1,
+    "descendant_name": "ImportedMammal",
+    "descendant_kind": "interface",
+    "descendant_file_path": "src/types/heritage-qualified.ts",
+    "descendant_line_start": 3,
+    "relation": "extends"
+  },
+  {
+    "depth": 1,
     "descendant_name": "Mammal",
     "descendant_kind": "interface",
     "descendant_file_path": "src/types/hierarchy.ts",

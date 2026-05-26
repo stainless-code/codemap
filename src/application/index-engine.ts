@@ -33,6 +33,7 @@ import {
   insertCssClasses,
   insertCssKeyframes,
   insertTypeMembers,
+  insertTypeHeritage,
   insertCalls,
   insertDynamicImports,
   insertAsyncCalls,
@@ -66,6 +67,10 @@ import {
 import { persistModuleCycles } from "./cycles-engine";
 import { appendIndexError } from "./error-log";
 import { persistFileBarrelFlags } from "./file-graph-flags";
+import {
+  persistTypeHeritageResolution,
+  resolveTypeHeritage,
+} from "./heritage-resolver";
 import { persistJsxElementsAndAttributes } from "./jsx-persist";
 import type { QueryBindValue } from "./query-engine";
 import type {
@@ -356,6 +361,9 @@ function insertParsedResults(
           if (parsed.typeMembers?.length) {
             insertTypeMembers(db, parsed.typeMembers);
           }
+          if (parsed.typeHeritage?.length) {
+            insertTypeHeritage(db, parsed.typeHeritage);
+          }
           if (parsed.calls?.length) insertCalls(db, parsed.calls);
           persistDynamicImports(db, absPath, parsed.dynamicImports);
           persistTierSubstrate(db, parsed.relPath, parsed);
@@ -389,6 +397,7 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM dependencies) as dependencies,
         (SELECT COUNT(*) FROM markers) as markers,
         (SELECT COUNT(*) FROM type_members) as type_members,
+        (SELECT COUNT(*) FROM type_heritage) as type_heritage,
         (SELECT COUNT(*) FROM calls) as calls,
         (SELECT COUNT(*) FROM css_variables) as css_vars,
         (SELECT COUNT(*) FROM css_classes) as css_classes,
@@ -435,6 +444,7 @@ export async function indexFiles(
   let insertMs = 0;
   let indexCreateMs = 0;
   let bindingsMs = 0;
+  let heritageMs = 0;
   let moduleCyclesMs = 0;
   let reExportChainsMs = 0;
   let slowest: { path: string; parse_ms: number }[] = [];
@@ -462,6 +472,7 @@ export async function indexFiles(
   let indexed = 0;
   let skipped = 0;
   let parseFailures = 0;
+  let heritageScopePaths: string[] | undefined;
 
   if (fullRebuild) {
     const parseStart = performance.now();
@@ -483,6 +494,7 @@ export async function indexFiles(
     const insertStart = performance.now();
     indexed = insertParsedResults(db, results, indexedPaths);
     insertMs = performance.now() - insertStart;
+    heritageScopePaths = undefined;
   } else {
     const existingHashes = options?.existingHashes ?? getAllFileHashes(db);
     const root = getProjectRoot();
@@ -532,6 +544,10 @@ export async function indexFiles(
     });
 
     transaction();
+    heritageScopePaths = [
+      ...parsedResults.map((p) => p.relPath),
+      ...(options?.deletedPaths ?? []),
+    ];
   }
 
   if (fullRebuild) {
@@ -571,9 +587,19 @@ export async function indexFiles(
     persistReExportChains(db);
     reExportChainsMs = performance.now() - reExportStart;
 
+    const heritageStart = performance.now();
+    const heritageRows = resolveTypeHeritage(db);
+    persistTypeHeritageResolution(db, heritageRows);
+    heritageMs = performance.now() - heritageStart;
+
     db.run("PRAGMA synchronous = NORMAL");
     db.run("PRAGMA foreign_keys = ON");
     db.run("PRAGMA journal_mode = WAL");
+  } else if (heritageScopePaths && heritageScopePaths.length > 0) {
+    const heritageStart = performance.now();
+    const heritageRows = resolveTypeHeritage(db, heritageScopePaths);
+    persistTypeHeritageResolution(db, heritageRows);
+    heritageMs = performance.now() - heritageStart;
   }
 
   const elapsed = Math.round(performance.now() - startTime);
@@ -590,6 +616,7 @@ export async function indexFiles(
       bindings_ms: Math.round(bindingsMs),
       module_cycles_ms: Math.round(moduleCyclesMs),
       re_export_chains_ms: Math.round(reExportChainsMs),
+      heritage_ms: Math.round(heritageMs),
       total_ms: elapsed,
       slowest_files: slowest,
     };
@@ -643,6 +670,9 @@ export async function indexFiles(
       );
       console.log(
         `    re_exports:     ${perf.re_export_chains_ms}  (persistReExportChains, full only)`,
+      );
+      console.log(
+        `    heritage:       ${perf.heritage_ms}  (resolveTypeHeritage + persist)`,
       );
       console.log(
         `    index_run:      ${perf.total_ms}  (parse + insert + index_create + DDL + bindings + cycles + re_exports)`,

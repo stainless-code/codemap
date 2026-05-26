@@ -74,7 +74,7 @@ Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/nod
 
 ### Core substrate & platform
 
-- [ ] **Type heritage substrate** — `type_heritage` table + resolve pass; rewire `type-ancestors` / `type-descendants` to lift signature-parsing limits. Plan: [`plans/type-heritage-substrate.md`](./plans/type-heritage-substrate.md). Effort: M. Depends: bindings/imports (shipped); [#141](https://github.com/stainless-code/codemap/pull/141) recipes shipped.
+- [x] **Type heritage substrate** — shipped ([#142](https://github.com/stainless-code/codemap/pull/142)): `type_heritage` table + resolve pass; recipes rewired. Plan: [`plans/type-heritage-substrate.md`](./plans/type-heritage-substrate.md).
 
 - [ ] **C.9 framework plugin layer** — static entry-point hints on `files` to sharpen reachability-predicate recipes (`untested-and-dead`, `unimported-exports`, future `dead-files-by-reachability`). Plan: [`plans/c9-plugin-layer.md`](./plans/c9-plugin-layer.md). Effort: XL; ships last in the impact-vs-cadence sequence (see plan § Shipping cadence).
 - [ ] **LSP diagnostic-push + VSCode extension** — recipes-as-`Diagnostic[]` server + paired extension; explicitly **not** a go-to-def / references shim (`tsserver` covers those). Plan: [`plans/lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md). Effort: XL; soft ordering after C.9 for cleaner squigglies on framework files.

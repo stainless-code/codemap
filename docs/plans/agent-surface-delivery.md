@@ -13,7 +13,7 @@
 | Next action         | Detail                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Open**            | Live MCP agent-eval arms + optional external nightly — [agent-eval-harness.md](./agent-eval-harness.md)         |
-| **In flight**       | [`type-heritage-substrate`](./type-heritage-substrate.md) — substrate follow-up to #141 (core substrate)        |
+| **In flight**       | [#142](https://github.com/stainless-code/codemap/pull/142) — `type_heritage` substrate                          |
 | **Recently merged** | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
 |                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
 |                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |

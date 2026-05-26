@@ -13,6 +13,7 @@ export interface IndexTableStats extends Record<string, number> {
   dependencies: number;
   markers: number;
   type_members: number;
+  type_heritage: number;
   calls: number;
   css_vars: number;
   css_classes: number;
@@ -50,6 +51,8 @@ export interface IndexPerformanceReport {
   module_cycles_ms: number;
   /** `persistReExportChains` wall (full rebuild only; `0` otherwise). */
   re_export_chains_ms: number;
+  /** `resolveTypeHeritage` + persist wall. */
+  heritage_ms: number;
   /**
    * `indexFiles` wall-clock — `parse + insert + index_create + DDL + bindings
    * + module_cycles + re_export_chains`. Does **not** include `collect_ms`

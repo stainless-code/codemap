@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -184,6 +184,24 @@ export function createTables(db: CodemapDatabase) {
       type TEXT,
       is_optional INTEGER NOT NULL DEFAULT 0,
       is_readonly INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- Class/interface extends + implements edges (one row per base).
+    CREATE TABLE IF NOT EXISTS type_heritage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      child_file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      child_name TEXT NOT NULL,
+      child_kind TEXT NOT NULL,
+      child_line_start INTEGER NOT NULL,
+      relation TEXT NOT NULL CHECK (relation IN ('extends', 'implements')),
+      base_simple_name TEXT NOT NULL,
+      base_qualified_name TEXT,
+      base_file_path TEXT,
+      base_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      resolution_kind TEXT NOT NULL CHECK (
+        resolution_kind IN ('same-file', 'imported', 'qualified-unresolved', 'unresolved')
+      ),
+      type_args TEXT
     ) STRICT;
 
     -- Lexical scope graph per R.11. Block/for/catch deferred — body refs
@@ -590,6 +608,10 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_type_members_symbol ON type_members(symbol_name, file_path, name, type, is_optional, is_readonly);
     CREATE INDEX IF NOT EXISTS idx_type_members_file ON type_members(file_path);
 
+    CREATE INDEX IF NOT EXISTS idx_type_heritage_child ON type_heritage(child_file_path, child_name, relation);
+    CREATE INDEX IF NOT EXISTS idx_type_heritage_base ON type_heritage(base_simple_name, base_file_path);
+    CREATE INDEX IF NOT EXISTS idx_type_heritage_base_symbol ON type_heritage(base_symbol_id);
+
     CREATE INDEX IF NOT EXISTS idx_scopes_parent ON scopes(file_path, parent_local_id);
     CREATE INDEX IF NOT EXISTS idx_scopes_kind ON scopes(kind, file_path);
     CREATE INDEX IF NOT EXISTS idx_scopes_owner ON scopes(owner_symbol_name, file_path);
@@ -713,6 +735,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS scopes;
     DROP TABLE IF EXISTS import_specifiers;
     DROP TABLE IF EXISTS type_members;
+    DROP TABLE IF EXISTS type_heritage;
     DROP TABLE IF EXISTS dependencies;
     DROP TABLE IF EXISTS markers;
     DROP TABLE IF EXISTS components;
@@ -1875,6 +1898,56 @@ export function insertTypeMembers(
         m.type,
         m.is_optional,
         m.is_readonly,
+      ),
+  );
+}
+
+/** One extends/implements edge from a class or interface symbol. */
+export interface TypeHeritageRow {
+  id?: number;
+  child_file_path: string;
+  child_name: string;
+  child_kind: string;
+  child_line_start: number;
+  relation: "extends" | "implements";
+  base_simple_name: string;
+  base_qualified_name: string | null;
+  base_file_path: string | null;
+  base_symbol_id: number | null;
+  resolution_kind:
+    | "same-file"
+    | "imported"
+    | "qualified-unresolved"
+    | "unresolved";
+  type_args: string | null;
+}
+
+export function insertTypeHeritage(
+  db: CodemapDatabase,
+  rows: TypeHeritageRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    `INSERT INTO type_heritage (
+      child_file_path, child_name, child_kind, child_line_start, relation,
+      base_simple_name, base_qualified_name, base_file_path, base_symbol_id,
+      resolution_kind, type_args
+    )`,
+    "(?,?,?,?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.child_file_path,
+        r.child_name,
+        r.child_kind,
+        r.child_line_start,
+        r.relation,
+        r.base_simple_name,
+        r.base_qualified_name,
+        r.base_file_path,
+        r.base_symbol_id,
+        r.resolution_kind,
+        r.type_args,
       ),
   );
 }

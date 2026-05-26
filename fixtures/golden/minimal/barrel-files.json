@@ -44,6 +44,10 @@
     "exports": 2
   },
   {
+    "file_path": "src/types/heritage-qualified.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/types/type-cycle.ts",
     "exports": 2
   },
@@ -73,10 +77,6 @@
   },
   {
     "file_path": "src/types/status.ts",
-    "exports": 1
-  },
-  {
-    "file_path": "src/usePermissions.ts",
     "exports": 1
   }
 ]

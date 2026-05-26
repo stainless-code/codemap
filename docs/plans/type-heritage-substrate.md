@@ -1,6 +1,6 @@
 # Type heritage substrate — plan
 
-> **Status:** open · **Priority:** P2 (substrate) · **Effort:** M (~2–3 weeks, 4 tracer-bullet PRs)
+> **Status:** shipped · **Priority:** P2 (substrate) · **Effort:** M (~2–3 weeks, 4 tracer-bullet PRs)
 >
 > **Motivator:** [`type-ancestors` / `type-descendants`](../templates/recipes/type-ancestors.md) recipes shipped in [#141](https://github.com/stainless-code/codemap/pull/141) by re-parsing `symbols.signature` in SQL. That tracer bullet works for same-file hierarchies but documents hard limits: qualified extends, comma-in-generics multi-base splits, and name-only homonym resolution. Lifting all limits requires **indexed heritage rows** populated from the oxc AST at parse time, then rewiring recipes to JOIN — not smarter string parsing.
 >
@@ -153,11 +153,11 @@ Primitive sources: [oxc AST class/interface nodes](https://oxc.rs/docs/guide/usa
 
 ## Acceptance (plan close)
 
-- [ ] No signature parsing in `type-ancestors` / `type-descendants` SQL
-- [ ] Qualified extends, multi-base with generics, and homonym cases covered by goldens
-- [ ] Incremental reindex updates heritage for touched files without full rebuild
-- [ ] Recipe `.md` bodies no longer list signature-parsing limits
-- [ ] `templates/recipes-fragments/heritage-edges.sql` removed
+- [x] No signature parsing in `type-ancestors` / `type-descendants` SQL
+- [x] Qualified extends, multi-base with generics, and homonym cases covered by goldens
+- [x] Incremental reindex updates heritage for touched files without full rebuild
+- [x] Recipe `.md` bodies no longer list signature-parsing limits
+- [x] `templates/recipes-fragments/heritage-edges.sql` removed
 
 ---
 

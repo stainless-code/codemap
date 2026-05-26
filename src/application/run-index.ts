@@ -55,6 +55,7 @@ function emptyStats(): IndexTableStats {
     dependencies: 0,
     markers: 0,
     type_members: 0,
+    type_heritage: 0,
     calls: 0,
     css_vars: 0,
     css_classes: 0,

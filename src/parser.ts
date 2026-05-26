@@ -17,6 +17,7 @@ import type {
   ComponentRow,
   MarkerRow,
   TypeMemberRow,
+  TypeHeritageRow,
   CallRow,
   ScopeRow,
   ReferenceRow,
@@ -60,6 +61,7 @@ interface ExtractedData {
   components: ComponentRow[];
   markers: MarkerRow[];
   typeMembers: TypeMemberRow[];
+  typeHeritage: TypeHeritageRow[];
   calls: CallRow[];
   scopes: ScopeRow[];
   references: ReferenceRow[];
@@ -155,6 +157,7 @@ export function extractFileData(
   const components: ComponentRow[] = [];
   const markers: MarkerRow[] = [];
   const typeMembers: TypeMemberRow[] = [];
+  const typeHeritage: TypeHeritageRow[] = [];
   const calls: CallRow[] = [];
   const references: ReferenceRow[] = [];
   const functionParams: FunctionParamRow[] = [];
@@ -216,6 +219,7 @@ export function extractFileData(
     components,
     markers,
     typeMembers,
+    typeHeritage,
     calls,
     references,
     functionParams,
@@ -257,6 +261,7 @@ export function extractFileData(
     components,
     markers,
     typeMembers,
+    typeHeritage,
     calls,
     scopes: [...ctx.scopes.getRecorded()],
     references,

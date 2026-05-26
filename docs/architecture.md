@@ -269,6 +269,25 @@ Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `
 | is_optional | INTEGER    | 1 if `?` modifier present                                 |
 | is_readonly | INTEGER    | 1 if `readonly` modifier present                          |
 
+### `type_heritage` — Class/interface extends and implements edges (`STRICT`)
+
+| Column              | Type       | Description                                                                            |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment row id                                                                  |
+| child_file_path     | TEXT FK    | File defining the child type                                                           |
+| child_name          | TEXT       | Child class or interface name                                                          |
+| child_kind          | TEXT       | `class` or `interface`                                                                 |
+| child_line_start    | INTEGER    | Child definition line                                                                  |
+| relation            | TEXT       | `extends` or `implements`                                                              |
+| base_simple_name    | TEXT       | Unqualified base name used for graph walks                                             |
+| base_qualified_name | TEXT       | Qualified base when present (e.g. `pkg.Type`); nullable                                |
+| base_file_path      | TEXT       | Resolved definition file (null until resolve pass)                                     |
+| base_symbol_id      | INTEGER FK | Resolved `symbols.id` (null when unresolved)                                           |
+| resolution_kind     | TEXT       | `same-file`, `imported`, `qualified-unresolved`, or `unresolved`                       |
+| type_args           | TEXT       | Comma-separated generic args when present (display only; walks use `base_simple_name`) |
+
+Populated at parse time from oxc AST; `heritage-resolver` fills `base_file_path` / `base_symbol_id` after bindings on full rebuild (scoped on incremental). Powers `type-ancestors` and `type-descendants` recipes.
+
 ### `imports` — Import statements (`STRICT`)
 
 | Column        | Type       | Description                                            |
