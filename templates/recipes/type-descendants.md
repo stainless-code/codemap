@@ -7,7 +7,7 @@ params:
   - name: kind
     type: string
     required: false
-    description: Optional `symbols.kind` filter on **descendant output rows** (`class` or `interface`).
+    description: Optional `symbols.kind` filter on **descendant output rows** (`class`, `interface`, or `type`).
   - name: max_depth
     type: number
     required: false
