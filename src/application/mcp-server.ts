@@ -71,7 +71,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * 17 JSON-RPC tools (CLI mirrors plus MCP-only helpers) and MCP resources
+ * 17 JSON-RPC tools (CLI mirrors plus no-CLI-verb helpers on MCP/HTTP) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].
@@ -206,7 +206,7 @@ function registerAuditTool(server: McpServer): void {
     "audit",
     {
       description:
-        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a temp DB, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository.'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
+        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a cached `.codemap/index.db` at that sha, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository.'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
       inputSchema: auditArgsSchema,
     },
     async (args) => wrapToolResult(await handleAudit(args)),
@@ -278,7 +278,7 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
     "show",
     {
       description:
-        "Look up symbol(s) by exact name or field-qualified --query search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` for arbitrary SQL.",
+        "Look up symbol(s) by exact name or field-qualified `query` search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` tool for arbitrary SQL.",
       inputSchema: showArgsSchema,
     },
     (args) => wrapToolResult(handleShow(args, opts.root)),
@@ -400,7 +400,7 @@ function registerResources(server: McpServer): void {
     server,
     "rule",
     "codemap://rule",
-    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents working in this repo).",
+    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents in the indexed project).",
   );
   registerStaticResource(
     server,

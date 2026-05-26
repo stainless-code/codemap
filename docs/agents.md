@@ -37,7 +37,7 @@ codemap agents init --no-git-hooks    # remove codemap hook blocks
 
 ## Git and `.gitignore`
 
-Codemap maintains its own self-managed **`<state-dir>/.gitignore`** (default `.codemap/.gitignore`) — a blacklist of generated artifacts (`index.db` + WAL/SHM, `audit-cache/`) reconciled to canonical on every codemap boot via `ensureStateGitignore` (`src/application/state-dir.ts`). Project-tracked sources (`recipes/`, `config.{ts,js,json}`) default to tracked.
+Codemap maintains its own self-managed **`<state-dir>/.gitignore`** (default `.codemap/.gitignore`) — a blacklist of generated artifacts (`index.db` + WAL/SHM, `audit-cache/` entry in the canonical list) reconciled to canonical on every codemap boot via `ensureStateGitignore` (`src/application/state-dir.ts`). **`audit --base` cache** physically lives at `<projectRoot>/.codemap/audit-cache/` (hardcoded; does not follow `--state-dir`). Project-tracked sources (`recipes/`, `config.{ts,js,json}`) default to tracked.
 
 The user's root **`.gitignore`** is no longer touched by `codemap agents init`. Future codemap versions can add new generated artifacts to the canonical blacklist; every consumer's project repairs itself on the next `codemap` invocation. **The setup logic IS the migration** (per plan §D11).
 

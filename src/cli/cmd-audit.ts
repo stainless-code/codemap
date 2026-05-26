@@ -51,7 +51,7 @@ export function parseAuditRest(rest: string[]):
   // Tracked separately so `--json --format sarif` can be rejected.
   let jsonShortcut = false;
   let format: AuditOutputFormat | undefined;
-  // Aliases `--format sarif` + non-zero exit + quiet. Plan: docs/plans/github-marketplace-action.md.
+  // Aliases `--format sarif` + non-zero exit on delta additions (no quiet mode).
   let ci = false;
   let summary = false;
   let noIndex = false;
@@ -251,7 +251,8 @@ export function printAuditCmdHelp(): void {
       `  --${d.key}-baseline <name>  Explicit baseline for the ${d.key} delta.`,
   ).join("\n");
 
-  console.log(`Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
+  console.log(
+    `Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
 
 Diff the current codemap index (default \`.codemap/index.db\`) against per-delta baselines (saved by \`codemap query --save-baseline\`)
 or against a git ref (\`--base <ref>\` materialises via \`git archive | tar -x\` + reindex), and emit structural deltas
@@ -263,7 +264,7 @@ Snapshot sources (one of these must resolve; --base and --baseline are mutually 
 
   --base <ref>                 Materialise <ref> via git archive | tar -x to a sha-keyed
                                cache under .codemap/audit-cache/ (plain tree, no .git
-                               artifact), reindex into a temp DB, then diff. <ref> = any
+                               artifact), reindex into a cached \`.codemap/index.db\` at that sha, then diff. <ref> = any
                                committish (origin/main, HEAD~5, sha, tag, …). Cache hit
                                on second run against same sha is sub-100ms. Requires a
                                git repository.
@@ -322,7 +323,8 @@ Examples:
 
   # Audit a frozen DB without re-indexing first
   codemap audit --baseline base --no-index
-`);
+`,
+  );
 }
 
 /**

@@ -183,11 +183,13 @@ Flags:
                   indexes, etc.). Same effect as CODEMAP_WATCH=0 /
                   "false" in the environment.
   --debounce <ms> Coalesce burst events into one reindex after <ms> of
-                  quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with --watch.
+                  quiet (default: ${DEFAULT_DEBOUNCE_MS}). Applies when the
+                  watcher is active (default; no-op with --no-watch).
   --help, -h      Show this help.
 
-Routes (every MCP tool maps to POST /tool/<name>; output shape matches
-\`codemap query --json\` envelope, NOT the MCP {content: [...]} wrapper):
+Routes (every MCP tool maps to POST /tool/<name>; HTTP returns each
+tool's native JSON payload directly — NOT the MCP {content: [...]}
+wrapper):
   POST /tool/query
   POST /tool/query_batch
   POST /tool/query_recipe

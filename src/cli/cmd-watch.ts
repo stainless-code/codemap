@@ -111,8 +111,8 @@ JSX / CSS + project-local recipes under \`<state-dir>/recipes/\`, default
 configured excludeDirNames) are skipped.
 
 The process runs until SIGINT/SIGTERM (drains pending edits + closes the
-file watcher). Tracer 4 lands an optimization: when watcher is active,
-\`codemap mcp audit\` skips its incremental-index prelude.
+file watcher). When a watcher is active on \`codemap mcp\` / \`codemap serve\`,
+\`audit\`'s incremental-index prelude is a no-op (the index is already live).
 `,
   );
 }

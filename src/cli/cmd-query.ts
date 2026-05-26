@@ -123,7 +123,7 @@ export function parseQueryRest(rest: string[]):
   let i = 1;
   let json = false;
   let format: OutputFormat | undefined;
-  // Aliases `--format sarif` + non-zero exit + quiet (mirrors `cmd-audit.ts`).
+  // Aliases `--format sarif` + non-zero exit + quiet (audit `--ci` omits quiet).
   let ci = false;
   let summary = false;
   let changedSince: string | undefined;
@@ -693,12 +693,15 @@ Read-only SQL against the codemap index (default \`.codemap/index.db\`; after at
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json                  Alias for --format json. Print a JSON array of row objects to stdout
-                          (for agents and scripts). On error, prints {"error":"<message>"} to stdout.
+  --json                  Alias for --format json. Default success shape: JSON
+                          array of row objects (or {"count": N} with --summary,
+                          {group_by, groups} with --group-by, baseline diff
+                          envelope with --baseline). On error, prints
+                          {"error":"<message>"} to stdout.
   --format <fmt>          One of: ${OUTPUT_FORMATS.join(" | ")}. Overrides --json when both are passed
                           (so --format text + --json prints text). Default = text.
                             text         Terminal table via console.table (default).
-                            json         Same as --json — JSON array of row objects.
+                            json         Same as --json — default row array (see composed shapes above).
                             sarif        SARIF 2.1.0 doc (GitHub Code Scanning); rule.id = codemap.<recipe>
                                          (or codemap.adhoc for ad-hoc SQL); auto-detects file_path / path /
                                          to_path / from_path; aggregate recipes (no location) emit results: [].
@@ -726,7 +729,8 @@ Flags:
                             package   Workspace dir from package.json/workspaces or pnpm-workspace.yaml;
                                       out-of-workspace paths bucket to "<root>".
   --save-baseline[=<name>]
-                          Snapshot the result rows to the query_baselines table inside \`.codemap/index.db\`
+                          Snapshot the result rows to the query_baselines table inside \`<state-dir>/index.db\`
+                          (default \`.codemap/index.db\`; no parallel JSON files; survives --full and SCHEMA bumps).
                           for later --baseline diffs. Name defaults to the --recipe id; ad-hoc SQL
                           must pass an explicit =<name>. Stores SQL, rows, row count, current git
                           HEAD (when available), and a timestamp. Re-saving with the same name

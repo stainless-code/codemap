@@ -85,9 +85,9 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (17; snake_case — one per CLI verb plus MCP-only helpers):
+Tools (17; snake_case — one per CLI verb plus no-CLI-verb helpers on MCP/HTTP):
   query                One read-only SQL statement.
-  query_batch          N statements in one round-trip (MCP-only).
+  query_batch          N statements in one round-trip (no CLI verb; MCP + HTTP).
   query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
   audit                Structural-drift audit ({head, deltas} envelope).
   save_baseline        Snapshot rows under a name (sql or recipe).
@@ -120,9 +120,11 @@ Resources:
                                  mirrors \`show --in <path>\`. Returns
                                  {matches, disambiguation?}.
 
-Output shape is verbatim from each tool's CLI counterpart \`--json\`
-envelope (no re-mapping). See docs/architecture.md § MCP wiring for
-the engine seam and the agent rule + skill for query examples.
+Output shape matches each tool's CLI \`--json\` payload where a CLI verb
+exists (no CLI verb: query_batch, trace, explore, node). MCP wraps payloads
+in \`{content: [{type: "text", text: …}]}\`; HTTP returns raw JSON. See
+docs/architecture.md § MCP wiring for the engine seam and the agent rule
++ skill for query examples.
 
 Flags:
   --watch              [default ON] Boot an in-process file watcher so
@@ -136,8 +138,8 @@ Flags:
                        ephemeral indexes, etc.). Same effect as
                        CODEMAP_WATCH=0 / "false" in the environment.
   --debounce <ms>      Coalesce burst events into one reindex after <ms>
-                       of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with
-                       --watch.
+                       of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Applies when
+                       the watcher is active (default; no-op with --no-watch).
   --help, -h           Show this help.
 
 Global flags (parsed by bootstrap, forwarded to the server):

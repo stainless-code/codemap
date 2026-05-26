@@ -79,8 +79,8 @@ export function readResource(uri: string): ResourcePayload | undefined {
 
 /**
  * List every available resource (URIs only — caller fetches payloads
- * separately). Used by the MCP `resources/list` request and could be
- * surfaced via HTTP later. Mirrors what `ResourceTemplate.list` returns
+ * separately). Used by the MCP `resources/list` request and HTTP
+ * `GET /resources`. Mirrors what `ResourceTemplate.list` returns
  * for the recipes URI plus schema / skill / rule / mcp-instructions / files / symbols URIs.
  */
 export function listResources(): { uri: string; description: string }[] {
@@ -97,11 +97,13 @@ export function listResources(): { uri: string; description: string }[] {
     },
     {
       uri: "codemap://skill",
-      description: "Full text of the bundled SKILL.md.",
+      description:
+        "Full text of the assembled codemap skill (`templates/agent-content/skill/`).",
     },
     {
       uri: "codemap://rule",
-      description: "Full text of the bundled codemap rule markdown.",
+      description:
+        "Full text of the assembled codemap rule (`templates/agent-content/rule/`).",
     },
     {
       uri: "codemap://mcp-instructions",

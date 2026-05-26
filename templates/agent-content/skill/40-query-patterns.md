@@ -11,7 +11,7 @@ FROM symbols WHERE name = 'getConfig';
 SELECT name, kind, file_path, line_start
 FROM symbols WHERE name LIKE '%Config%' ORDER BY name;
 
--- Field-qualified search (CLI / MCP `show --query` / `{query: …}`) — equivalent SQL:
+-- Field-qualified search — CLI: `codemap show --query '…'`; MCP/HTTP `show` / `snippet` with `{query: …}`:
 -- `codemap show --query 'kind:function name:Auth path:src/' --print-sql`
 SELECT name, kind, file_path, line_start, line_end, signature,
        is_exported, parent_name, visibility

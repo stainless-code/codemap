@@ -9,7 +9,7 @@ How **@stainless-code/codemap** is built and published. **Doc index:** [README.m
 
 The `templates/` directory ships two parallel subtrees:
 
-- **`templates/agents/`** — consumer-disk targets copied by `codemap agents init` (thin pointer files: ~16-line SKILL.md + ~22-line rule).
+- **`templates/agents/`** — consumer-disk targets copied by `codemap agents init` (thin pointer files: ~16-line SKILL.md + ~23-line rule).
 - **`templates/agent-content/`** — server-side source assembled live by `codemap skill` / `codemap rule` / `codemap://skill` / `codemap://rule` / `codemap://mcp-instructions`. Section files in `agent-content/skill/` concatenate in lexical order; `*.gen.md` files are replaced at fetch time by renderers in `src/application/agent-content.ts`. Root-level `mcp-instructions.md` feeds MCP initialize `instructions`. See [agents.md](./agents.md#section-assembler-and-genmd) for the split rationale.
 - **`templates/recipes/`** — bundled SQL recipe `.sql` + `.md` pairs shipped in the npm package; project-local recipes in `<state-dir>/recipes/` also appear in `--recipes-json`.
 
