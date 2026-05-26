@@ -309,7 +309,7 @@ TS shape for one row of the `imports` table.
 
 ### `IndexPerformanceReport`
 
-TS shape emitted under `IndexRunStats.performance` when `--performance` is set. Seven per-phase timings (`collect_ms`, `parse_ms`, `insert_ms`, `index_create_ms`, `bindings_ms`, `module_cycles_ms`, `re_export_chains_ms`) + `total_ms` + top-10 slowest files. Note: `total_ms` is `indexFiles` wall-clock (parse + insert + DDL + bindings + cycles + re_exports) and excludes `collect_ms`; end-to-end run wall is `collect_ms + total_ms`. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps the report as JSON post-run.
+TS shape emitted under `IndexRunStats.performance` when `--performance` is set. Eight per-phase timings (`collect_ms`, `parse_ms`, `insert_ms`, `index_create_ms`, `bindings_ms`, `module_cycles_ms`, `re_export_chains_ms`, `heritage_ms`) + `total_ms` + top-10 slowest files. Note: `total_ms` is `indexFiles` wall-clock (parse + insert + DDL + bindings + cycles + re_exports + heritage) and excludes `collect_ms`; end-to-end run wall is `collect_ms + total_ms`. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps the report as JSON post-run.
 
 ### `IndexResult`
 
@@ -581,6 +581,10 @@ The glob implementation used on both Bun and Node (since the `collectFiles` refa
 ### tracer bullet
 
 A small end-to-end vertical slice (see [`.cursor/rules/tracer-bullets.mdc`](../.cursor/rules/tracer-bullets.mdc)). Used in PRs to validate the critical path before expanding.
+
+### `type_heritage` (table)
+
+One row per `extends` / `implements` edge on a class or interface. Populated at parse from oxc AST; `heritage-resolver` (pass 2, after bindings) fills `base_file_path` / `base_symbol_id` and sets `resolution_kind` (`same-file`, `imported`, `qualified-unresolved`, `unresolved`). Powers `type-ancestors` and `type-descendants` recipes.
 
 ### `type_members` (table)
 

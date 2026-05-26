@@ -49,7 +49,7 @@
   },
   {
     "file_path": "src/types/hierarchy.ts",
-    "exported_count": 5,
+    "exported_count": 6,
     "fan_in": 1,
     "avg_coverage_pct": 0,
     "measured_symbols": 0,

@@ -26,8 +26,13 @@ resolved_bases AS (
     OR (
       th.base_symbol_id IS NULL
       AND th.base_file_path IS NOT NULL
-      AND parent.name = th.base_simple_name
-      AND parent.file_path = th.base_file_path
+      AND parent.id = (
+        SELECT MIN(s2.id)
+        FROM symbols s2
+        WHERE s2.name = th.base_simple_name
+          AND s2.file_path = th.base_file_path
+          AND s2.kind IN ('class', 'interface')
+      )
     )
   )
   WHERE th.resolution_kind IN ('same-file', 'imported')

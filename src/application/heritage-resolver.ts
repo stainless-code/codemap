@@ -18,9 +18,10 @@ interface ReExportEntry {
 interface SymbolEntry {
   id: number;
   kind: string;
+  scope_local_id: number;
 }
 
-const TYPE_SYMBOL_KINDS = new Set(["class", "interface"]);
+const TYPE_SYMBOL_KINDS = new Set(["class", "interface", "type"]);
 
 const MAX_REEXPORT_DEPTH = 10;
 
@@ -99,6 +100,16 @@ function followReExportChain(
   return null;
 }
 
+function pickTypeSymbol(candidates: SymbolEntry[]): SymbolEntry | null {
+  if (!candidates.length) return null;
+  const moduleLevel = candidates.filter((s) => s.scope_local_id === 0);
+  const pool = moduleLevel.length ? moduleLevel : candidates;
+  for (const s of pool) {
+    if (TYPE_SYMBOL_KINDS.has(s.kind)) return s;
+  }
+  return pool[0] ?? null;
+}
+
 function findModuleSymbol(
   filePath: string,
   name: string,
@@ -106,10 +117,7 @@ function findModuleSymbol(
 ): SymbolEntry | null {
   const list = symbolsByFile.get(filePath)?.get(name);
   if (!list?.length) return null;
-  for (const s of list) {
-    if (TYPE_SYMBOL_KINDS.has(s.kind)) return s;
-  }
-  return list[0] ?? null;
+  return pickTypeSymbol(list);
 }
 
 function resolveHeritageRow(
@@ -183,14 +191,44 @@ function resolveHeritageRow(
   };
 }
 
+export function expandHeritageResolveScope(
+  db: CodemapDatabase,
+  changedPaths: readonly string[],
+): string[] {
+  if (changedPaths.length === 0) return [];
+  const scope = new Set(changedPaths);
+  const placeholders = changedPaths.map(() => "?").join(",");
+  for (const row of db
+    .query<{ file_path: string }>(
+      `SELECT DISTINCT file_path FROM imports WHERE resolved_path IN (${placeholders})`,
+    )
+    .all(...changedPaths)) {
+    scope.add(row.file_path);
+  }
+  for (const row of db
+    .query<{ child_file_path: string }>(
+      `SELECT DISTINCT child_file_path FROM type_heritage WHERE base_file_path IN (${placeholders})`,
+    )
+    .all(...changedPaths)) {
+    scope.add(row.child_file_path);
+  }
+  return [...scope];
+}
+
 export function resolveTypeHeritage(
   db: CodemapDatabase,
   filePaths?: readonly string[],
 ): TypeHeritageRow[] {
   const symbolsByFile = new Map<string, Map<string, SymbolEntry[]>>();
   for (const s of db
-    .query<{ id: number; file_path: string; name: string; kind: string }>(
-      "SELECT id, file_path, name, kind FROM symbols WHERE kind IN ('class','interface')",
+    .query<{
+      id: number;
+      file_path: string;
+      name: string;
+      kind: string;
+      scope_local_id: number;
+    }>(
+      "SELECT id, file_path, name, kind, scope_local_id FROM symbols WHERE kind IN ('class','interface','type')",
     )
     .all()) {
     let byName = symbolsByFile.get(s.file_path);
@@ -203,7 +241,7 @@ export function resolveTypeHeritage(
       list = [];
       byName.set(s.name, list);
     }
-    list.push({ id: s.id, kind: s.kind });
+    list.push({ id: s.id, kind: s.kind, scope_local_id: s.scope_local_id });
   }
 
   const importsByFile = new Map<string, Map<string, ImportSpec>>();
@@ -275,7 +313,8 @@ export function resolveTypeHeritage(
 
   const where =
     filePaths && filePaths.length > 0
-      ? `WHERE child_file_path IN (${filePaths.map(() => "?").join(",")})`
+      ? `WHERE child_file_path IN (${filePaths.map(() => "?").join(",")})
+         OR (base_file_path IS NOT NULL AND base_file_path IN (${filePaths.map(() => "?").join(",")}))`
       : "";
   const rows = db
     .query<TypeHeritageRow>(
@@ -284,7 +323,7 @@ export function resolveTypeHeritage(
               resolution_kind, type_args
        FROM type_heritage ${where}`,
     )
-    .all(...(filePaths ?? []));
+    .all(...(filePaths ?? []), ...(filePaths ?? []));
 
   return rows.map((row) =>
     resolveHeritageRow(

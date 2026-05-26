@@ -13,8 +13,9 @@
 | Next action         | Detail                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Open**            | Live MCP agent-eval arms + optional external nightly — [agent-eval-harness.md](./agent-eval-harness.md)         |
-| **In flight**       | [#142](https://github.com/stainless-code/codemap/pull/142) — `type_heritage` substrate                          |
-| **Recently merged** | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
+| **In flight**       | —                                                                                                               |
+| **Recently merged** | [#142](https://github.com/stainless-code/codemap/pull/142) — `type_heritage` substrate                          |
+|                     | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
 |                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
 |                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |
 |                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                       |

@@ -70,6 +70,7 @@ import { persistFileBarrelFlags } from "./file-graph-flags";
 import {
   persistTypeHeritageResolution,
   resolveTypeHeritage,
+  expandHeritageResolveScope,
 } from "./heritage-resolver";
 import { persistJsxElementsAndAttributes } from "./jsx-persist";
 import type { QueryBindValue } from "./query-engine";
@@ -597,7 +598,8 @@ export async function indexFiles(
     db.run("PRAGMA journal_mode = WAL");
   } else if (heritageScopePaths && heritageScopePaths.length > 0) {
     const heritageStart = performance.now();
-    const heritageRows = resolveTypeHeritage(db, heritageScopePaths);
+    const scope = expandHeritageResolveScope(db, heritageScopePaths);
+    const heritageRows = resolveTypeHeritage(db, scope);
     persistTypeHeritageResolution(db, heritageRows);
     heritageMs = performance.now() - heritageStart;
   }

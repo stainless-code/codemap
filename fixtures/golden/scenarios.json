@@ -240,6 +240,36 @@
       "params": { "symbol_name": "CycleA", "max_depth": 5 }
     },
     {
+      "id": "type-ancestors-both",
+      "prompt": "Multi-base same-file extends ancestors of Both",
+      "recipe": "type-ancestors",
+      "params": { "symbol_name": "Both" }
+    },
+    {
+      "id": "type-ancestors-generic-both",
+      "prompt": "Generic comma multi-base extends ancestors of GenericBoth",
+      "recipe": "type-ancestors",
+      "params": { "symbol_name": "GenericBoth" }
+    },
+    {
+      "id": "type-ancestors-imported-mammal",
+      "prompt": "Cross-file import resolves Animal ancestor of ImportedMammal",
+      "recipe": "type-ancestors",
+      "params": {
+        "symbol_name": "ImportedMammal",
+        "file_path": "src/types/heritage-qualified.ts"
+      }
+    },
+    {
+      "id": "type-ancestors-qualified-child",
+      "prompt": "Qualified namespace extends yields no recipe ancestors",
+      "recipe": "type-ancestors",
+      "params": {
+        "symbol_name": "QualifiedChild",
+        "file_path": "src/types/heritage-qualified.ts"
+      }
+    },
+    {
       "id": "type-descendants-unknown",
       "prompt": "Unknown base type returns empty descendants",
       "recipe": "type-descendants",
