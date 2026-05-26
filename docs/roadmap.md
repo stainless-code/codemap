@@ -74,6 +74,8 @@ Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/nod
 
 ### Core substrate & platform
 
+- [ ] **Type heritage substrate** — `type_heritage` table + resolve pass; rewire `type-ancestors` / `type-descendants` to lift signature-parsing limits. Plan: [`plans/type-heritage-substrate.md`](./plans/type-heritage-substrate.md). Effort: M. Depends: bindings/imports (shipped); [#141](https://github.com/stainless-code/codemap/pull/141) recipes shipped.
+
 - [ ] **C.9 framework plugin layer** — static entry-point hints on `files` to sharpen reachability-predicate recipes (`untested-and-dead`, `unimported-exports`, future `dead-files-by-reachability`). Plan: [`plans/c9-plugin-layer.md`](./plans/c9-plugin-layer.md). Effort: XL; ships last in the impact-vs-cadence sequence (see plan § Shipping cadence).
 - [ ] **LSP diagnostic-push + VSCode extension** — recipes-as-`Diagnostic[]` server + paired extension; explicitly **not** a go-to-def / references shim (`tsserver` covers those). Plan: [`plans/lsp-diagnostic-push.md`](./plans/lsp-diagnostic-push.md). Effort: XL; soft ordering after C.9 for cleaner squigglies on framework files.
 - [ ] **Apply-engine direction** — diff-shape recipes, per-row `actions[].command`, `apply --rows` / `--diff-input` / fixpoint loop. Substrate tiers 1–6 shipped; open steps 2–12. Plan: [`plans/apply-engine-direction.md`](./plans/apply-engine-direction.md).
