@@ -46,7 +46,7 @@ We **do not** commit another product’s source tree, paths, business strings, o
 | **Goldens** from **our** fixtures only     | Snapshots keyed to proprietary names |
 | **Abstract `prompt` text** (intent labels) | Verbatim customer prompts            |
 
-**Tier B:** Point `CODEMAP_ROOT` at a **local** clone; goldens for that tree stay **gitignored** (or private automation) — see [.gitignore](../.gitignore) and [benchmark § Tier B](./benchmark.md#fixtures).
+**Tier B:** Point `CODEMAP_ROOT` at a **local** clone; goldens for that tree stay **gitignored** (or private automation) — see [.gitignore](../.gitignore) and [benchmark § Agent eval harness — Tier B](./benchmark.md#agent-eval-harness).
 
 ---
 

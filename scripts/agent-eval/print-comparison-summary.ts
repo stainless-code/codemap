@@ -12,9 +12,13 @@ function isLogComparison(v: ComparisonReport): v is LiveLogComparison {
 
 function isComparisonReport(v: unknown): v is ComparisonReport {
   if (v === null || typeof v !== "object") return false;
-  const mode = (v as { mode?: unknown }).mode;
+  const row = v as Record<string, unknown>;
+  const mode = row.mode;
   if (mode !== "probe" && mode !== "live" && mode !== "log") return false;
-  return Array.isArray((v as { scenarios?: unknown }).scenarios);
+  if (typeof row.generatedAt !== "string") return false;
+  if (!Array.isArray(row.scenarios)) return false;
+  if (row.summary === null || typeof row.summary !== "object") return false;
+  return true;
 }
 
 function fmt(n: number, digits = 0): string {

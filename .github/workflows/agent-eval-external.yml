@@ -1,5 +1,5 @@
 # Optional manual agent-eval on an in-repo indexed fixture (default: fixtures/minimal).
-# For external public repos (zod, fastify), clone/index locally and pass matching scenarios/probes inputs.
+# Clone external trees into the checkout first; pass repo-relative fixture_root + matching scenarios/probes.
 name: Agent eval (external)
 
 on:
@@ -45,6 +45,11 @@ jobs:
         id: paths
         run: |
           set -euo pipefail
+          RUNS="${{ inputs.runs }}"
+          if ! [[ "$RUNS" =~ ^[1-9][0-9]*$ ]]; then
+            echo "runs must be a positive integer (got: $RUNS)" >&2
+            exit 1
+          fi
           FIXTURE="${{ inputs.fixture_root }}"
           if [[ "$FIXTURE" == *".."* ]]; then
             echo "fixture_root must not contain .." >&2
@@ -89,6 +94,7 @@ jobs:
           AGENT_EVAL_PRINT_SUMMARY: "1"
           AGENT_EVAL_SCENARIOS: ${{ steps.paths.outputs.scenarios }}
           AGENT_EVAL_PROBES: ${{ steps.paths.outputs.probes }}
+          CODEMAP_MCP_TOOLS: ${{ inputs.mode == 'live' && 'query,query_recipe' || '' }}
         run: bash scripts/agent-eval/run-arms.sh
 
       - name: Upload comparison artifact

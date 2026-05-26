@@ -11,6 +11,7 @@ import { runLiveMcpArm } from "./live-mcp-arm";
 import {
   assertLiveEvalToolEnabled,
   defaultLiveEvalMcpToolsEnv,
+  ensureLiveEvalMcpToolsEnv,
   requiredMcpToolForGolden,
 } from "./mcp-allowlist";
 import { jsonCharLength } from "./metrics";
@@ -554,6 +555,18 @@ describe("live MCP arm", () => {
     }
   });
 
+  it("ensureLiveEvalMcpToolsEnv applies default when blank", () => {
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = "  ";
+    try {
+      ensureLiveEvalMcpToolsEnv(process.env);
+      expect(process.env.CODEMAP_MCP_TOOLS).toBe(defaultLiveEvalMcpToolsEnv());
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
   it("runLiveMcpArm returns rows via handleQuery", () => {
     const root = join(import.meta.dir, "../../fixtures/minimal");
     initCodemap(resolveCodemapConfig(root, undefined));
@@ -699,6 +712,51 @@ describe("print-comparison-summary", () => {
     });
     expect(md).toContain("log exports");
     expect(md).toContain("wall ms");
+  });
+
+  it("main rejects malformed comparison JSON", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-bad-json-"));
+    const bad = join(tmp, "bad.json");
+    writeFileSync(bad, JSON.stringify({ mode: "probe", scenarios: [] }));
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("compare-live-logs CLI smoke", () => {
+  it("exits 0 comparing sample logs", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const onLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-cursor-log.json",
+    );
+    const offLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-no-mcp-log.json",
+    );
+    const result = spawnSync(
+      "bun",
+      [
+        join(import.meta.dir, "compare-live-logs.ts"),
+        "--mcp-on",
+        onLog,
+        "--mcp-off",
+        offLog,
+      ],
+      { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+    );
+    expect(result.status).toBe(0);
   });
 });
 

@@ -14,6 +14,14 @@ export function defaultLiveEvalMcpToolsEnv(): string {
   return LIVE_EVAL_MCP_TOOLS.join(",");
 }
 
+/** Apply eval subset when CODEMAP_MCP_TOOLS is unset or blank. */
+export function ensureLiveEvalMcpToolsEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (env.CODEMAP_MCP_TOOLS?.trim()) return;
+  env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+}
+
 export function requiredMcpToolForGolden(
   golden: GoldenScenario,
 ): LiveEvalMcpTool {

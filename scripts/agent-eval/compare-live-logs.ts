@@ -1,8 +1,12 @@
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parseAgentLogFile } from "./parse-agent-log";
 import type { ParsedAgentLog } from "./parse-agent-log";
+
+const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(EVAL_DIR, "../..");
 
 export interface LogArmRecord extends ParsedAgentLog {
   logPath: string;
@@ -42,7 +46,7 @@ function optValue(argv: string[], i: number, flag: string): string {
 }
 
 function parseArgs(argv: string[]) {
-  let output = resolve(".agent-eval/log-comparison.json");
+  let output = join(REPO_ROOT, ".agent-eval/log-comparison.json");
   let mcpOnLog = "";
   let mcpOffLog = "";
   let id = "session";

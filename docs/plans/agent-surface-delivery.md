@@ -14,10 +14,11 @@
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Open**            | —                                                                                                               |
 | **In flight**       | [#144](https://github.com/stainless-code/codemap/pull/144) — agent eval live MCP arms + log comparison (PR 9)   |
-| **Recently merged** | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
+| **Recently merged** | [#142](https://github.com/stainless-code/codemap/pull/142) — `type_heritage` substrate (P2)                     |
+|                     | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
 |                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
 |                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |
-|                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                       |
+|                     | Wave 1–2 (#126–#138) — see merged rows below; plan tombstones removed per docs-governance                       |
 
 Update the table below when a PR merges or a new branch opens.
 

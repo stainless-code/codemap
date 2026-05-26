@@ -11,7 +11,7 @@ import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
 import { runLiveMcpArm } from "./live-mcp-arm";
 import {
-  defaultLiveEvalMcpToolsEnv,
+  ensureLiveEvalMcpToolsEnv,
   resolveLiveEvalMcpTools,
 } from "./mcp-allowlist";
 import {
@@ -309,8 +309,8 @@ Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset.
   const priorCodeMapRoot = process.env.CODEMAP_ROOT;
   const priorMcpTools = process.env.CODEMAP_MCP_TOOLS;
   process.env.CODEMAP_ROOT = args.fixtureRoot;
-  if (args.mode === "live" && priorMcpTools === undefined) {
-    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+  if (args.mode === "live") {
+    ensureLiveEvalMcpToolsEnv(process.env);
   }
 
   try {
