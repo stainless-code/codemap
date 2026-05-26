@@ -26,7 +26,7 @@ Probe harness ([#139](https://github.com/stainless-code/codemap/pull/139)) shipp
 
 ## P1 — Open
 
-_(PR 9 live+log remains open until #144 merges; probe slice already shipped in #139.)_
+_(none — PR 9 live+log completes in #144; probe shipped in #139.)_
 
 ---
 

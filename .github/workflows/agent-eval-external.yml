@@ -68,7 +68,10 @@ jobs:
           echo "fixture=$FIXTURE_ABS" >> "$GITHUB_OUTPUT"
           SCEN="$INPUT_SCENARIOS"
           if [[ -n "$SCEN" ]]; then
-            if [[ "$SCEN" == *".."* ]]; then exit 1; fi
+            if [[ "$SCEN" == *".."* ]]; then
+              echo "scenarios must not contain .." >&2
+              exit 1
+            fi
             SCEN_ABS="${{ github.workspace }}/$SCEN"
             if [[ ! -f "$SCEN_ABS" ]]; then
               echo "scenarios file not found: $SCEN_ABS" >&2
@@ -78,7 +81,10 @@ jobs:
           fi
           PROB="$INPUT_PROBES"
           if [[ -n "$PROB" ]]; then
-            if [[ "$PROB" == *".."* ]]; then exit 1; fi
+            if [[ "$PROB" == *".."* ]]; then
+              echo "probes must not contain .." >&2
+              exit 1
+            fi
             PROB_ABS="${{ github.workspace }}/$PROB"
             if [[ ! -f "$PROB_ABS" ]]; then
               echo "probes file not found: $PROB_ABS" >&2

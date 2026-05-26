@@ -61,6 +61,10 @@ export function runLiveMcpArm(
       liveMcpPayloadChars(tool, callArgs, result),
     ),
     success: result.ok && rows > 0,
-    ...(!result.ok ? { error: result.error } : {}),
+    ...(!result.ok
+      ? { error: result.error }
+      : rows === 0
+        ? { error: "query returned 0 rows" }
+        : {}),
   };
 }

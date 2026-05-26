@@ -287,22 +287,27 @@ bun run benchmark
 
 ### Agent eval harness
 
-Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Three modes:
+Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). **Probe** and **live** arms share `AGENT_EVAL_MODE`; **log** comparison is separate (see below).
 
-| Mode                | Flag / env                                 | MCP-on arm                                                                                                           |
-| ------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| **Probe** (default) | `AGENT_EVAL_MODE=probe`                    | `queryRows` (one simulated query per probe)                                                                          |
-| **Live**            | `AGENT_EVAL_MODE=live`                     | `handleQuery` / `handleQueryRecipe` via transport-agnostic handlers; defaults `CODEMAP_MCP_TOOLS=query,query_recipe` |
-| **Log**             | `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` | Parses exported MCP-on vs MCP-off agent transcripts (post-hoc; no simulated off-arm)                                 |
+| Mode                | Flag / env              | MCP-on arm                                                                                                           |
+| ------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Probe** (default) | `AGENT_EVAL_MODE=probe` | `queryRows` (one simulated query per probe)                                                                          |
+| **Live**            | `AGENT_EVAL_MODE=live`  | `handleQuery` / `handleQueryRecipe` via transport-agnostic handlers; defaults `CODEMAP_MCP_TOOLS=query,query_recipe` |
+
+**Log comparison** (orthogonal to `AGENT_EVAL_MODE` — do not set `AGENT_EVAL_MODE=log`):
+
+| Mode    | Env / CLI                                                              | MCP-on arm                                          |
+| ------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
+| **Log** | `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` (or `compare-live-logs.ts`) | Parses exported MCP-on vs MCP-off agent transcripts |
 
 **Eval layers** (full methodology and exploratory findings: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md)):
 
-| Layer          | MCP-on                         | MCP-off / baseline                         | In CI today?                     |
-| -------------- | ------------------------------ | ------------------------------------------ | -------------------------------- |
-| **Probe**      | `queryRows`                    | Simulated glob → read × N → grep           | Yes (`test:agent-eval`)          |
-| **Live**       | MCP handlers                   | Same traditional arm                       | Yes (smoke in `test:agent-eval`) |
-| **Log**        | Parsed MCP-on export           | Parsed MCP-off export                      | No (manual logs)                 |
-| **Dual-agent** | Live MCP tools in an LLM agent | Same tasks; MCP/`codemap query` prohibited | No (research only)               |
+| Layer          | MCP-on                         | MCP-off / baseline                         | In CI today?                                                                  |
+| -------------- | ------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| **Probe**      | `queryRows`                    | Simulated glob → read × N → grep           | Yes (`test:agent-eval`)                                                       |
+| **Live**       | MCP handlers                   | Same traditional arm                       | Yes (smoke in `test:agent-eval`)                                              |
+| **Log**        | Parsed MCP-on export           | Parsed MCP-off export                      | Parser smoke only (`test:agent-eval` on sample logs); no CI on ad-hoc exports |
+| **Dual-agent** | Live MCP tools in an LLM agent | Same tasks; MCP/`codemap query` prohibited | No (research only)                                                            |
 
 **Probe** and **live** index the fixture, then compare MCP-on against a simulated **MCP-off** arm (`glob` → `read` × N → `grep`). **Log** mode is orthogonal to `AGENT_EVAL_MODE`: it compares two exported session logs via `compare-live-logs.ts`. The traditional arm models **naive** discovery; a skilled grep-only agent may match MCP on simple lookups — see the research note § 4.
 
@@ -323,7 +328,7 @@ AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh
 bun scripts/agent-eval/print-comparison-summary.ts .agent-eval/comparison.json
 ```
 
-Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`, **`AGENT_EVAL_MODE`** (`probe` | `live`), **`AGENT_EVAL_LOG_OUTPUT`**. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`). **Log comparison:** `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` write `.agent-eval/log-comparison.json` (override path with `AGENT_EVAL_LOG_OUTPUT`) and print a summary. Optional single-log parse: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh`.
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`, **`AGENT_EVAL_MODE`** (`probe` | `live`), **`AGENT_EVAL_RUNS`**, **`AGENT_EVAL_LOG_ON`**, **`AGENT_EVAL_LOG_OFF`**, **`AGENT_EVAL_LOG`**, **`AGENT_EVAL_LOG_OUTPUT`**, **`AGENT_EVAL_PRINT_SUMMARY`**. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`). **Log comparison:** `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` write `.agent-eval/log-comparison.json` (override path with `AGENT_EVAL_LOG_OUTPUT`) and print a summary. Optional single-log parse: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh`.
 
 **Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload). Probe MCP-on counts resolved SQL + bind values + JSON rows; live MCP-on counts tool name + args + handler JSON payload (recipe probes use `query_recipe`, not `query` — tool counts differ from probe mode). MCP-off includes bytes read + grep hits. Log mode also counts assistant output chars from exports. Per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed in probe/live. Results stay local JSON — no telemetry upload (benchmark harness floor).
 
@@ -332,7 +337,7 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EV
 - **Probe mode** is deterministic (no LLM): it measures structural cost of indexed SQL vs traditional file scan on the same corpus. Use it for regression guardrails and fixture tuning.
 - **Live mode** dispatches the same golden tasks through `handleQuery` / `handleQueryRecipe` (transport-agnostic MCP handlers) with a minimal `CODEMAP_MCP_TOOLS` allowlist — closer to real MCP round-trips without an LLM in the loop.
 - **Log mode** parses exported agent transcripts (entries / messages / line formats) from separate MCP-on vs MCP-off sessions. Token estimates include tool `args` / `arguments` payloads, assistant output, and structured `content` part arrays where present; `wallMs` sums per-entry timings when exported.
-- In-repo fixtures beyond minimal: point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree and pass matching `--scenarios` / `--probes`. Optional **`workflow_dispatch`** on [`.github/workflows/agent-eval-external.yml`](../.github/workflows/agent-eval-external.yml) supports repo-relative fixture paths + scenario/probe overrides (default: `fixtures/minimal`). Named external repos (zod, fastify) with published numbers remain the [roadmap backlog](./roadmap.md#backlog) item — clone and index locally first.
+- In-repo fixtures beyond minimal: point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree and pass matching `--scenarios` / `--probes`. Optional **`workflow_dispatch`** on [`.github/workflows/agent-eval-external.yml`](../.github/workflows/agent-eval-external.yml) supports repo-relative fixture paths + scenario/probe overrides (default: `fixtures/minimal`). When `fixture_root` is `fixtures/minimal`, the workflow runs `test:golden` first; other paths rely on an existing index or a full harness reindex (golden `setup` steps run after index when declared in scenarios JSON). Uploads `.agent-eval/comparison.json` only (not log comparison). Named external repos (zod, fastify) with published numbers remain the [roadmap backlog](./roadmap.md#backlog) item — clone and index locally first.
 
 **Pinned sample (`fixtures/minimal`, live mode, 2026-05-26):** reproduce with `AGENT_EVAL_MODE=live AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh`. Three probes, `runs=1`, all scenarios ok:
 

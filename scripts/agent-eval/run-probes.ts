@@ -7,6 +7,7 @@ import { queryRows } from "../../src/application/index-engine";
 import type { RecipeParamValue } from "../../src/application/recipe-params";
 import { resolveCodemapConfig } from "../../src/config";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { runGoldenSetup } from "../query-golden/run-setup";
 import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
 import { runLiveMcpArm } from "./live-mcp-arm";
@@ -303,7 +304,8 @@ Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset or blank.
   const probesRaw = readFileSync(args.probesPath, "utf-8");
   const { probes } = parseProbesJson(probesRaw);
   const goldenRaw = readFileSync(args.scenariosPath, "utf-8");
-  const { scenarios: goldenScenarios } = parseScenariosJson(goldenRaw);
+  const { setup: goldenSetup, scenarios: goldenScenarios } =
+    parseScenariosJson(goldenRaw);
   const goldenById = new Map(goldenScenarios.map((s) => [s.id, s]));
 
   for (const probe of probes) {
@@ -335,6 +337,9 @@ Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset or blank.
       }
     } else {
       await cm.index({ mode: "full", quiet: true });
+    }
+    if (goldenSetup.length > 0) {
+      runGoldenSetup(goldenSetup, args.fixtureRoot);
     }
 
     const aggregated: ScenarioComparison[] = probes.map((probe) => {
@@ -391,12 +396,6 @@ export function averageSamples(
     throw new Error("averageSamples requires at least one sample");
   }
   const prompt = samples[0]!.prompt;
-  let mcpOnToolCallCount = 0;
-  let mcpOffToolCallCount = 0;
-  let mcpOnWallMs = 0;
-  let mcpOffWallMs = 0;
-  let mcpOnEstTokens = 0;
-  let mcpOffEstTokens = 0;
   const avgArm = (
     pick: (s: ScenarioComparison) => ArmRunMetrics,
   ): ArmRunMetrics => {
@@ -406,6 +405,7 @@ export function averageSamples(
     let resultCount = 0;
     let estTokens = 0;
     let success = true;
+    let error: string | undefined;
     for (const s of samples) {
       const arm = pick(s);
       wallMs += arm.wallMs;
@@ -413,6 +413,9 @@ export function averageSamples(
       resultCount += arm.resultCount;
       estTokens += arm.estTokens;
       success &&= arm.success;
+      if (arm.error !== undefined) {
+        error ??= arm.error;
+      }
     }
     return {
       wallMs: wallMs / n,
@@ -421,16 +424,9 @@ export function averageSamples(
       resultCount: Math.round(resultCount / n),
       estTokens: Math.ceil(estTokens / n),
       success,
+      ...(error !== undefined ? { error } : {}),
     };
   };
-  for (const s of samples) {
-    mcpOnWallMs += s.mcpOn.wallMs;
-    mcpOffWallMs += s.mcpOff.wallMs;
-    mcpOnToolCallCount += s.mcpOn.toolCallCount;
-    mcpOffToolCallCount += s.mcpOff.toolCallCount;
-    mcpOnEstTokens += s.mcpOn.estTokens;
-    mcpOffEstTokens += s.mcpOff.estTokens;
-  }
   const mcpOn = avgArm((s) => s.mcpOn);
   const mcpOff = avgArm((s) => s.mcpOff);
   const scenarioSuccess = samples.every((s) => s.scenarioSuccess);
@@ -441,9 +437,9 @@ export function averageSamples(
     mcpOff,
     scenarioSuccess,
     delta: {
-      toolCallCount: mcpOffToolCallCount / n - mcpOnToolCallCount / n,
-      wallMs: mcpOffWallMs / n - mcpOnWallMs / n,
-      estTokens: mcpOffEstTokens / n - mcpOnEstTokens / n,
+      toolCallCount: mcpOff.toolCallCount - mcpOn.toolCallCount,
+      wallMs: mcpOff.wallMs - mcpOn.wallMs,
+      estTokens: mcpOff.estTokens - mcpOn.estTokens,
     },
   };
 }

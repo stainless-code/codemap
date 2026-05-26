@@ -10,12 +10,12 @@
 
 ## 1. Eval layers
 
-| Layer          | What it measures                                         | MCP-off arm                        | Reproducible?                                                    |
-| -------------- | -------------------------------------------------------- | ---------------------------------- | ---------------------------------------------------------------- |
-| **Probe**      | `queryRows` vs simulated glob→read→grep                  | Traditional regex probe in harness | Yes — `bun run test:agent-eval`                                  |
-| **Live**       | `handleQuery` / `handleQueryRecipe` vs traditional probe | Same traditional arm               | Yes — `AGENT_EVAL_MODE=live bash scripts/agent-eval/run-arms.sh` |
-| **Log**        | Exported MCP-on vs MCP-off session transcripts           | Post-hoc parse only                | Yes when logs are supplied                                       |
-| **Dual-agent** | Real LLM agent with MCP vs same tasks with MCP forbidden | Agent uses Grep/Read/Glob only     | Manual / ad hoc today; not in CI                                 |
+| Layer          | What it measures                                         | MCP-off arm                        | Reproducible?                                                                                                   |
+| -------------- | -------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Probe**      | `queryRows` vs simulated glob→read→grep                  | Traditional regex probe in harness | Yes — `bun run test:agent-eval`                                                                                 |
+| **Live**       | `handleQuery` / `handleQueryRecipe` vs traditional probe | Same traditional arm               | Yes — `bun run test:agent-eval` (live smoke) + local `AGENT_EVAL_MODE=live bash scripts/agent-eval/run-arms.sh` |
+| **Log**        | Exported MCP-on vs MCP-off session transcripts           | Post-hoc parse only                | Yes when logs are supplied                                                                                      |
+| **Dual-agent** | Real LLM agent with MCP vs same tasks with MCP forbidden | Agent uses Grep/Read/Glob only     | Manual / ad hoc today; not in CI                                                                                |
 
 The harness **traditional arm** models **naive** file discovery (glob, read every candidate, grep). A **skilled** agent may grep directly and match MCP on simple lookups — see § 4.
 

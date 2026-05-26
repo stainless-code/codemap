@@ -360,7 +360,7 @@ describe("run-probes helpers", () => {
     expect(avg.mcpOff.estTokens).toBe(12);
   });
 
-  it("averageSamples delta uses unrounded arm averages", () => {
+  it("averageSamples delta matches rounded arm counts", () => {
     const samples = [
       scenario({
         id: "p",
@@ -377,6 +377,24 @@ describe("run-probes helpers", () => {
     expect(avg.mcpOff.toolCallCount).toBe(3);
     expect(avg.mcpOn.toolCallCount).toBe(1);
     expect(avg.delta.toolCallCount).toBe(2);
+  });
+
+  it("averageSamples preserves arm error when any run failed", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ success: false, error: "SQL bad" }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ success: true }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOn.success).toBe(false);
+    expect(avg.mcpOn.error).toBe("SQL bad");
   });
 
   it("traditionalToolSequence includes glob and grep with zero reads", () => {
@@ -541,6 +559,38 @@ describe("run-probes smoke", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it("live mode exits non-zero when query_recipe is not allowlisted", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-live-deny-"));
+    const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--mode",
+      "live",
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          CODEMAP_MCP_TOOLS: "query",
+        },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/not enabled/i);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
 });
 
 describe("live MCP arm", () => {
@@ -657,6 +707,29 @@ describe("live MCP arm", () => {
       else process.env.CODEMAP_MCP_TOOLS = prior;
     }
   });
+
+  it("runLiveMcpArm marks empty results as failure with error", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "empty",
+          prompt: "empty",
+          sql: "SELECT 1 WHERE 1 = 0",
+        },
+        root,
+        "empty",
+      );
+      expect(metrics.success).toBe(false);
+      expect(metrics.error).toBe("query returned 0 rows");
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
 });
 
 describe("compare-live-logs", () => {
@@ -682,6 +755,15 @@ describe("compare-live-logs", () => {
     expect(() =>
       compareLogArms("/no/such/on.json", "/no/such/off.json"),
     ).toThrow(/MCP-on log not found/);
+    expect(() =>
+      compareLogArms(
+        join(
+          import.meta.dir,
+          "../../fixtures/agent-eval/sample-cursor-log.json",
+        ),
+        "/no/such/off.json",
+      ),
+    ).toThrow(/MCP-off log not found/);
   });
 });
 
@@ -881,5 +963,10 @@ describe("tool-payload", () => {
         groups: [{ count: 3 }, { count: 2 }],
       }),
     ).toBe(5);
+    expect(
+      resultCountFromToolPayload({
+        groups: [{ rows: [{}, {}] }, { rows: [{}] }],
+      }),
+    ).toBe(3);
   });
 });
