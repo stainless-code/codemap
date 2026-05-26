@@ -5,12 +5,14 @@ import { resolveCodemapConfig } from "./config";
 import { globSync } from "./glob-sync";
 import { initCodemap } from "./runtime";
 import {
+  INLINE_PARSE_MAX,
   parseFilesParallel,
   parseParseWorkerCountOverride,
   parseWorkerRecycleEvery,
 } from "./worker-pool";
 
-const minimalRoot = join(import.meta.dir, "..", "fixtures", "minimal");
+const repoRoot = join(import.meta.dir, "..");
+const minimalRoot = join(repoRoot, "fixtures", "minimal");
 
 describe("parseParseWorkerCountOverride", () => {
   test("accepts valid decimal integers", () => {
@@ -48,16 +50,48 @@ describe("parseFilesParallel", () => {
     await expect(parseFilesParallel([])).resolves.toEqual([]);
   });
 
-  test("returns promptly after worker-pool parse (no orphaned timeout timers)", async () => {
+  test("returns parsed results via the worker pool path", async () => {
     initCodemap(resolveCodemapConfig(minimalRoot, undefined));
     const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
-    expect(files.length).toBeGreaterThan(12);
+    expect(files.length).toBeGreaterThan(INLINE_PARSE_MAX);
+
+    const results = await parseFilesParallel(files);
+    expect(results.length).toBe(files.length);
+  });
+
+  test("subprocess exits promptly after worker-pool parse (no orphaned timers)", async () => {
+    const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
+    expect(files.length).toBeGreaterThan(INLINE_PARSE_MAX);
+
+    const script = `
+import { resolveCodemapConfig } from "./src/config.ts";
+import { globSync } from "./src/glob-sync.ts";
+import { initCodemap } from "./src/runtime.ts";
+import { INLINE_PARSE_MAX, parseFilesParallel } from "./src/worker-pool.ts";
+
+const root = ${JSON.stringify(minimalRoot)};
+initCodemap(resolveCodemapConfig(root, undefined));
+const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], root);
+if (files.length <= INLINE_PARSE_MAX) {
+  throw new Error("fixture too small for worker-pool path");
+}
+await parseFilesParallel(files);
+`;
 
     const started = performance.now();
-    const results = await parseFilesParallel(files);
+    const proc = Bun.spawn([process.execPath, "-e", script], {
+      cwd: repoRoot,
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const [exitCode, stderr] = await Promise.all([
+      proc.exited,
+      new Response(proc.stderr).text(),
+    ]);
     const elapsedMs = performance.now() - started;
 
-    expect(results.length).toBe(files.length);
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
     expect(elapsedMs).toBeLessThan(5_000);
   }, 10_000);
 });
