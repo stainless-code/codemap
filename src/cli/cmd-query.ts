@@ -123,7 +123,7 @@ export function parseQueryRest(rest: string[]):
   let i = 1;
   let json = false;
   let format: OutputFormat | undefined;
-  // Aliases `--format sarif` + non-zero exit + quiet (mirrors `cmd-audit.ts`).
+  // Aliases `--format sarif` + non-zero exit + quiet (audit `--ci` omits quiet).
   let ci = false;
   let summary = false;
   let changedSince: string | undefined;
@@ -624,7 +624,7 @@ function formatIncompatibility(
 }
 
 /**
- * Print the bundled recipe catalog as JSON to stdout. Each entry carries
+ * Print the recipe catalog (bundled + project-local) as JSON to stdout. Each entry carries
  * `last_run_at` + `run_count` recency fields when an indexed DB exists,
  * else null/0 fallbacks. The verb runs before `bootstrapCodemap()` (the
  * catalog has historically been "no DB required") — keep it side-effect
@@ -678,7 +678,7 @@ function formatRecipeHelpLines(): string {
 }
 
 /**
- * Print **`codemap query`** usage, flags, and bundled recipe ids to stdout.
+ * Print **`codemap query`** usage, flags, and recipe catalog ids to stdout.
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();
@@ -689,16 +689,19 @@ export function printQueryCmdHelp(): void {
        codemap query --baselines
        codemap query --drop-baseline <name>
 
-Read-only SQL against .codemap.db (after at least one successful index run).
+Read-only SQL against the codemap index (default \`.codemap/index.db\`; after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
-  --json                  Alias for --format json. Print a JSON array of row objects to stdout
-                          (for agents and scripts). On error, prints {"error":"<message>"} to stdout.
+  --json                  Alias for --format json. Default success shape: JSON
+                          array of row objects (or {"count": N} with --summary,
+                          {group_by, groups} with --group-by, baseline diff
+                          envelope with --baseline). On error, prints
+                          {"error":"<message>"} to stdout.
   --format <fmt>          One of: ${OUTPUT_FORMATS.join(" | ")}. Overrides --json when both are passed
                           (so --format text + --json prints text). Default = text.
                             text         Terminal table via console.table (default).
-                            json         Same as --json — JSON array of row objects.
+                            json         Same as --json — default row array (see composed shapes above).
                             sarif        SARIF 2.1.0 doc (GitHub Code Scanning); rule.id = codemap.<recipe>
                                          (or codemap.adhoc for ad-hoc SQL); auto-detects file_path / path /
                                          to_path / from_path; aggregate recipes (no location) emit results: [].
@@ -726,7 +729,8 @@ Flags:
                             package   Workspace dir from package.json/workspaces or pnpm-workspace.yaml;
                                       out-of-workspace paths bucket to "<root>".
   --save-baseline[=<name>]
-                          Snapshot the result rows to the query_baselines table inside .codemap.db
+                          Snapshot the result rows to the query_baselines table inside \`<state-dir>/index.db\`
+                          (default \`.codemap/index.db\`; no parallel JSON files; survives --full and SCHEMA bumps).
                           for later --baseline diffs. Name defaults to the --recipe id; ad-hoc SQL
                           must pass an explicit =<name>. Stores SQL, rows, row count, current git
                           HEAD (when available), and a timestamp. Re-saving with the same name
@@ -738,15 +742,15 @@ Flags:
                           Recipe actions, when defined, attach to the added rows only.
   --baselines             List saved baselines (name, recipe_id, row_count, git_ref, created_at).
   --drop-baseline <name>  Delete a saved baseline. Exits 1 if the name doesn't exist.
-  --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
+  --recipe, -r <id>       Run recipe SQL by id (bundled or project-local; no SQL string on the command line).
   --params <k=v[,k=v]>    Bind params for a parametrised recipe. May be repeated;
                           last value wins on duplicate keys. Example:
                           --params kind=function,name_pattern=%Query%
-  --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
+  --recipes-json          Print the full recipe catalog (id, description, sql, source, …) as JSON. No DB.
   --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
   --help, -h              Show this help.
 
-Bundled recipes:
+Recipe catalog:
 ${recipeBlock}
 
 Examples:

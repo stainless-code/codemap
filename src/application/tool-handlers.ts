@@ -1,6 +1,6 @@
 /**
  * Pure transport-agnostic tool handlers — every codemap MCP tool's body
- * extracted so HTTP (`codemap serve`, planned PR #44+) can dispatch to the
+ * extracted so HTTP (`codemap serve`) can dispatch to the
  * exact same logic without depending on the MCP SDK.
  *
  * Contract: each handler takes the args object the MCP `inputSchema`

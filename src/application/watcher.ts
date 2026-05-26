@@ -9,7 +9,7 @@ import { runCodemapIndex } from "./run-index";
 import { STATE_DIR_DEFAULT } from "./state-dir";
 
 /**
- * `codemap watch` engine — keeps `.codemap.db` fresh on file edits so
+ * `codemap watch` engine — keeps `.codemap/index.db` fresh on file edits so
  * every CLI / MCP / HTTP query reads live data without a per-request
  * reindex prelude. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
  *
@@ -363,7 +363,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   // Priming: only flip the active flag AFTER the optional catch-up
   // resolves. Without this, a `mcp --watch audit` immediately after
   // boot would skip the incremental-index prelude and read whatever
-  // was in `.codemap.db` from the prior run (potentially stale by N
+  // was in `.codemap/index.db` from the prior run (potentially stale by N
   // commits). CodeRabbit raised the freshness race on PR #47.
   let stopped = false;
   let primingDone: Promise<void>;

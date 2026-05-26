@@ -47,7 +47,7 @@ bun add @stainless-code/codemap
 ```bash
 codemap                                                      # incremental index (run once per session)
 codemap dead-code --json                                     # outcome alias → query --recipe untested-and-dead
-codemap query --json --recipe fan-out                        # bundled SQL via recipe id (alias: -r)
+codemap query --json --recipe fan-out                        # recipe SQL by id (alias: -r)
 codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  # ad-hoc SQL
 codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
 codemap validate --json                                      # detect stale / missing / unindexed files
@@ -124,11 +124,11 @@ codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
 codemap audit --base origin/main --json                         # ad-hoc — archive+reindex against any committish; no --save-baseline needed
 codemap audit --base origin/main --format sarif                 # emit SARIF 2.1.0 directly (Code Scanning); also: --ci alias
-codemap audit --base origin/main --ci                           # CI shortcut: --format sarif + non-zero exit on additions + quiet
+codemap audit --base origin/main --ci                           # CI shortcut: --format sarif + non-zero exit on additions
 codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override
 # --base materialises <ref> via `git archive | tar -x` to .codemap/audit-cache/<sha>/, reindexes into
-# a temp DB, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
-# non-git projects get a clean `--base requires a git repository` error.
+# a cached `.codemap/index.db` at that sha, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
+# non-git projects get a clean `codemap audit: --base requires a git repository.` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
 # --format <text|json|sarif|annotations|mermaid|diff|diff-json> — pipe results into GitHub Code Scanning
@@ -169,7 +169,7 @@ codemap serve --port 7878             # default-ON watcher
 codemap watch --quiet                 # standalone (decoupled from a transport)
 codemap mcp --no-watch                # opt out for one-shot fire-and-forget calls
 CODEMAP_WATCH=0 codemap mcp           # env-var opt-out (mirrors --no-watch)
-# List bundled recipes as JSON, or print one recipe's SQL (no DB required)
+# List recipe catalog (bundled + project-local) as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).
@@ -221,12 +221,12 @@ codemap skill                                                   # full codemap S
 codemap rule                                                    # full codemap rule markdown to stdout
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
-codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
-# Tools (17): query, query_batch (MCP-only), query_recipe, audit, save_baseline,
+codemap mcp                                                     # JSON-RPC on stdio (17 tools; watcher default-ON)
+# Tools (17): query, query_batch (no CLI verb), query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
-# MCP-only (no CLI verb): query_batch, trace, explore, node. Other tools mirror a CLI --json envelope.
-# Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
+# No CLI verb (MCP + HTTP): query_batch, trace, explore, node. Other tools mirror a CLI --json envelope.
+# Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.

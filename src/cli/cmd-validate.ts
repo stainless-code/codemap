@@ -18,7 +18,7 @@ interface ValidateOpts {
 export function printValidateCmdHelp(): void {
   console.log(`Usage: codemap validate [--json] [paths...]
 
-Compare the SHA-256 stored in .codemap.db against the on-disk content of each
+Compare the SHA-256 stored in the codemap index (default \`.codemap/index.db\`) against the on-disk content of each
 file. Prints rows for entries that are out of sync — without the agent paying
 to re-read every file.
 

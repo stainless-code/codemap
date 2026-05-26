@@ -71,7 +71,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * one tool per CLI verb (plus MCP-only `query_batch`) and MCP resources
+ * 17 JSON-RPC tools (CLI mirrors plus no-CLI-verb helpers on MCP/HTTP) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].
@@ -85,7 +85,7 @@ interface ServerOpts {
   /** Test hook — defaults to `process.env`. */
   env?: NodeJS.ProcessEnv | undefined;
   /**
-   * If true, boot a co-process file watcher (chokidar via
+   * If true, boot an in-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data without
    * a per-request reindex prelude. Drains pending events on shutdown.
    * See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
@@ -170,7 +170,7 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
     "query",
     {
       description:
-        'Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
+        'Run one read-only SQL statement against the codemap index (default `.codemap/index.db`). Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
       inputSchema: queryArgsSchema,
     },
     (args) => wrapToolResult(handleQuery(args, opts.root)),
@@ -182,7 +182,7 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
     "query_recipe",
     {
       description:
-        'Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
+        'Run a recipe by id (bundled or project-local). Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: queryRecipeArgsSchema,
     },
     (args) => wrapToolResult(handleQueryRecipe(args, opts.root)),
@@ -206,7 +206,7 @@ function registerAuditTool(server: McpServer): void {
     "audit",
     {
       description:
-        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a temp DB, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
+        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a cached `.codemap/index.db` at that sha, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository.'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
       inputSchema: auditArgsSchema,
     },
     async (args) => wrapToolResult(await handleAudit(args)),
@@ -218,7 +218,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context --json` prints (project root, schema version, file/symbol counts, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
+        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
       inputSchema: contextArgsSchema,
     },
     (args) => wrapToolResult(handleContext(args)),
@@ -230,7 +230,7 @@ function registerValidateTool(server: McpServer): void {
     "validate",
     {
       description:
-        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns rows with status ('ok' / 'changed' / 'missing'). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose stale .codemap.db before issuing structural queries.",
+        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns only out-of-sync rows with status `stale` / `missing` / `unindexed` (fresh paths omitted). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose a stale index before issuing structural queries.",
       inputSchema: validateArgsSchema,
     },
     (args) => wrapToolResult(handleValidate(args)),
@@ -242,7 +242,7 @@ function registerSaveBaselineTool(server: McpServer, opts: ServerOpts): void {
     "save_baseline",
     {
       description:
-        "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (bundled recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
+        "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (catalog recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
       inputSchema: saveBaselineArgsSchema,
     },
     (args) => wrapToolResult(handleSaveBaseline(args, opts.root)),
@@ -278,7 +278,7 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
     "show",
     {
       description:
-        "Look up symbol(s) by exact name or field-qualified --query search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` for arbitrary SQL.",
+        "Look up symbol(s) by exact name or field-qualified `query` search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` tool for arbitrary SQL.",
       inputSchema: showArgsSchema,
     },
     (args) => wrapToolResult(handleShow(args, opts.root)),
@@ -373,35 +373,34 @@ function registerApplyTool(server: McpServer, opts: ServerOpts): void {
  * Register codemap MCP resources (static URIs + file/symbol/recipe
  * templates). Same payloads as HTTP `GET /resources/{encoded-uri}`. Payloads come from the shared
  * `application/resource-handlers.ts` module — same lazy-cache used by the
- * HTTP transport (`GET /resources/{uri}` in `http-server.ts`). Resources
- * are constant for the server-process lifetime so eager-vs-lazy produce
- * identical observable behavior; lazy keeps boot lean for sessions that
- * never call read_resource.
+ * HTTP transport (`GET /resources/{uri}` in `http-server.ts`). Schema / skill /
+ * rule / mcp-instructions memoize per process; recipes / files / symbols read
+ * live so recency fields and index mutations under `--watch` stay fresh.
  */
 function registerResources(server: McpServer): void {
   registerStaticResource(
     server,
     "recipes",
     "codemap://recipes",
-    "Bundled SQL recipes catalog (id, description, sql, params, optional per-row actions). Same payload as `codemap query --recipes-json`.",
+    "Recipe catalog (bundled + project-local): id, description, sql, params, optional per-row actions. Same payload as `codemap query --recipes-json`.",
   );
   registerStaticResource(
     server,
     "schema",
     "codemap://schema",
-    "DDL of every table in .codemap.db (queried live from sqlite_schema). Tells the agent what tables and columns exist.",
+    "DDL of every table in the codemap index (default `.codemap/index.db`; cached after first read from sqlite_schema). Tells the agent what tables and columns exist.",
   );
   registerStaticResource(
     server,
     "skill",
     "codemap://skill",
-    "Full text of the bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.",
+    "Full text of the assembled codemap skill (`templates/agent-content/skill/`). Agents that don't preload the skill at session start can fetch it here.",
   );
   registerStaticResource(
     server,
     "rule",
     "codemap://rule",
-    "Full text of the bundled `templates/agents/rules/codemap.md` (always-on priming for agents working in this repo).",
+    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents in the indexed project).",
   );
   registerStaticResource(
     server,
@@ -558,10 +557,10 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
 }
 
 /**
- * Starts the MCP server over stdio (the only transport in v1; HTTP is
- * deferred to v1.x — see plan § 2). Resolves when the transport closes
- * (stdin EOF). Logs to stderr per MCP convention so stdout stays
- * dedicated to JSON-RPC framing.
+ * Starts the MCP server over stdio. HTTP consumers use `codemap serve`
+ * (`src/application/http-server.ts`) against the same tool handlers.
+ * Resolves when the transport closes (stdin EOF). Logs to stderr per MCP
+ * convention so stdout stays dedicated to JSON-RPC framing.
  */
 export async function runMcpServer(opts: ServerOpts): Promise<void> {
   await bootstrapForMcp(opts);

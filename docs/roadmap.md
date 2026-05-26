@@ -29,7 +29,7 @@ Codemap stays a structural-index primitive that other tools can consume. Two lay
 Every PR reviewer defends these. The reviewer tests embedded below are the canonical filters for any new verb / column / engine.
 
 - **A. SQL is the API.** Every capability is a recipe (saved query) or a primitive recipes can compose — never a pre-baked verdict. SQL is a durable, well-known query language; agents compose any predicate without us deciding which questions are important. The moment a CLI verb returns `pass`/`fail` _without_ a recipe form behind it, the moat erodes — the tool becomes "yet another linter with opinions baked in" instead of "the database your agent queries." **Verdicts are an OUTPUT mode** (e.g. `--format sarif`, `audit --base <ref>` deltas), never a primitive. **Reviewer test for any new verb:** "is this also expressible as `query --recipe <id>`?"
-- **B. Extracted structure ≥ verdicts.** Schema breadth is the substrate every recipe layers on. CSS (`css_variables` / `css_classes` / `css_keyframes`), `markers`, `type_members`, `calls.caller_scope`, `components.hooks_used`, the substrate-extraction tier (`scopes` / `references` / `bindings` / `function_params` / `runtime_markers` / `test_suites` / `re_export_chains` / `module_cycles` / `file_metrics` / `import_specifiers` / `jsx_elements` / `jsx_attributes` / `async_calls` / `try_catch` / `decorators` / `jsdoc_tags` / `dynamic_imports`) — these are codemap-specific extractions; their richness directly determines what JOINs are expressible and which agent questions get clean answers. Slimming the schema for theoretical perf / simplicity is a regression unless the column is empirically unread. **Reviewer test for any "drop column X" PR:** "what recipe (bundled or hypothetical) does this kill?"
+- **B. Extracted structure ≥ verdicts.** Schema breadth is the substrate every recipe layers on. CSS (`css_variables` / `css_classes` / `css_keyframes`), `markers`, `type_members`, `type_heritage`, `calls.caller_scope`, `components.hooks_used`, the substrate-extraction tier (`scopes` / `references` / `bindings` / `function_params` / `runtime_markers` / `test_suites` / `re_export_chains` / `module_cycles` / `file_metrics` / `import_specifiers` / `jsx_elements` / `jsx_attributes` / `async_calls` / `try_catch` / `decorators` / `jsdoc_tags` / `dynamic_imports`) — these are codemap-specific extractions; their richness directly determines what JOINs are expressible and which agent questions get clean answers. Slimming the schema for theoretical perf / simplicity is a regression unless the column is empirically unread. **Reviewer test for any "drop column X" PR:** "what recipe (bundled or hypothetical) does this kill?"
 
 ### Floors (v1 product-shape)
 
@@ -54,13 +54,13 @@ Soft constraints — describe shipped reality. Decided-but-unshipped flips live 
 
 ### Agent & indexing ops
 
-Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-and-ops.md`](./plans/agent-surface-and-ops.md). PR tracker: [`plans/agent-surface-delivery.md`](./plans/agent-surface-delivery.md).
+Prioritized agent & indexing ops queue (2026-05). Reference: [agents.md](./agents.md), [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness).
 
-Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/node, `agents init --mcp`, affected tests, index lock/`unlock`, parse-worker hardening, field-qualified search) shipped in [#126](https://github.com/stainless-code/codemap/pull/126)–[#138](https://github.com/stainless-code/codemap/pull/138). Reference: [agents.md](./agents.md), PR tracker [agent-surface-delivery.md](./plans/agent-surface-delivery.md).
+Wave 1–2 shipped in [#126](https://github.com/stainless-code/codemap/pull/126)–[#138](https://github.com/stainless-code/codemap/pull/138) (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/node, `agents init --mcp`, affected tests, index lock/`unlock`, parse-worker hardening, field-qualified search). Agent eval (PR 9) shipped in [#139](https://github.com/stainless-code/codemap/pull/139) (probe) + [#144](https://github.com/stainless-code/codemap/pull/144) (live MCP arms + log comparison).
 
 **Open (P1)**
 
-_(none after #144 merges — probe shipped in #139; live+log completes PR 9 in #144)_
+_(none — P1 agent-surface work complete)_
 
 **P2 — strategic (trigger-gated where noted)**
 

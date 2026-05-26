@@ -53,8 +53,9 @@ export function _resetResourceCachesForTests(): void {
  *
  * Data-shaped URIs (`files/{path}`, `symbols/{name}`) read live from
  * `.codemap/index.db` every call — no caching, since the index can
- * change between requests under `--watch`. Catalog-style URIs
- * (`recipes`, `schema`, `skill`) cache lazily.
+ * change between requests under `--watch`. Schema / skill / rule /
+ * mcp-instructions cache lazily per process; recipes / recipes/{id} /
+ * files / symbols read live every call.
  */
 export function readResource(uri: string): ResourcePayload | undefined {
   if (uri === "codemap://recipes") return readRecipesCatalog();
@@ -78,29 +79,31 @@ export function readResource(uri: string): ResourcePayload | undefined {
 
 /**
  * List every available resource (URIs only — caller fetches payloads
- * separately). Used by the MCP `resources/list` request and could be
- * surfaced via HTTP later. Mirrors what `ResourceTemplate.list` returns
- * for the recipes-template URI plus the three static URIs.
+ * separately). Used by the MCP `resources/list` request and HTTP
+ * `GET /resources`. Mirrors what `ResourceTemplate.list` returns
+ * for the recipes URI plus schema / skill / rule / mcp-instructions / files / symbols URIs.
  */
 export function listResources(): { uri: string; description: string }[] {
   const out: { uri: string; description: string }[] = [
     {
       uri: "codemap://recipes",
       description:
-        "Bundled SQL recipes catalog (id, description, sql, optional per-row actions).",
+        "Recipe catalog (bundled + project-local): id, description, sql, optional per-row actions.",
     },
     {
       uri: "codemap://schema",
       description:
-        "DDL of every table in .codemap.db (queried live from sqlite_schema).",
+        "DDL of every table in the codemap index (default `.codemap/index.db`; cached after first read from sqlite_schema).",
     },
     {
       uri: "codemap://skill",
-      description: "Full text of the bundled SKILL.md.",
+      description:
+        "Full text of the assembled codemap skill (`templates/agent-content/skill/`).",
     },
     {
       uri: "codemap://rule",
-      description: "Full text of the bundled codemap rule markdown.",
+      description:
+        "Full text of the assembled codemap rule (`templates/agent-content/rule/`).",
     },
     {
       uri: "codemap://mcp-instructions",

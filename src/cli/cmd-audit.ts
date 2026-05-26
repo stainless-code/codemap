@@ -51,7 +51,7 @@ export function parseAuditRest(rest: string[]):
   // Tracked separately so `--json --format sarif` can be rejected.
   let jsonShortcut = false;
   let format: AuditOutputFormat | undefined;
-  // Aliases `--format sarif` + non-zero exit + quiet. Plan: docs/plans/github-marketplace-action.md.
+  // Aliases `--format sarif` + non-zero exit on delta additions (no quiet mode).
   let ci = false;
   let summary = false;
   let noIndex = false;
@@ -151,7 +151,7 @@ export function parseAuditRest(rest: string[]):
     return {
       kind: "error",
       message:
-        "codemap audit: missing snapshot source. Pass --base <ref> (worktree+reindex against any committish), --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
+        "codemap audit: missing snapshot source. Pass --base <ref> (git archive + reindex against any committish), --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
     };
   }
 
@@ -251,19 +251,20 @@ export function printAuditCmdHelp(): void {
       `  --${d.key}-baseline <name>  Explicit baseline for the ${d.key} delta.`,
   ).join("\n");
 
-  console.log(`Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
+  console.log(
+    `Usage: codemap audit [--base <ref> | --baseline <prefix>] [--<delta>-baseline <name>]... [--json] [--summary] [--no-index]
 
-Diff the current .codemap.db against per-delta baselines (saved by \`codemap query --save-baseline\`)
+Diff the current codemap index (default \`.codemap/index.db\`) against per-delta baselines (saved by \`codemap query --save-baseline\`)
 or against a git ref (\`--base <ref>\` materialises via \`git archive | tar -x\` + reindex), and emit structural deltas
 as a {head, deltas} envelope. Each delta carries its own \`base\` metadata. v1 ships three deltas:
-files, dependencies, deprecated. No verdict / threshold / non-zero exit codes — compose --json + jq
-for CI exit codes.
+files, dependencies, deprecated. No built-in verdict / threshold config — compose --json + jq
+for CI exit codes, or use --ci (aliases --format sarif + non-zero exit on additions).
 
 Snapshot sources (one of these must resolve; --base and --baseline are mutually exclusive):
 
   --base <ref>                 Materialise <ref> via git archive | tar -x to a sha-keyed
                                cache under .codemap/audit-cache/ (plain tree, no .git
-                               artifact), reindex into a temp DB, then diff. <ref> = any
+                               artifact), reindex into a cached \`.codemap/index.db\` at that sha, then diff. <ref> = any
                                committish (origin/main, HEAD~5, sha, tag, …). Cache hit
                                on second run against same sha is sub-100ms. Requires a
                                git repository.
@@ -296,7 +297,7 @@ Other flags:
 
 Examples:
 
-  # Compare current branch to origin/main (no setup — worktree + reindex on first run)
+  # Compare current branch to origin/main (no setup — archive extract + reindex on first run)
   codemap audit --base origin/main --json
 
   # Compare to a tag, with explicit per-delta override for one slot
@@ -322,7 +323,8 @@ Examples:
 
   # Audit a frozen DB without re-indexing first
   codemap audit --baseline base --no-index
-`);
+`,
+  );
 }
 
 /**

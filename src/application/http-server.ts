@@ -80,7 +80,7 @@ export interface HttpServerOpts {
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
   /**
-   * If true, boot a co-process file watcher (chokidar via
+   * If true, boot an in-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data. Drains
    * pending events on shutdown. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
    */
@@ -590,7 +590,7 @@ function validate<T extends ZodRawShape>(
  * The browser sends the request (CORS only blocks the *response* from
  * being read by JS — the request itself reaches us and any side effect
  * executes). For state-changing tools (`save_baseline`, `drop_baseline`)
- * this lets a malicious page mutate the developer's `.codemap.db`.
+ * this lets a malicious page mutate the developer's `.codemap/index.db`.
  *
  * DNS rebinding extends the same attack: `evil.com` resolves to
  * `127.0.0.1` after page load; the browser sends `Host: evil.com:7878`

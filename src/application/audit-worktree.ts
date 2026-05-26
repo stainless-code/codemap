@@ -188,7 +188,7 @@ export async function populateWorktree(
     } catch (err) {
       return {
         code: "reindex-failed",
-        error: `codemap audit: reindex failed on worktree (${
+        error: `codemap audit: reindex failed on audit-cache extract (${
           err instanceof Error ? err.message : String(err)
         }).`,
       };

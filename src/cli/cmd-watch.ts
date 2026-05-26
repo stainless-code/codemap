@@ -90,8 +90,8 @@ Long-running process that re-indexes changed files in real time so every
 prelude. Eliminates the "is the index stale?" friction for AI agents
 working in long sessions or multi-step refactors.
 
-For the killer combo, use \`codemap serve --watch\` or \`codemap mcp --watch\`
-to boot the transport and the watcher in one process.
+For transport + watcher in one process, use \`codemap mcp\` or \`codemap serve\` (watcher
+default-ON since 2026-05). Pass \`--no-watch\` or set \`CODEMAP_WATCH=0\` to opt out.
 
 Flags:
   --debounce <ms>   Coalesce burst events into one reindex after <ms> of
@@ -111,8 +111,8 @@ JSX / CSS + project-local recipes under \`<state-dir>/recipes/\`, default
 configured excludeDirNames) are skipped.
 
 The process runs until SIGINT/SIGTERM (drains pending edits + closes the
-file watcher). Tracer 4 lands an optimization: when watcher is active,
-\`codemap mcp audit\` skips its incremental-index prelude.
+file watcher). When a watcher is active on \`codemap mcp\` / \`codemap serve\`,
+\`audit\`'s incremental-index prelude is a no-op (the index is already live).
 `,
   );
 }

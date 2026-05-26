@@ -40,14 +40,15 @@ PR comment renderer (audit/SARIF → markdown summary):
   codemap pr-comment <file> [--shape audit|sarif] [--json]   # - for stdin
 
 MCP server (Model Context Protocol — for agent hosts):
-  codemap mcp                                        # stdio JSON-RPC, one tool per CLI verb
+  codemap mcp                                        # stdio JSON-RPC (17 tools; watcher default-ON)
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
-  codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]
+  codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]   # watcher default-ON
 
 Watch mode (long-running; keeps .codemap/index.db fresh on file edits):
   codemap watch [--debounce 250] [--quiet]
-  codemap mcp --watch · codemap serve --watch    # killer combo
+  codemap mcp · codemap serve                        # transport + watcher (default-ON since 2026-05)
+  codemap mcp --no-watch · CODEMAP_WATCH=0           # opt out for one-shot calls
 
 Targeted reads (precise lookup by symbol name):
   codemap show <name> [--kind <k>] [--in <path>] [--json]      # metadata: file:line + signature

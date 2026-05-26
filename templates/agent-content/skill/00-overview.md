@@ -21,7 +21,8 @@ If `codemap` isn't on `PATH`: `npx @stainless-code/codemap`, `pnpm dlx @stainles
 
 ## Query output contract
 
-- **Success** → `--json` prints a JSON array of row objects to stdout.
+- **Success (default)** → `--json` / `--format json` prints a JSON **array of row objects** to stdout.
+- **Composed shapes** → `--summary` → `{"count": N}`; `--group-by` → `{"group_by": "<mode>", "groups": [...]}`; `--baseline` → diff envelope `{baseline, current_row_count, added, removed}` (see flags below).
 - **Failure** → stdout is a single `{"error": "<message>"}` and exit code is 1. Covers invalid SQL, database open errors, and bootstrap failures (config load, resolver setup) — not just SQL runtime errors. The CLI sets `process.exitCode` instead of `process.exit`, so piped stdout is not cut off.
 - **No row cap.** Add `LIMIT` (and `ORDER BY`) in SQL when you need bounded output.
 - When answering structural questions from the index, **ground the answer in the query rows** — do not invent or silently drop rows. Use `--json` for large or multi-column results.

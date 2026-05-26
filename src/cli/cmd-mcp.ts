@@ -9,7 +9,7 @@ import { CODEMAP_VERSION } from "../version";
 /**
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"mcp"`.
  * `--root` / `--config` are absorbed by bootstrap. `--watch` /
- * `--debounce <ms>` boot a co-process watcher (per
+ * `--debounce <ms>` boot an in-process watcher (per
  * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage)) so the
  * MCP server's tools always read live data without per-request reindex.
  */
@@ -85,10 +85,10 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
+Tools (17; snake_case — one per CLI verb plus no-CLI-verb helpers on MCP/HTTP):
   query                One read-only SQL statement.
-  query_batch          N statements in one round-trip (MCP-only).
-  query_recipe         Bundled SQL recipe by id; per-row \`actions\` hints.
+  query_batch          N statements in one round-trip (no CLI verb; MCP + HTTP).
+  query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
   audit                Structural-drift audit ({head, deltas} envelope).
   save_baseline        Snapshot rows under a name (sql or recipe).
   list_baselines       Catalog of saved baselines.
@@ -99,12 +99,18 @@ Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
   snippet              Same lookup + source text from disk.
   impact               Symbol/file blast-radius walker (callers, callees,
                        dependents, dependencies).
+  affected             Reverse-dependency walk to test paths.
+  trace                Shortest call path + budget-capped snippets.
+  explore              Multi-name neighborhood survey.
+  node                 One-hop symbol card (show + depth-1 neighborhood).
+  apply                Apply recipe diff rows to disk (confirmation gated).
 
 Resources:
   Lazy-cached (constant for the server-process lifetime):
-    codemap://schema             Live DDL of every table (cached after first read).
-    codemap://skill              Bundled SKILL.md.
-    codemap://rule               Bundled codemap rule markdown.
+    codemap://schema             DDL of every table (cached after first read).
+    codemap://skill              Assembled skill markdown.
+    codemap://rule               Assembled codemap rule markdown.
+    codemap://mcp-instructions   MCP initialize tool-selection playbook.
   Live read-per-call (no caching — see latest indexed state every read):
     codemap://recipes            Full recipe catalog (recency fields stay fresh).
     codemap://recipes/{id}       Single recipe (id, description, sql).
@@ -114,25 +120,26 @@ Resources:
                                  mirrors \`show --in <path>\`. Returns
                                  {matches, disambiguation?}.
 
-Output shape is verbatim from each tool's CLI counterpart \`--json\`
-envelope (no re-mapping). See docs/architecture.md § MCP wiring for
-the engine seam and the agent rule + skill for query examples.
+Output shape matches each tool's CLI \`--json\` payload where a CLI verb
+exists (no CLI verb: query_batch, trace, explore, node). MCP wraps payloads
+in \`{content: [{type: "text", text: …}]}\`; HTTP returns raw JSON. See
+docs/architecture.md § MCP wiring for the engine seam and the agent rule
++ skill for query examples.
 
 Flags:
-  --watch              [default ON] Boot a co-process file watcher so
+  --watch              [default ON] Boot an in-process file watcher so
                        every tool reads a live index — eliminates the
-                       per-request reindex prelude. Equivalent to
-                       \`codemap watch\` running in parallel. Default-ON
-                       since 2026-05; explicit flag kept for backwards-
-                       compat with existing launch scripts.
+                       per-request reindex prelude. Default-ON since
+                       2026-05; explicit flag kept for backwards-compat
+                       with existing launch scripts.
   --no-watch           Opt out of the default watcher. Use when you
-                       want one-shot tool calls without spawning the
-                       chokidar co-process (CI scripts that fire-and-
-                       forget, ephemeral indexes, etc.). Same effect as
+                       want one-shot tool calls without the in-process
+                       chokidar loop (CI scripts that fire-and-forget,
+                       ephemeral indexes, etc.). Same effect as
                        CODEMAP_WATCH=0 / "false" in the environment.
   --debounce <ms>      Coalesce burst events into one reindex after <ms>
-                       of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with
-                       --watch.
+                       of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Applies when
+                       the watcher is active (default; no-op with --no-watch).
   --help, -h           Show this help.
 
 Global flags (parsed by bootstrap, forwarded to the server):
@@ -148,7 +155,7 @@ With --watch, the file watcher is drained before the server exits.
 /**
  * Entry-point for `codemap mcp`. Boots the MCP server over stdio and
  * resolves when the transport closes (clean shutdown via stdin EOF).
- * With `watch: true`, also boots a co-process file watcher so the
+ * With `watch: true`, also boots an in-process file watcher so the
  * server's tools always read live data. Bootstrap / DB / SDK errors
  * propagate as exit code 1 via main.
  */

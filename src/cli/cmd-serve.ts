@@ -18,7 +18,7 @@ export interface ServeRunOpts {
   port: number;
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
-  /** Boot a co-process file watcher so tools always read live data. */
+  /** Boot an in-process file watcher so tools always read live data. */
   watch: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet (only meaningful with `watch: true`). */
   debounceMs: number;
@@ -172,34 +172,41 @@ Flags:
                   Require Authorization: Bearer <secret> on every request.
                   GET /health is exempt so liveness probes work without
                   leaking the token. Use a long random string.
-  --watch         [default ON] Boot a co-process file watcher so every
+  --watch         [default ON] Boot an in-process file watcher so every
                   tool reads a live index — eliminates the per-request
                   reindex prelude. Default-ON since 2026-05; explicit
                   flag kept for backwards-compat with existing launch
                   scripts.
   --no-watch      Opt out of the default watcher. Use when you want
-                  one-shot HTTP requests without spawning the chokidar
-                  co-process (CI scripts that fire-and-forget, ephemeral
+                  one-shot HTTP requests without the in-process chokidar
+                  loop (CI scripts that fire-and-forget, ephemeral
                   indexes, etc.). Same effect as CODEMAP_WATCH=0 /
                   "false" in the environment.
   --debounce <ms> Coalesce burst events into one reindex after <ms> of
-                  quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with --watch.
+                  quiet (default: ${DEFAULT_DEBOUNCE_MS}). Applies when the
+                  watcher is active (default; no-op with --no-watch).
   --help, -h      Show this help.
 
-Routes (every MCP tool maps to POST /tool/<name>; output shape matches
-\`codemap query --json\` envelope, NOT the MCP {content: [...]} wrapper):
+Routes (every MCP tool maps to POST /tool/<name>; HTTP returns each
+tool's native JSON payload directly — NOT the MCP {content: [...]}
+wrapper):
   POST /tool/query
   POST /tool/query_batch
   POST /tool/query_recipe
   POST /tool/audit
+  POST /tool/save_baseline
+  POST /tool/list_baselines
+  POST /tool/drop_baseline
   POST /tool/context
   POST /tool/validate
   POST /tool/show
   POST /tool/snippet
   POST /tool/impact
-  POST /tool/save_baseline
-  POST /tool/list_baselines
-  POST /tool/drop_baseline
+  POST /tool/affected
+  POST /tool/trace
+  POST /tool/explore
+  POST /tool/node
+  POST /tool/apply
   GET  /health                        Liveness probe (auth-exempt).
   GET  /tools                         Tool catalog.
   GET  /resources                     Resource catalog.
@@ -209,6 +216,7 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
                                         codemap://schema
                                         codemap://skill
                                         codemap://rule
+                                        codemap://mcp-instructions
                                         codemap://files/{path}
                                         codemap://symbols/{name}
 

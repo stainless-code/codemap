@@ -29,7 +29,7 @@ Reproduce:
 AGENT_EVAL_MODE=live AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh
 ```
 
-Corpus: [`fixtures/minimal`](../fixtures/minimal/) · Probes: [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) · Output: `.agent-eval/comparison.json` (gitignored).
+Corpus: [`fixtures/minimal`](../../fixtures/minimal/) · Probes: [`scripts/agent-eval/scenarios.json`](../../scripts/agent-eval/scenarios.json) · Output: `.agent-eval/comparison.json` (gitignored).
 
 Captured **2026-05-26** (live MCP handlers, `runs=1`, all three probes succeeded):
 
