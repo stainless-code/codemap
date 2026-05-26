@@ -59,13 +59,13 @@ Max **3 parallel tracks** at once.
 
 Do not rush with P0/P1. **2–4 separate PRs** after P1 completes.
 
-| Item               | Plan                                                                                                                           | Gate                                                              |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| Type hierarchy     | `type-ancestors` / `type-descendants` recipes (plan deleted — shipped)                                                         | merged [#141](https://github.com/stainless-code/codemap/pull/141) |
-| Framework routes   | [`framework-route-extraction`](./framework-route-extraction.md)                                                                | Blocked on [`c9-plugin-layer`](./c9-plugin-layer.md) (XL)         |
-| Call substrate     | [`callback-dispatch-synthesis`](./callback-dispatch-synthesis.md), [`unresolved-calls-staging`](./unresolved-calls-staging.md) | One at a time (schema + parser)                                   |
-| FTS default        | [`fts-default-on-evaluation`](./fts-default-on-evaluation.md)                                                                  | Measurement-only; solo PR anytime                                 |
-| Cross-project root | [`cross-project-mcp-root`](./cross-project-mcp-root.md)                                                                        | On demand                                                         |
+| Item               | Plan                                                                                                                           | Gate                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Type hierarchy     | `type-ancestors` / `type-descendants` recipes + `type_heritage` substrate (plans deleted — shipped)                            | merged [#141](https://github.com/stainless-code/codemap/pull/141), [#142](https://github.com/stainless-code/codemap/pull/142) |
+| Framework routes   | [`framework-route-extraction`](./framework-route-extraction.md)                                                                | Blocked on [`c9-plugin-layer`](./c9-plugin-layer.md) (XL)                                                                     |
+| Call substrate     | [`callback-dispatch-synthesis`](./callback-dispatch-synthesis.md), [`unresolved-calls-staging`](./unresolved-calls-staging.md) | One at a time (schema + parser)                                                                                               |
+| FTS default        | [`fts-default-on-evaluation`](./fts-default-on-evaluation.md)                                                                  | Measurement-only; solo PR anytime                                                                                             |
+| Cross-project root | [`cross-project-mcp-root`](./cross-project-mcp-root.md)                                                                        | On demand                                                                                                                     |
 
 ---
 
