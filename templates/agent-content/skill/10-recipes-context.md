@@ -33,7 +33,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 
 **Watch mode (`codemap watch [--debounce 250] [--quiet]`)** — standalone long-running process that debounces file changes and re-indexes only the changed paths. SIGINT/SIGTERM drains pending edits before exit. `mcp` / `serve` boot the watcher in-process by default since 2026-05; use `codemap watch` standalone when you want the watcher decoupled from a transport (e.g. running alongside an editor that already speaks MCP via a different process).
 
-**Tools** — snake_case keys (Codemap convention; CLI stays kebab — translation at the MCP arg layer). Every tool returns the same JSON envelope its CLI counterpart's `--json` prints. Run `codemap <verb> --help` (or `query_recipe --recipes-json` / the CLI verb's docs) for the authoritative parameter list and result shape; the entries below are existence + transport notes only.
+**Tools** — snake_case keys (Codemap convention; CLI stays kebab — translation at the MCP arg layer). Every tool returns the same JSON envelope its CLI counterpart's `--json` prints. Run `codemap <verb> --help` (or `codemap query --recipes-json` / the CLI verb's docs) for the authoritative parameter list and result shape; the entries below are existence + transport notes only.
 
 - **`query`** — `{sql, summary?, changed_since?, group_by?, format?}`. One read-only SQL. `format` accepts `sarif | annotations | mermaid | diff | diff-json` (incompatible with `summary` / `group_by`).
 - **`query_batch`** — **MCP-only** (no CLI). `{statements: (string | {sql, summary?, changed_since?, group_by?})[]}`. N statements / one round-trip; per-statement errors isolated.
@@ -43,7 +43,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`list_baselines`** — no args; returns the array `codemap query --baselines --json` would print.
 - **`drop_baseline`** — `{name}` → `{dropped}` or `isError` if unknown.
 - **`context`** — `{compact?, intent?}`. Session-start project envelope (one call replaces 4-5 `query`s).
-- **`validate`** — `{paths?: string[]}`. SHA-256 vs `files.content_hash`; rows return `ok` / `stale` / `missing` / `unindexed`.
+- **`validate`** — `{paths?: string[]}`. SHA-256 vs `files.content_hash`; returns only out-of-sync rows (`stale` / `missing` / `unindexed` — fresh paths are omitted).
 - **`show`** — `{name, kind?, in?}` or `{query, with_fts?}`. Exact symbol lookup or field-qualified search (`kind:`, `name:`, `path:`, `in:` + free text) → `{matches, disambiguation?, warning?}`. CLI: `codemap show --query '…' [--print-sql]`.
 - **`snippet`** — same as `show` (`{name, kind?, in?}` or `{query, with_fts?}`) but each match also carries `source` (file text) + `stale` / `missing` flags → `{matches, disambiguation?, warning?}`. No reindex side-effects.
 - **`impact`** — `{target, direction?, via?, depth?, limit?, summary?}`. Symbol/file blast-radius walker (replaces hand-composed `WITH RECURSIVE`). Auto-resolves symbol vs file target; `via` defaults to every backend compatible with the kind.

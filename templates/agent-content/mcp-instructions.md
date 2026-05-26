@@ -4,7 +4,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file/symbol counts, recipe summary (one call replaces 4–5 queries).
+1. **`context`** — project root, schema version, file count, language breakdown, recipe summary (one call replaces 4–5 queries).
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
 
@@ -13,7 +13,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 | Goal                             | MCP tool                                                                                   | Recipe twin (`query_recipe`)                                                                                            |
 | -------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | Exact symbol lookup              | **`show`** (`name`, optional `in`)                                                         | `find-symbol-definitions`                                                                                               |
-| Field-qualified symbol discovery | **`show`** or **`snippet`** (`query` with `kind:` / `name:` / `path:` / `in:` + free text) | `find-symbol-by-kind` for kind-heavy patterns; `--print-sql` for ad-hoc SQL                                             |
+| Field-qualified symbol discovery | **`show`** or **`snippet`** (`query` with `kind:` / `name:` / `path:` / `in:` + free text) | `find-symbol-by-kind` for kind-heavy patterns; `show --query '…' --print-sql` to inspect generated SQL                  |
 | Kind / pattern lookup            | **`query_recipe`**                                                                         | `find-symbol-by-kind`                                                                                                   |
 | Source at symbol                 | **`snippet`**                                                                              | same rows as `show` + disk text                                                                                         |
 | Blast radius                     | **`impact`** (`target`, `direction`, `via`, `depth`)                                       | `fan-in` for file hubs; symbol call graph via SQL or `impact`                                                           |

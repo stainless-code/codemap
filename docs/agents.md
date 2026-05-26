@@ -79,7 +79,7 @@ Append alone would duplicate on every run — markers + replace are what prevent
 
 ## Live fetch surface (CLI + MCP + HTTP)
 
-Once `agents init` has written the pointer templates, the consumer's disk holds 12–20 lines per file. The actual content is served live:
+Once `agents init` has written the pointer templates, the consumer's disk holds ~16-line SKILL + ~23-line rule. The actual content is served live:
 
 | Surface                | Skill                                                    | Rule                                                    |
 | ---------------------- | -------------------------------------------------------- | ------------------------------------------------------- |

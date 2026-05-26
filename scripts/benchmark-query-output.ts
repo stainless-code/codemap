@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Compares stdout size and line count for `codemap query` (console.table) vs `codemap query --json`
- * against the current project's `.codemap.db`. Run from the repo root after indexing:
+ * against the current project's index (default `.codemap/index.db`). Run from the repo root after indexing:
  *
  *   bun src/index.ts
  *   bun scripts/benchmark-query-output.ts
@@ -9,6 +9,8 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { resolveCodemapConfig } from "../src/config";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const INDEX_TS = join(REPO_ROOT, "src/index.ts");
@@ -75,7 +77,7 @@ function jsonArgsToDefaultArgs(args: string[]): string[] {
 }
 
 function main(): void {
-  const dbPath = join(REPO_ROOT, ".codemap.db");
+  const dbPath = resolveCodemapConfig(REPO_ROOT, undefined).databasePath;
   if (!existsSync(dbPath)) {
     console.error(
       `No index at ${dbPath}. Run: bun src/index.ts (from repo root), then re-run this script.`,

@@ -54,13 +54,13 @@ Soft constraints — describe shipped reality. Decided-but-unshipped flips live 
 
 ### Agent & indexing ops
 
-Prioritized agent & indexing ops queue (2026-05). Index: [`plans/agent-surface-and-ops.md`](./plans/agent-surface-and-ops.md). PR tracker: [`plans/agent-surface-delivery.md`](./plans/agent-surface-delivery.md).
+Prioritized agent & indexing ops queue (2026-05). Reference: [agents.md](./agents.md), [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness).
 
-Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/node, `agents init --mcp`, affected tests, index lock/`unlock`, parse-worker hardening, field-qualified search) shipped in [#126](https://github.com/stainless-code/codemap/pull/126)–[#138](https://github.com/stainless-code/codemap/pull/138). Reference: [agents.md](./agents.md), PR tracker [agent-surface-delivery.md](./plans/agent-surface-delivery.md).
+Wave 1–2 shipped in [#126](https://github.com/stainless-code/codemap/pull/126)–[#138](https://github.com/stainless-code/codemap/pull/138) (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/node, `agents init --mcp`, affected tests, index lock/`unlock`, parse-worker hardening, field-qualified search). Agent eval (PR 9) shipped in [#139](https://github.com/stainless-code/codemap/pull/139) (probe) + [#144](https://github.com/stainless-code/codemap/pull/144) (live MCP arms + log comparison).
 
 **Open (P1)**
 
-_(none after #144 merges — probe shipped in #139; live+log completes PR 9 in #144)_
+_(none — P1 agent-surface work complete)_
 
 **P2 — strategic (trigger-gated where noted)**
 

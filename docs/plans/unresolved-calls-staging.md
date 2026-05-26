@@ -4,7 +4,7 @@
 >
 > **Motivator:** Call sites are inserted during parse; cross-file resolution to callee symbols happens in bindings post-pass without a durable staging queue. Re-indexing a subset of files can leave stale call edges until full rebuild. A two-phase extract→resolve pipeline enables scoped re-resolution on incremental sync.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets)
+> **Roadmap:** [§ Agent & indexing ops — P2](../roadmap.md#agent--indexing-ops)
 
 ---
 
