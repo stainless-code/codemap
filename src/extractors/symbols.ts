@@ -13,6 +13,7 @@ import type { VisitorObject } from "oxc-parser";
 
 import type { SymbolRow, TypeMemberRow } from "../db";
 import { isComponentCandidate } from "./components";
+import { recordClassHeritage, recordInterfaceHeritage } from "./heritage";
 import { buildJsDocIndex, findJsDoc } from "./jsdoc";
 import type { JsDocEntry } from "./jsdoc";
 import { offsetToLine } from "./offsets";
@@ -287,6 +288,14 @@ function registerSymbolHandlers(
         scope_local_id: scopes.currentLocalId(),
       });
       extractObjectMembers(node.body?.body, relPath, name, typeMembers);
+      recordInterfaceHeritage(
+        ctx,
+        relPath,
+        name,
+        "interface",
+        interfaceLineStart,
+        node,
+      );
     },
 
     TSEnumDeclaration(node: any) {
@@ -378,6 +387,7 @@ function registerSymbolHandlers(
         ...nameTokenColumns(node.id, classLineStart, lineMap),
         scope_local_id: scopes.currentLocalId(),
       });
+      recordClassHeritage(ctx, relPath, name, "class", classLineStart, node);
       scopes.push(
         name,
         "class",

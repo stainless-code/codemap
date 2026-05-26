@@ -13,7 +13,7 @@
   },
   {
     "path": "README.md",
-    "content_hash": "534dd8cc879d7d42e14637528a43297ebe0ad7fe7e9443631725a969a7ed5df8",
+    "content_hash": "60f28d758b1d2a65a751cb17c2aa0d00c65d953d94836e4d7d5b3f60011bfd3f",
     "language": "md",
     "line_count": 52
   },
@@ -130,6 +130,12 @@
     "content_hash": "19ff92a0acce67e5a385e8f1b1607f787462626669d3b941ee0fc91030672b67",
     "language": "css",
     "line_count": 9
+  },
+  {
+    "path": "src/types/heritage-qualified.ts",
+    "content_hash": "d77f5b555d6482037fbe4d77b05258033eaa6cd092f8cd3d64bdc892aa2245f6",
+    "language": "ts",
+    "line_count": 14
   },
   {
     "path": "src/types/hierarchy.ts",

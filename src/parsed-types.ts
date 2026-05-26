@@ -11,6 +11,7 @@ import type {
   CssClassRow,
   CssKeyframeRow,
   TypeMemberRow,
+  TypeHeritageRow,
   CallRow,
   ScopeRow,
   ReferenceRow,
@@ -45,6 +46,7 @@ export interface ParsedFile {
   markers?: MarkerRow[];
   suppressions?: SuppressionRow[];
   typeMembers?: TypeMemberRow[];
+  typeHeritage?: TypeHeritageRow[];
   calls?: CallRow[];
   scopes?: ScopeRow[];
   references?: ReferenceRow[];

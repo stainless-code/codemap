@@ -29,6 +29,7 @@ export type ParsedFilePayload = Pick<
   | "markers"
   | "suppressions"
   | "typeMembers"
+  | "typeHeritage"
   | "calls"
   | "importSpecifiers"
   | "scopes"

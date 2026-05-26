@@ -24,11 +24,11 @@ actions:
 
 # type-descendants
 
-Symbols that **`extends`** or **`implements`** the given type, with transitive **`extends`** descent scoped by **child file path** on recursive hops.
+Symbols that **`extends`** or **`implements`** the given type, with transitive **`extends`** descent scoped by resolved **`base_file_path`** / **`base_symbol_id`**.
 
-Heritage is parsed from indexed `symbols.signature`. Generic arguments are stripped for matching. Recursive walks follow `(descendant_name, descendant_file_path)` so homonymous types in other files do not pollute the chain.
+Heritage edges come from **`type_heritage`**. Recursive walks follow `(descendant_name, descendant_file_path)`. When `file_path` is set, descendant rows are limited to that file (disambiguates homonymous base types).
 
-**Limits:** same signature-parsing caveats as [`type-ancestors`](./type-ancestors.md). When `file_path` is set, descendant rows are limited to that file (disambiguates homonymous base types).
+**Gaps:** same as [`type-ancestors`](./type-ancestors.md) for unresolved edges.
 
 ```bash
 codemap query --recipe type-descendants --params symbol_name=Animal

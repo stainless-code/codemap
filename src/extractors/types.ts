@@ -13,6 +13,7 @@ import type {
   SymbolRow,
   TestSuiteRow,
   TypeMemberRow,
+  TypeHeritageRow,
 } from "../db";
 import type {
   ParsedAsyncCall,
@@ -128,6 +129,7 @@ export interface ExtractContext {
   readonly components: ComponentRow[];
   readonly markers: MarkerRow[];
   readonly typeMembers: TypeMemberRow[];
+  readonly typeHeritage: TypeHeritageRow[];
   readonly calls: CallRow[];
   readonly references: ReferenceRow[];
   readonly functionParams: FunctionParamRow[];

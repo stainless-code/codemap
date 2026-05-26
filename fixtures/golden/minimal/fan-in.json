@@ -40,6 +40,10 @@
     "fan_in": 1
   },
   {
+    "to_path": "src/types/hierarchy.ts",
+    "fan_in": 1
+  },
+  {
     "to_path": "src/utils/format.ts",
     "fan_in": 1
   }

@@ -119,9 +119,16 @@
     "re_export_source": null
   },
   {
-    "name": "Animal",
+    "name": "ImportedMammal",
     "kind": "type",
-    "file_path": "src/types/hierarchy.ts",
+    "file_path": "src/types/heritage-qualified.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "QualifiedChild",
+    "kind": "type",
+    "file_path": "src/types/heritage-qualified.ts",
     "is_default": 0,
     "re_export_source": null
   },

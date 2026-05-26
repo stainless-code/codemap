@@ -84,6 +84,12 @@
     "language": "ts"
   },
   {
+    "path": "src/types/heritage-qualified.ts",
+    "line_count": 14,
+    "size": 249,
+    "language": "ts"
+  },
+  {
     "path": ".codemap/config.json",
     "line_count": 11,
     "size": 151,
@@ -112,11 +118,5 @@
     "line_count": 9,
     "size": 310,
     "language": "md"
-  },
-  {
-    "path": "src/theme.css",
-    "line_count": 9,
-    "size": 94,
-    "language": "css"
   }
 ]
