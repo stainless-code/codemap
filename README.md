@@ -226,7 +226,7 @@ codemap mcp                                                     # JSON-RPC on st
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
 # MCP-only (no CLI verb): query_batch, trace, explore, node. Other tools mirror a CLI --json envelope.
-# Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
+# Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
 # Output shape verbatim from `--json` envelopes (no re-mapping). Snake_case throughout.

@@ -170,7 +170,7 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
     "query",
     {
       description:
-        'Run one read-only SQL statement against .codemap.db. Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
+        'Run one read-only SQL statement against the codemap index (default `.codemap/index.db`). Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
       inputSchema: queryArgsSchema,
     },
     (args) => wrapToolResult(handleQuery(args, opts.root)),
@@ -218,7 +218,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context --json` prints (project root, schema version, file/symbol counts, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
+        "Project bootstrap snapshot — returns the same envelope `codemap context --json` prints (project root, schema version, file count, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
       inputSchema: contextArgsSchema,
     },
     (args) => wrapToolResult(handleContext(args)),
@@ -230,7 +230,7 @@ function registerValidateTool(server: McpServer): void {
     "validate",
     {
       description:
-        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns rows with status ('ok' / 'changed' / 'missing'). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose stale .codemap.db before issuing structural queries.",
+        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns only out-of-sync rows with status `stale` / `missing` / `unindexed` (fresh paths omitted). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose a stale index before issuing structural queries.",
       inputSchema: validateArgsSchema,
     },
     (args) => wrapToolResult(handleValidate(args)),
@@ -389,7 +389,7 @@ function registerResources(server: McpServer): void {
     server,
     "schema",
     "codemap://schema",
-    "DDL of every table in .codemap.db (queried live from sqlite_schema). Tells the agent what tables and columns exist.",
+    "DDL of every table in the codemap index (default `.codemap/index.db`; queried live from sqlite_schema). Tells the agent what tables and columns exist.",
   );
   registerStaticResource(
     server,

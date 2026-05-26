@@ -689,7 +689,7 @@ export function printQueryCmdHelp(): void {
        codemap query --baselines
        codemap query --drop-baseline <name>
 
-Read-only SQL against .codemap.db (after at least one successful index run).
+Read-only SQL against the codemap index (default \`.codemap/index.db\`; after at least one successful index run).
 The CLI does not cap row count — use SQL LIMIT (and ORDER BY) when you need a bounded result set.
 
 Flags:
@@ -726,7 +726,7 @@ Flags:
                             package   Workspace dir from package.json/workspaces or pnpm-workspace.yaml;
                                       out-of-workspace paths bucket to "<root>".
   --save-baseline[=<name>]
-                          Snapshot the result rows to the query_baselines table inside .codemap.db
+                          Snapshot the result rows to the query_baselines table inside \`.codemap/index.db\`
                           for later --baseline diffs. Name defaults to the --recipe id; ad-hoc SQL
                           must pass an explicit =<name>. Stores SQL, rows, row count, current git
                           HEAD (when available), and a timestamp. Re-saving with the same name

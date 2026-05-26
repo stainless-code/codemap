@@ -92,7 +92,7 @@ export function listResources(): { uri: string; description: string }[] {
     {
       uri: "codemap://schema",
       description:
-        "DDL of every table in .codemap.db (queried live from sqlite_schema).",
+        "DDL of every table in the codemap index (default `.codemap/index.db`; queried live from sqlite_schema).",
     },
     {
       uri: "codemap://skill",
