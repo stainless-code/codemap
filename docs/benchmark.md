@@ -295,7 +295,16 @@ Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shi
 | **Live**            | `AGENT_EVAL_MODE=live`                     | `handleQuery` / `handleQueryRecipe` via transport-agnostic handlers; defaults `CODEMAP_MCP_TOOLS=query,query_recipe` |
 | **Log**             | `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` | Parses exported MCP-on vs MCP-off agent transcripts (post-hoc; no simulated off-arm)                                 |
 
-**Probe** and **live** index the fixture, then compare MCP-on against a simulated **MCP-off** arm (`glob` → `read` × N → `grep`). **Log** mode is orthogonal to `AGENT_EVAL_MODE`: it compares two exported session logs via `compare-live-logs.ts`.
+**Eval layers** (full methodology and exploratory findings: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md)):
+
+| Layer          | MCP-on                         | MCP-off / baseline                         | In CI today?                     |
+| -------------- | ------------------------------ | ------------------------------------------ | -------------------------------- |
+| **Probe**      | `queryRows`                    | Simulated glob → read × N → grep           | Yes (`test:agent-eval`)          |
+| **Live**       | MCP handlers                   | Same traditional arm                       | Yes (smoke in `test:agent-eval`) |
+| **Log**        | Parsed MCP-on export           | Parsed MCP-off export                      | No (manual logs)                 |
+| **Dual-agent** | Live MCP tools in an LLM agent | Same tasks; MCP/`codemap query` prohibited | No (research only)               |
+
+**Probe** and **live** index the fixture, then compare MCP-on against a simulated **MCP-off** arm (`glob` → `read` × N → `grep`). **Log** mode is orthogonal to `AGENT_EVAL_MODE`: it compares two exported session logs via `compare-live-logs.ts`. The traditional arm models **naive** discovery; a skilled grep-only agent may match MCP on simple lookups — see the research note § 4.
 
 Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId` (override with `--scenarios` / `AGENT_EVAL_SCENARIOS` when using an external corpus); probe definitions live in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) (override with `--probes` / `AGENT_EVAL_PROBES`). The MCP-off **traditional** regex/globs in each probe approximate naive file discovery (not byte-identical to golden SQL).
 
@@ -324,6 +333,17 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EV
 - **Live mode** dispatches the same golden tasks through `handleQuery` / `handleQueryRecipe` (transport-agnostic MCP handlers) with a minimal `CODEMAP_MCP_TOOLS` allowlist — closer to real MCP round-trips without an LLM in the loop.
 - **Log mode** parses exported agent transcripts (entries / messages / line formats) from separate MCP-on vs MCP-off sessions. Token estimates include tool `args` / `arguments` payloads, assistant output, and structured `content` part arrays where present; `wallMs` sums per-entry timings when exported.
 - In-repo fixtures beyond minimal: point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree and pass matching `--scenarios` / `--probes`. Optional **`workflow_dispatch`** on [`.github/workflows/agent-eval-external.yml`](../.github/workflows/agent-eval-external.yml) supports repo-relative fixture paths + scenario/probe overrides (default: `fixtures/minimal`). Named external repos (zod, fastify) with published numbers remain the [roadmap backlog](./roadmap.md#backlog) item — clone and index locally first.
+
+**Pinned sample (`fixtures/minimal`, live mode, 2026-05-26):** reproduce with `AGENT_EVAL_MODE=live AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh`. Three probes, `runs=1`, all scenarios ok:
+
+| Scenario                     | MCP-on tools | MCP-off tools | MCP-on est. tokens | MCP-off est. tokens |
+| ---------------------------- | ------------ | ------------- | ------------------ | ------------------- |
+| `symbol-usePermissions`      | 1            | 25            | 53                 | 2,591               |
+| `dependencies-from-consumer` | 1            | 25            | 173                | 2,697               |
+| `find-call-sites`            | 1            | 25            | 375                | 2,667               |
+| **Totals**                   | **3**        | **75**        | **601**            | **7,955**           |
+
+Numbers are stable for a given fixture + schema; re-run locally after intentional schema or probe changes. Dual-agent and self-index studies: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md).
 
 **Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 
