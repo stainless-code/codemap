@@ -156,7 +156,7 @@ export function normalizeSearchInGlob(
   projectRoot: string,
   glob: string,
 ): string {
-  const metaIdx = glob.search(/[*?\[]/);
+  const metaIdx = glob.search(/[*?[]/);
   if (metaIdx === -1) {
     return isAbsolute(glob) ? toProjectRelative(projectRoot, glob) : glob;
   }
