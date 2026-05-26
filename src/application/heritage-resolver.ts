@@ -120,9 +120,22 @@ function findModuleSymbol(
   return pickTypeSymbol(list);
 }
 
+function findResolvedSymbol(
+  filePath: string,
+  name: string,
+  symbolsByFile: Map<string, Map<string, SymbolEntry[]>>,
+  defaultExportByFile: Map<string, SymbolEntry>,
+): SymbolEntry | null {
+  if (name === "default") {
+    return defaultExportByFile.get(filePath) ?? null;
+  }
+  return findModuleSymbol(filePath, name, symbolsByFile);
+}
+
 function resolveHeritageRow(
   row: TypeHeritageRow,
   symbolsByFile: Map<string, Map<string, SymbolEntry[]>>,
+  defaultExportByFile: Map<string, SymbolEntry>,
   importsByFile: Map<string, Map<string, ImportSpec>>,
   depsByFile: Map<string, Map<string, string>>,
   exportsByFile: Map<string, Set<string>>,
@@ -136,10 +149,11 @@ function resolveHeritageRow(
     return row;
   }
 
-  const sameFile = findModuleSymbol(
+  const sameFile = findResolvedSymbol(
     row.child_file_path,
     row.base_simple_name,
     symbolsByFile,
+    defaultExportByFile,
   );
   if (sameFile) {
     return {
@@ -163,10 +177,11 @@ function resolveHeritageRow(
           reExportsByFile,
           indexedPaths,
         ) ?? { file: targetFile, name: exportName };
-        const sym = findModuleSymbol(
+        const sym = findResolvedSymbol(
           resolved.file,
           resolved.name,
           symbolsByFile,
+          defaultExportByFile,
         );
         if (sym) {
           return {
@@ -200,6 +215,7 @@ export function expandHeritageResolveScope(
 ): string[] {
   if (changedPaths.length === 0) return [];
   const scope = new Set(changedPaths);
+  const changedSet = new Set(changedPaths);
   const placeholders = changedPaths.map(() => "?").join(",");
   for (const row of db
     .query<{ file_path: string }>(
@@ -214,6 +230,34 @@ export function expandHeritageResolveScope(
     )
     .all(...changedPaths)) {
     scope.add(row.child_file_path);
+  }
+  const indexedPaths = new Set(
+    db
+      .query<{ path: string }>("SELECT path FROM files")
+      .all()
+      .map((r) => r.path),
+  );
+  for (const r of db
+    .query<{
+      file_path: string;
+      is_re_export: number;
+      re_export_source: string | null;
+      name: string;
+    }>(
+      "SELECT file_path, is_re_export, re_export_source, name FROM exports WHERE is_re_export = 1 AND re_export_source IS NOT NULL",
+    )
+    .all()) {
+    const entry = parseReExportSource(r.re_export_source!, r.name);
+    const target = resolveReExport(r.file_path, entry.source, indexedPaths);
+    if (target && changedSet.has(target)) {
+      for (const imp of db
+        .query<{ file_path: string }>(
+          "SELECT DISTINCT file_path FROM imports WHERE resolved_path = ?",
+        )
+        .all(r.file_path)) {
+        scope.add(imp.file_path);
+      }
+    }
   }
   return [...scope];
 }
@@ -245,6 +289,24 @@ export function resolveTypeHeritage(
       byName.set(s.name, list);
     }
     list.push({ id: s.id, kind: s.kind, scope_local_id: s.scope_local_id });
+  }
+
+  const defaultExportByFile = new Map<string, SymbolEntry>();
+  for (const s of db
+    .query<{
+      id: number;
+      file_path: string;
+      kind: string;
+      scope_local_id: number;
+    }>(
+      "SELECT id, file_path, kind, scope_local_id FROM symbols WHERE is_default_export = 1",
+    )
+    .all()) {
+    defaultExportByFile.set(s.file_path, {
+      id: s.id,
+      kind: s.kind,
+      scope_local_id: s.scope_local_id,
+    });
   }
 
   const importsByFile = new Map<string, Map<string, ImportSpec>>();
@@ -332,6 +394,7 @@ export function resolveTypeHeritage(
     resolveHeritageRow(
       row,
       symbolsByFile,
+      defaultExportByFile,
       importsByFile,
       depsByFile,
       exportsByFile,

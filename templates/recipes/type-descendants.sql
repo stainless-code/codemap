@@ -6,7 +6,7 @@ base_symbols AS (
   SELECT s.id, s.name, s.file_path
   FROM symbols s
   CROSS JOIN params p
-  WHERE s.kind IN ('class', 'interface')
+  WHERE s.kind IN ('class', 'interface', 'type')
     AND s.name = p.symbol_name
     AND (p.file_path IS NULL OR p.file_path = '' OR s.file_path = p.file_path)
     AND s.id = (
@@ -14,7 +14,7 @@ base_symbols AS (
       FROM symbols s2
       WHERE s2.name = s.name
         AND s2.file_path = s.file_path
-        AND s2.kind IN ('class', 'interface')
+        AND s2.kind IN ('class', 'interface', 'type')
       ORDER BY CASE WHEN s2.scope_local_id = 0 THEN 0 ELSE 1 END, s2.id
       LIMIT 1
     )
@@ -63,7 +63,7 @@ descendants(
           FROM symbols s2
           WHERE s2.name = bs.name
             AND s2.file_path = bs.file_path
-            AND s2.kind IN ('class', 'interface')
+            AND s2.kind IN ('class', 'interface', 'type')
           ORDER BY CASE WHEN s2.scope_local_id = 0 THEN 0 ELSE 1 END, s2.id
           LIMIT 1
         )

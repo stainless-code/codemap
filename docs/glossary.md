@@ -584,7 +584,7 @@ A small end-to-end vertical slice (see [`.cursor/rules/tracer-bullets.mdc`](../.
 
 ### `type_heritage` (table)
 
-One row per `extends` / `implements` edge on a class or interface. Populated at parse from oxc AST; `heritage-resolver` (pass 2, after bindings) fills `base_file_path` / `base_symbol_id` and sets `resolution_kind` (`same-file`, `imported`, `qualified-unresolved`, `unresolved`). Incremental `--files` re-resolves rows in changed files plus importers and consumers pointing at changed base files. Powers `type-ancestors` and `type-descendants` recipes.
+One row per `extends` / `implements` edge on a class or interface. Populated at parse from oxc AST; `heritage-resolver` (pass 2, after bindings) fills `base_file_path` / `base_symbol_id` and sets `resolution_kind` (`same-file`, `imported`, `qualified-unresolved`, `unresolved`). Non-simple expression bases use `base_qualified_name = '(expression)'` and stay out of recipe walks. Incremental `--files` re-resolves rows in changed files plus importers and consumers pointing at changed base files (including one-hop type re-export barrels). Powers `type-ancestors` and `type-descendants` recipes. **`file_path` param:** on `type-ancestors` it disambiguates the start symbol only; on `type-descendants` it also filters output to descendants in that file.
 
 ### `type_members` (table)
 
