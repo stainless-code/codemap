@@ -249,6 +249,24 @@ describe("run-probes helpers", () => {
     ).toThrow(/unknown goldenId/);
   });
 
+  it("main rejects missing probes file", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const result = spawnSync(
+      "bun",
+      [
+        join(import.meta.dir, "run-probes.ts"),
+        "--fixture-root",
+        fixtureRoot,
+        "--probes",
+        join(fixtureRoot, "no-such-probes.json"),
+      ],
+      { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Probes file not found");
+  });
+
   it("runProbeOnce throws when live mode missing fixtureRoot", () => {
     expect(() =>
       runProbeOnce(
@@ -615,6 +633,30 @@ describe("live MCP arm", () => {
       else process.env.CODEMAP_MCP_TOOLS = prior;
     }
   });
+
+  it("runLiveMcpArm surfaces handler errors on ArmRunMetrics", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "bad-sql",
+          prompt: "bad",
+          sql: "SELECT FROM WHERE",
+        },
+        root,
+        "bad",
+      );
+      expect(metrics.success).toBe(false);
+      expect(metrics.error).toBeDefined();
+      expect(metrics.error!.length).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
 });
 
 describe("compare-live-logs", () => {
@@ -721,6 +763,37 @@ describe("print-comparison-summary", () => {
     const tmp = mkdtempSync(join(tmpdir(), "agent-eval-bad-json-"));
     const bad = join(tmp, "bad.json");
     writeFileSync(bad, JSON.stringify({ mode: "probe", scenarios: [] }));
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("main rejects comparison JSON missing arm metrics", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-shallow-json-"));
+    const bad = join(tmp, "shallow.json");
+    writeFileSync(
+      bad,
+      JSON.stringify({
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        mode: "probe",
+        scenarios: [{ id: "a" }],
+        summary: {
+          mcpOnTotalToolCalls: 1,
+          mcpOffTotalToolCalls: 2,
+          mcpOnTotalEstTokens: 3,
+          mcpOffTotalEstTokens: 4,
+          successCount: 1,
+        },
+      }),
+    );
     try {
       const result = spawnSync(
         "bun",

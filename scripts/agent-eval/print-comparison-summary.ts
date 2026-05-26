@@ -10,15 +10,68 @@ function isLogComparison(v: ComparisonReport): v is LiveLogComparison {
   return v.mode === "log";
 }
 
+function isArmMetrics(v: unknown): boolean {
+  if (v === null || typeof v !== "object") return false;
+  const arm = v as Record<string, unknown>;
+  return (
+    typeof arm.toolCallCount === "number" && typeof arm.estTokens === "number"
+  );
+}
+
+function isProbeLiveScenario(v: unknown): boolean {
+  if (v === null || typeof v !== "object") return false;
+  const s = v as Record<string, unknown>;
+  if (typeof s.id !== "string") return false;
+  if (!isArmMetrics(s.mcpOn) || !isArmMetrics(s.mcpOff)) return false;
+  const delta = s.delta;
+  if (delta === null || typeof delta !== "object") return false;
+  const d = delta as Record<string, unknown>;
+  return typeof d.toolCallCount === "number" && typeof d.estTokens === "number";
+}
+
+function isLogScenario(v: unknown): boolean {
+  if (v === null || typeof v !== "object") return false;
+  const s = v as Record<string, unknown>;
+  if (typeof s.id !== "string") return false;
+  if (!isArmMetrics(s.mcpOn) || !isArmMetrics(s.mcpOff)) return false;
+  const delta = s.delta;
+  if (delta === null || typeof delta !== "object") return false;
+  const d = delta as Record<string, unknown>;
+  return typeof d.toolCallCount === "number" && typeof d.estTokens === "number";
+}
+
 function isComparisonReport(v: unknown): v is ComparisonReport {
   if (v === null || typeof v !== "object") return false;
   const row = v as Record<string, unknown>;
   const mode = row.mode;
   if (mode !== "probe" && mode !== "live" && mode !== "log") return false;
   if (typeof row.generatedAt !== "string") return false;
-  if (!Array.isArray(row.scenarios)) return false;
+  if (!Array.isArray(row.scenarios) || row.scenarios.length === 0) {
+    return false;
+  }
   if (row.summary === null || typeof row.summary !== "object") return false;
-  return true;
+  const summary = row.summary as Record<string, unknown>;
+  if (mode === "log") {
+    if (
+      typeof summary.mcpOnTotalToolCalls !== "number" ||
+      typeof summary.mcpOffTotalToolCalls !== "number" ||
+      typeof summary.mcpOnTotalEstTokens !== "number" ||
+      typeof summary.mcpOffTotalEstTokens !== "number"
+    ) {
+      return false;
+    }
+    return row.scenarios.every(isLogScenario);
+  }
+  if (
+    typeof summary.mcpOnTotalToolCalls !== "number" ||
+    typeof summary.mcpOffTotalToolCalls !== "number" ||
+    typeof summary.mcpOnTotalEstTokens !== "number" ||
+    typeof summary.mcpOffTotalEstTokens !== "number" ||
+    typeof summary.successCount !== "number"
+  ) {
+    return false;
+  }
+  return row.scenarios.every(isProbeLiveScenario);
 }
 
 function fmt(n: number, digits = 0): string {
