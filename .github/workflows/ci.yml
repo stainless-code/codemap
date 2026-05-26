@@ -95,6 +95,9 @@ jobs:
       - name: Golden query regression (fixtures/minimal)
         run: bun run test:golden
 
+      - name: Agent eval probe harness (fixtures/minimal)
+        run: bun run test:agent-eval
+
   build:
     name: 🧰 Build
     needs: skip-ci

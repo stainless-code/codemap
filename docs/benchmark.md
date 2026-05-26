@@ -10,6 +10,7 @@
 | **Measure SQL vs glob+read+regex** after an index exists — `src/benchmark.ts`, scenarios, fixtures                                                       | [§ The benchmark script](#the-benchmark-script)                                  |
 | **Compare `codemap query` table vs `--json` stdout** (lines/bytes) on an existing index                                                                  | [§ Query stdout (`benchmark:query`)](#query-stdout-table-vs-json-benchmarkquery) |
 | **Guardrail full-rebuild per-phase walls against a committed baseline** (local + weekly scheduled)                                                       | [§ Perf baseline (regression guardrail)](#perf-baseline-regression-guardrail)    |
+| **A/B agent eval** — indexed MCP-on vs file-scan MCP-off tool-call + token comparison on fixed probes                                                    | [§ Agent eval harness](#agent-eval-harness)                                      |
 
 ---
 
@@ -282,10 +283,34 @@ bun run dev --full
 bun run benchmark
 ```
 
-**CI:** the workflow **Benchmark (fixture)** runs the same steps with `CODEMAP_ROOT=$GITHUB_WORKSPACE/fixtures/minimal`.
+**CI:** the **Test** job runs `bun run test:agent-eval` after `test:golden` (probe smoke reuses the golden index via `--skip-index` when present; typically ~1–2 min combined); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
+
+### Agent eval harness
+
+Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shipped in npm). Indexes the fixture corpus once, then compares an **indexed query arm** (one simulated `query` tool call per probe via `queryRows`, not an MCP transport round-trip) against an **MCP-off** arm that simulates agent discovery without the index (`glob` → `read` × N → `grep`). Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId` (override with `--scenarios` / `AGENT_EVAL_SCENARIOS` when using an external corpus); probe definitions live in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) (override with `--probes` / `AGENT_EVAL_PROBES`). The MCP-off **traditional** regex/globs in each probe approximate naive file discovery (not byte-identical to golden SQL).
+
+**One-command local run:**
+
+```bash
+bash scripts/agent-eval/run-arms.sh
+# default output: .agent-eval/comparison.json
+# exits non-zero when any probe's scenarioSuccess is false
+```
+
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`). Optional real agent session logs: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh` (prints parsed tool metrics via `print-log-metrics.ts`).
+
+**Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload — MCP-on includes SQL, bind values, and JSON rows; MCP-off includes bytes read + grep hits), per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed. Results stay local JSON — no telemetry upload ([plan](./plans/agent-eval-harness.md) L.5).
+
+**Methodology notes:**
+
+- **Probe mode** is deterministic (no LLM): it measures structural cost of indexed SQL vs traditional file scan on the same corpus. Use it for regression guardrails and fixture tuning.
+- **Log mode** parses exported agent transcripts (entries / messages / line formats) when you run live A/B sessions with MCP on vs off. Token estimates include tool `args` / `arguments` payloads and structured `content` part arrays where present; `wallMs` sums per-entry timings when exported.
+- External public repos (zod, fastify, etc.): point `AGENT_EVAL_FIXTURE_ROOT` at an indexed tree, pass matching `--scenarios` / `--probes` overrides, and extend probe definitions — same harness, not duplicated fixtures.
+
+Plan: [`docs/plans/agent-eval-harness.md`](./plans/agent-eval-harness.md). PR CI runs `bun run test:agent-eval` in the **Test** job; optional nightly / `workflow_dispatch` for external fixtures is not wired yet.
 
 **Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 
 **Tier B (local tree, not in default CI):** `bun run test:golden:external` (or `bun scripts/query-golden.ts --corpus external`) indexes **`CODEMAP_ROOT`**, **`CODEMAP_TEST_BENCH`**, or **`--root`**, loads [fixtures/golden/scenarios.external.json](../fixtures/golden/scenarios.external.json) if present else [scenarios.external.example.json](../fixtures/golden/scenarios.external.example.json), and writes/compares goldens under `fixtures/golden/external/` (gitignored). Use **`match`** in scenarios for subset checks (`minRows`, `everyRowContains`); use **`budgetMs`** with optional **`--strict-budget`** for perf warnings. Do not commit proprietary paths or goldens from private apps.
 
-Scenario titles match the table above; **indexed row counts** on the fixture are stable for a given schema. A larger second fixture is optional — see [roadmap.md](./roadmap.md).
+Scenario titles in the [benchmark scenarios table](#custom-scenarios-codemap_benchmark_config) describe latency fixtures; **agent-eval probes** are a separate three-scenario subset in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json). **Indexed row counts** on the fixture are stable for a given schema. A larger second fixture is optional — see [roadmap.md](./roadmap.md).

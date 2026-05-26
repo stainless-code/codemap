@@ -24,7 +24,7 @@
 2. **Filter `register*Tool` invocations** — skip unlisted tools
 3. **Log registered set** on stderr at debug level or when allowlist active
 4. **Tests** — `CODEMAP_MCP_TOOLS=query,show` registers exactly two tools
-5. **Docs** — README env table; [agent-eval-harness](./agent-eval-harness.md) uses allowlist for arms
+5. **Docs** — README env table; live agent-eval arms may use allowlist (future — see [agent-eval-harness](./agent-eval-harness.md) open acceptance items)
 
 ---
 

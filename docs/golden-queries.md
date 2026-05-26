@@ -2,7 +2,7 @@
 
 **Purpose:** Regression-test **Codemap internals** by comparing **`codemap query`** output to **checked-in expectations** (or subset matchers) on fixed corpora — **not** an LLM-in-the-loop eval. **Latency / tokens vs scanning:** [benchmark.md](./benchmark.md).
 
-**Operational docs:** [CONTRIBUTING § Golden queries](../.github/CONTRIBUTING.md) · [benchmark § Fixtures](./benchmark.md#fixtures) · Runner: [scripts/query-golden.ts](../scripts/query-golden.ts) · Schema: [scripts/query-golden/schema.ts](../scripts/query-golden/schema.ts)
+**Operational docs:** [CONTRIBUTING § Golden queries](../.github/CONTRIBUTING.md) · [benchmark § Fixtures](./benchmark.md#fixtures) · [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness) (probe A/B reuses scenarios via `goldenId`) · Runner: [scripts/query-golden.ts](../scripts/query-golden.ts) · Schema: [scripts/query-golden/schema.ts](../scripts/query-golden/schema.ts)
 
 ---
 
@@ -25,12 +25,13 @@
 
 ## How this fits other tooling
 
-| Piece                     | Role                                                         |
-| ------------------------- | ------------------------------------------------------------ |
-| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                             |
-| `src/benchmark.ts`        | Speed comparison (not golden row equality)                   |
-| `bun test`                | Unit tests for parsers, CLI, DB                              |
-| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore |
+| Piece                     | Role                                                               |
+| ------------------------- | ------------------------------------------------------------------ |
+| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                                   |
+| `scripts/agent-eval/`     | Tier **A** probe A/B (`test:agent-eval`; reuses golden `goldenId`) |
+| `src/benchmark.ts`        | Speed comparison (not golden row equality)                         |
+| `bun test`                | Unit tests for parsers, CLI, DB                                    |
+| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore       |
 
 ---
 
@@ -71,7 +72,7 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 | Area                          | State                                                                                                                                                                                                                                                                                                                                       |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tier A runner + CI            | **`bun run test:golden`** in `check`                                                                                                                                                                                                                                                                                                        |
+| Tier A runner + CI            | **`bun run test:golden`** + **`bun run test:agent-eval`** in `check` (CI Test job runs both; agent-eval reuses golden index when present)                                                                                                                                                                                                   |
 | Tier A scenario coverage      | Scenarios cover the core parser / schema surfaces plus bundled-recipe smoke tests; some user-data and opt-in tables are intentionally exercised by unit tests or specific recipes instead of a one-row-per-table golden. Current scenario inventory is derived from [scenarios.json](../fixtures/golden/scenarios.json), not repeated here. |
 | Tier B external + schema      | **`test:golden:external`**, Zod in **`scripts/query-golden/schema.ts`**                                                                                                                                                                                                                                                                     |
 | Subset matchers + budgets     | **`match`**, **`budgetMs`**, **`--strict-budget`**                                                                                                                                                                                                                                                                                          |

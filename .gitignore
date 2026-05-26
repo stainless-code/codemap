@@ -15,3 +15,4 @@ fixtures/golden/scenarios.external.json
 # QA chat prompts tied to a private/local index (paths + product names)
 fixtures/qa/*.local.md
 fixtures/benchmark/*.local.json
+.agent-eval/

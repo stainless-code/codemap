@@ -12,8 +12,9 @@ bun install   # runs `prepare` → Husky git hooks
 bun run dev   # same as `bun src/index.ts` — CLI from source
 bun test
 bun run test:golden   # golden SQL vs fixtures/minimal (also runs at end of `bun run check`)
+bun run test:agent-eval   # probe A/B harness smoke on fixtures/minimal (also runs at end of `bun run check`)
 bun run test:golden:external   # Tier B: local tree via CODEMAP_ROOT / --root (not in CI)
-bun run check   # build, then format:check + lint:ci + test + typecheck, then test:golden
+bun run check   # build, then format:check + lint:ci + test + typecheck, then test:golden + test:agent-eval
 bun run clean   # remove untracked/ignored build artifacts (keeps `.env`, `.codemap/`)
 bun run check-updates   # interactive dependency updates (`bun update -i --latest`)
 ```

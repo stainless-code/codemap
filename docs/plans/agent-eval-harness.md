@@ -1,8 +1,8 @@
 # Agent eval harness — plan
 
-> **Status:** open · **Priority:** P1 · **Effort:** M (~2 weeks)
+> **Status:** open (probe tracer bullet shipped [#139](https://github.com/stainless-code/codemap/pull/139)) · **Priority:** P1 · **Effort:** M (~2 weeks)
 >
-> **Motivator:** Codemap claims agent-discovery wins ([why-codemap.md](../why-codemap.md), [benchmark.md](../benchmark.md)) but CI only gates query latency and golden SQL. Need falsifiable A/B: agent with MCP vs without, measuring tool-call count and tokens on fixed tasks.
+> **Motivator:** Codemap claims agent-discovery wins ([why-codemap.md](../why-codemap.md), [benchmark.md](../benchmark.md)). PR CI now gates golden SQL plus deterministic probe A/B smoke on `fixtures/minimal`; still need falsifiable **live** agent runs (MCP on vs off) and external-fixture benchmarks measuring tool-call count and tokens on fixed tasks.
 >
 > **Roadmap:** [§ Backlog](../roadmap.md#backlog) (falsifiable benchmark item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1)
 
@@ -22,20 +22,24 @@
 
 ## Implementation steps
 
-1. **`scripts/agent-eval/run-arms.sh`** — orchestrate N runs per arm
-2. **Probe scripts** — structured tasks mirroring golden queries ("find symbol X", "who imports Y", "fan-in top 10")
-3. **Parser for agent logs** — extract tool names from Claude/Cursor export format (start with one agent)
+1. **`scripts/agent-eval/run-arms.sh`** — orchestrate N runs per arm ✅
+2. **Probe scripts** — structured tasks mirroring golden queries ("find symbol X", "who imports Y", "find call sites") ✅ (3 probes shipped)
+3. **Parser for agent logs** — extract tool names from Claude/Cursor export format ✅
 4. **Summary reporter** — markdown table for docs/benchmark.md
-5. **CI job** — optional nightly or manual `workflow_dispatch` (public fixtures only)
-6. **Link to [mcp-tool-allowlist](./mcp-tool-allowlist.md)** for minimal-tool arms
+5. **PR CI probe gate** — `test:agent-eval` in Test job on `fixtures/minimal` ✅
+6. **Optional nightly / `workflow_dispatch`** — public external fixtures only
+7. **Link to [mcp-tool-allowlist](./mcp-tool-allowlist.md)** for minimal-tool live arms
 
 ---
 
 ## Acceptance
 
-- [ ] One-command local run produces comparison JSON
-- [ ] At least 3 scenarios covered
-- [ ] Documented methodology section in benchmark.md
+- [x] One-command local run produces comparison JSON (`bash scripts/agent-eval/run-arms.sh`)
+- [x] At least 3 scenarios covered (`scripts/agent-eval/scenarios.json`)
+- [x] Documented methodology section in benchmark.md
+- [x] PR CI gates probe harness (`bun run test:agent-eval` in Test job on `fixtures/minimal`)
+- [ ] Optional nightly or manual `workflow_dispatch` (public external fixtures only)
+- [ ] Live agent A/B arms with MCP allowlist subset
 
 ---
 

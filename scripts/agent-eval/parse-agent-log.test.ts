@@ -1,0 +1,452 @@
+import { describe, expect, it } from "bun:test";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { resolveCodemapConfig } from "../../src/config";
+import { initCodemap } from "../../src/runtime";
+import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { jsonCharLength } from "./metrics";
+import { parseAgentLog, parseAgentLogFile } from "./parse-agent-log";
+import {
+  estimateProbeTokens,
+  mcpOffPayloadChars,
+  mcpOnPayloadChars,
+} from "./probe-tokens";
+import {
+  allProbesSucceeded,
+  applyProbeExitCode,
+  averageSamples,
+  runProbeOnce,
+  summarize,
+} from "./run-probes";
+import type { ArmRunMetrics, ScenarioComparison } from "./run-probes";
+import { parseProbesJson } from "./schema";
+import {
+  runTraditionalProbe,
+  traditionalToolSequence,
+} from "./traditional-probe";
+
+const sampleLog = join(
+  import.meta.dir,
+  "../../fixtures/agent-eval/sample-cursor-log.json",
+);
+
+function arm(overrides: Partial<ArmRunMetrics> = {}): ArmRunMetrics {
+  return {
+    wallMs: 1,
+    toolSequence: ["query"],
+    toolCallCount: 1,
+    resultCount: 1,
+    estTokens: 10,
+    success: true,
+    ...overrides,
+  };
+}
+
+function scenario(
+  overrides: Partial<ScenarioComparison> & Pick<ScenarioComparison, "id">,
+): ScenarioComparison {
+  return {
+    prompt: "p",
+    mcpOn: arm(),
+    mcpOff: arm({ toolSequence: ["glob", "grep"], toolCallCount: 2 }),
+    scenarioSuccess: true,
+    delta: { toolCallCount: 1, wallMs: 0, estTokens: 0 },
+    ...overrides,
+  };
+}
+
+describe("parse-agent-log", () => {
+  it("parses entries-transcript JSON", () => {
+    const parsed = parseAgentLogFile(sampleLog);
+    expect(parsed.format).toBe("entries-transcript");
+    expect(parsed.toolSequence).toEqual(["query"]);
+    expect(parsed.toolCallCount).toBe(1);
+    expect(parsed.promptChars).toBeGreaterThan(0);
+    expect(parsed.estTokens).toBeGreaterThan(0);
+  });
+
+  it("counts tool args in log-mode token estimate", () => {
+    const withoutArgs = parseAgentLog(
+      JSON.stringify({
+        entries: [
+          { kind: "user", text: "q" },
+          { kind: "tool_call", tool: "query" },
+        ],
+      }),
+    );
+    const withArgs = parseAgentLogFile(sampleLog);
+    expect(withArgs.estTokens).toBeGreaterThan(withoutArgs.estTokens);
+  });
+
+  it("parses array-transcript JSON", () => {
+    const raw = JSON.stringify([
+      { role: "user", content: "Where is X?" },
+      { kind: "tool_call", tool: "query" },
+    ]);
+    const parsed = parseAgentLog(raw);
+    expect(parsed.format).toBe("array-transcript");
+    expect(parsed.toolSequence).toEqual(["query"]);
+  });
+
+  it("parses OpenAI-style messages with tool_calls", () => {
+    const raw = JSON.stringify({
+      messages: [
+        { role: "user", content: "List components" },
+        {
+          role: "assistant",
+          tool_calls: [
+            {
+              function: {
+                name: "mcp_codemap_query",
+                arguments: "{}",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const parsed = parseAgentLog(raw);
+    expect(parsed.format).toBe("messages-transcript");
+    expect(parsed.toolSequence).toEqual(["query"]);
+  });
+
+  it("does not double-count tool_calls and kind tool_call on one entry", () => {
+    const raw = JSON.stringify({
+      entries: [
+        {
+          kind: "tool_call",
+          tool: "query",
+          role: "assistant",
+          tool_calls: [{ function: { name: "mcp_codemap_show" } }],
+        },
+      ],
+    });
+    const parsed = parseAgentLog(raw);
+    expect(parsed.toolSequence).toEqual(["show"]);
+  });
+
+  it("parses line-oriented tool logs with normalized names", () => {
+    const raw = `USER: find createClient call sites
+TOOL: Grep
+TOOL: Read
+TOOL: query
+ASSISTANT: found 3 call sites`;
+    const parsed = parseAgentLog(raw);
+    expect(parsed.format).toBe("line-log");
+    expect(parsed.toolSequence).toEqual(["grep", "read", "query"]);
+    expect(parsed.toolCallCount).toBe(3);
+  });
+
+  it("parses tool_calls without assistant role", () => {
+    const raw = JSON.stringify({
+      entries: [{ tool_calls: [{ function: { name: "mcp_codemap_query" } }] }],
+    });
+    const parsed = parseAgentLog(raw);
+    expect(parsed.toolSequence).toEqual(["query"]);
+  });
+
+  it("counts structured content part arrays in token estimate", () => {
+    const plain = parseAgentLog(
+      JSON.stringify({
+        messages: [{ role: "user", content: "short" }],
+      }),
+    );
+    const parts = parseAgentLog(
+      JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Where is usePermissions defined?" },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(parts.estTokens).toBeGreaterThan(plain.estTokens);
+  });
+
+  it("counts input_text content parts", () => {
+    const parsed = parseAgentLog(
+      JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "input_text", input_text: "longer user prompt" }],
+          },
+        ],
+      }),
+    );
+    expect(parsed.promptChars).toBeGreaterThan(10);
+  });
+
+  it("throws on invalid JSON", () => {
+    expect(() => parseAgentLog("{not json")).toThrow(/invalid JSON/);
+  });
+
+  it("throws on unsupported JSON shape without masking as invalid JSON", () => {
+    expect(() => parseAgentLog("{}")).toThrow(/unsupported JSON shape/);
+    expect(() => parseAgentLog("{}")).not.toThrow(/invalid JSON/);
+  });
+});
+
+describe("probe-tokens", () => {
+  it("counts SQL and bind values in MCP-on payload", () => {
+    expect(mcpOnPayloadChars("SELECT 1", [1])).toBeGreaterThan(8);
+    const withBinds = mcpOnPayloadChars("SELECT 1", [1], ["createClient"]);
+    const withoutBinds = mcpOnPayloadChars("SELECT 1", [1], []);
+    expect(withBinds).toBeGreaterThan(withoutBinds);
+    const emptyRowsPayload = mcpOnPayloadChars("SELECT 1", []);
+    expect(emptyRowsPayload).toBe(
+      Buffer.byteLength("SELECT 1", "utf-8") +
+        jsonCharLength([]) +
+        jsonCharLength([]),
+    );
+    expect(estimateProbeTokens("task", emptyRowsPayload)).toBe(
+      Math.ceil((Buffer.byteLength("task", "utf-8") + emptyRowsPayload) / 4),
+    );
+  });
+
+  it("uses bytesRead without double JSON charge for MCP-off", () => {
+    const payload = mcpOffPayloadChars(400, [{ file_path: "a.ts" }]);
+    expect(payload).toBeGreaterThan(400);
+  });
+});
+
+describe("run-probes helpers", () => {
+  it("resolveGoldenQuery resolves recipe probes", () => {
+    const { sql, bindValues } = resolveGoldenQuery({
+      id: "find-call-sites",
+      recipe: "find-call-sites",
+      params: { callee: "createClient" },
+    });
+    expect(sql).toContain("SELECT");
+    expect(bindValues.length).toBeGreaterThan(0);
+  });
+
+  it("runProbeOnce throws on unknown goldenId", () => {
+    expect(() =>
+      runProbeOnce(
+        {
+          id: "missing",
+          goldenId: "nope",
+          traditional: { globs: ["**/*.ts"], regex: "x", mode: "files" },
+        },
+        new Map(),
+      ),
+    ).toThrow(/unknown goldenId/);
+  });
+
+  it("averageSamples rejects empty input", () => {
+    expect(() => averageSamples("p", [])).toThrow(
+      /requires at least one sample/,
+    );
+  });
+
+  it("averageSamples averages metrics and keeps per-arm success", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ wallMs: 2, success: true }),
+        mcpOff: arm({ wallMs: 4, toolCallCount: 3, success: false }),
+        scenarioSuccess: false,
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ wallMs: 4, success: true }),
+        mcpOff: arm({ wallMs: 6, toolCallCount: 5, success: true }),
+        scenarioSuccess: true,
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOn.wallMs).toBe(3);
+    expect(avg.mcpOff.wallMs).toBe(5);
+    expect(avg.mcpOn.success).toBe(true);
+    expect(avg.mcpOff.success).toBe(false);
+    expect(avg.scenarioSuccess).toBe(false);
+  });
+
+  it("summarize counts scenarioSuccess", () => {
+    const summary = summarize([
+      scenario({ id: "a", scenarioSuccess: true }),
+      scenario({ id: "b", scenarioSuccess: false }),
+    ]);
+    expect(summary.successCount).toBe(1);
+  });
+
+  it("allProbesSucceeded requires every scenario", () => {
+    expect(allProbesSucceeded(3, 3)).toBe(true);
+    expect(allProbesSucceeded(2, 3)).toBe(false);
+  });
+
+  it("applyProbeExitCode sets process exitCode on partial failure", () => {
+    process.exitCode = 0;
+    applyProbeExitCode(2, 3);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = 0;
+    applyProbeExitCode(3, 3);
+    expect(process.exitCode).toBe(0);
+  });
+
+  it("averageSamples re-ceils averaged estTokens", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ estTokens: 10 }),
+        mcpOff: arm({ estTokens: 11, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ estTokens: 11 }),
+        mcpOff: arm({ estTokens: 12, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(Number.isInteger(avg.mcpOn.estTokens)).toBe(true);
+    expect(Number.isInteger(avg.mcpOff.estTokens)).toBe(true);
+    expect(avg.mcpOn.estTokens).toBe(11);
+    expect(avg.mcpOff.estTokens).toBe(12);
+  });
+
+  it("averageSamples delta uses unrounded arm averages", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ toolCallCount: 1 }),
+        mcpOff: arm({ toolCallCount: 2, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ toolCallCount: 1 }),
+        mcpOff: arm({ toolCallCount: 4, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOff.toolCallCount).toBe(3);
+    expect(avg.mcpOn.toolCallCount).toBe(1);
+    expect(avg.delta.toolCallCount).toBe(2);
+  });
+
+  it("traditionalToolSequence includes glob and grep with zero reads", () => {
+    expect(traditionalToolSequence(0)).toEqual(["glob", "grep"]);
+  });
+
+  it("runTraditionalProbe rejects invalid regex", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    expect(() =>
+      runTraditionalProbe({
+        globs: ["**/*.ts"],
+        regex: "[",
+        mode: "files",
+      }),
+    ).toThrow(/invalid traditional regex/);
+  });
+
+  it("runTraditionalProbe finds files in fixtures/minimal", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const result = runTraditionalProbe({
+      globs: ["**/*.ts"],
+      regex: "createClient",
+      mode: "files",
+    });
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.filesRead).toBeGreaterThan(0);
+  });
+});
+
+describe("parseProbesJson", () => {
+  it("rejects invalid JSON", () => {
+    expect(() => parseProbesJson("{")).toThrow(/invalid probes JSON/);
+  });
+
+  it("rejects invalid schema", () => {
+    expect(() => parseProbesJson(JSON.stringify({ version: 2 }))).toThrow(
+      /invalid probes file/,
+    );
+  });
+});
+
+describe("run-probes smoke", () => {
+  it("exits non-zero when scenarioSuccess is incomplete", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-exit-"));
+    const probesPath = join(tmp, "probes.json");
+    const out = join(tmp, "comparison.json");
+    writeFileSync(
+      probesPath,
+      JSON.stringify({
+        version: 1,
+        probes: [
+          {
+            id: "fail-traditional",
+            goldenId: "symbol-usePermissions",
+            traditional: {
+              globs: ["**/*.ts"],
+              regex: "zzz_nope_match_codemap_98765",
+              mode: "files",
+            },
+          },
+        ],
+      }),
+    );
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+      "--probes",
+      probesPath,
+    ];
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+      });
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("indexes fixtures/minimal and compares three probes", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-smoke-"));
+    const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+      });
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(await Bun.file(out).text()) as {
+        scenarios: ScenarioComparison[];
+        summary: { successCount: number; mcpOffTotalToolCalls: number };
+      };
+      expect(parsed.scenarios).toHaveLength(3);
+      expect(parsed.summary.successCount).toBe(3);
+      expect(parsed.summary.mcpOffTotalToolCalls).toBeGreaterThan(
+        parsed.scenarios.reduce((n, s) => n + s.mcpOn.toolCallCount, 0),
+      );
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
+});

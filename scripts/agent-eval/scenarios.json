@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "probes": [
+    {
+      "id": "symbol-usePermissions",
+      "goldenId": "symbol-usePermissions",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "export\\s+(?:function|const)\\s+usePermissions",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "dependencies-from-consumer",
+      "goldenId": "dependencies-from-consumer",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "from\\s+['\"][^'\"]+['\"]",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "find-call-sites",
+      "goldenId": "find-call-sites",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "createClient\\s*\\(",
+        "mode": "matches"
+      }
+    }
+  ]
+}

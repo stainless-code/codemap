@@ -13,7 +13,7 @@
 ## Recommended ship order
 
 ```
-P0 (ops polish, ~2 weeks total — see delivery tracker for PR bundling)
+P0 (ops polish) — shipped in Wave 1 ([#126](https://github.com/stainless-code/codemap/pull/126), [#127](https://github.com/stainless-code/codemap/pull/127))
   PR1: mcp-server-instructions + mcp-tool-allowlist
   PR2: wsl-watch-policy → git-hook-auto-sync
 
