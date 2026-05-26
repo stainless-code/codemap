@@ -12,7 +12,7 @@ This project is indexed by **Codemap** — a local SQLite database (default **`.
 
 ```bash
 codemap query --json "<SQL>"               # ad-hoc SQL (JSON output)
-codemap query --json --recipe <id>         # bundled SQL (with stable ordering + per-row actions)
+codemap query --json --recipe <id>         # recipe SQL (bundled or project-local; stable ordering + per-row actions)
 codemap query --recipes-json               # canonical list of every bundled + project-local recipe id
 ```
 

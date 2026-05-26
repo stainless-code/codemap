@@ -361,7 +361,7 @@ MCP tool with no CLI counterpart — runs N read-only SQL statements in one roun
 
 ### `file_metrics` (table)
 
-Per-file aggregate metrics (one row per indexed TS/JS file): `total_lines`, `code_lines`, `blank_lines`, `comment_lines`, plus symbol-kind counts (`function_count`, `class_count`, `interface_count`, `export_count`, `let_count`, `const_count`, `var_count`, `arrow_count`). Line classification is regex-light per [Tier 11 ship report](./plans/substrate-extraction.md#tier-11--metrics-expansion-per-symbol--per-file).
+Per-file aggregate metrics (one row per indexed TS/JS file): `total_lines`, `code_lines`, `blank_lines`, `comment_lines`, plus symbol-kind counts (`function_count`, `class_count`, `interface_count`, `export_count`, `let_count`, `const_count`, `var_count`, `arrow_count`). Line classification is regex-light per [Tier 11 ship report](./plans/substrate-extraction.md#tier-11--metrics-expansion-per-symbol--per-file--partial-2026-05-15).
 
 ### `function_params` (table)
 
@@ -441,7 +441,7 @@ A managed root-level file (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copil
 
 ### query
 
-Any SQL run against `.codemap/index.db` — either a **recipe** (bundled SQL) or ad-hoc. Bundled SQL lives in `templates/recipes/`; **`src/application/query-recipes.ts`** is the registry/loader shim over **`recipes-loader.ts`**.
+Any SQL run against `.codemap/index.db` — either a **recipe** (saved SQL by id — bundled or project-local) or ad-hoc. Bundled SQL lives in `templates/recipes/`; project-local in `<state-dir>/recipes/`. **`src/application/query-recipes.ts`** is the registry/loader shim over **`recipes-loader.ts`**.
 
 ### query baseline
 

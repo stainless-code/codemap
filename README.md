@@ -169,7 +169,7 @@ codemap serve --port 7878             # default-ON watcher
 codemap watch --quiet                 # standalone (decoupled from a transport)
 codemap mcp --no-watch                # opt out for one-shot fire-and-forget calls
 CODEMAP_WATCH=0 codemap mcp           # env-var opt-out (mirrors --no-watch)
-# List bundled recipes as JSON, or print one recipe's SQL (no DB required)
+# List recipe catalog (bundled + project-local) as JSON, or print one recipe's SQL (no DB required)
 codemap query --recipes-json
 codemap query --print-sql fan-out
 # `components-by-hooks` ranks by hook count without SQLite JSON1 (comma-based count on the stored JSON array).

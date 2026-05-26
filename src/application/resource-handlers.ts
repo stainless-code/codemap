@@ -87,7 +87,7 @@ export function listResources(): { uri: string; description: string }[] {
     {
       uri: "codemap://recipes",
       description:
-        "Bundled SQL recipes catalog (id, description, sql, optional per-row actions).",
+        "Recipe catalog (bundled + project-local): id, description, sql, optional per-row actions.",
     },
     {
       uri: "codemap://schema",

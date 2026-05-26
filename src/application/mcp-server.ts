@@ -182,7 +182,7 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
     "query_recipe",
     {
       description:
-        'Run a bundled SQL recipe by id. Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
+        'Run a recipe by id (bundled or project-local). Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: queryRecipeArgsSchema,
     },
     (args) => wrapToolResult(handleQueryRecipe(args, opts.root)),
@@ -242,7 +242,7 @@ function registerSaveBaselineTool(server: McpServer, opts: ServerOpts): void {
     "save_baseline",
     {
       description:
-        "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (bundled recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
+        "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (catalog recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
       inputSchema: saveBaselineArgsSchema,
     },
     (args) => wrapToolResult(handleSaveBaseline(args, opts.root)),
@@ -383,7 +383,7 @@ function registerResources(server: McpServer): void {
     server,
     "recipes",
     "codemap://recipes",
-    "Bundled SQL recipes catalog (id, description, sql, params, optional per-row actions). Same payload as `codemap query --recipes-json`.",
+    "Recipe catalog (bundled + project-local): id, description, sql, params, optional per-row actions. Same payload as `codemap query --recipes-json`.",
   );
   registerStaticResource(
     server,
