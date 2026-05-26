@@ -85,7 +85,7 @@ interface ServerOpts {
   /** Test hook — defaults to `process.env`. */
   env?: NodeJS.ProcessEnv | undefined;
   /**
-   * If true, boot a co-process file watcher (chokidar via
+   * If true, boot an in-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data without
    * a per-request reindex prelude. Drains pending events on shutdown.
    * See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).

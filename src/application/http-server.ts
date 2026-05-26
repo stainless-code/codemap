@@ -80,7 +80,7 @@ export interface HttpServerOpts {
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
   /**
-   * If true, boot a co-process file watcher (chokidar via
+   * If true, boot an in-process file watcher (chokidar via
    * `runWatchLoop`) so the server's tools always read live data. Drains
    * pending events on shutdown. See [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage).
    */

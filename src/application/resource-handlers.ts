@@ -81,7 +81,7 @@ export function readResource(uri: string): ResourcePayload | undefined {
  * List every available resource (URIs only — caller fetches payloads
  * separately). Used by the MCP `resources/list` request and could be
  * surfaced via HTTP later. Mirrors what `ResourceTemplate.list` returns
- * for the recipes-template URI plus the three static URIs.
+ * for the recipes URI plus schema / skill / rule / mcp-instructions / files / symbols URIs.
  */
 export function listResources(): { uri: string; description: string }[] {
   const out: { uri: string; description: string }[] = [

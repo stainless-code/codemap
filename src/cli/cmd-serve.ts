@@ -18,7 +18,7 @@ export interface ServeRunOpts {
   port: number;
   /** Bearer token; if undefined the server skips auth. */
   token: string | undefined;
-  /** Boot a co-process file watcher so tools always read live data. */
+  /** Boot an in-process file watcher so tools always read live data. */
   watch: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet (only meaningful with `watch: true`). */
   debounceMs: number;
@@ -172,14 +172,14 @@ Flags:
                   Require Authorization: Bearer <secret> on every request.
                   GET /health is exempt so liveness probes work without
                   leaking the token. Use a long random string.
-  --watch         [default ON] Boot a co-process file watcher so every
+  --watch         [default ON] Boot an in-process file watcher so every
                   tool reads a live index — eliminates the per-request
                   reindex prelude. Default-ON since 2026-05; explicit
                   flag kept for backwards-compat with existing launch
                   scripts.
   --no-watch      Opt out of the default watcher. Use when you want
-                  one-shot HTTP requests without spawning the chokidar
-                  co-process (CI scripts that fire-and-forget, ephemeral
+                  one-shot HTTP requests without the in-process chokidar
+                  loop (CI scripts that fire-and-forget, ephemeral
                   indexes, etc.). Same effect as CODEMAP_WATCH=0 /
                   "false" in the environment.
   --debounce <ms> Coalesce burst events into one reindex after <ms> of

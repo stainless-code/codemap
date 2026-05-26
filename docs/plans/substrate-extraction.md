@@ -520,7 +520,7 @@ Deferred to a future slice (out of Tier 2 scope):
 - External-module bindings via `.d.ts` parsing (`react`'s `useState`, etc. resolve to `is_external=1, resolved_symbol_id=NULL`).
 - `for (const x of …)` / `for (const x in …)` body-scoping (today `x` shares parent function scope).
 
-**Tier 2 closed at 1.3% unresolved.** The remaining bucket is dominated by truly unindexable refs (`infer T` in conditional types, `.codemap/audit-cache/` re-indexed worktrees) and a thin tail of complex AST patterns.
+**Tier 2 closed at 1.3% unresolved.** The remaining bucket is dominated by truly unindexable refs (`infer T` in conditional types, `.codemap/audit-cache/` re-indexed extract trees) and a thin tail of complex AST patterns.
 
 ---
 

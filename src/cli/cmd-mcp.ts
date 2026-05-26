@@ -9,7 +9,7 @@ import { CODEMAP_VERSION } from "../version";
 /**
  * Parse `argv` after the global bootstrap: `rest[0]` must be `"mcp"`.
  * `--root` / `--config` are absorbed by bootstrap. `--watch` /
- * `--debounce <ms>` boot a co-process watcher (per
+ * `--debounce <ms>` boot an in-process watcher (per
  * [`docs/architecture.md` § Watch wiring](../../docs/architecture.md#cli-usage)) so the
  * MCP server's tools always read live data without per-request reindex.
  */
@@ -125,16 +125,15 @@ envelope (no re-mapping). See docs/architecture.md § MCP wiring for
 the engine seam and the agent rule + skill for query examples.
 
 Flags:
-  --watch              [default ON] Boot a co-process file watcher so
+  --watch              [default ON] Boot an in-process file watcher so
                        every tool reads a live index — eliminates the
-                       per-request reindex prelude. Equivalent to
-                       \`codemap watch\` running in parallel. Default-ON
-                       since 2026-05; explicit flag kept for backwards-
-                       compat with existing launch scripts.
+                       per-request reindex prelude. Default-ON since
+                       2026-05; explicit flag kept for backwards-compat
+                       with existing launch scripts.
   --no-watch           Opt out of the default watcher. Use when you
-                       want one-shot tool calls without spawning the
-                       chokidar co-process (CI scripts that fire-and-
-                       forget, ephemeral indexes, etc.). Same effect as
+                       want one-shot tool calls without the in-process
+                       chokidar loop (CI scripts that fire-and-forget,
+                       ephemeral indexes, etc.). Same effect as
                        CODEMAP_WATCH=0 / "false" in the environment.
   --debounce <ms>      Coalesce burst events into one reindex after <ms>
                        of quiet (default: ${DEFAULT_DEBOUNCE_MS}). Only meaningful with
@@ -154,7 +153,7 @@ With --watch, the file watcher is drained before the server exits.
 /**
  * Entry-point for `codemap mcp`. Boots the MCP server over stdio and
  * resolves when the transport closes (clean shutdown via stdin EOF).
- * With `watch: true`, also boots a co-process file watcher so the
+ * With `watch: true`, also boots an in-process file watcher so the
  * server's tools always read live data. Bootstrap / DB / SDK errors
  * propagate as exit code 1 via main.
  */

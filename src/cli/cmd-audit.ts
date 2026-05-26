@@ -151,7 +151,7 @@ export function parseAuditRest(rest: string[]):
     return {
       kind: "error",
       message:
-        "codemap audit: missing snapshot source. Pass --base <ref> (worktree+reindex against any committish), --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
+        "codemap audit: missing snapshot source. Pass --base <ref> (git archive + reindex against any committish), --baseline <prefix> (auto-resolves <prefix>-files / <prefix>-dependencies / <prefix>-deprecated) or --<delta>-baseline <name> per delta.",
     };
   }
 
@@ -296,7 +296,7 @@ Other flags:
 
 Examples:
 
-  # Compare current branch to origin/main (no setup — worktree + reindex on first run)
+  # Compare current branch to origin/main (no setup — archive extract + reindex on first run)
   codemap audit --base origin/main --json
 
   # Compare to a tag, with explicit per-delta override for one slot

@@ -37,7 +37,7 @@ export interface AuditDelta {
 /**
  * Per-delta snapshot metadata — discriminated by `source`. `"baseline"` (B.6
  * reuse) loads rows from the `query_baselines` table; `"ref"` materialises the
- * snapshot via worktree + reindex (`--base <ref>`). Per-delta because audits
+ * snapshot via `git archive | tar -x` + reindex (`--base <ref>`). Per-delta because audits
  * can mix sources (e.g. `--base origin/main --files-baseline pr-files`).
  */
 export type AuditBase = AuditBaseFromBaseline | AuditBaseFromRef;
