@@ -12,6 +12,7 @@ import type { SymbolRow } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   expandHeritageResolveScope,
+  persistTypeHeritageResolution,
   resolveTypeHeritage,
 } from "./heritage-resolver";
 
@@ -572,6 +573,61 @@ describe("resolveTypeHeritage", () => {
       const [row] = resolveTypeHeritage(db);
       expect(row?.resolution_kind).toBe("imported");
       expect(row?.base_file_path).toBe("src/types/hierarchy.ts");
+      expect(row?.base_symbol_id).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe("persistTypeHeritageResolution", () => {
+  it("updates base_file_path and base_symbol_id in the database", () => {
+    const db = freshDb();
+    try {
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "h",
+        size: 1,
+        line_count: 1,
+        language: "ts",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      insertSymbols(db, [
+        sym("src/a.ts", "Base", "interface"),
+        sym("src/a.ts", "Derived", "interface", { line_start: 5 }),
+      ]);
+      insertTypeHeritage(db, [
+        {
+          child_file_path: "src/a.ts",
+          child_name: "Derived",
+          child_kind: "interface",
+          child_line_start: 5,
+          relation: "extends",
+          base_simple_name: "Base",
+          base_qualified_name: null,
+          base_file_path: null,
+          base_symbol_id: null,
+          resolution_kind: "unresolved",
+          type_args: null,
+        },
+      ]);
+      const rowId = db
+        .query<{ id: number }>("SELECT id FROM type_heritage LIMIT 1")
+        .get()!.id;
+      const resolved = resolveTypeHeritage(db);
+      persistTypeHeritageResolution(db, resolved);
+      const row = db
+        .query<{
+          base_file_path: string | null;
+          base_symbol_id: number | null;
+          resolution_kind: string;
+        }>(
+          "SELECT base_file_path, base_symbol_id, resolution_kind FROM type_heritage WHERE id = ?",
+        )
+        .get(rowId);
+      expect(row?.resolution_kind).toBe("same-file");
+      expect(row?.base_file_path).toBe("src/a.ts");
       expect(row?.base_symbol_id).toBe(1);
     } finally {
       db.close();

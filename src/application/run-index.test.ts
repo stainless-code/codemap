@@ -110,5 +110,57 @@ describe("runCodemapIndex", () => {
         closeDb(db);
       }
     });
+
+    test("incremental re-index re-resolves type_heritage when the defining file changes", async () => {
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src/types.ts"),
+        "export interface Base { x: string; }\nexport interface Child extends Base { y: string; }\n",
+      );
+      writeFileSync(join(projectRoot, "package.json"), "{}");
+      const indexedAt = commitAll("add types");
+
+      const db = openDb();
+      try {
+        await runCodemapIndex(db, { mode: "full", quiet: true });
+
+        const beforeStale = db
+          .query<{ resolution_kind: string; base_symbol_id: number | null }>(
+            "SELECT resolution_kind, base_symbol_id FROM type_heritage WHERE child_name = 'Child'",
+          )
+          .get();
+        expect(beforeStale?.resolution_kind).toBe("same-file");
+        expect(beforeStale?.base_symbol_id).not.toBeNull();
+
+        db.run(
+          "UPDATE type_heritage SET base_symbol_id = NULL, base_file_path = NULL, resolution_kind = 'unresolved' WHERE child_name = 'Child'",
+        );
+
+        writeFileSync(
+          join(projectRoot, "src/types.ts"),
+          "export interface Base { x: string; z: boolean; }\nexport interface Child extends Base { y: string; }\n",
+        );
+        commitAll("extend base");
+
+        setMeta(db, "last_indexed_commit", indexedAt);
+
+        await runCodemapIndex(db, { mode: "incremental", quiet: true });
+
+        const row = db
+          .query<{
+            base_symbol_id: number | null;
+            resolution_kind: string;
+            base_file_path: string | null;
+          }>(
+            "SELECT base_symbol_id, resolution_kind, base_file_path FROM type_heritage WHERE child_name = 'Child'",
+          )
+          .get();
+        expect(row?.resolution_kind).toBe("same-file");
+        expect(row?.base_file_path).toBe("src/types.ts");
+        expect(row?.base_symbol_id).not.toBeNull();
+      } finally {
+        closeDb(db);
+      }
+    });
   });
 });
