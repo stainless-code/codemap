@@ -27,11 +27,13 @@ resolved_bases AS (
       th.base_symbol_id IS NULL
       AND th.base_file_path IS NOT NULL
       AND parent.id = (
-        SELECT MIN(s2.id)
+        SELECT s2.id
         FROM symbols s2
         WHERE s2.name = th.base_simple_name
           AND s2.file_path = th.base_file_path
-          AND s2.kind IN ('class', 'interface')
+          AND s2.kind IN ('class', 'interface', 'type')
+        ORDER BY CASE WHEN s2.scope_local_id = 0 THEN 0 ELSE 1 END, s2.id
+        LIMIT 1
       )
     )
   )

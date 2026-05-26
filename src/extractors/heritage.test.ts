@@ -58,6 +58,7 @@ interface Weird extends (A | B) {}
     const lineMap = buildLineMap(src);
     const rows = extractHeritageFromSource("x.ts", result.program, lineMap);
     expect(rows).toHaveLength(1);
+    expect(rows[0]?.base_qualified_name).toBe("(expression)");
     expect(rows[0]?.resolution_kind).toBe("unresolved");
   });
 

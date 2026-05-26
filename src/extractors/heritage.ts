@@ -143,7 +143,7 @@ function recordHeritageBase(
       child_line_start: child.line_start,
       relation,
       base_simple_name: simple,
-      base_qualified_name: null,
+      base_qualified_name: "(expression)",
       type_args: null,
       resolution_kind: "unresolved",
     });

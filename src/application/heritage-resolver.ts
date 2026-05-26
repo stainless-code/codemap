@@ -132,6 +132,9 @@ function resolveHeritageRow(
   if (row.resolution_kind === "qualified-unresolved") {
     return row;
   }
+  if (row.base_qualified_name === "(expression)") {
+    return row;
+  }
 
   const sameFile = findModuleSymbol(
     row.child_file_path,
