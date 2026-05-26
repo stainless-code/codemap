@@ -44,7 +44,3 @@ export class ParseTimeoutError extends Error {
     this.timeoutMs = timeoutMs;
   }
 }
-
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
