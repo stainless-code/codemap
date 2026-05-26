@@ -622,6 +622,12 @@ describe("compare-live-logs", () => {
     expect(summary.mcpOnTotalToolCalls).toBe(1);
     expect(summary.mcpOffTotalToolCalls).toBe(3);
   });
+
+  it("compareLogArms rejects missing log paths", () => {
+    expect(() =>
+      compareLogArms("/no/such/on.json", "/no/such/off.json"),
+    ).toThrow(/MCP-on log not found/);
+  });
 });
 
 describe("print-comparison-summary", () => {

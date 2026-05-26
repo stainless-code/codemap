@@ -38,15 +38,15 @@ Merge each PR to `main` directly. No long-lived integration branch (`feat/agent-
 
 Max **3 parallel tracks** at once.
 
-| PR    | Plans                                                                                                                                                            | Status | Blocked by                                                                                                             | Parallel with |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **3** | Index lock + `errors.log` → parse-worker hardening (stack)                                                                                                       | merged | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5          |
-| **4** | `call-path` + `symbol-neighborhood` recipes                                                                                                                      | merged | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5          |
-| **5** | `affected-tests` recipe + MCP `affected` ([#133](https://github.com/stainless-code/codemap/pull/133))                                                            | merged | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4          |
-| **6** | MCP `trace` / `explore` / `node` + instructions update                                                                                                           | merged | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4    |
-| **7** | Field-qualified `show --query` search                                                                                                                            | merged | [#138](https://github.com/stainless-code/codemap/pull/138)                                                             | PR 1, PR 6    |
-| **8** | `agents init --mcp` wiring                                                                                                                                       | merged | [#135](https://github.com/stainless-code/codemap/pull/135)                                                             | 3–5           |
-| **9** | Agent eval harness — probe ([#139](https://github.com/stainless-code/codemap/pull/139)); live + log ([#144](https://github.com/stainless-code/codemap/pull/144)) | open   | —                                                                                                                      | PR 1, PR 8    |
+| PR    | Plans                                                                                                                                                            | Status  | Blocked by                                                                                                             | Parallel with |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **3** | Index lock + `errors.log` → parse-worker hardening (stack)                                                                                                       | merged  | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5          |
+| **4** | `call-path` + `symbol-neighborhood` recipes                                                                                                                      | merged  | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5          |
+| **5** | `affected-tests` recipe + MCP `affected` ([#133](https://github.com/stainless-code/codemap/pull/133))                                                            | merged  | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4          |
+| **6** | MCP `trace` / `explore` / `node` + instructions update                                                                                                           | merged  | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4    |
+| **7** | Field-qualified `show --query` search                                                                                                                            | merged  | [#138](https://github.com/stainless-code/codemap/pull/138)                                                             | PR 1, PR 6    |
+| **8** | `agents init --mcp` wiring                                                                                                                                       | merged  | [#135](https://github.com/stainless-code/codemap/pull/135)                                                             | 3–5           |
+| **9** | Agent eval harness — probe ([#139](https://github.com/stainless-code/codemap/pull/139)); live + log ([#144](https://github.com/stainless-code/codemap/pull/144)) | partial | —                                                                                                                      | PR 1, PR 8    |
 
 **Parallelization constraints**
 
@@ -56,7 +56,7 @@ Max **3 parallel tracks** at once.
 
 ### Wave 3 — P2 (separate epic, trigger-gated)
 
-Do not rush with P0/P1. **2–4 separate PRs** after P1 completes.
+Do not rush with P0/P1. **2–4 separate PRs** (type hierarchy already merged; agent eval PR 9 completes in #144).
 
 | Item               | Plan                                                                                                                           | Gate                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |

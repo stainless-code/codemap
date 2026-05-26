@@ -72,6 +72,12 @@ export function compareLogArms(
   mcpOffPath: string,
   id = "session",
 ): LogScenarioComparison {
+  if (!existsSync(mcpOnPath)) {
+    throw new Error(`compare-live-logs: MCP-on log not found: ${mcpOnPath}`);
+  }
+  if (!existsSync(mcpOffPath)) {
+    throw new Error(`compare-live-logs: MCP-off log not found: ${mcpOffPath}`);
+  }
   const mcpOnParsed = parseAgentLogFile(mcpOnPath);
   const mcpOffParsed = parseAgentLogFile(mcpOffPath);
   return buildLogScenario(id, mcpOnPath, mcpOffPath, mcpOnParsed, mcpOffParsed);
@@ -146,17 +152,13 @@ Options:
     console.error("compare-live-logs: --mcp-on and --mcp-off are required");
     process.exit(1);
   }
-  if (!existsSync(args.mcpOnLog)) {
-    console.error(`compare-live-logs: MCP-on log not found: ${args.mcpOnLog}`);
+  let scenario: LogScenarioComparison;
+  try {
+    scenario = compareLogArms(args.mcpOnLog, args.mcpOffLog, args.id);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
-  if (!existsSync(args.mcpOffLog)) {
-    console.error(
-      `compare-live-logs: MCP-off log not found: ${args.mcpOffLog}`,
-    );
-    process.exit(1);
-  }
-  const scenario = compareLogArms(args.mcpOnLog, args.mcpOffLog, args.id);
   const report: LiveLogComparison = {
     generatedAt: new Date().toISOString(),
     mode: "log",

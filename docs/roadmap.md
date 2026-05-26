@@ -60,7 +60,7 @@ Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/nod
 
 **Open (P1)**
 
-_(none — agent eval harness shipped on minimal fixture; named external benchmark CI remains backlog)_
+_(none after #144 merges — probe shipped in #139; live+log completes PR 9 in #144)_
 
 **P2 — strategic (trigger-gated where noted)**
 
