@@ -175,6 +175,12 @@ Options:
   console.log(
     `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls}\n`,
   );
+  if (report.summary.mcpOnTotalToolCalls === 0) {
+    console.error(
+      "compare-live-logs: MCP-on export has 0 tool calls — check the log path and format",
+    );
+    process.exit(1);
+  }
 }
 
 if (import.meta.main) {

@@ -24,47 +24,59 @@ export function runLiveMcpArm(
   root: string,
   prompt: string,
 ): ArmRunMetrics {
-  const tool = requiredMcpToolForGolden(golden);
-  assertLiveEvalToolEnabled(tool);
   const t0 = performance.now();
-  let callArgs: QueryRecipeArgs | { sql: string };
-  let result: ToolResult;
-  if (tool === "query_recipe") {
-    if (golden.recipe === undefined) {
-      throw new Error(
-        `agent-eval live: golden "${golden.id}" requires recipe for query_recipe arm`,
-      );
+  try {
+    const tool = requiredMcpToolForGolden(golden);
+    assertLiveEvalToolEnabled(tool);
+    let callArgs: QueryRecipeArgs | { sql: string };
+    let result: ToolResult;
+    if (tool === "query_recipe") {
+      if (golden.recipe === undefined) {
+        throw new Error(
+          `agent-eval live: golden "${golden.id}" requires recipe for query_recipe arm`,
+        );
+      }
+      callArgs = {
+        recipe: golden.recipe,
+        ...(golden.params !== undefined ? { params: golden.params } : {}),
+      };
+      result = handleQueryRecipe(callArgs, root);
+    } else {
+      const { sql } = resolveGoldenQuery(golden);
+      callArgs = { sql };
+      result = handleQuery({ sql }, root);
     }
-    callArgs = {
-      recipe: golden.recipe,
-      ...(golden.params !== undefined ? { params: golden.params } : {}),
+    const wallMs = performance.now() - t0;
+    const toolSequence = [tool];
+    const rows =
+      result.ok && result.format === "json"
+        ? resultCountFromToolPayload(result.payload)
+        : 0;
+    return {
+      wallMs,
+      toolSequence,
+      toolCallCount: toolSequence.length,
+      resultCount: rows,
+      estTokens: estimateProbeTokens(
+        prompt,
+        liveMcpPayloadChars(tool, callArgs, result),
+      ),
+      success: result.ok && rows > 0,
+      ...(!result.ok
+        ? { error: result.error }
+        : rows === 0
+          ? { error: "query returned 0 rows" }
+          : {}),
     };
-    result = handleQueryRecipe(callArgs, root);
-  } else {
-    const { sql } = resolveGoldenQuery(golden);
-    callArgs = { sql };
-    result = handleQuery({ sql }, root);
+  } catch (err) {
+    return {
+      wallMs: performance.now() - t0,
+      toolSequence: [],
+      toolCallCount: 0,
+      resultCount: 0,
+      estTokens: estimateProbeTokens(prompt, 0),
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
-  const wallMs = performance.now() - t0;
-  const toolSequence = [tool];
-  const rows =
-    result.ok && result.format === "json"
-      ? resultCountFromToolPayload(result.payload)
-      : 0;
-  return {
-    wallMs,
-    toolSequence,
-    toolCallCount: toolSequence.length,
-    resultCount: rows,
-    estTokens: estimateProbeTokens(
-      prompt,
-      liveMcpPayloadChars(tool, callArgs, result),
-    ),
-    success: result.ok && rows > 0,
-    ...(!result.ok
-      ? { error: result.error }
-      : rows === 0
-        ? { error: "query returned 0 rows" }
-        : {}),
-  };
 }

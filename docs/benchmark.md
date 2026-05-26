@@ -209,7 +209,7 @@ Independent of the consumer-facing scenarios above, the repo carries a **per-pha
 
 1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `heritage_ms` / `total_ms`.
 2. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps that report as JSON to `<path>` after the run (no CLI flag added; env-var only).
-3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares to `fixtures/benchmark/perf-baseline.json`.
+3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares **`collect_ms`**, **`parse_ms`**, **`insert_ms`**, **`index_create_ms`**, **`bindings_ms`**, and **`total_ms`** to `fixtures/benchmark/perf-baseline.json`. Other `IndexPerformanceReport` fields (`module_cycles_ms`, `re_export_chains_ms`, `heritage_ms`, …) appear in `--performance` JSON only — not baseline-gated.
 4. **Local / scheduled only** — run before perf-sensitive PRs; [`.github/workflows/perf-baseline.yml`](../.github/workflows/perf-baseline.yml) fires weekly + `workflow_dispatch` for drift visibility. **Not** on the PR CI path (6 min × 3 runs + bimodal GHA runners → flaky merge gate).
 
 ### Why this is separate from `src/benchmark.ts`
@@ -350,7 +350,7 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EV
 
 Numbers are stable for a given fixture + schema; re-run locally after intentional schema or probe changes. Dual-agent and self-index studies: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md).
 
-**Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json), and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
+**Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs declared **`setup`** steps when present (e.g. coverage ingest), then runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json) and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 
 **Tier B (local tree, not in default CI):** `bun run test:golden:external` (or `bun scripts/query-golden.ts --corpus external`) indexes **`CODEMAP_ROOT`**, **`CODEMAP_TEST_BENCH`**, or **`--root`**, loads [fixtures/golden/scenarios.external.json](../fixtures/golden/scenarios.external.json) if present else [scenarios.external.example.json](../fixtures/golden/scenarios.external.example.json), and writes/compares goldens under `fixtures/golden/external/` (gitignored). Use **`match`** in scenarios for subset checks (`minRows`, `everyRowContains`); use **`budgetMs`** with optional **`--strict-budget`** for perf warnings. Do not commit proprietary paths or goldens from private apps.
 

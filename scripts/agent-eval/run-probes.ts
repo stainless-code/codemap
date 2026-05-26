@@ -170,6 +170,7 @@ function runMcpOnArm(
       mcpOnPayloadChars(sql, rows, bindValues),
     ),
     success: rows.length > 0,
+    ...(rows.length === 0 ? { error: "query returned 0 rows" } : {}),
   };
 }
 
@@ -371,6 +372,14 @@ Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset or blank.
     console.log(
       `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls} (${report.summary.successCount}/${probes.length} scenarios ok)\n`,
     );
+    for (const s of aggregated) {
+      if (s.mcpOn.error !== undefined) {
+        console.error(`  ${s.id} MCP-on: ${s.mcpOn.error}`);
+      }
+      if (s.mcpOff.error !== undefined) {
+        console.error(`  ${s.id} MCP-off: ${s.mcpOff.error}`);
+      }
+    }
 
     applyProbeExitCode(report.summary.successCount, probes.length);
   } finally {
@@ -421,7 +430,7 @@ export function averageSamples(
       wallMs: wallMs / n,
       toolSequence: first.toolSequence,
       toolCallCount: Math.round(toolCallCount / n),
-      resultCount: Math.round(resultCount / n),
+      resultCount: success ? Math.round(resultCount / n) : 0,
       estTokens: Math.ceil(estTokens / n),
       success,
       ...(error !== undefined ? { error } : {}),

@@ -20,6 +20,7 @@ if [[ -f "$INDEX_DB" ]]; then
 fi
 
 echo "=== agent-eval: ${MODE} arms (runs=$RUNS) ==="
+set +e
 bun "$SCRIPT_DIR/run-probes.ts" \
   --mode "$MODE" \
   --output "$OUT" \
@@ -28,6 +29,8 @@ bun "$SCRIPT_DIR/run-probes.ts" \
   --scenarios "$SCENARIOS" \
   --probes "$PROBES" \
   "${SKIP_ARGS[@]}"
+PROBE_EXIT=$?
+set -e
 
 if [[ -n "${AGENT_EVAL_LOG:-}" ]]; then
   echo "=== agent-eval: parse agent log $AGENT_EVAL_LOG ==="
@@ -44,8 +47,9 @@ if [[ -n "${AGENT_EVAL_LOG_ON:-}" && -n "${AGENT_EVAL_LOG_OFF:-}" ]]; then
   bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$LOG_OUT"
 fi
 
-if [[ "${AGENT_EVAL_PRINT_SUMMARY:-0}" == "1" ]]; then
+if [[ "${AGENT_EVAL_PRINT_SUMMARY:-0}" == "1" && -f "$OUT" ]]; then
   bun "$SCRIPT_DIR/print-comparison-summary.ts" --input "$OUT"
 fi
 
 echo "Wrote $OUT"
+exit "$PROBE_EXIT"

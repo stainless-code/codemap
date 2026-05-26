@@ -127,6 +127,28 @@ export function formatComparisonMarkdown(report: ComparisonReport): string {
   lines.push(
     `**Totals (${modeNote}):** MCP-on ${report.summary.mcpOnTotalToolCalls} tool calls / ${report.summary.mcpOnTotalEstTokens} est. tokens; MCP-off ${report.summary.mcpOffTotalToolCalls} / ${report.summary.mcpOffTotalEstTokens}; ${report.summary.successCount}/${report.scenarios.length} scenarios ok.`,
   );
+  const failures = report.scenarios.filter(
+    (s) => !s.scenarioSuccess || s.mcpOn.error !== undefined || s.mcpOff.error,
+  );
+  if (failures.length > 0) {
+    lines.push("");
+    lines.push("**Failures:**");
+    for (const s of failures) {
+      if (s.mcpOn.error !== undefined) {
+        lines.push(`- ${s.id} MCP-on: ${s.mcpOn.error}`);
+      }
+      if (s.mcpOff.error !== undefined) {
+        lines.push(`- ${s.id} MCP-off: ${s.mcpOff.error}`);
+      }
+      if (
+        s.mcpOn.error === undefined &&
+        s.mcpOff.error === undefined &&
+        !s.scenarioSuccess
+      ) {
+        lines.push(`- ${s.id}: scenario incomplete`);
+      }
+    }
+  }
   return `${lines.join("\n")}\n`;
 }
 
