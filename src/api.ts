@@ -82,7 +82,7 @@ export class Codemap {
   }
 
   /**
-   * Absolute path to the SQLite index file (e.g. `.codemap.db`).
+   * Absolute path to the SQLite index file (e.g. `.codemap/index.db`).
    */
   get databasePath(): string {
     return getDatabasePath();

@@ -624,7 +624,7 @@ function formatIncompatibility(
 }
 
 /**
- * Print the bundled recipe catalog as JSON to stdout. Each entry carries
+ * Print the recipe catalog (bundled + project-local) as JSON to stdout. Each entry carries
  * `last_run_at` + `run_count` recency fields when an indexed DB exists,
  * else null/0 fallbacks. The verb runs before `bootstrapCodemap()` (the
  * catalog has historically been "no DB required") — keep it side-effect

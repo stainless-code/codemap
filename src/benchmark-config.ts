@@ -35,7 +35,7 @@ interface BenchmarkConfigFile {
 }
 
 /**
- * Reject mutating or multi-statement SQL. Benchmark JSON is local/trusted but must not run DDL/DML against `.codemap.db`.
+ * Reject mutating or multi-statement SQL. Benchmark JSON is local/trusted but must not run DDL/DML against the codemap index.
  */
 export function assertReadOnlyIndexedSql(sql: string): void {
   const trimmed = sql.trim();

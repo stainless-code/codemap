@@ -53,8 +53,9 @@ export function _resetResourceCachesForTests(): void {
  *
  * Data-shaped URIs (`files/{path}`, `symbols/{name}`) read live from
  * `.codemap/index.db` every call — no caching, since the index can
- * change between requests under `--watch`. Catalog-style URIs
- * (`recipes`, `schema`, `skill`) cache lazily.
+ * change between requests under `--watch`. Schema / skill / rule /
+ * mcp-instructions cache lazily per process; recipes / recipes/{id} /
+ * files / symbols read live every call.
  */
 export function readResource(uri: string): ResourcePayload | undefined {
   if (uri === "codemap://recipes") return readRecipesCatalog();

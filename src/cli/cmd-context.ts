@@ -19,7 +19,7 @@ export function printContextCmdHelp(): void {
   console.log(`Usage: codemap context [--compact] [--for "<intent>"]
 
 Emit a JSON envelope describing the current index — project metadata, top
-hubs (fan-in), a sample of markers, and the bundled recipe catalog. Designed
+hubs (fan-in), a sample of markers, and the recipe catalog (bundled + project-local). Designed
 for agents and editors that want a single-command "give me everything cheap".
 
 Flags:

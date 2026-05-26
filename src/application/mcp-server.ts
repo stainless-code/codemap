@@ -218,7 +218,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context --json` prints (project root, schema version, file count, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
+        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
       inputSchema: contextArgsSchema,
     },
     (args) => wrapToolResult(handleContext(args)),
@@ -373,10 +373,9 @@ function registerApplyTool(server: McpServer, opts: ServerOpts): void {
  * Register codemap MCP resources (static URIs + file/symbol/recipe
  * templates). Same payloads as HTTP `GET /resources/{encoded-uri}`. Payloads come from the shared
  * `application/resource-handlers.ts` module — same lazy-cache used by the
- * HTTP transport (`GET /resources/{uri}` in `http-server.ts`). Resources
- * are constant for the server-process lifetime so eager-vs-lazy produce
- * identical observable behavior; lazy keeps boot lean for sessions that
- * never call read_resource.
+ * HTTP transport (`GET /resources/{uri}` in `http-server.ts`). Schema / skill /
+ * rule / mcp-instructions memoize per process; recipes / files / symbols read
+ * live so recency fields and index mutations under `--watch` stay fresh.
  */
 function registerResources(server: McpServer): void {
   registerStaticResource(
@@ -395,13 +394,13 @@ function registerResources(server: McpServer): void {
     server,
     "skill",
     "codemap://skill",
-    "Full text of the bundled `templates/agents/skills/codemap/SKILL.md`. Agents that don't preload the skill at session start can fetch it here.",
+    "Full text of the assembled codemap skill (`templates/agent-content/skill/`). Agents that don't preload the skill at session start can fetch it here.",
   );
   registerStaticResource(
     server,
     "rule",
     "codemap://rule",
-    "Full text of the bundled `templates/agents/rules/codemap.md` (always-on priming for agents working in this repo).",
+    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents working in this repo).",
   );
   registerStaticResource(
     server,

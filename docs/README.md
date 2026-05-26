@@ -122,7 +122,7 @@ When in doubt, default to absorbing into the closest existing root-level file (u
 
 When an audit closes, lift shipped work into canonical homes (`architecture.md`, a plan, `.agents/lessons.md`, `roadmap.md` backlog). **Do not leave tombstones** — no pointer table, no "recover via `git log --follow -- <deleted-path>`" rows in living docs. Deleted audit text lives in git history only; cite the shipping PR or commit when closure needs a durable anchor.
 
-- **Delete** when the re-derivable test passes (findings visible in source / no source-cites / no unique policy) — see [docs-governance § Closing an audit](../../.agents/skills/docs-governance/SKILL.md#closing-an-audit).
+- **Delete** when the re-derivable test passes (findings visible in source / no source-cites / no unique policy) — see [docs-governance § Closing an audit](../.agents/skills/docs-governance/SKILL.md#closing-an-audit).
 - **Slim + keep** in `audits/` when the file carries decisions-of-record, source back-references, or methodology not captured elsewhere — add a `Status: Closed` header.
 - **Absorb into a plan** when the audit is the synthesis substrate for in-flight work — the plan's provenance block owns recovery (`git show <sha> -- docs/audits/…` belongs there, not in `docs/README.md`).
 

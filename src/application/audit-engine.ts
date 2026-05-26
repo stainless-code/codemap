@@ -55,13 +55,13 @@ export interface AuditBaseFromRef {
   ref: string;
   /** Resolved sha — what `git rev-parse --verify` returned. */
   sha: string;
-  /** When the worktree-side `.codemap.db` was last indexed (cache-mtime). */
+  /** When the worktree-side `.codemap/index.db` was last indexed (cache-mtime). */
   indexed_at: number;
 }
 
 /**
  * Current-state metadata at audit time. `indexed_at` reflects the live
- * `.codemap.db`'s last index run — `cmd-audit.ts` runs an incremental
+ * `.codemap/index.db`'s last index run — `cmd-audit.ts` runs an incremental
  * index prelude (unless `--no-index`) so this is fresh by default.
  */
 export interface AuditHead {
@@ -394,7 +394,7 @@ export interface RunAuditFromRefOpts {
 /**
  * Run an audit with the base snapshot materialised from a git ref.
  * Resolves `<ref>` to a sha, reuses (or populates) the worktree cache,
- * runs each delta's canonical SQL on the cached `.codemap.db`, and diffs
+ * runs each delta's canonical SQL on the cached `.codemap/index.db`, and diffs
  * against the live DB. Per-delta overrides escape to the existing
  * `query_baselines`-backed path.
  *

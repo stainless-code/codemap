@@ -829,7 +829,7 @@ function attachRecipeActions(
 
 /**
  * Rewrites raw SQLite errors that almost always indicate a missing or empty
- * `.codemap.db` into an actionable hint. Other errors are returned unchanged.
+ * `.codemap/index.db` into an actionable hint. Other errors are returned unchanged.
  */
 function enrichQueryError(message: string): string {
   if (
