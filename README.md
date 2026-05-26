@@ -47,7 +47,7 @@ bun add @stainless-code/codemap
 ```bash
 codemap                                                      # incremental index (run once per session)
 codemap dead-code --json                                     # outcome alias → query --recipe untested-and-dead
-codemap query --json --recipe fan-out                        # bundled SQL via recipe id (alias: -r)
+codemap query --json --recipe fan-out                        # recipe SQL by id (alias: -r)
 codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  # ad-hoc SQL
 codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
 codemap validate --json                                      # detect stale / missing / unindexed files
@@ -221,7 +221,7 @@ codemap skill                                                   # full codemap S
 codemap rule                                                    # full codemap rule markdown to stdout
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
-codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
+codemap mcp                                                     # JSON-RPC on stdio (17 tools; watcher default-ON)
 # Tools (17): query, query_batch (MCP-only), query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
