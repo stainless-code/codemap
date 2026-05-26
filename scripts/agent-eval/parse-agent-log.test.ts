@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -139,6 +139,14 @@ ASSISTANT: found 3 call sites`;
     expect(parsed.toolCallCount).toBe(3);
   });
 
+  it("parses tool_calls without assistant role", () => {
+    const raw = JSON.stringify({
+      entries: [{ tool_calls: [{ function: { name: "mcp_codemap_query" } }] }],
+    });
+    const parsed = parseAgentLog(raw);
+    expect(parsed.toolSequence).toEqual(["query"]);
+  });
+
   it("counts structured content part arrays in token estimate", () => {
     const plain = parseAgentLog(
       JSON.stringify({
@@ -158,6 +166,20 @@ ASSISTANT: found 3 call sites`;
       }),
     );
     expect(parts.estTokens).toBeGreaterThan(plain.estTokens);
+  });
+
+  it("counts input_text content parts", () => {
+    const parsed = parseAgentLog(
+      JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [{ type: "input_text", input_text: "longer user prompt" }],
+          },
+        ],
+      }),
+    );
+    expect(parsed.promptChars).toBeGreaterThan(10);
   });
 
   it("throws on invalid JSON", () => {
@@ -311,6 +333,18 @@ describe("run-probes helpers", () => {
     expect(traditionalToolSequence(0)).toEqual(["glob", "grep"]);
   });
 
+  it("runTraditionalProbe rejects invalid regex", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    expect(() =>
+      runTraditionalProbe({
+        globs: ["**/*.ts"],
+        regex: "[",
+        mode: "files",
+      }),
+    ).toThrow(/invalid traditional regex/);
+  });
+
   it("runTraditionalProbe finds files in fixtures/minimal", () => {
     const root = join(import.meta.dir, "../../fixtures/minimal");
     initCodemap(resolveCodemapConfig(root, undefined));
@@ -337,6 +371,51 @@ describe("parseProbesJson", () => {
 });
 
 describe("run-probes smoke", () => {
+  it("exits non-zero when scenarioSuccess is incomplete", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-exit-"));
+    const probesPath = join(tmp, "probes.json");
+    const out = join(tmp, "comparison.json");
+    writeFileSync(
+      probesPath,
+      JSON.stringify({
+        version: 1,
+        probes: [
+          {
+            id: "fail-traditional",
+            goldenId: "symbol-usePermissions",
+            traditional: {
+              globs: ["**/*.ts"],
+              regex: "zzz_nope_match_codemap_98765",
+              mode: "files",
+            },
+          },
+        ],
+      }),
+    );
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+      "--probes",
+      probesPath,
+    ];
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+      });
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("indexes fixtures/minimal and compares three probes", async () => {
     const { spawnSync } = await import("node:child_process");
     const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");

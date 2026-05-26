@@ -276,46 +276,59 @@ Options:
     }
   }
 
+  const priorCodeMapRoot = process.env.CODEMAP_ROOT;
   process.env.CODEMAP_ROOT = args.fixtureRoot;
 
-  const cm = await createCodemap({ root: args.fixtureRoot });
-  const dbPath = resolveCodemapConfig(args.fixtureRoot, undefined).databasePath;
-  if (args.skipIndex) {
-    if (!existsSync(dbPath)) {
-      throw new Error(
-        `--skip-index: no index at ${dbPath}; run index first or omit --skip-index`,
-      );
+  try {
+    const cm = await createCodemap({ root: args.fixtureRoot });
+    const dbPath = resolveCodemapConfig(
+      args.fixtureRoot,
+      undefined,
+    ).databasePath;
+    if (args.skipIndex) {
+      if (!existsSync(dbPath)) {
+        throw new Error(
+          `--skip-index: no index at ${dbPath}; run index first or omit --skip-index`,
+        );
+      }
+    } else {
+      await cm.index({ mode: "full", quiet: true });
     }
-  } else {
-    await cm.index({ mode: "full", quiet: true });
+
+    const aggregated: ScenarioComparison[] = probes.map((probe) => {
+      const samples: ScenarioComparison[] = [];
+      for (let i = 0; i < args.runs; i++) {
+        samples.push(runProbeOnce(probe, goldenById));
+      }
+      if (args.runs === 1) return samples[0]!;
+      return averageSamples(probe.id, samples);
+    });
+
+    const report: AgentEvalComparison = {
+      generatedAt: new Date().toISOString(),
+      mode: "probe",
+      fixtureRoot: args.fixtureRoot,
+      runs: args.runs,
+      scenarios: aggregated,
+      summary: summarize(aggregated),
+    };
+
+    mkdirSync(dirname(args.output), { recursive: true });
+    writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
+    console.log(`\n  agent-eval: wrote ${args.output}`);
+    console.log(
+      `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls} (${report.summary.successCount}/${probes.length} scenarios ok)\n`,
+    );
+
+    applyProbeExitCode(report.summary.successCount, probes.length);
+    if (process.exitCode === 1) process.exit(1);
+  } finally {
+    if (priorCodeMapRoot === undefined) {
+      delete process.env.CODEMAP_ROOT;
+    } else {
+      process.env.CODEMAP_ROOT = priorCodeMapRoot;
+    }
   }
-
-  const aggregated: ScenarioComparison[] = probes.map((probe) => {
-    const samples: ScenarioComparison[] = [];
-    for (let i = 0; i < args.runs; i++) {
-      samples.push(runProbeOnce(probe, goldenById));
-    }
-    if (args.runs === 1) return samples[0]!;
-    return averageSamples(probe.id, samples);
-  });
-
-  const report: AgentEvalComparison = {
-    generatedAt: new Date().toISOString(),
-    mode: "probe",
-    fixtureRoot: args.fixtureRoot,
-    runs: args.runs,
-    scenarios: aggregated,
-    summary: summarize(aggregated),
-  };
-
-  mkdirSync(dirname(args.output), { recursive: true });
-  writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, "utf-8");
-  console.log(`\n  agent-eval: wrote ${args.output}`);
-  console.log(
-    `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls} (${report.summary.successCount}/${probes.length} scenarios ok)\n`,
-  );
-
-  applyProbeExitCode(report.summary.successCount, probes.length);
 }
 
 export function averageSamples(
@@ -331,6 +344,8 @@ export function averageSamples(
   let mcpOffToolCallCount = 0;
   let mcpOnWallMs = 0;
   let mcpOffWallMs = 0;
+  let mcpOnEstTokens = 0;
+  let mcpOffEstTokens = 0;
   const avgArm = (
     pick: (s: ScenarioComparison) => ArmRunMetrics,
   ): ArmRunMetrics => {
@@ -362,6 +377,8 @@ export function averageSamples(
     mcpOffWallMs += s.mcpOff.wallMs;
     mcpOnToolCallCount += s.mcpOn.toolCallCount;
     mcpOffToolCallCount += s.mcpOff.toolCallCount;
+    mcpOnEstTokens += s.mcpOn.estTokens;
+    mcpOffEstTokens += s.mcpOff.estTokens;
   }
   const mcpOn = avgArm((s) => s.mcpOn);
   const mcpOff = avgArm((s) => s.mcpOff);
@@ -375,7 +392,7 @@ export function averageSamples(
     delta: {
       toolCallCount: mcpOffToolCallCount / n - mcpOnToolCallCount / n,
       wallMs: mcpOffWallMs / n - mcpOnWallMs / n,
-      estTokens: mcpOff.estTokens - mcpOn.estTokens,
+      estTokens: mcpOffEstTokens / n - mcpOnEstTokens / n,
     },
   };
 }

@@ -25,6 +25,15 @@ export function runTraditionalProbe(
   return { ...raw, wallMs: performance.now() - t0 };
 }
 
+function compileTraditionalRegex(regex: string): RegExp {
+  try {
+    return new RegExp(regex);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`agent-eval: invalid traditional regex "${regex}": ${msg}`);
+  }
+}
+
 function runRegexTraditional(spec: {
   globs: string[];
   regex: string;
@@ -42,7 +51,7 @@ function runRegexTraditional(spec: {
     }
   } else {
     for (const [path, content] of contents) {
-      if (new RegExp(spec.regex).test(content))
+      if (compileTraditionalRegex(spec.regex).test(content))
         results.push({ file_path: path });
     }
   }

@@ -26,23 +26,20 @@ function toolNameFromCall(call: JsonRecord): string | undefined {
   return undefined;
 }
 
-function collectToolsFromEntry(entry: JsonRecord): string[] {
-  if (entry.role === "assistant" && Array.isArray(entry.tool_calls)) {
-    const fromCalls: string[] = [];
-    for (const call of entry.tool_calls) {
-      if (!isRecord(call)) continue;
-      const name = toolNameFromCall(call);
-      if (name) fromCalls.push(normalizeToolName(name));
-    }
-    if (fromCalls.length > 0) return fromCalls;
+function collectToolsFromCallsArray(calls: unknown[]): string[] {
+  const tools: string[] = [];
+  for (const call of calls) {
+    if (!isRecord(call)) continue;
+    const name = toolNameFromCall(call);
+    if (name) tools.push(normalizeToolName(name));
   }
-  if (entry.role === "assistant" && Array.isArray(entry.toolCalls)) {
-    const fromCalls: string[] = [];
-    for (const call of entry.toolCalls) {
-      if (!isRecord(call)) continue;
-      const name = toolNameFromCall(call);
-      if (name) fromCalls.push(normalizeToolName(name));
-    }
+  return tools;
+}
+
+function collectToolsFromEntry(entry: JsonRecord): string[] {
+  const toolCalls = entry.tool_calls ?? entry.toolCalls;
+  if (Array.isArray(toolCalls)) {
+    const fromCalls = collectToolsFromCallsArray(toolCalls);
     if (fromCalls.length > 0) return fromCalls;
   }
   const kind = entry.kind ?? entry.type;
@@ -88,10 +85,12 @@ function textCharsFromContent(content: unknown): number {
   let chars = 0;
   for (const part of content) {
     if (!isRecord(part)) continue;
-    if (typeof part.text === "string") {
-      chars += Buffer.byteLength(part.text, "utf-8");
-    } else if (typeof part.content === "string") {
-      chars += Buffer.byteLength(part.content, "utf-8");
+    for (const key of ["text", "content", "input_text", "input"] as const) {
+      const v = part[key];
+      if (typeof v === "string") {
+        chars += Buffer.byteLength(v, "utf-8");
+        break;
+      }
     }
   }
   return chars;
