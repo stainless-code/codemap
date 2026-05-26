@@ -13,8 +13,9 @@
 | Next action         | Detail                                                                                                          |
 | ------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Open**            | Live MCP agent-eval arms + optional external nightly — [agent-eval-harness.md](./agent-eval-harness.md)         |
-| **In flight**       | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
-| **Recently merged** | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
+| **In flight**       | [`type-heritage-substrate`](./type-heritage-substrate.md) — substrate follow-up to #141 (core substrate)        |
+| **Recently merged** | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
+|                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
 |                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |
 |                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                       |
 
@@ -57,13 +58,13 @@ Max **3 parallel tracks** at once.
 
 Do not rush with P0/P1. **2–4 separate PRs** after P1 completes.
 
-| Item               | Plan                                                                                                                           | Gate                                                            |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| Type hierarchy     | `type-ancestors` / `type-descendants` recipes (plan deleted — shipped)                                                         | open [#141](https://github.com/stainless-code/codemap/pull/141) |
-| Framework routes   | [`framework-route-extraction`](./framework-route-extraction.md)                                                                | Blocked on [`c9-plugin-layer`](./c9-plugin-layer.md) (XL)       |
-| Call substrate     | [`callback-dispatch-synthesis`](./callback-dispatch-synthesis.md), [`unresolved-calls-staging`](./unresolved-calls-staging.md) | One at a time (schema + parser)                                 |
-| FTS default        | [`fts-default-on-evaluation`](./fts-default-on-evaluation.md)                                                                  | Measurement-only; solo PR anytime                               |
-| Cross-project root | [`cross-project-mcp-root`](./cross-project-mcp-root.md)                                                                        | On demand                                                       |
+| Item               | Plan                                                                                                                           | Gate                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| Type hierarchy     | `type-ancestors` / `type-descendants` recipes (plan deleted — shipped)                                                         | merged [#141](https://github.com/stainless-code/codemap/pull/141) |
+| Framework routes   | [`framework-route-extraction`](./framework-route-extraction.md)                                                                | Blocked on [`c9-plugin-layer`](./c9-plugin-layer.md) (XL)         |
+| Call substrate     | [`callback-dispatch-synthesis`](./callback-dispatch-synthesis.md), [`unresolved-calls-staging`](./unresolved-calls-staging.md) | One at a time (schema + parser)                                   |
+| FTS default        | [`fts-default-on-evaluation`](./fts-default-on-evaluation.md)                                                                  | Measurement-only; solo PR anytime                                 |
+| Cross-project root | [`cross-project-mcp-root`](./cross-project-mcp-root.md)                                                                        | On demand                                                         |
 
 ---
 
