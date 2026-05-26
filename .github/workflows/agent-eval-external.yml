@@ -1,12 +1,12 @@
-# Optional manual / nightly agent-eval on an indexed fixture (public trees only).
-# Default fixture is fixtures/minimal; override with workflow_dispatch input.
+# Optional manual agent-eval on an in-repo indexed fixture (default: fixtures/minimal).
+# For external public repos (zod, fastify), clone/index locally and pass matching scenarios/probes inputs.
 name: Agent eval (external)
 
 on:
   workflow_dispatch:
     inputs:
       fixture_root:
-        description: "Path to indexed project root (relative to repo or absolute in runner)"
+        description: "Indexed project root — repo-relative path under the checkout (default fixtures/minimal)"
         required: false
         default: fixtures/minimal
       mode:
@@ -21,6 +21,14 @@ on:
         description: "Repeat count per probe"
         required: false
         default: "1"
+      scenarios:
+        description: "Golden scenarios JSON — repo-relative; empty = fixtures/golden/scenarios.json"
+        required: false
+        default: ""
+      probes:
+        description: "Probe definitions JSON — repo-relative; empty = scripts/agent-eval/scenarios.json"
+        required: false
+        default: ""
 
 jobs:
   agent-eval-external:
@@ -33,15 +41,44 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Golden index (fixtures/minimal when using default)
+      - name: Resolve paths
+        id: paths
+        run: |
+          set -euo pipefail
+          FIXTURE="${{ inputs.fixture_root }}"
+          if [[ "$FIXTURE" == *".."* ]]; then
+            echo "fixture_root must not contain .." >&2
+            exit 1
+          fi
+          FIXTURE_ABS="${{ github.workspace }}/$FIXTURE"
+          if [[ ! -d "$FIXTURE_ABS" ]]; then
+            echo "fixture_root not found: $FIXTURE_ABS" >&2
+            exit 1
+          fi
+          echo "fixture=$FIXTURE_ABS" >> "$GITHUB_OUTPUT"
+          SCEN="${{ inputs.scenarios }}"
+          if [[ -n "$SCEN" ]]; then
+            if [[ "$SCEN" == *".."* ]]; then exit 1; fi
+            echo "scenarios=${{ github.workspace }}/$SCEN" >> "$GITHUB_OUTPUT"
+          fi
+          PROB="${{ inputs.probes }}"
+          if [[ -n "$PROB" ]]; then
+            if [[ "$PROB" == *".."* ]]; then exit 1; fi
+            echo "probes=${{ github.workspace }}/$PROB" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Golden index (fixtures/minimal only)
+        if: inputs.fixture_root == 'fixtures/minimal'
         run: bun run test:golden
 
       - name: Run agent-eval harness
         env:
           AGENT_EVAL_MODE: ${{ inputs.mode }}
-          AGENT_EVAL_FIXTURE_ROOT: ${{ github.workspace }}/${{ inputs.fixture_root }}
+          AGENT_EVAL_FIXTURE_ROOT: ${{ steps.paths.outputs.fixture }}
           AGENT_EVAL_RUNS: ${{ inputs.runs }}
           AGENT_EVAL_PRINT_SUMMARY: "1"
+          AGENT_EVAL_SCENARIOS: ${{ steps.paths.outputs.scenarios }}
+          AGENT_EVAL_PROBES: ${{ steps.paths.outputs.probes }}
         run: bash scripts/agent-eval/run-arms.sh
 
       - name: Upload comparison artifact

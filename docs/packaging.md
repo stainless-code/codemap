@@ -4,7 +4,7 @@ How **@stainless-code/codemap** is built and published. **Doc index:** [README.m
 
 ## Build & publish surface
 
-- **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs **`check`** (build, format, lint, tests, typecheck, golden queries, agent-eval probe smoke).
+- **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs **`check`** (build, format, lint, tests, typecheck, golden queries, agent-eval harness smoke).
 - **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** — no `src/` on npm.
 
 The `templates/` directory ships two parallel subtrees:

@@ -19,10 +19,6 @@ if [[ -f "$INDEX_DB" ]]; then
   SKIP_ARGS=(--skip-index)
 fi
 
-if [[ "$MODE" == "live" && -z "${CODEMAP_MCP_TOOLS:-}" ]]; then
-  export CODEMAP_MCP_TOOLS=query,query_recipe
-fi
-
 echo "=== agent-eval: ${MODE} arms (runs=$RUNS) ==="
 bun "$SCRIPT_DIR/run-probes.ts" \
   --mode "$MODE" \
@@ -40,7 +36,7 @@ fi
 
 if [[ -n "${AGENT_EVAL_LOG_ON:-}" && -n "${AGENT_EVAL_LOG_OFF:-}" ]]; then
   LOG_OUT="${AGENT_EVAL_LOG_OUTPUT:-$REPO_ROOT/.agent-eval/log-comparison.json}"
-  echo "=== agent-eval: compare live logs ==="
+  echo "=== agent-eval: compare live logs (orthogonal to AGENT_EVAL_MODE) ==="
   bun "$SCRIPT_DIR/compare-live-logs.ts" \
     --mcp-on "$AGENT_EVAL_LOG_ON" \
     --mcp-off "$AGENT_EVAL_LOG_OFF" \

@@ -16,7 +16,7 @@ MCP initialize instructions + `codemap://mcp-instructions`, `CODEMAP_MCP_TOOLS`,
 
 Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](./agent-surface-delivery.md).
 
-**Agent eval harness** (probe + live MCP arms + log comparison): [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) — shipped; optional external runs via [`.github/workflows/agent-eval-external.yml`](../../.github/workflows/agent-eval-external.yml).
+**Agent eval harness** (probe + live MCP arms + log comparison): [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) — shipped on `fixtures/minimal`; optional in-repo fixture runs via [`.github/workflows/agent-eval-external.yml`](../../.github/workflows/agent-eval-external.yml). Named external benchmark CI (zod, fastify) remains [roadmap backlog](../roadmap.md#backlog).
 
 ---
 

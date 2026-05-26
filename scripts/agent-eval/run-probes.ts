@@ -68,7 +68,7 @@ export interface AgentEvalComparison {
   generatedAt: string;
   /** `probe` = queryRows; `live` = transport-agnostic MCP handlers. */
   mode: AgentEvalMode;
-  /** Active subset when `mode` is `live` (from `CODEMAP_MCP_TOOLS`). */
+  /** Eval allowlist subset when `mode` is `live` (not full MCP server registration). */
   mcpTools?: readonly string[];
   /** Indexed corpus root passed to `--fixture-root`. */
   fixtureRoot: string;
@@ -199,13 +199,16 @@ export function runProbeOnce(
     );
   }
   const prompt = golden.prompt ?? probe.id;
-  const mcpOn =
-    mode === "live"
-      ? runLiveMcpArm(golden, fixtureRoot!, prompt)
-      : (() => {
-          const { sql, bindValues } = resolveGoldenQuery(golden);
-          return runMcpOnArm(prompt, sql, bindValues);
-        })();
+  let mcpOn: ArmRunMetrics;
+  if (mode === "live") {
+    if (fixtureRoot === undefined) {
+      throw new Error("runProbeOnce: fixtureRoot required when mode is live");
+    }
+    mcpOn = runLiveMcpArm(golden, fixtureRoot, prompt);
+  } else {
+    const { sql, bindValues } = resolveGoldenQuery(golden);
+    mcpOn = runMcpOnArm(prompt, sql, bindValues);
+  }
   const mcpOff = runMcpOffArm(prompt, probe);
   return {
     id: probe.id,
@@ -357,7 +360,6 @@ Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset.
     );
 
     applyProbeExitCode(report.summary.successCount, probes.length);
-    if (process.exitCode === 1) process.exit(1);
   } finally {
     if (priorCodeMapRoot === undefined) {
       delete process.env.CODEMAP_ROOT;
@@ -439,8 +441,12 @@ export function averageSamples(
 }
 
 if (import.meta.main) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(() => {
+      if (process.exitCode === 1) process.exit(1);
+    });
 }

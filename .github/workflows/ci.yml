@@ -95,7 +95,7 @@ jobs:
       - name: Golden query regression (fixtures/minimal)
         run: bun run test:golden
 
-      - name: Agent eval probe harness (fixtures/minimal)
+      - name: Agent eval harness (probe + live smoke, fixtures/minimal)
         run: bun run test:agent-eval
 
   build:

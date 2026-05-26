@@ -2,7 +2,12 @@ import {
   handleQuery,
   handleQueryRecipe,
 } from "../../src/application/tool-handlers";
-import type { ToolResult } from "../../src/application/tool-handlers";
+import type {
+  QueryRecipeArgs,
+  ToolResult,
+} from "../../src/application/tool-handlers";
+import { resolveCodemapConfig } from "../../src/config";
+import { initCodemap } from "../../src/runtime";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import type { GoldenScenario } from "../query-golden/schema";
 import {
@@ -21,20 +26,23 @@ export function runLiveMcpArm(
   root: string,
   prompt: string,
 ): ArmRunMetrics {
+  initCodemap(resolveCodemapConfig(root, undefined));
   const tool = requiredMcpToolForGolden(golden);
   assertLiveEvalToolEnabled(tool);
   const t0 = performance.now();
-  let callArgs: Record<string, unknown>;
+  let callArgs: QueryRecipeArgs | { sql: string };
   let result: ToolResult;
   if (tool === "query_recipe") {
+    if (golden.recipe === undefined) {
+      throw new Error(
+        `agent-eval live: golden "${golden.id}" requires recipe for query_recipe arm`,
+      );
+    }
     callArgs = {
-      recipe: golden.recipe!,
+      recipe: golden.recipe,
       ...(golden.params !== undefined ? { params: golden.params } : {}),
     };
-    result = handleQueryRecipe(
-      callArgs as Parameters<typeof handleQueryRecipe>[0],
-      root,
-    );
+    result = handleQueryRecipe(callArgs, root);
   } else {
     const { sql } = resolveGoldenQuery(golden);
     callArgs = { sql };

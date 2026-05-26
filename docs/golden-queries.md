@@ -25,13 +25,13 @@
 
 ## How this fits other tooling
 
-| Piece                     | Role                                                               |
-| ------------------------- | ------------------------------------------------------------------ |
-| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                                   |
-| `scripts/agent-eval/`     | Tier **A** probe A/B (`test:agent-eval`; reuses golden `goldenId`) |
-| `src/benchmark.ts`        | Speed comparison (not golden row equality)                         |
-| `bun test`                | Unit tests for parsers, CLI, DB                                    |
-| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore       |
+| Piece                     | Role                                                                        |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                                            |
+| `scripts/agent-eval/`     | Tier **A** agent-eval harness (`test:agent-eval`; reuses golden `goldenId`) |
+| `src/benchmark.ts`        | Speed comparison (not golden row equality)                                  |
+| `bun test`                | Unit tests for parsers, CLI, DB                                             |
+| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore                |
 
 ---
 

@@ -10,15 +10,15 @@
 
 ## Quick resume
 
-| Next action         | Detail                                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Open**            | —                                                                                                               |
-| **In flight**       | —                                                                                                               |
-| **Recently merged** | Agent eval live MCP arms — probe + `handleQuery`/`handleQueryRecipe` + log comparison                           |
-|                     | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
-|                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
-|                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |
-|                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                       |
+| Next action         | Detail                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Open**            | —                                                                                                                        |
+| **In flight**       | —                                                                                                                        |
+| **Recently merged** | [#144](https://github.com/stainless-code/codemap/pull/144) — agent eval live MCP arms + log comparison (PR 9 completion) |
+|                     | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2)          |
+|                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                             |
+|                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                               |
+|                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                                |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -39,15 +39,15 @@ Merge each PR to `main` directly. No long-lived integration branch (`feat/agent-
 
 Max **3 parallel tracks** at once.
 
-| PR    | Plans                                                                                                 | Status                                                              | Blocked by                                                                                                             | Parallel with |
-| ----- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **3** | Index lock + `errors.log` → parse-worker hardening (stack)                                            | merged                                                              | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5          |
-| **4** | `call-path` + `symbol-neighborhood` recipes                                                           | merged                                                              | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5          |
-| **5** | `affected-tests` recipe + MCP `affected` ([#133](https://github.com/stainless-code/codemap/pull/133)) | merged                                                              | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4          |
-| **6** | MCP `trace` / `explore` / `node` + instructions update                                                | merged                                                              | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4    |
-| **7** | Field-qualified `show --query` search                                                                 | merged                                                              | [#138](https://github.com/stainless-code/codemap/pull/138)                                                             | PR 1, PR 6    |
-| **8** | `agents init --mcp` wiring                                                                            | merged                                                              | [#135](https://github.com/stainless-code/codemap/pull/135)                                                             | 3–5           |
-| **9** | Agent eval harness — probe + live MCP arms + log comparison                                           | merged ([#139](https://github.com/stainless-code/codemap/pull/139)) | —                                                                                                                      | PR 1, PR 8    |
+| PR    | Plans                                                                                                                                                            | Status | Blocked by                                                                                                             | Parallel with |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **3** | Index lock + `errors.log` → parse-worker hardening (stack)                                                                                                       | merged | [#129](https://github.com/stainless-code/codemap/pull/129), [#130](https://github.com/stainless-code/codemap/pull/130) | 4, 5          |
+| **4** | `call-path` + `symbol-neighborhood` recipes                                                                                                                      | merged | [#131](https://github.com/stainless-code/codemap/pull/131)                                                             | 3, 5          |
+| **5** | `affected-tests` recipe + MCP `affected` ([#133](https://github.com/stainless-code/codemap/pull/133))                                                            | merged | [#132](https://github.com/stainless-code/codemap/pull/132), [#133](https://github.com/stainless-code/codemap/pull/133) | 3, 4          |
+| **6** | MCP `trace` / `explore` / `node` + instructions update                                                                                                           | merged | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4    |
+| **7** | Field-qualified `show --query` search                                                                                                                            | merged | [#138](https://github.com/stainless-code/codemap/pull/138)                                                             | PR 1, PR 6    |
+| **8** | `agents init --mcp` wiring                                                                                                                                       | merged | [#135](https://github.com/stainless-code/codemap/pull/135)                                                             | 3–5           |
+| **9** | Agent eval harness — probe ([#139](https://github.com/stainless-code/codemap/pull/139)); live + log ([#144](https://github.com/stainless-code/codemap/pull/144)) | merged | —                                                                                                                      | PR 1, PR 8    |
 
 **Parallelization constraints**
 
@@ -95,6 +95,6 @@ When opening or merging a PR:
 
 1. Update **Quick resume** and the relevant row **Status** (`planned` → `open` → `merged` / partial).
 2. On merge of a **shipped** Wave item: **delete** its plan file and lift any unique ops detail to [`agents.md`](../agents.md) / [`architecture.md`](../architecture.md); **prune** matching `[x]` lines from [`roadmap.md`](../roadmap.md#agent--indexing-ops) per [docs-governance Rule 2](../../.agents/skills/docs-governance/SKILL.md) (do not leave completed checkboxes in the backlog).
-3. **Keep** plan files while work is partial (e.g. agent-eval probe shipped, live arms open) — update status header and acceptance checkboxes instead of deleting.
+3. **Keep** plan files while work is partial — update status header and acceptance checkboxes instead of deleting.
 
 Status values: `planned` · `open` · `merged` · `partial` · `cancelled`

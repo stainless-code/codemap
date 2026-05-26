@@ -248,6 +248,28 @@ describe("run-probes helpers", () => {
     ).toThrow(/unknown goldenId/);
   });
 
+  it("runProbeOnce throws when live mode missing fixtureRoot", () => {
+    expect(() =>
+      runProbeOnce(
+        {
+          id: "p",
+          goldenId: "symbol-usePermissions",
+          traditional: { globs: ["**/*.ts"], regex: "x", mode: "files" },
+        },
+        new Map([
+          [
+            "symbol-usePermissions",
+            {
+              id: "symbol-usePermissions",
+              sql: "SELECT 1",
+            },
+          ],
+        ]),
+        "live",
+      ),
+    ).toThrow(/fixtureRoot required/);
+  });
+
   it("averageSamples rejects empty input", () => {
     expect(() => averageSamples("p", [])).toThrow(
       /requires at least one sample/,
@@ -555,6 +577,31 @@ describe("live MCP arm", () => {
       else process.env.CODEMAP_MCP_TOOLS = prior;
     }
   });
+
+  it("runLiveMcpArm returns rows via handleQueryRecipe", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "find-call-sites",
+          prompt: "call sites",
+          recipe: "find-call-sites",
+          params: { callee: "createClient" },
+        },
+        root,
+        "call sites",
+      );
+      expect(metrics.toolSequence).toEqual(["query_recipe"]);
+      expect(metrics.success).toBe(true);
+      expect(metrics.resultCount).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
 });
 
 describe("compare-live-logs", () => {
@@ -604,11 +651,59 @@ describe("print-comparison-summary", () => {
     expect(md).toContain("| a |");
     expect(md).toContain("probe (queryRows)");
   });
+
+  it("renders log comparison markdown with wall totals", () => {
+    const md = formatComparisonMarkdown({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      mode: "log",
+      scenarios: [
+        {
+          id: "session",
+          mcpOn: {
+            logPath: "on.json",
+            format: "entries-transcript",
+            toolSequence: ["query"],
+            toolCallCount: 1,
+            promptChars: 10,
+            outputChars: 5,
+            estTokens: 4,
+            wallMs: 100,
+          },
+          mcpOff: {
+            logPath: "off.json",
+            format: "entries-transcript",
+            toolSequence: ["glob", "grep"],
+            toolCallCount: 2,
+            promptChars: 10,
+            outputChars: 5,
+            estTokens: 8,
+            wallMs: 200,
+          },
+          delta: { toolCallCount: 1, estTokens: 4, wallMs: 100 },
+        },
+      ],
+      summary: {
+        mcpOnTotalToolCalls: 1,
+        mcpOffTotalToolCalls: 2,
+        mcpOnTotalEstTokens: 4,
+        mcpOffTotalEstTokens: 8,
+        mcpOnTotalWallMs: 100,
+        mcpOffTotalWallMs: 200,
+      },
+    });
+    expect(md).toContain("log exports");
+    expect(md).toContain("wall ms");
+  });
 });
 
 describe("tool-payload", () => {
   it("resultCountFromToolPayload handles arrays and count envelopes", () => {
     expect(resultCountFromToolPayload([{ a: 1 }, { a: 2 }])).toBe(2);
     expect(resultCountFromToolPayload({ count: 5 })).toBe(5);
+    expect(
+      resultCountFromToolPayload({
+        groups: [{ count: 3 }, { count: 2 }],
+      }),
+    ).toBe(5);
   });
 });

@@ -10,6 +10,13 @@ function isLogComparison(v: ComparisonReport): v is LiveLogComparison {
   return v.mode === "log";
 }
 
+function isComparisonReport(v: unknown): v is ComparisonReport {
+  if (v === null || typeof v !== "object") return false;
+  const mode = (v as { mode?: unknown }).mode;
+  if (mode !== "probe" && mode !== "live" && mode !== "log") return false;
+  return Array.isArray((v as { scenarios?: unknown }).scenarios);
+}
+
 function fmt(n: number, digits = 0): string {
   if (digits === 0) return String(Math.round(n));
   return n.toFixed(digits);
@@ -33,9 +40,14 @@ export function formatComparisonMarkdown(report: ComparisonReport): string {
       );
     }
     lines.push("");
-    lines.push(
-      `**Totals:** MCP-on ${report.summary.mcpOnTotalToolCalls} tool calls / ${report.summary.mcpOnTotalEstTokens} est. tokens; MCP-off ${report.summary.mcpOffTotalToolCalls} / ${report.summary.mcpOffTotalEstTokens}.`,
-    );
+    let totals = `**Totals (log exports):** MCP-on ${report.summary.mcpOnTotalToolCalls} tool calls / ${report.summary.mcpOnTotalEstTokens} est. tokens; MCP-off ${report.summary.mcpOffTotalToolCalls} / ${report.summary.mcpOffTotalEstTokens}`;
+    if (
+      report.summary.mcpOnTotalWallMs !== undefined &&
+      report.summary.mcpOffTotalWallMs !== undefined
+    ) {
+      totals += `; wall ms MCP-on ${Math.round(report.summary.mcpOnTotalWallMs)} / MCP-off ${Math.round(report.summary.mcpOffTotalWallMs)}`;
+    }
+    lines.push(`${totals}.`);
     return `${lines.join("\n")}\n`;
   }
 
@@ -47,7 +59,7 @@ export function formatComparisonMarkdown(report: ComparisonReport): string {
   lines.push("");
   const modeNote =
     report.mode === "live"
-      ? `live MCP handlers (${(report.mcpTools ?? []).join(", ") || "query, query_recipe"})`
+      ? `live MCP handlers (eval subset: ${(report.mcpTools ?? []).join(", ") || "query, query_recipe"})`
       : "probe (queryRows)";
   lines.push(
     `**Totals (${modeNote}):** MCP-on ${report.summary.mcpOnTotalToolCalls} tool calls / ${report.summary.mcpOnTotalEstTokens} est. tokens; MCP-off ${report.summary.mcpOffTotalToolCalls} / ${report.summary.mcpOffTotalEstTokens}; ${report.summary.successCount}/${report.scenarios.length} scenarios ok.`,
@@ -81,9 +93,21 @@ Print a markdown summary table for probe, live, or log comparison JSON.
 `);
     process.exit(args.help ? 0 : 1);
   }
-  const raw = readFileSync(args.input, "utf-8");
-  const report = JSON.parse(raw) as ComparisonReport;
-  process.stdout.write(formatComparisonMarkdown(report));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(args.input, "utf-8"));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`print-comparison-summary: invalid JSON: ${msg}`);
+    process.exit(1);
+  }
+  if (!isComparisonReport(parsed)) {
+    console.error(
+      "print-comparison-summary: expected comparison JSON with mode probe|live|log and scenarios[]",
+    );
+    process.exit(1);
+  }
+  process.stdout.write(formatComparisonMarkdown(parsed));
 }
 
 if (import.meta.main) {

@@ -11,8 +11,9 @@ export function resultCountFromToolPayload(payload: unknown): number {
       let n = 0;
       for (const group of row.groups) {
         if (group !== null && typeof group === "object") {
-          const rows = (group as { rows?: unknown }).rows;
-          if (Array.isArray(rows)) n += rows.length;
+          const g = group as { rows?: unknown; count?: unknown };
+          if (Array.isArray(g.rows)) n += g.rows.length;
+          else if (typeof g.count === "number") n += g.count;
         }
       }
       return n;
