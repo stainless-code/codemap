@@ -183,7 +183,6 @@ SELECT
   d.relation
 FROM descendants d
 CROSS JOIN params p
-WHERE p.kind_filter IS NULL
-  OR p.kind_filter = ''
-  OR d.descendant_kind = p.kind_filter
+WHERE (p.kind_filter IS NULL OR p.kind_filter = '' OR d.descendant_kind = p.kind_filter)
+  AND (p.file_path IS NULL OR p.file_path = '' OR d.descendant_file_path = p.file_path)
 ORDER BY d.depth ASC, d.relation ASC, d.descendant_name ASC, d.descendant_file_path ASC;

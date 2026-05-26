@@ -240,6 +240,30 @@
       "params": { "symbol_name": "CycleA", "max_depth": 5 }
     },
     {
+      "id": "type-descendants-unknown",
+      "prompt": "Unknown base type returns empty descendants",
+      "recipe": "type-descendants",
+      "params": { "symbol_name": "nonexistentType" }
+    },
+    {
+      "id": "type-descendants-homonym-empty",
+      "prompt": "file_path on homonym base with no local children returns empty",
+      "recipe": "type-descendants",
+      "params": {
+        "symbol_name": "Mammal",
+        "file_path": "src/types/homonym-mammal.ts"
+      }
+    },
+    {
+      "id": "type-descendants-homonym-scoped",
+      "prompt": "file_path scopes descendants to the hierarchy Mammal chain",
+      "recipe": "type-descendants",
+      "params": {
+        "symbol_name": "Mammal",
+        "file_path": "src/types/hierarchy.ts"
+      }
+    },
+    {
       "id": "affected-tests-complexity",
       "prompt": "Test file importing changed complexity fixture",
       "recipe": "affected-tests",

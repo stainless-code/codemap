@@ -28,7 +28,7 @@ Symbols that **`extends`** or **`implements`** the given type, with transitive *
 
 Heritage is parsed from indexed `symbols.signature`. Generic arguments are stripped for matching. Recursive walks follow `(descendant_name, descendant_file_path)` so homonymous types in other files do not pollute the chain.
 
-**Limits:** same signature-parsing caveats as [`type-ancestors`](./type-ancestors.md).
+**Limits:** same signature-parsing caveats as [`type-ancestors`](./type-ancestors.md). When `file_path` is set, descendant rows are limited to that file (disambiguates homonymous base types).
 
 ```bash
 codemap query --recipe type-descendants --params symbol_name=Animal
