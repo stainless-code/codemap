@@ -24,39 +24,39 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 If the question matches any of these, use the index instead of grepping:
 
-| Question shape                                               | Table(s) / Recipe                                                |
-| ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| "What/which files import X?"                                 | `imports` (by `source`) or `dependencies` (by `to_path`)         |
-| "Where is X defined?"                                        | `symbols`                                                        |
-| "What does file X export?"                                   | `exports`                                                        |
-| "Who depends on file X?" / "What does file X depend on?"     | `dependencies`                                                   |
-| "Who calls X?" / "What does X call?"                         | `calls`                                                          |
-| "Where is X used?" / "Every reference to X"                  | `--recipe find-references` (name-keyed)                          |
-| "Every reference to X defined in file Y" (precise rename)    | `--recipe find-symbol-references` (bindings-precise)             |
-| "Every write to X"                                           | `--recipe find-write-sites`                                      |
-| "Every fn taking a `User` param"                             | `--recipe find-by-param-type` (params `type_text=...`)           |
-| "What hooks does component X use?" / "List React components" | `components`                                                     |
-| "What are the CSS variables/tokens for X?"                   | `css_variables`                                                  |
-| "What CSS classes / keyframes are in X?"                     | `css_classes` / `css_keyframes`                                  |
-| "Find all TODOs / FIXMEs / HACKs / NOTEs"                    | `markers`                                                        |
-| "What fields does interface/type X have?"                    | `type_members`                                                   |
-| "What does X extend / implement?" / type hierarchy           | `type_heritage` / `--recipe type-ancestors` / `type-descendants` |
-| "Is X deprecated?" / "What's `@beta` / `@internal`?"         | `symbols.doc_comment` / `symbols.visibility`                     |
-| "Leftover `console.log` calls"                               | `--recipe find-leftover-console` (or `runtime_markers`)          |
-| "What `process.env.X` vars does this app read?"              | `--recipe env-var-audit`                                         |
-| "Find `.skip` / `.only` / `.todo` tests"                     | `--recipe find-skipped-tests`                                    |
-| "Tests per file (counts + framework)"                        | `--recipe tests-by-file`                                         |
-| "Are there import cycles?" / "Files in cycles"               | `--recipe circular-imports` / `module_cycles`                    |
-| "Where do barrel files re-export from?"                      | `--recipe barrel-chains` / `re_export_chains`                    |
-| "Functions over 50 lines / deeply nested"                    | `--recipe large-functions` / `deeply-nested-functions`           |
-| "What's the cyclomatic complexity / nesting depth of X?"     | `symbols.complexity` / `symbols.nesting_depth`                   |
-| "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `codemap ingest-coverage`)                     |
-| "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                                     |
-| "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                                 |
-| "Which exports has nobody imported?"                         | `--recipe unimported-exports`                                    |
-| "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                        |
-| "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                                 |
-| "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested`                              |
+| Question shape                                               | Table(s) / Recipe                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| "What/which files import X?"                                 | `imports` (by `source`) or `dependencies` (by `to_path`)                  |
+| "Where is X defined?"                                        | `symbols`                                                                 |
+| "What does file X export?"                                   | `exports`                                                                 |
+| "Who depends on file X?" / "What does file X depend on?"     | `dependencies`                                                            |
+| "Who calls X?" / "What does X call?"                         | `calls`                                                                   |
+| "Where is X used?" / "Every reference to X"                  | `--recipe find-references` (name-keyed)                                   |
+| "Every reference to X defined in file Y" (precise rename)    | `--recipe find-symbol-references` (bindings-precise)                      |
+| "Every write to X"                                           | `--recipe find-write-sites`                                               |
+| "Every fn taking a `User` param"                             | `--recipe find-by-param-type` (params `type_text=...`)                    |
+| "What hooks does component X use?" / "List React components" | `components`                                                              |
+| "What are the CSS variables/tokens for X?"                   | `css_variables`                                                           |
+| "What CSS classes / keyframes are in X?"                     | `css_classes` / `css_keyframes`                                           |
+| "Find all TODOs / FIXMEs / HACKs / NOTEs"                    | `markers`                                                                 |
+| "What fields does interface/type X have?"                    | `type_members`                                                            |
+| "What does X extend / implement?" / type hierarchy           | `type_heritage` / `--recipe type-ancestors` / `--recipe type-descendants` |
+| "Is X deprecated?" / "What's `@beta` / `@internal`?"         | `symbols.doc_comment` / `symbols.visibility`                              |
+| "Leftover `console.log` calls"                               | `--recipe find-leftover-console` (or `runtime_markers`)                   |
+| "What `process.env.X` vars does this app read?"              | `--recipe env-var-audit`                                                  |
+| "Find `.skip` / `.only` / `.todo` tests"                     | `--recipe find-skipped-tests`                                             |
+| "Tests per file (counts + framework)"                        | `--recipe tests-by-file`                                                  |
+| "Are there import cycles?" / "Files in cycles"               | `--recipe circular-imports` / `module_cycles`                             |
+| "Where do barrel files re-export from?"                      | `--recipe barrel-chains` / `re_export_chains`                             |
+| "Functions over 50 lines / deeply nested"                    | `--recipe large-functions` / `deeply-nested-functions`                    |
+| "What's the cyclomatic complexity / nesting depth of X?"     | `symbols.complexity` / `symbols.nesting_depth`                            |
+| "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `codemap ingest-coverage`)                              |
+| "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                                              |
+| "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                                          |
+| "Which exports has nobody imported?"                         | `--recipe unimported-exports`                                             |
+| "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                                 |
+| "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                                          |
+| "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested`                                       |
 
 ## Quick reference queries
 
