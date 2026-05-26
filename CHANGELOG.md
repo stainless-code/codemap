@@ -1,5 +1,41 @@
 # @stainless-code/codemap
 
+## 0.9.0
+
+### Minor Changes
+
+- [#129](https://github.com/stainless-code/codemap/pull/129) [`6648add`](https://github.com/stainless-code/codemap/commit/6648add30205e1d07cf0c778a9d1332fd583fd43) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add cross-process index lock with `codemap unlock`, and append parse failures to `<state-dir>/errors.log`.
+
+- [#130](https://github.com/stainless-code/codemap/pull/130) [`f5374b8`](https://github.com/stainless-code/codemap/commit/f5374b8519135066ce7271837d65bb0547c0c53d) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add per-file parse timeouts with worker recycle during full and incremental indexing; failures log to errors.log and appear in the index summary.
+
+### Patch Changes
+
+- [#132](https://github.com/stainless-code/codemap/pull/132) [`8a1de53`](https://github.com/stainless-code/codemap/commit/8a1de53ae978b2d038fdc355917391be416a5fe2) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `affected-tests` recipe and `codemap affected` CLI for reverse-dependency test selection from changed files.
+
+- [#135](https://github.com/stainless-code/codemap/pull/135) [`c4b4b36`](https://github.com/stainless-code/codemap/commit/c4b4b3686c5c34d686f5f128dbab3360cd04a478) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `codemap agents init --mcp` — project-level MCP config for Cursor, Claude Code, VS Code, Continue, Cline, Amazon Q (workspace `.amazonq/default.json` + legacy `.amazonq/mcp.json`), and Gemini CLI (Windsurf when that integration is selected), with idempotent JSON merge and Claude `mcp__codemap__*` permissions.
+
+- [#138](https://github.com/stainless-code/codemap/pull/138) [`829075c`](https://github.com/stainless-code/codemap/commit/829075cc13a4241718935c2ec724addfa9928e3b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add field-qualified symbol discovery on `codemap show --query` and MCP/HTTP `show` / `snippet` via a `query` argument (`kind:`, `name:`, `path:`, `in:` + optional free text). Includes parameterized SQL engine, optional FTS join, `--print-sql` Moat-A transparency, and `{matches, disambiguation?, warning?}` envelope parity across CLI, MCP, and HTTP.
+
+- [#124](https://github.com/stainless-code/codemap/pull/124) [`04c4aa7`](https://github.com/stainless-code/codemap/commit/04c4aa738c83dc612cc7cff6c96c5fd95e01ecdf) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Honor `--state-dir` for project recipes; populate `function_params.owner_kind`; register MCP `files`/`symbols` resource templates with optional `?in=` filter; watcher fixes for custom state dirs.
+
+- [#133](https://github.com/stainless-code/codemap/pull/133) [`386ffa6`](https://github.com/stainless-code/codemap/commit/386ffa663d2dbb94b16d07c85c6cdf91f04e5b4e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add MCP/HTTP `affected` tool — same preprocessor as `codemap affected`, composes the `affected-tests` recipe. Respects `CODEMAP_MCP_TOOLS` allowlist.
+
+- [#126](https://github.com/stainless-code/codemap/pull/126) [`ed4ca6b`](https://github.com/stainless-code/codemap/commit/ed4ca6bc4d2feab67901079951d3077ca405c588) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add MCP initialize server instructions (tool-selection playbook) and `CODEMAP_MCP_TOOLS` env for subset tool registration.
+
+- [`ee9f6b2`](https://github.com/stainless-code/codemap/commit/ee9f6b240cfd7fddae5990ad54a87bad2fd7343c) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Bump `oxc-parser` to ^0.133.0 and `@typescript/native-preview` to the latest 7.0 dev build.
+
+- [`9fa1e9d`](https://github.com/stainless-code/codemap/commit/9fa1e9d54420aef044c97a6e157c46be4ac10e17) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Pin runtime and dev dependencies to exact versions in `package.json` (drop carets) and refresh `bun.lock`. Dev tooling: `oxfmt` 0.52, `oxlint` 1.67, `@typescript/native-preview` 20260526. Oxlint 1.67 drops a redundant escape in `show-search-mode.ts` glob regex (no behavior change).
+
+- [#131](https://github.com/stainless-code/codemap/pull/131) [`a8cf25b`](https://github.com/stainless-code/codemap/commit/a8cf25ba787312224e7dfe0ca1945c45dae51285) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `call-path` and `symbol-neighborhood` query recipes for cycle-safe call-graph tracing and bidirectional symbol exploration.
+
+- [#143](https://github.com/stainless-code/codemap/pull/143) [`e475d20`](https://github.com/stainless-code/codemap/commit/e475d204d1168529ffaa7963881ec5f1f89cf90c) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix type heritage resolve edge cases: default-import bases, re-export barrel incremental scope, homonym dedupe in ancestor walks, and `(expression)` complex extends handling.
+
+- [#142](https://github.com/stainless-code/codemap/pull/142) [`a085ec6`](https://github.com/stainless-code/codemap/commit/a085ec6217f261b2d451c26dc893b4e6c88be9b4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `type_heritage` substrate and rewire `type-ancestors` / `type-descendants` recipes to JOIN indexed heritage edges instead of parsing `symbols.signature`.
+
+- [#141](https://github.com/stainless-code/codemap/pull/141) [`bd5a1fa`](https://github.com/stainless-code/codemap/commit/bd5a1fa99feceb5d35e470f8ef63c047fde7e4b9) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `type-ancestors` and `type-descendants` query recipes for extends/implements hierarchy walks (backed by the `type_heritage` substrate after [#142](https://github.com/stainless-code/codemap/issues/142)).
+
+- [#127](https://github.com/stainless-code/codemap/pull/127) [`4318cc4`](https://github.com/stainless-code/codemap/commit/4318cc4694e5af6157842d864bc9075617d26af9) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add WSL watch policy (auto-disable on `/mnt/*` mounts) and opt-in git hooks for background incremental index when the watcher is off.
+
 ## 0.8.0
 
 ### Minor Changes
