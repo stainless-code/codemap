@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "kind": "user",
+      "text": "Where is the usePermissions symbol defined?"
+    },
+    {
+      "kind": "tool_call",
+      "tool": "Glob",
+      "args": { "pattern": "**/*.{ts,tsx}" },
+      "wallMs": 120
+    },
+    {
+      "kind": "tool_call",
+      "tool": "Read",
+      "args": { "path": "src/hooks/usePermissions.ts" },
+      "wallMs": 85
+    },
+    {
+      "kind": "tool_call",
+      "tool": "Grep",
+      "args": { "pattern": "export function usePermissions" },
+      "wallMs": 40
+    },
+    {
+      "kind": "assistant",
+      "text": "usePermissions is defined in src/hooks/usePermissions.ts"
+    }
+  ]
+}

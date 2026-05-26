@@ -107,6 +107,8 @@ Recipe ids cited in the playbook are machine-validated in tests against the live
 
 Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
+**Agent eval live arms** — see [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness) for `AGENT_EVAL_MODE=live`, log comparison, and the minimal eval subset (`query`, `query_recipe`).
+
 ## MCP wiring via `agents init`
 
 **`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown. Registry source of truth: **`src/agents-init-mcp-registry.ts`** (`AGENTS_INIT_MCP_REGISTRY`).

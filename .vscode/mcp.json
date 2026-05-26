@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "codemap": {
+      "type": "stdio",
+      "command": "bun",
+      "args": ["src/index.ts", "mcp", "--watch", "--root", "${workspaceFolder}"]
+    }
+  }
+}

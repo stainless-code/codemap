@@ -1,6 +1,6 @@
 # Agent surface & indexing ops — plan index
 
-> **Status:** partial (Wave 1–2 + probe eval shipped; live agent-eval arms open) · **Created:** 2026-05-24
+> **Status:** partial (Wave 1–2 shipped; PR 9 agent-eval probe shipped, live+log in [#144](https://github.com/stainless-code/codemap/pull/144); P2 strategic bets open) · **Created:** 2026-05-24
 >
 > **Purpose:** Prioritized work queue for agent UX, MCP ergonomics, indexing reliability, and TS/JS graph substrate gaps. Open items have plan files; shipped Wave 1–2 work lives in [agents.md](../agents.md) and the PR tracker.
 >
@@ -18,11 +18,15 @@ Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](.
 
 ---
 
+## Shipped / in flight (PR 9 — agent eval)
+
+Probe harness ([#139](https://github.com/stainless-code/codemap/pull/139)) shipped. Live MCP arms + log comparison in [#144](https://github.com/stainless-code/codemap/pull/144) (in flight at last tracker update). Reference: [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness). Named external benchmark CI (zod, fastify) remains [roadmap backlog](../roadmap.md#backlog).
+
+---
+
 ## P1 — Open
 
-| Plan                                          | Effort | Summary                                                                                        |
-| --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
-| [agent-eval-harness](./agent-eval-harness.md) | M      | Probe A/B + PR CI ([#139](https://github.com/stainless-code/codemap/pull/139)); live arms open |
+_(none — PR 9 live+log completes in #144; probe shipped in #139.)_
 
 ---
 

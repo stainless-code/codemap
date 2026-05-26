@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codemap": {
+      "command": "bun",
+      "args": ["src/index.ts", "mcp", "--watch", "--root", "${workspaceFolder}"]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-/** Chars / 4 token estimate per agent-eval-harness plan L.4. */
+/** Chars / 4 token estimate (benchmark § Agent eval harness). */
 export function estimateTokens(chars: number): number {
   return Math.ceil(chars / 4);
 }

@@ -6,8 +6,17 @@ import { join } from "node:path";
 import { resolveCodemapConfig } from "../../src/config";
 import { initCodemap } from "../../src/runtime";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { compareLogArms, summarizeLogComparison } from "./compare-live-logs";
+import { runLiveMcpArm } from "./live-mcp-arm";
+import {
+  assertLiveEvalToolEnabled,
+  defaultLiveEvalMcpToolsEnv,
+  ensureLiveEvalMcpToolsEnv,
+  requiredMcpToolForGolden,
+} from "./mcp-allowlist";
 import { jsonCharLength } from "./metrics";
 import { parseAgentLog, parseAgentLogFile } from "./parse-agent-log";
+import { formatComparisonMarkdown } from "./print-comparison-summary";
 import {
   estimateProbeTokens,
   mcpOffPayloadChars,
@@ -22,6 +31,7 @@ import {
 } from "./run-probes";
 import type { ArmRunMetrics, ScenarioComparison } from "./run-probes";
 import { parseProbesJson } from "./schema";
+import { resultCountFromToolPayload } from "./tool-payload";
 import {
   runTraditionalProbe,
   traditionalToolSequence,
@@ -239,6 +249,46 @@ describe("run-probes helpers", () => {
     ).toThrow(/unknown goldenId/);
   });
 
+  it("main rejects missing probes file", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const result = spawnSync(
+      "bun",
+      [
+        join(import.meta.dir, "run-probes.ts"),
+        "--fixture-root",
+        fixtureRoot,
+        "--probes",
+        join(fixtureRoot, "no-such-probes.json"),
+      ],
+      { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Probes file not found");
+  });
+
+  it("runProbeOnce throws when live mode missing fixtureRoot", () => {
+    expect(() =>
+      runProbeOnce(
+        {
+          id: "p",
+          goldenId: "symbol-usePermissions",
+          traditional: { globs: ["**/*.ts"], regex: "x", mode: "files" },
+        },
+        new Map([
+          [
+            "symbol-usePermissions",
+            {
+              id: "symbol-usePermissions",
+              sql: "SELECT 1",
+            },
+          ],
+        ]),
+        "live",
+      ),
+    ).toThrow(/fixtureRoot required/);
+  });
+
   it("averageSamples rejects empty input", () => {
     expect(() => averageSamples("p", [])).toThrow(
       /requires at least one sample/,
@@ -310,7 +360,7 @@ describe("run-probes helpers", () => {
     expect(avg.mcpOff.estTokens).toBe(12);
   });
 
-  it("averageSamples delta uses unrounded arm averages", () => {
+  it("averageSamples delta matches rounded arm counts", () => {
     const samples = [
       scenario({
         id: "p",
@@ -327,6 +377,46 @@ describe("run-probes helpers", () => {
     expect(avg.mcpOff.toolCallCount).toBe(3);
     expect(avg.mcpOn.toolCallCount).toBe(1);
     expect(avg.delta.toolCallCount).toBe(2);
+  });
+
+  it("averageSamples preserves arm error when any run failed", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ success: false, error: "SQL bad" }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({ success: true }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOn.success).toBe(false);
+    expect(avg.mcpOn.error).toBe("SQL bad");
+  });
+
+  it("averageSamples zeroes resultCount when any run failed", () => {
+    const samples = [
+      scenario({
+        id: "p",
+        mcpOn: arm({ resultCount: 5, success: true }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+      scenario({
+        id: "p",
+        mcpOn: arm({
+          resultCount: 0,
+          success: false,
+          error: "query returned 0 rows",
+        }),
+        mcpOff: arm({ success: true, toolSequence: ["glob", "grep"] }),
+      }),
+    ];
+    const avg = averageSamples("p", samples);
+    expect(avg.mcpOn.success).toBe(false);
+    expect(avg.mcpOn.resultCount).toBe(0);
   });
 
   it("traditionalToolSequence includes glob and grep with zero reads", () => {
@@ -449,4 +539,523 @@ describe("run-probes smoke", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it("indexes fixtures/minimal in live MCP mode", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-live-"));
+    const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--mode",
+      "live",
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          CODEMAP_MCP_TOOLS: defaultLiveEvalMcpToolsEnv(),
+        },
+      });
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(await Bun.file(out).text()) as {
+        mode: string;
+        mcpTools?: string[];
+        scenarios: ScenarioComparison[];
+        summary: { successCount: number };
+      };
+      expect(parsed.mode).toBe("live");
+      expect(parsed.mcpTools).toEqual(["query", "query_recipe"]);
+      expect(parsed.scenarios).toHaveLength(3);
+      expect(parsed.summary.successCount).toBe(3);
+      expect(parsed.scenarios[2]!.mcpOn.toolSequence).toEqual(["query_recipe"]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("live mode exits non-zero when query_recipe is not allowlisted", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-live-deny-"));
+    const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--mode",
+      "live",
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          CODEMAP_MCP_TOOLS: "query",
+        },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/not enabled/i);
+      const parsed = JSON.parse(await Bun.file(out).text()) as {
+        scenarios: ScenarioComparison[];
+      };
+      expect(
+        parsed.scenarios.some((s) => s.mcpOn.error?.includes("not enabled")),
+      ).toBe(true);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
+});
+
+describe("live MCP arm", () => {
+  it("requiredMcpToolForGolden picks query vs query_recipe", () => {
+    expect(
+      requiredMcpToolForGolden({
+        id: "sql",
+        sql: "SELECT 1",
+      }),
+    ).toBe("query");
+    expect(
+      requiredMcpToolForGolden({
+        id: "recipe",
+        recipe: "find-call-sites",
+        params: { callee: "x" },
+      }),
+    ).toBe("query_recipe");
+  });
+
+  it("assertLiveEvalToolEnabled rejects trimmed allowlist", () => {
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = "query";
+    try {
+      expect(() => assertLiveEvalToolEnabled("query_recipe")).toThrow(
+        /not enabled/,
+      );
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("ensureLiveEvalMcpToolsEnv applies default when blank", () => {
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = "  ";
+    try {
+      ensureLiveEvalMcpToolsEnv(process.env);
+      expect(process.env.CODEMAP_MCP_TOOLS).toBe(defaultLiveEvalMcpToolsEnv());
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("runLiveMcpArm returns rows via handleQuery", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "symbol-usePermissions",
+          prompt: "Where is usePermissions?",
+          sql: "SELECT name FROM symbols WHERE name = 'usePermissions'",
+        },
+        root,
+        "Where is usePermissions?",
+      );
+      expect(metrics.toolSequence).toEqual(["query"]);
+      expect(metrics.success).toBe(true);
+      expect(metrics.resultCount).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("runLiveMcpArm returns rows via handleQueryRecipe", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "find-call-sites",
+          prompt: "call sites",
+          recipe: "find-call-sites",
+          params: { callee: "createClient" },
+        },
+        root,
+        "call sites",
+      );
+      expect(metrics.toolSequence).toEqual(["query_recipe"]);
+      expect(metrics.success).toBe(true);
+      expect(metrics.resultCount).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("runLiveMcpArm surfaces handler errors on ArmRunMetrics", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "bad-sql",
+          prompt: "bad",
+          sql: "SELECT FROM WHERE",
+        },
+        root,
+        "bad",
+      );
+      expect(metrics.success).toBe(false);
+      expect(metrics.error).toBeDefined();
+      expect(metrics.error!.length).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("runLiveMcpArm marks empty results as failure with error", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "empty",
+          prompt: "empty",
+          sql: "SELECT 1 WHERE 1 = 0",
+        },
+        root,
+        "empty",
+      );
+      expect(metrics.success).toBe(false);
+      expect(metrics.error).toBe("query returned 0 rows");
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+});
+
+describe("compare-live-logs", () => {
+  it("compares MCP-on vs MCP-off sample logs", () => {
+    const onLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-cursor-log.json",
+    );
+    const offLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-no-mcp-log.json",
+    );
+    const scenario = compareLogArms(onLog, offLog, "usePermissions");
+    expect(scenario.mcpOn.toolCallCount).toBe(1);
+    expect(scenario.mcpOff.toolCallCount).toBe(3);
+    expect(scenario.delta.toolCallCount).toBe(2);
+    const summary = summarizeLogComparison([scenario]);
+    expect(summary.mcpOnTotalToolCalls).toBe(1);
+    expect(summary.mcpOffTotalToolCalls).toBe(3);
+  });
+
+  it("compareLogArms rejects missing log paths", () => {
+    expect(() =>
+      compareLogArms("/no/such/on.json", "/no/such/off.json"),
+    ).toThrow(/MCP-on log not found/);
+    expect(() =>
+      compareLogArms(
+        join(
+          import.meta.dir,
+          "../../fixtures/agent-eval/sample-cursor-log.json",
+        ),
+        "/no/such/off.json",
+      ),
+    ).toThrow(/MCP-off log not found/);
+  });
+});
+
+describe("print-comparison-summary", () => {
+  it("renders probe comparison markdown", () => {
+    const md = formatComparisonMarkdown({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      mode: "probe",
+      fixtureRoot: "/tmp",
+      runs: 1,
+      scenarios: [
+        scenario({
+          id: "a",
+          delta: { toolCallCount: 2, wallMs: 1, estTokens: 50 },
+          mcpOff: arm({ toolCallCount: 3, estTokens: 60 }),
+        }),
+      ],
+      summary: {
+        mcpOnTotalToolCalls: 1,
+        mcpOffTotalToolCalls: 3,
+        mcpOnTotalWallMs: 1,
+        mcpOffTotalWallMs: 2,
+        mcpOnTotalEstTokens: 10,
+        mcpOffTotalEstTokens: 60,
+        successCount: 1,
+      },
+    });
+    expect(md).toContain("| a |");
+    expect(md).toContain("probe (queryRows)");
+  });
+
+  it("renders probe failures with arm errors", () => {
+    const md = formatComparisonMarkdown({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      mode: "live",
+      fixtureRoot: "/tmp",
+      runs: 1,
+      mcpTools: ["query"],
+      scenarios: [
+        scenario({
+          id: "find-call-sites",
+          scenarioSuccess: false,
+          mcpOn: arm({
+            success: false,
+            error: 'agent-eval live: MCP tool "query_recipe" is not enabled',
+          }),
+        }),
+      ],
+      summary: {
+        mcpOnTotalToolCalls: 0,
+        mcpOffTotalToolCalls: 25,
+        mcpOnTotalWallMs: 1,
+        mcpOffTotalWallMs: 2,
+        mcpOnTotalEstTokens: 0,
+        mcpOffTotalEstTokens: 60,
+        successCount: 0,
+      },
+    });
+    expect(md).toContain("**Failures:**");
+    expect(md).toContain("query_recipe");
+  });
+
+  it("renders log comparison markdown with wall totals", () => {
+    const md = formatComparisonMarkdown({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      mode: "log",
+      scenarios: [
+        {
+          id: "session",
+          mcpOn: {
+            logPath: "on.json",
+            format: "entries-transcript",
+            toolSequence: ["query"],
+            toolCallCount: 1,
+            promptChars: 10,
+            outputChars: 5,
+            estTokens: 4,
+            wallMs: 100,
+          },
+          mcpOff: {
+            logPath: "off.json",
+            format: "entries-transcript",
+            toolSequence: ["glob", "grep"],
+            toolCallCount: 2,
+            promptChars: 10,
+            outputChars: 5,
+            estTokens: 8,
+            wallMs: 200,
+          },
+          delta: { toolCallCount: 1, estTokens: 4, wallMs: 100 },
+        },
+      ],
+      summary: {
+        mcpOnTotalToolCalls: 1,
+        mcpOffTotalToolCalls: 2,
+        mcpOnTotalEstTokens: 4,
+        mcpOffTotalEstTokens: 8,
+        mcpOnTotalWallMs: 100,
+        mcpOffTotalWallMs: 200,
+      },
+    });
+    expect(md).toContain("log exports");
+    expect(md).toContain("wall ms");
+  });
+
+  it("main rejects malformed comparison JSON", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-bad-json-"));
+    const bad = join(tmp, "bad.json");
+    writeFileSync(bad, JSON.stringify({ mode: "probe", scenarios: [] }));
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("main rejects comparison JSON missing arm metrics", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-shallow-json-"));
+    const bad = join(tmp, "shallow.json");
+    writeFileSync(
+      bad,
+      JSON.stringify({
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        mode: "probe",
+        scenarios: [{ id: "a" }],
+        summary: {
+          mcpOnTotalToolCalls: 1,
+          mcpOffTotalToolCalls: 2,
+          mcpOnTotalEstTokens: 3,
+          mcpOffTotalEstTokens: 4,
+          successCount: 1,
+        },
+      }),
+    );
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("main rejects log comparison with malformed wall ms totals", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-bad-wall-"));
+    const bad = join(tmp, "bad-wall.json");
+    writeFileSync(
+      bad,
+      JSON.stringify({
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        mode: "log",
+        scenarios: [
+          {
+            id: "session",
+            mcpOn: { toolCallCount: 1, estTokens: 1 },
+            mcpOff: { toolCallCount: 2, estTokens: 2 },
+            delta: { toolCallCount: 1, estTokens: 1 },
+          },
+        ],
+        summary: {
+          mcpOnTotalToolCalls: 1,
+          mcpOffTotalToolCalls: 2,
+          mcpOnTotalEstTokens: 1,
+          mcpOffTotalEstTokens: 2,
+          mcpOnTotalWallMs: "not-a-number",
+          mcpOffTotalWallMs: 100,
+        },
+      }),
+    );
+    try {
+      const result = spawnSync(
+        "bun",
+        [join(import.meta.dir, "print-comparison-summary.ts"), "--input", bad],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("compare-live-logs CLI smoke", () => {
+  it("exits 0 comparing sample logs", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const onLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-cursor-log.json",
+    );
+    const offLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-no-mcp-log.json",
+    );
+    const result = spawnSync(
+      "bun",
+      [
+        join(import.meta.dir, "compare-live-logs.ts"),
+        "--mcp-on",
+        onLog,
+        "--mcp-off",
+        offLog,
+      ],
+      { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+    );
+    expect(result.status).toBe(0);
+  });
+
+  it("exits 1 when MCP-on export has no tool calls", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-empty-on-"));
+    const onLog = join(tmp, "empty-on.json");
+    const offLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-no-mcp-log.json",
+    );
+    writeFileSync(onLog, JSON.stringify({ entries: [] }));
+    try {
+      const result = spawnSync(
+        "bun",
+        [
+          join(import.meta.dir, "compare-live-logs.ts"),
+          "--mcp-on",
+          onLog,
+          "--mcp-off",
+          offLog,
+        ],
+        { encoding: "utf-8", cwd: join(import.meta.dir, "../..") },
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/0 tool calls/i);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("tool-payload", () => {
+  it("resultCountFromToolPayload handles arrays and count envelopes", () => {
+    expect(resultCountFromToolPayload([{ a: 1 }, { a: 2 }])).toBe(2);
+    expect(resultCountFromToolPayload({ count: 5 })).toBe(5);
+    expect(
+      resultCountFromToolPayload({
+        groups: [{ count: 3 }, { count: 2 }],
+      }),
+    ).toBe(5);
+    expect(
+      resultCountFromToolPayload({
+        groups: [{ rows: [{}, {}] }, { rows: [{}] }],
+      }),
+    ).toBe(3);
+  });
 });

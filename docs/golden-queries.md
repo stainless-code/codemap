@@ -2,7 +2,7 @@
 
 **Purpose:** Regression-test **Codemap internals** by comparing **`codemap query`** output to **checked-in expectations** (or subset matchers) on fixed corpora — **not** an LLM-in-the-loop eval. **Latency / tokens vs scanning:** [benchmark.md](./benchmark.md).
 
-**Operational docs:** [CONTRIBUTING § Golden queries](../.github/CONTRIBUTING.md) · [benchmark § Fixtures](./benchmark.md#fixtures) · [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness) (probe A/B reuses scenarios via `goldenId`) · Runner: [scripts/query-golden.ts](../scripts/query-golden.ts) · Schema: [scripts/query-golden/schema.ts](../scripts/query-golden/schema.ts)
+**Operational docs:** [CONTRIBUTING § Golden queries](../.github/CONTRIBUTING.md) · [benchmark § Fixtures](./benchmark.md#fixtures) · [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness) (agent-eval harness — probe + live — reuses scenarios via `goldenId`) · Runner: [scripts/query-golden.ts](../scripts/query-golden.ts) · Setup: [scripts/query-golden/run-setup.ts](../scripts/query-golden/run-setup.ts) · Schema: [scripts/query-golden/schema.ts](../scripts/query-golden/schema.ts)
 
 ---
 
@@ -25,13 +25,13 @@
 
 ## How this fits other tooling
 
-| Piece                     | Role                                                               |
-| ------------------------- | ------------------------------------------------------------------ |
-| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                                   |
-| `scripts/agent-eval/`     | Tier **A** probe A/B (`test:agent-eval`; reuses golden `goldenId`) |
-| `src/benchmark.ts`        | Speed comparison (not golden row equality)                         |
-| `bun test`                | Unit tests for parsers, CLI, DB                                    |
-| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore       |
+| Piece                     | Role                                                                        |
+| ------------------------- | --------------------------------------------------------------------------- |
+| `fixtures/minimal/`       | Tier **A** corpus; stable for CI                                            |
+| `scripts/agent-eval/`     | Tier **A** agent-eval harness (`test:agent-eval`; reuses golden `goldenId`) |
+| `src/benchmark.ts`        | Speed comparison (not golden row equality)                                  |
+| `bun test`                | Unit tests for parsers, CLI, DB                                             |
+| `CODEMAP_ROOT` / `--root` | Index **any** tree; Tier **B** uses env + optional gitignore                |
 
 ---
 
@@ -46,7 +46,7 @@ We **do not** commit another product’s source tree, paths, business strings, o
 | **Goldens** from **our** fixtures only     | Snapshots keyed to proprietary names |
 | **Abstract `prompt` text** (intent labels) | Verbatim customer prompts            |
 
-**Tier B:** Point `CODEMAP_ROOT` at a **local** clone; goldens for that tree stay **gitignored** (or private automation) — see [.gitignore](../.gitignore) and [benchmark § Tier B](./benchmark.md#fixtures).
+**Tier B:** Point `CODEMAP_ROOT` at a **local** clone; goldens for that tree stay **gitignored** (or private automation) — see [.gitignore](../.gitignore). For agent-eval on external fixtures, see [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) and [`.github/workflows/agent-eval-external.yml`](../.github/workflows/agent-eval-external.yml).
 
 ---
 
@@ -62,7 +62,7 @@ We **do not** commit another product’s source tree, paths, business strings, o
 
 ## Scenario shape (implemented)
 
-Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). Each entry has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
+Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). The file may be a **bare array** of scenarios (legacy) or an object `{ "setup": [...], "scenarios": [...] }`. Optional top-level **`setup`** runs once after index, before scenarios — today only **`{ "kind": "ingest-coverage", "path": "<relative-to-fixture>" }`** (see [run-setup.ts](../scripts/query-golden/run-setup.ts)); missing coverage files are skipped with a warning. Each scenario has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
 
 **Prompts** in JSON are **intent labels**, not pasted chat logs — pair with queries whose literals come from **fixture-owned** data (see [fixtures/qa/prompts.external.template.md](../fixtures/qa/prompts.external.template.md) for optional chat QA).
 

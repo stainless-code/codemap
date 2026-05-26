@@ -7,8 +7,14 @@ import { queryRows } from "../../src/application/index-engine";
 import type { RecipeParamValue } from "../../src/application/recipe-params";
 import { resolveCodemapConfig } from "../../src/config";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { runGoldenSetup } from "../query-golden/run-setup";
 import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
+import { runLiveMcpArm } from "./live-mcp-arm";
+import {
+  ensureLiveEvalMcpToolsEnv,
+  resolveLiveEvalMcpTools,
+} from "./mcp-allowlist";
 import {
   estimateProbeTokens,
   mcpOffPayloadChars,
@@ -20,6 +26,8 @@ import {
   runTraditionalProbe,
   traditionalToolSequence,
 } from "./traditional-probe";
+
+export type AgentEvalMode = "probe" | "live";
 
 const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(EVAL_DIR, "../..");
@@ -38,6 +46,8 @@ export interface ArmRunMetrics {
   estTokens: number;
   /** True when `resultCount > 0`. */
   success: boolean;
+  /** Live MCP handler error when `success` is false and the handler returned `ok: false`. */
+  error?: string;
 }
 
 /** One probe scenario: both arms plus deltas (`mcpOff − mcpOn`). */
@@ -59,8 +69,10 @@ export interface ScenarioComparison {
 export interface AgentEvalComparison {
   /** ISO-8601 timestamp when the report was generated. */
   generatedAt: string;
-  /** Fixed `"probe"` — deterministic harness mode (no LLM). */
-  mode: "probe";
+  /** `probe` = queryRows; `live` = transport-agnostic MCP handlers. */
+  mode: AgentEvalMode;
+  /** Eval allowlist subset when `mode` is `live` (not full MCP server registration). */
+  mcpTools?: readonly string[];
   /** Indexed corpus root passed to `--fixture-root`. */
   fixtureRoot: string;
   /** Repeat count per probe (`--runs` / `AGENT_EVAL_RUNS`). */
@@ -94,11 +106,19 @@ function parseArgs(argv: string[]) {
   let fixtureRoot = join(REPO_ROOT, "fixtures/minimal");
   let scenariosPath = join(REPO_ROOT, "fixtures/golden/scenarios.json");
   let probesPath = join(EVAL_DIR, "scenarios.json");
+  let mode: AgentEvalMode = "probe";
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") help = true;
     else if (a === "--skip-index") skipIndex = true;
-    else if (a === "--output") {
+    else if (a === "--mode") {
+      const v = optValue(argv, i, a);
+      i++;
+      if (v !== "probe" && v !== "live") {
+        throw new Error('--mode must be "probe" or "live"');
+      }
+      mode = v;
+    } else if (a === "--output") {
       output = resolve(optValue(argv, i, a));
       i++;
     } else if (a === "--runs") {
@@ -127,6 +147,7 @@ function parseArgs(argv: string[]) {
     fixtureRoot,
     scenariosPath,
     probesPath,
+    mode,
   };
 }
 
@@ -149,6 +170,7 @@ function runMcpOnArm(
       mcpOnPayloadChars(sql, rows, bindValues),
     ),
     success: rows.length > 0,
+    ...(rows.length === 0 ? { error: "query returned 0 rows" } : {}),
   };
 }
 
@@ -165,12 +187,17 @@ function runMcpOffArm(prompt: string, probe: AgentEvalProbe): ArmRunMetrics {
       mcpOffPayloadChars(trad.bytesRead, trad.results),
     ),
     success: trad.results.length > 0,
+    ...(trad.results.length === 0
+      ? { error: "traditional probe returned 0 results" }
+      : {}),
   };
 }
 
 export function runProbeOnce(
   probe: AgentEvalProbe,
   goldenById: Map<string, GoldenScenario>,
+  mode: AgentEvalMode = "probe",
+  fixtureRoot?: string,
 ): ScenarioComparison {
   const golden = goldenById.get(probe.goldenId);
   if (golden === undefined) {
@@ -179,8 +206,16 @@ export function runProbeOnce(
     );
   }
   const prompt = golden.prompt ?? probe.id;
-  const { sql, bindValues } = resolveGoldenQuery(golden);
-  const mcpOn = runMcpOnArm(prompt, sql, bindValues);
+  let mcpOn: ArmRunMetrics;
+  if (mode === "live") {
+    if (fixtureRoot === undefined) {
+      throw new Error("runProbeOnce: fixtureRoot required when mode is live");
+    }
+    mcpOn = runLiveMcpArm(golden, fixtureRoot, prompt);
+  } else {
+    const { sql, bindValues } = resolveGoldenQuery(golden);
+    mcpOn = runMcpOnArm(prompt, sql, bindValues);
+  }
   const mcpOff = runMcpOffArm(prompt, probe);
   return {
     id: probe.id,
@@ -247,10 +282,10 @@ async function main(): Promise<void> {
   if (args.help) {
     console.log(`Usage: bun scripts/agent-eval/run-probes.ts [options]
 
-Deterministic A/B probe: codemap query (MCP-on arm) vs glob+read+grep (MCP-off arm).
-Indexes fixtures/minimal by default; writes comparison JSON locally (no upload).
+A/B probe: MCP-on arm vs glob+read+grep (MCP-off arm). Indexes fixtures/minimal by default.
 
 Options:
+  --mode MODE         probe (queryRows, default) or live (handleQuery / handleQueryRecipe)
   --output FILE       Output JSON path (default: .agent-eval/comparison.json)
   --runs N            Repeat each probe N times; averages wallMs/estTokens (toolSequence from run 1)
   --fixture-root DIR  Corpus to index (default: fixtures/minimal)
@@ -258,14 +293,23 @@ Options:
   --probes FILE       Probe definitions JSON (default: scripts/agent-eval/scenarios.json)
   --skip-index        Skip full index when .codemap/index.db already exists (CI reuse after test:golden)
   -h, --help
+
+Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset or blank.
 `);
     process.exit(0);
   }
 
+  if (!existsSync(args.probesPath)) {
+    throw new Error(`Probes file not found: ${args.probesPath}`);
+  }
+  if (!existsSync(args.scenariosPath)) {
+    throw new Error(`Scenarios file not found: ${args.scenariosPath}`);
+  }
   const probesRaw = readFileSync(args.probesPath, "utf-8");
   const { probes } = parseProbesJson(probesRaw);
   const goldenRaw = readFileSync(args.scenariosPath, "utf-8");
-  const { scenarios: goldenScenarios } = parseScenariosJson(goldenRaw);
+  const { setup: goldenSetup, scenarios: goldenScenarios } =
+    parseScenariosJson(goldenRaw);
   const goldenById = new Map(goldenScenarios.map((s) => [s.id, s]));
 
   for (const probe of probes) {
@@ -277,7 +321,11 @@ Options:
   }
 
   const priorCodeMapRoot = process.env.CODEMAP_ROOT;
+  const priorMcpTools = process.env.CODEMAP_MCP_TOOLS;
   process.env.CODEMAP_ROOT = args.fixtureRoot;
+  if (args.mode === "live") {
+    ensureLiveEvalMcpToolsEnv(process.env);
+  }
 
   try {
     const cm = await createCodemap({ root: args.fixtureRoot });
@@ -294,11 +342,16 @@ Options:
     } else {
       await cm.index({ mode: "full", quiet: true });
     }
+    if (goldenSetup.length > 0) {
+      runGoldenSetup(goldenSetup, args.fixtureRoot);
+    }
 
     const aggregated: ScenarioComparison[] = probes.map((probe) => {
       const samples: ScenarioComparison[] = [];
       for (let i = 0; i < args.runs; i++) {
-        samples.push(runProbeOnce(probe, goldenById));
+        samples.push(
+          runProbeOnce(probe, goldenById, args.mode, args.fixtureRoot),
+        );
       }
       if (args.runs === 1) return samples[0]!;
       return averageSamples(probe.id, samples);
@@ -306,9 +359,12 @@ Options:
 
     const report: AgentEvalComparison = {
       generatedAt: new Date().toISOString(),
-      mode: "probe",
+      mode: args.mode,
       fixtureRoot: args.fixtureRoot,
       runs: args.runs,
+      ...(args.mode === "live"
+        ? { mcpTools: resolveLiveEvalMcpTools(process.env) }
+        : {}),
       scenarios: aggregated,
       summary: summarize(aggregated),
     };
@@ -319,14 +375,26 @@ Options:
     console.log(
       `  summary: mcp-on ${report.summary.mcpOnTotalToolCalls} tool calls, mcp-off ${report.summary.mcpOffTotalToolCalls} (${report.summary.successCount}/${probes.length} scenarios ok)\n`,
     );
+    for (const s of aggregated) {
+      if (s.mcpOn.error !== undefined) {
+        console.error(`  ${s.id} MCP-on: ${s.mcpOn.error}`);
+      }
+      if (s.mcpOff.error !== undefined) {
+        console.error(`  ${s.id} MCP-off: ${s.mcpOff.error}`);
+      }
+    }
 
     applyProbeExitCode(report.summary.successCount, probes.length);
-    if (process.exitCode === 1) process.exit(1);
   } finally {
     if (priorCodeMapRoot === undefined) {
       delete process.env.CODEMAP_ROOT;
     } else {
       process.env.CODEMAP_ROOT = priorCodeMapRoot;
+    }
+    if (priorMcpTools === undefined) {
+      delete process.env.CODEMAP_MCP_TOOLS;
+    } else {
+      process.env.CODEMAP_MCP_TOOLS = priorMcpTools;
     }
   }
 }
@@ -340,12 +408,6 @@ export function averageSamples(
     throw new Error("averageSamples requires at least one sample");
   }
   const prompt = samples[0]!.prompt;
-  let mcpOnToolCallCount = 0;
-  let mcpOffToolCallCount = 0;
-  let mcpOnWallMs = 0;
-  let mcpOffWallMs = 0;
-  let mcpOnEstTokens = 0;
-  let mcpOffEstTokens = 0;
   const avgArm = (
     pick: (s: ScenarioComparison) => ArmRunMetrics,
   ): ArmRunMetrics => {
@@ -355,6 +417,7 @@ export function averageSamples(
     let resultCount = 0;
     let estTokens = 0;
     let success = true;
+    let error: string | undefined;
     for (const s of samples) {
       const arm = pick(s);
       wallMs += arm.wallMs;
@@ -362,24 +425,20 @@ export function averageSamples(
       resultCount += arm.resultCount;
       estTokens += arm.estTokens;
       success &&= arm.success;
+      if (arm.error !== undefined) {
+        error ??= arm.error;
+      }
     }
     return {
       wallMs: wallMs / n,
       toolSequence: first.toolSequence,
       toolCallCount: Math.round(toolCallCount / n),
-      resultCount: Math.round(resultCount / n),
+      resultCount: success ? Math.round(resultCount / n) : 0,
       estTokens: Math.ceil(estTokens / n),
       success,
+      ...(error !== undefined ? { error } : {}),
     };
   };
-  for (const s of samples) {
-    mcpOnWallMs += s.mcpOn.wallMs;
-    mcpOffWallMs += s.mcpOff.wallMs;
-    mcpOnToolCallCount += s.mcpOn.toolCallCount;
-    mcpOffToolCallCount += s.mcpOff.toolCallCount;
-    mcpOnEstTokens += s.mcpOn.estTokens;
-    mcpOffEstTokens += s.mcpOff.estTokens;
-  }
   const mcpOn = avgArm((s) => s.mcpOn);
   const mcpOff = avgArm((s) => s.mcpOff);
   const scenarioSuccess = samples.every((s) => s.scenarioSuccess);
@@ -390,16 +449,20 @@ export function averageSamples(
     mcpOff,
     scenarioSuccess,
     delta: {
-      toolCallCount: mcpOffToolCallCount / n - mcpOnToolCallCount / n,
-      wallMs: mcpOffWallMs / n - mcpOnWallMs / n,
-      estTokens: mcpOffEstTokens / n - mcpOnEstTokens / n,
+      toolCallCount: mcpOff.toolCallCount - mcpOn.toolCallCount,
+      wallMs: mcpOff.wallMs - mcpOn.wallMs,
+      estTokens: mcpOff.estTokens - mcpOn.estTokens,
     },
   };
 }
 
 if (import.meta.main) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  main()
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    })
+    .finally(() => {
+      if (process.exitCode === 1) process.exit(1);
+    });
 }

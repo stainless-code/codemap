@@ -1,0 +1,116 @@
+# Optional manual agent-eval on an in-repo indexed fixture (default: fixtures/minimal).
+# Clone external trees into the checkout first; pass repo-relative fixture_root + matching scenarios/probes.
+name: Agent eval (external)
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixture_root:
+        description: "Indexed project root — repo-relative path under the checkout (default fixtures/minimal)"
+        required: false
+        default: fixtures/minimal
+      mode:
+        description: "Harness mode — probe (queryRows) or live (MCP handlers)"
+        required: false
+        default: probe
+        type: choice
+        options:
+          - probe
+          - live
+      runs:
+        description: "Repeat count per probe"
+        required: false
+        default: "1"
+      scenarios:
+        description: "Golden scenarios JSON — repo-relative; empty = fixtures/golden/scenarios.json"
+        required: false
+        default: ""
+      probes:
+        description: "Probe definitions JSON — repo-relative; empty = scripts/agent-eval/scenarios.json"
+        required: false
+        default: ""
+
+jobs:
+  agent-eval-external:
+    name: Agent eval (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Resolve paths
+        id: paths
+        env:
+          INPUT_RUNS: ${{ inputs.runs }}
+          INPUT_FIXTURE_ROOT: ${{ inputs.fixture_root }}
+          INPUT_SCENARIOS: ${{ inputs.scenarios }}
+          INPUT_PROBES: ${{ inputs.probes }}
+        run: |
+          set -euo pipefail
+          RUNS="$INPUT_RUNS"
+          if ! [[ "$RUNS" =~ ^[1-9][0-9]*$ ]]; then
+            echo "runs must be a positive integer (got: $RUNS)" >&2
+            exit 1
+          fi
+          FIXTURE="$INPUT_FIXTURE_ROOT"
+          if [[ "$FIXTURE" == *".."* ]]; then
+            echo "fixture_root must not contain .." >&2
+            exit 1
+          fi
+          FIXTURE_ABS="${{ github.workspace }}/$FIXTURE"
+          if [[ ! -d "$FIXTURE_ABS" ]]; then
+            echo "fixture_root not found: $FIXTURE_ABS" >&2
+            exit 1
+          fi
+          echo "fixture=$FIXTURE_ABS" >> "$GITHUB_OUTPUT"
+          SCEN="$INPUT_SCENARIOS"
+          if [[ -n "$SCEN" ]]; then
+            if [[ "$SCEN" == *".."* ]]; then
+              echo "scenarios must not contain .." >&2
+              exit 1
+            fi
+            SCEN_ABS="${{ github.workspace }}/$SCEN"
+            if [[ ! -f "$SCEN_ABS" ]]; then
+              echo "scenarios file not found: $SCEN_ABS" >&2
+              exit 1
+            fi
+            echo "scenarios=$SCEN_ABS" >> "$GITHUB_OUTPUT"
+          fi
+          PROB="$INPUT_PROBES"
+          if [[ -n "$PROB" ]]; then
+            if [[ "$PROB" == *".."* ]]; then
+              echo "probes must not contain .." >&2
+              exit 1
+            fi
+            PROB_ABS="${{ github.workspace }}/$PROB"
+            if [[ ! -f "$PROB_ABS" ]]; then
+              echo "probes file not found: $PROB_ABS" >&2
+              exit 1
+            fi
+            echo "probes=$PROB_ABS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Golden index (fixtures/minimal only)
+        if: inputs.fixture_root == 'fixtures/minimal'
+        run: bun run test:golden
+
+      - name: Run agent-eval harness
+        env:
+          AGENT_EVAL_MODE: ${{ inputs.mode }}
+          AGENT_EVAL_FIXTURE_ROOT: ${{ steps.paths.outputs.fixture }}
+          AGENT_EVAL_RUNS: ${{ inputs.runs }}
+          AGENT_EVAL_PRINT_SUMMARY: "1"
+          AGENT_EVAL_SCENARIOS: ${{ steps.paths.outputs.scenarios }}
+          AGENT_EVAL_PROBES: ${{ steps.paths.outputs.probes }}
+          CODEMAP_MCP_TOOLS: ${{ inputs.mode == 'live' && 'query,query_recipe' || '' }}
+        run: bash scripts/agent-eval/run-arms.sh
+
+      - name: Upload comparison artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-comparison
+          path: .agent-eval/comparison.json
+          if-no-files-found: error
