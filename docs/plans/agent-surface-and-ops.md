@@ -28,14 +28,13 @@ Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](.
 
 ## P2 — Strategic bets
 
-| Plan                                                                      | Effort | Summary                                               |
-| ------------------------------------------------------------------------- | ------ | ----------------------------------------------------- |
-| [framework-route-extraction](./framework-route-extraction.md)             | L      | Express / React Router / NestJS → `http_routes` table |
-| [callback-dispatch-synthesis](./callback-dispatch-synthesis.md)           | L      | Heuristic call edges with `provenance` column         |
-| [unresolved-calls-staging](./unresolved-calls-staging.md)                 | L      | Two-phase call resolution queue                       |
-| [cross-project-mcp-root](./cross-project-mcp-root.md)                     | M      | Optional `root` on MCP tools + DB cache               |
-| [fts-default-on-evaluation](./fts-default-on-evaluation.md)               | S–M    | Measure size tax; maybe flip default                  |
-| [call-path-type-hierarchy-recipes](./call-path-type-hierarchy-recipes.md) | M      | `type-ancestors` / descendants recipes                |
+| Plan                                                            | Effort | Summary                                               |
+| --------------------------------------------------------------- | ------ | ----------------------------------------------------- |
+| [framework-route-extraction](./framework-route-extraction.md)   | L      | Express / React Router / NestJS → `http_routes` table |
+| [callback-dispatch-synthesis](./callback-dispatch-synthesis.md) | L      | Heuristic call edges with `provenance` column         |
+| [unresolved-calls-staging](./unresolved-calls-staging.md)       | L      | Two-phase call resolution queue                       |
+| [cross-project-mcp-root](./cross-project-mcp-root.md)           | M      | Optional `root` on MCP tools + DB cache               |
+| [fts-default-on-evaluation](./fts-default-on-evaluation.md)     | S–M    | Measure size tax; maybe flip default                  |
 
 ---
 

@@ -48,6 +48,12 @@
     "language": "tsx"
   },
   {
+    "path": "src/types/hierarchy.ts",
+    "line_count": 18,
+    "size": 272,
+    "language": "ts"
+  },
+  {
     "path": "tsconfig.json",
     "line_count": 18,
     "size": 363,
@@ -112,11 +118,5 @@
     "line_count": 9,
     "size": 94,
     "language": "css"
-  },
-  {
-    "path": "src/components/shop/ApiBridge.tsx",
-    "line_count": 8,
-    "size": 184,
-    "language": "tsx"
   }
 ]

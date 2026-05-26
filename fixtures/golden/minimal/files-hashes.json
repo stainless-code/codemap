@@ -13,7 +13,7 @@
   },
   {
     "path": "README.md",
-    "content_hash": "390688dd7d6a7fd10daf9ec36acf4562e1a29859bfce78ca88ba4d5abd2eb0ab",
+    "content_hash": "534dd8cc879d7d42e14637528a43297ebe0ad7fe7e9443631725a969a7ed5df8",
     "language": "md",
     "line_count": 52
   },
@@ -132,10 +132,28 @@
     "line_count": 9
   },
   {
+    "path": "src/types/hierarchy.ts",
+    "content_hash": "68ab089d7f22ae9212b84f8ffe20ff1c46d9b2b86b1af3af6062dd5e59503034",
+    "language": "ts",
+    "line_count": 18
+  },
+  {
+    "path": "src/types/homonym-mammal.ts",
+    "content_hash": "28b505e7360693f8a6cb5244485b074b393489972282e34208496c6a9c29e5f3",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
     "path": "src/types/status.ts",
     "content_hash": "85a4d68b1bcffdd9b00c25293b5b81be1ce690a7525b444c6315dcf2b8876b7b",
     "language": "ts",
     "line_count": 5
+  },
+  {
+    "path": "src/types/type-cycle.ts",
+    "content_hash": "be72971384bd7e230632a32f89b43a36e782e9d26e376869674fe34737a7b09c",
+    "language": "ts",
+    "line_count": 4
   },
   {
     "path": "src/usePermissions.ts",
