@@ -4,19 +4,19 @@
 >
 > **Motivator:** Codemap claims agent-discovery wins ([why-codemap.md](../why-codemap.md), [benchmark.md](../benchmark.md)). PR CI now gates golden SQL plus deterministic probe A/B smoke on `fixtures/minimal`; still need falsifiable **live** agent runs (MCP on vs off) and external-fixture benchmarks measuring tool-call count and tokens on fixed tasks.
 >
-> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (falsifiable benchmark item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1)
+> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (falsifiable benchmark item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1--open)
 
 ---
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                              | Source                                         |
-| --- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| L.1 | Harness lives in **`scripts/agent-eval/`** — not shipped in npm package.                                              | Dev/CI only                                    |
-| L.2 | Fixtures reuse **golden-query scenarios** + optional external public repos (zod, fastify) per roadmap benchmark item. | Don't duplicate fixtures                       |
-| L.3 | Arms: **codemap MCP on** vs **off** (or [mcp-tool-allowlist](./mcp-tool-allowlist.md) subset).                        | Clean ablation                                 |
-| L.4 | Metrics: tool-call sequence, wall time, estimated tokens (chars/4), success bit.                                      | Publishable table                              |
-| L.5 | **No telemetry upload** — results written to local JSON + optional CI artifact.                                       | [Floor](../roadmap.md#floors-v1-product-shape) |
+| #   | Decision                                                                                                                                   | Source                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| L.1 | Harness lives in **`scripts/agent-eval/`** — not shipped in npm package.                                                                   | Dev/CI only                                    |
+| L.2 | Fixtures reuse **golden-query scenarios** + optional external public repos (zod, fastify) per roadmap benchmark item.                      | Don't duplicate fixtures                       |
+| L.3 | Arms: **codemap MCP on** vs **off** (or `CODEMAP_MCP_TOOLS` subset per [agents.md § MCP tool allowlist](../agents.md#mcp-tool-allowlist)). | Clean ablation                                 |
+| L.4 | Metrics: tool-call sequence, wall time, estimated tokens (chars/4), success bit.                                                           | Publishable table                              |
+| L.5 | **No telemetry upload** — results written to local JSON + optional CI artifact.                                                            | [Floor](../roadmap.md#floors-v1-product-shape) |
 
 ---
 
@@ -28,7 +28,7 @@
 4. **Summary reporter** — markdown table for docs/benchmark.md
 5. **PR CI probe gate** — `test:agent-eval` in Test job on `fixtures/minimal` ✅
 6. **Optional nightly / `workflow_dispatch`** — public external fixtures only
-7. **Link to [mcp-tool-allowlist](./mcp-tool-allowlist.md)** for minimal-tool live arms
+7. **Document `CODEMAP_MCP_TOOLS`** minimal-tool live arms ([agents.md § MCP tool allowlist](../agents.md#mcp-tool-allowlist))
 
 ---
 
@@ -45,4 +45,4 @@
 
 ## Dependencies
 
-- [mcp-server-instructions](./mcp-server-instructions.md) and [agents-init-mcp-wiring](./agents-init-mcp-wiring.md) improve arm fairness (agents actually use tools)
+- [agents.md § MCP server instructions](../agents.md#mcp-server-instructions) and [agents init `--mcp`](../agents.md#mcp-wiring-via-agents-init) improve arm fairness (agents actually use tools)

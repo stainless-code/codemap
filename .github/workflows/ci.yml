@@ -120,7 +120,7 @@ jobs:
 
       # 0.6.0 regression guard — `resolveBundledRecipesDir()` walked
       # past the package root, so `--recipes-json` returned `[]` even
-      # though the tarball shipped the 40 recipes correctly.
+      # though the tarball shipped the bundled recipes correctly.
       - name: Node smoke (bundled recipes resolve from dist)
         run: |
           set -euo pipefail
@@ -184,7 +184,7 @@ jobs:
     if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
     # Non-blocking until we've published codemap@<v1> matching the Action.
-    # Today the Action pulls codemap@latest from npm (0.4.0), which works
+    # Today the Action pulls codemap@latest from npm (currently 0.8.x), which works
     # for `--version` but doesn't validate v1.x flags. Promote to a hard
     # gate when v1.0.0 ships.
     continue-on-error: true

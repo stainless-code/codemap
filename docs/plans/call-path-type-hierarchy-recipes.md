@@ -4,7 +4,7 @@
 >
 > **Motivator:** Shortest-path and type-ancestor queries are common agent tasks. `impact` walks radius but doesn't find minimal paths. `type_members` exists but no bundled recipe for extends/implements chains.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2) · overlaps [mcp-trace-explore-tools](./mcp-trace-explore-tools.md) (ship recipes there first for call-path)
+> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets) · `call-path` / `symbol-neighborhood` recipes + MCP tools shipped #131/#134
 
 ---
 
@@ -12,7 +12,7 @@
 
 | #   | Decision                                                                                                                                     | Source         |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| L.1 | **Recipes only** in this plan — MCP wrappers live in [mcp-trace-explore-tools](./mcp-trace-explore-tools.md).                                | Split concerns |
+| L.1 | **Recipes only** in this plan — MCP `trace` / `explore` / `node` wrappers already shipped.                                                   | Split concerns |
 | L.2 | Call path uses **recursive CTE** on `calls` table; optional `via=dependencies` mode.                                                         | Moat A         |
 | L.3 | Type hierarchy uses **`type_members`** + class/interface `symbols` relationships where extracted; document gaps for incomplete extends data. | Honest limits  |
 | L.4 | No new library export required for v1 — optional `findCallPath()` in `api.ts` later.                                                         | YAGNI          |
@@ -58,5 +58,5 @@
 
 ## Dependencies
 
-- [mcp-trace-explore-tools](./mcp-trace-explore-tools.md) for `call-path` MCP wrapper
+- MCP `trace` tool + `call-path` recipe (shipped #131/#134)
 - [callback-dispatch-synthesis](./callback-dispatch-synthesis.md) improves call-path completeness

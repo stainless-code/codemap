@@ -4,7 +4,7 @@
 >
 > **Motivator:** Call sites are inserted during parse; cross-file resolution to callee symbols happens in bindings post-pass without a durable staging queue. Re-indexing a subset of files can leave stale call edges until full rebuild. A two-phase extract→resolve pipeline enables scoped re-resolution on incremental sync.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2)
+> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets)
 
 ---
 
@@ -59,4 +59,4 @@ CREATE TABLE unresolved_calls (
 ## Dependencies
 
 - Pairs with [callback-dispatch-synthesis](./callback-dispatch-synthesis.md) (runs after base resolve)
-- [index-lock-and-error-log](./index-lock-and-error-log.md) for concurrent index safety
+- [agents.md](../agents.md) — concurrent index safety via `<state-dir>/index.lock` / `codemap unlock`

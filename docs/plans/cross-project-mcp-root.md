@@ -4,7 +4,7 @@
 >
 > **Motivator:** Some agent setups index multiple repos (monorepo + packages, microservices). A single MCP server could query another indexed tree if given an explicit root path — without restarting the server.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2)
+> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets)
 
 ---
 
@@ -47,4 +47,4 @@ Ship when a consumer runs multi-root MCP or opens an issue with concrete layout.
 
 ## Dependencies
 
-- [index-lock-and-error-log](./index-lock-and-error-log.md) — clarify lock is per state-dir, not global singleton confusion
+- [agents.md](../agents.md) — `index.lock` is per `<state-dir>`, not a global singleton

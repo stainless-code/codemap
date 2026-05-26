@@ -1,8 +1,8 @@
 # Agent surface & indexing ops — plan index
 
-> **Status:** open · **Created:** 2026-05-24
+> **Status:** partial (Wave 1–2 + probe eval shipped; live agent-eval arms open) · **Created:** 2026-05-24
 >
-> **Purpose:** Prioritized work queue for agent UX, MCP ergonomics, indexing reliability, and TS/JS graph substrate gaps. Each item has its own plan file; this index links priority tiers and recommended ship order.
+> **Purpose:** Prioritized work queue for agent UX, MCP ergonomics, indexing reliability, and TS/JS graph substrate gaps. Open items have plan files; shipped Wave 1–2 work lives in [agents.md](../agents.md) and the PR tracker.
 >
 > **Roadmap home:** [§ Backlog — Agent & indexing ops](../roadmap.md#agent--indexing-ops)
 >
@@ -10,53 +10,19 @@
 
 ---
 
-## Recommended ship order
+## Shipped (Wave 1–2, #126–#138)
 
-```
-P0 (ops polish) — shipped in Wave 1 ([#126](https://github.com/stainless-code/codemap/pull/126), [#127](https://github.com/stainless-code/codemap/pull/127))
-  PR1: mcp-server-instructions + mcp-tool-allowlist
-  PR2: wsl-watch-policy → git-hook-auto-sync
+MCP initialize instructions + `codemap://mcp-instructions`, `CODEMAP_MCP_TOOLS`, WSL `/mnt` watch policy, opt-in git-hook auto-sync, MCP `trace` / `explore` / `node`, `agents init --mcp`, `affected-tests` + MCP `affected`, cross-process `index.lock` + `codemap unlock` + `errors.log`, parse-worker timeout/recycle, field-qualified `show --query`.
 
-P1 (agent + reliability, parallel tracks)
-  Track A: mcp-trace-explore-tools (+ call-path recipes)
-  Track B: agents-init-mcp-wiring
-  Track C: index-lock-and-error-log → parse-worker-hardening
-  Track D: affected-tests-recipe
-  Track E: field-qualified-search
-  Track F: agent-eval-harness (after MCP instructions + allowlist)
-
-P2 (substrate + trigger-gated)
-  c9-plugin-layer (existing XL plan) → framework-route-extraction
-  unresolved-calls-staging → callback-dispatch-synthesis
-  call-path-type-hierarchy-recipes (extends P1 recipes)
-  fts-default-on-evaluation (measurement gate)
-  cross-project-mcp-root (on demand)
-```
+Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](./agent-surface-delivery.md).
 
 ---
 
-## P0 — Quick wins
+## P1 — Open
 
-| Plan                                                    | Effort | Summary                                           |
-| ------------------------------------------------------- | ------ | ------------------------------------------------- |
-| [mcp-server-instructions](./mcp-server-instructions.md) | S      | MCP initialize playbook for tool selection        |
-| [wsl-watch-policy](./wsl-watch-policy.md)               | S      | Disable broken watcher on WSL `/mnt` mounts       |
-| [git-hook-auto-sync](./git-hook-auto-sync.md)           | S      | Opt-in git hooks for background incremental index |
-| [mcp-tool-allowlist](./mcp-tool-allowlist.md)           | S      | `CODEMAP_MCP_TOOLS` env subset registration       |
-
----
-
-## P1 — Medium effort
-
-| Plan                                                      | Effort | Summary                                            |
-| --------------------------------------------------------- | ------ | -------------------------------------------------- |
-| [mcp-trace-explore-tools](./mcp-trace-explore-tools.md)   | M      | MCP trace/explore/node + recipe twins              |
-| [agents-init-mcp-wiring](./agents-init-mcp-wiring.md)     | M      | `agents init --mcp` config + permissions           |
-| [affected-tests-recipe](./affected-tests-recipe.md)       | M      | Test selection from dep graph + stdin              |
-| [index-lock-and-error-log](./index-lock-and-error-log.md) | M      | Cross-process lock + `codemap unlock` + errors.log |
-| [parse-worker-hardening](./parse-worker-hardening.md)     | M      | Per-file timeout + worker recycle                  |
-| [field-qualified-search](./field-qualified-search.md)     | M      | `kind:` / `path:` / `name:` search → SQL           |
-| [agent-eval-harness](./agent-eval-harness.md)             | M      | A/B agent eval for tool-call + token metrics       |
+| Plan                                          | Effort | Summary                                                                                        |
+| --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
+| [agent-eval-harness](./agent-eval-harness.md) | M      | Probe A/B + PR CI ([#139](https://github.com/stainless-code/codemap/pull/139)); live arms open |
 
 ---
 
@@ -75,11 +41,11 @@ P2 (substrate + trigger-gated)
 
 ## Related existing plans
 
-| Plan                                                          | Relationship                                                                      |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| [c9-plugin-layer](./c9-plugin-layer.md)                       | Prerequisite for [framework-route-extraction](./framework-route-extraction.md)    |
-| [github-marketplace-action](./github-marketplace-action.md)   | May add `affected` mode after [affected-tests-recipe](./affected-tests-recipe.md) |
-| [perf-triangulation-rollout](./perf-triangulation-rollout.md) | [parse-worker-hardening](./parse-worker-hardening.md) related Phase 3 items       |
+| Plan                                                          | Relationship                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [c9-plugin-layer](./c9-plugin-layer.md)                       | Prerequisite for [framework-route-extraction](./framework-route-extraction.md) |
+| [github-marketplace-action](./github-marketplace-action.md)   | May add `affected` mode (shipped CLI/MCP `affected` + `affected-tests` recipe) |
+| [perf-triangulation-rollout](./perf-triangulation-rollout.md) | Parse-worker hardening shipped #130; Phase 3 deferrals remain in rollout plan  |
 
 ---
 
