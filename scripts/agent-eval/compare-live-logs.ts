@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { parseAgentLogFile } from "./parse-agent-log";
@@ -144,6 +144,16 @@ Options:
   }
   if (args.mcpOnLog === "" || args.mcpOffLog === "") {
     console.error("compare-live-logs: --mcp-on and --mcp-off are required");
+    process.exit(1);
+  }
+  if (!existsSync(args.mcpOnLog)) {
+    console.error(`compare-live-logs: MCP-on log not found: ${args.mcpOnLog}`);
+    process.exit(1);
+  }
+  if (!existsSync(args.mcpOffLog)) {
+    console.error(
+      `compare-live-logs: MCP-off log not found: ${args.mcpOffLog}`,
+    );
     process.exit(1);
   }
   const scenario = compareLogArms(args.mcpOnLog, args.mcpOffLog, args.id);

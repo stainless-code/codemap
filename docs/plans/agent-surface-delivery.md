@@ -10,15 +10,14 @@
 
 ## Quick resume
 
-| Next action         | Detail                                                                                                                   |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Open**            | —                                                                                                                        |
-| **In flight**       | —                                                                                                                        |
-| **Recently merged** | [#144](https://github.com/stainless-code/codemap/pull/144) — agent eval live MCP arms + log comparison (PR 9 completion) |
-|                     | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2)          |
-|                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                             |
-|                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                               |
-|                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                                |
+| Next action         | Detail                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Open**            | —                                                                                                               |
+| **In flight**       | [#144](https://github.com/stainless-code/codemap/pull/144) — agent eval live MCP arms + log comparison (PR 9)   |
+| **Recently merged** | [#141](https://github.com/stainless-code/codemap/pull/141) — `type-ancestors` / `type-descendants` recipes (P2) |
+|                     | [#139](https://github.com/stainless-code/codemap/pull/139) — agent-eval probe harness (PR 9)                    |
+|                     | [#138](https://github.com/stainless-code/codemap/pull/138) — field-qualified search (PR 7)                      |
+|                     | Wave 1–2 (#126–#137) — see merged rows below; plan tombstones removed per docs-governance                       |
 
 Update the table below when a PR merges or a new branch opens.
 
@@ -47,7 +46,7 @@ Max **3 parallel tracks** at once.
 | **6** | MCP `trace` / `explore` / `node` + instructions update                                                                                                           | merged | [#134](https://github.com/stainless-code/codemap/pull/134)                                                             | PR 1, PR 4    |
 | **7** | Field-qualified `show --query` search                                                                                                                            | merged | [#138](https://github.com/stainless-code/codemap/pull/138)                                                             | PR 1, PR 6    |
 | **8** | `agents init --mcp` wiring                                                                                                                                       | merged | [#135](https://github.com/stainless-code/codemap/pull/135)                                                             | 3–5           |
-| **9** | Agent eval harness — probe ([#139](https://github.com/stainless-code/codemap/pull/139)); live + log ([#144](https://github.com/stainless-code/codemap/pull/144)) | merged | —                                                                                                                      | PR 1, PR 8    |
+| **9** | Agent eval harness — probe ([#139](https://github.com/stainless-code/codemap/pull/139)); live + log ([#144](https://github.com/stainless-code/codemap/pull/144)) | open   | —                                                                                                                      | PR 1, PR 8    |
 
 **Parallelization constraints**
 

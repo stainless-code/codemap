@@ -6,8 +6,6 @@ import type {
   QueryRecipeArgs,
   ToolResult,
 } from "../../src/application/tool-handlers";
-import { resolveCodemapConfig } from "../../src/config";
-import { initCodemap } from "../../src/runtime";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import type { GoldenScenario } from "../query-golden/schema";
 import {
@@ -26,7 +24,6 @@ export function runLiveMcpArm(
   root: string,
   prompt: string,
 ): ArmRunMetrics {
-  initCodemap(resolveCodemapConfig(root, undefined));
   const tool = requiredMcpToolForGolden(golden);
   assertLiveEvalToolEnabled(tool);
   const t0 = performance.now();

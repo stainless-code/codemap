@@ -59,12 +59,22 @@ jobs:
           SCEN="${{ inputs.scenarios }}"
           if [[ -n "$SCEN" ]]; then
             if [[ "$SCEN" == *".."* ]]; then exit 1; fi
-            echo "scenarios=${{ github.workspace }}/$SCEN" >> "$GITHUB_OUTPUT"
+            SCEN_ABS="${{ github.workspace }}/$SCEN"
+            if [[ ! -f "$SCEN_ABS" ]]; then
+              echo "scenarios file not found: $SCEN_ABS" >&2
+              exit 1
+            fi
+            echo "scenarios=$SCEN_ABS" >> "$GITHUB_OUTPUT"
           fi
           PROB="${{ inputs.probes }}"
           if [[ -n "$PROB" ]]; then
             if [[ "$PROB" == *".."* ]]; then exit 1; fi
-            echo "probes=${{ github.workspace }}/$PROB" >> "$GITHUB_OUTPUT"
+            PROB_ABS="${{ github.workspace }}/$PROB"
+            if [[ ! -f "$PROB_ABS" ]]; then
+              echo "probes file not found: $PROB_ABS" >&2
+              exit 1
+            fi
+            echo "probes=$PROB_ABS" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Golden index (fixtures/minimal only)
