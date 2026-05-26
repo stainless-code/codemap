@@ -90,11 +90,11 @@ Same four structural tasks, two subagents on the **codemap repo** index (not `fi
 
 ---
 
-## 6. Follow-up (not shipped)
+## 6. Follow-up
+
+**Shipped (2026-05):** log capture for the log-comparison arm — [`capture-real-sessions.ts`](../../scripts/agent-eval/capture-real-sessions.ts) (see [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness)).
 
 - **Scripted dual-agent harness** — Task JSON, golden expected answers, spawn MCP-on / MCP-off agents, score tool count + answer diff (extends `scripts/agent-eval/`, dev-only).
 - **External fixture CI** — [roadmap § Backlog](../roadmap.md#backlog): zod, fastify, vue-core, next.js with published numbers in [benchmark.md](../benchmark.md).
-
-Log capture for the log-comparison arm: [`scripts/agent-eval/capture-real-sessions.ts`](../../scripts/agent-eval/capture-real-sessions.ts) (see [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness)).
 
 When dual-agent is scripted and external fixtures land, lift durable methodology into [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) and close or slim this note per [docs-governance](../README.md#closing-research).

@@ -2,7 +2,7 @@
  * Capture entries-transcript session logs from real MCP handlers + traditional
  * file-scan arms (dev-only). Writes logs for compare-live-logs.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,7 @@ import {
 import type { QueryRecipeArgs } from "../../src/application/tool-handlers";
 import { resolveCodemapConfig } from "../../src/config";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { runGoldenSetup } from "../query-golden/run-setup";
 import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
 import {
@@ -32,6 +33,27 @@ const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(EVAL_DIR, "../..");
 
 type LogEntry = Record<string, unknown>;
+
+/** Mirror shell `${VAR:-default}` — empty string falls back to default. */
+export function envPath(key: string, fallback: string): string {
+  const v = process.env[key];
+  if (v === undefined || v === "") return fallback;
+  return resolve(v);
+}
+
+export function validateProbesAgainstGolden(
+  probes: AgentEvalProbe[],
+  goldenById: Map<string, GoldenScenario>,
+  scenariosPath: string,
+): void {
+  for (const probe of probes) {
+    if (!goldenById.has(probe.goldenId)) {
+      throw new Error(
+        `Probe "${probe.id}": goldenId "${probe.goldenId}" not found in ${scenariosPath}`,
+      );
+    }
+  }
+}
 
 function assistantAnswer(probeId: string, resultCount: number): string {
   if (resultCount <= 0) return `No results for ${probeId}.`;
@@ -62,8 +84,7 @@ function buildMcpOnSession(
 ): LogEntry[] {
   const entries: LogEntry[] = [];
   for (const probe of probes) {
-    const golden = goldenById.get(probe.goldenId);
-    if (golden === undefined) continue;
+    const golden = goldenById.get(probe.goldenId)!;
     const prompt = golden.prompt ?? probe.id;
     entries.push({ kind: "user", text: prompt });
     const tool = requiredMcpToolForGolden(golden);
@@ -111,8 +132,8 @@ function buildMcpOffSession(
 ): LogEntry[] {
   const entries: LogEntry[] = [];
   for (const probe of probes) {
-    const golden = goldenById.get(probe.goldenId);
-    const prompt = golden?.prompt ?? probe.id;
+    const golden = goldenById.get(probe.goldenId)!;
+    const prompt = golden.prompt ?? probe.id;
     entries.push({ kind: "user", text: prompt });
     const trad = runTraditionalProbe(probe.traditional);
     const sequence = traditionalToolSequence(trad.filesRead);
@@ -136,24 +157,37 @@ function buildMcpOffSession(
 }
 
 async function main(): Promise<void> {
-  const fixtureRoot = resolve(
-    process.env.AGENT_EVAL_FIXTURE_ROOT ?? join(REPO_ROOT, "fixtures/minimal"),
+  const fixtureRoot = envPath(
+    "AGENT_EVAL_FIXTURE_ROOT",
+    join(REPO_ROOT, "fixtures/minimal"),
   );
-  const outDir = resolve(
-    process.env.AGENT_EVAL_SESSION_DIR ??
-      join(REPO_ROOT, ".agent-eval/sessions"),
+  const outDir = envPath(
+    "AGENT_EVAL_SESSION_DIR",
+    join(REPO_ROOT, ".agent-eval/sessions"),
   );
-  const scenariosPath = resolve(
-    process.env.AGENT_EVAL_SCENARIOS ??
-      join(REPO_ROOT, "fixtures/golden/scenarios.json"),
+  const scenariosPath = envPath(
+    "AGENT_EVAL_SCENARIOS",
+    join(REPO_ROOT, "fixtures/golden/scenarios.json"),
   );
-  const probesPath = join(EVAL_DIR, "scenarios.json");
+  const probesPath = envPath(
+    "AGENT_EVAL_PROBES",
+    join(EVAL_DIR, "scenarios.json"),
+  );
+  const skipIndex = process.env.AGENT_EVAL_SKIP_INDEX === "1";
+
+  if (!existsSync(probesPath)) {
+    throw new Error(`Probes file not found: ${probesPath}`);
+  }
+  if (!existsSync(scenariosPath)) {
+    throw new Error(`Scenarios file not found: ${scenariosPath}`);
+  }
 
   const { probes } = parseProbesJson(readFileSync(probesPath, "utf-8"));
-  const { scenarios: goldenScenarios } = parseScenariosJson(
+  const { setup: goldenSetup, scenarios: goldenScenarios } = parseScenariosJson(
     readFileSync(scenariosPath, "utf-8"),
   );
   const goldenById = new Map(goldenScenarios.map((s) => [s.id, s]));
+  validateProbesAgainstGolden(probes, goldenById, scenariosPath);
 
   const priorRoot = process.env.CODEMAP_ROOT;
   const priorMcpTools = process.env.CODEMAP_MCP_TOOLS;
@@ -162,9 +196,21 @@ async function main(): Promise<void> {
 
   try {
     const cm = await createCodemap({ root: fixtureRoot });
-    await cm.index({ mode: "full", quiet: true });
+    const dbPath = resolveCodemapConfig(fixtureRoot, undefined).databasePath;
+    if (skipIndex) {
+      if (!existsSync(dbPath)) {
+        throw new Error(
+          `AGENT_EVAL_SKIP_INDEX=1: no index at ${dbPath}; run index first or unset skip`,
+        );
+      }
+    } else {
+      await cm.index({ mode: "full", quiet: true });
+    }
+    if (goldenSetup.length > 0) {
+      runGoldenSetup(goldenSetup, fixtureRoot);
+    }
     console.log(
-      `Indexed ${fixtureRoot} → ${resolveCodemapConfig(fixtureRoot, undefined).databasePath}`,
+      `Indexed ${fixtureRoot} → ${dbPath}${skipIndex ? " (skip-index)" : ""}`,
     );
 
     const mcpOnEntries = buildMcpOnSession(probes, goldenById, fixtureRoot);
