@@ -10,12 +10,12 @@
 
 ## 1. Eval layers
 
-| Layer          | What it measures                                         | MCP-off arm                        | Reproducible?                                                                                                   |
-| -------------- | -------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Probe**      | `queryRows` vs simulated glob→read→grep                  | Traditional regex probe in harness | Yes — `bun run test:agent-eval`                                                                                 |
-| **Live**       | `handleQuery` / `handleQueryRecipe` vs traditional probe | Same traditional arm               | Yes — `bun run test:agent-eval` (live smoke) + local `AGENT_EVAL_MODE=live bash scripts/agent-eval/run-arms.sh` |
-| **Log**        | Exported MCP-on vs MCP-off session transcripts           | Post-hoc parse only                | Yes when logs are supplied                                                                                      |
-| **Dual-agent** | Real LLM agent with MCP vs same tasks with MCP forbidden | Agent uses Grep/Read/Glob only     | Manual / ad hoc today; not in CI                                                                                |
+| Layer          | What it measures                                         | MCP-off arm                        | Reproducible?                                                                                                               |
+| -------------- | -------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Probe**      | `queryRows` vs simulated glob→read→grep                  | Traditional regex probe in harness | Yes — `bun run test:agent-eval`                                                                                             |
+| **Live**       | `handleQuery` / `handleQueryRecipe` vs traditional probe | Same traditional arm               | Yes — `bun run test:agent-eval` (live smoke) + local `AGENT_EVAL_MODE=live bash scripts/agent-eval/run-arms.sh`             |
+| **Log**        | Exported MCP-on vs MCP-off session transcripts           | Post-hoc parse only                | Yes when logs are supplied, or generate via [`capture-real-sessions.ts`](../../scripts/agent-eval/capture-real-sessions.ts) |
+| **Dual-agent** | Real LLM agent with MCP vs same tasks with MCP forbidden | Agent uses Grep/Read/Glob only     | Manual / ad hoc today; not in CI                                                                                            |
 
 The harness **traditional arm** models **naive** file discovery (glob, read every candidate, grep). A **skilled** agent may grep directly and match MCP on simple lookups — see § 4.
 
@@ -90,10 +90,11 @@ Same four structural tasks, two subagents on the **codemap repo** index (not `fi
 
 ---
 
-## 6. Follow-up (not shipped)
+## 6. Follow-up
+
+**Shipped (2026-05):** log capture for the log-comparison arm — [`capture-real-sessions.ts`](../../scripts/agent-eval/capture-real-sessions.ts) (see [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness)).
 
 - **Scripted dual-agent harness** — Task JSON, golden expected answers, spawn MCP-on / MCP-off agents, score tool count + answer diff (extends `scripts/agent-eval/`, dev-only).
 - **External fixture CI** — [roadmap § Backlog](../roadmap.md#backlog): zod, fastify, vue-core, next.js with published numbers in [benchmark.md](../benchmark.md).
-- **Log capture helper** — Not shipped; log comparison today uses manually exported transcripts + `compare-live-logs.ts` / `AGENT_EVAL_LOG_ON`/`OFF`.
 
 When dual-agent is scripted and external fixtures land, lift durable methodology into [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) and close or slim this note per [docs-governance](../README.md#closing-research).

@@ -328,7 +328,24 @@ AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh
 bun scripts/agent-eval/print-comparison-summary.ts .agent-eval/comparison.json
 ```
 
-Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`, **`AGENT_EVAL_MODE`** (`probe` | `live`), **`AGENT_EVAL_RUNS`**, **`AGENT_EVAL_LOG_ON`**, **`AGENT_EVAL_LOG_OFF`**, **`AGENT_EVAL_LOG`**, **`AGENT_EVAL_LOG_OUTPUT`**, **`AGENT_EVAL_PRINT_SUMMARY`**. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`). **Log comparison:** `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` write `.agent-eval/log-comparison.json` (override path with `AGENT_EVAL_LOG_OUTPUT`) and print a summary. Optional single-log parse: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh`.
+**Log capture (local, no real agent export):** generate entries-style MCP-on/off transcripts from live handlers + the traditional probe, then compare. Synthetic MCP-off logs omit read `tool_result` payloads — log-mode token totals undercount vs probe/live arms; use those arms for payload-inclusive estimates.
+
+```bash
+bun scripts/agent-eval/capture-real-sessions.ts
+# → .agent-eval/sessions/real-mcp-on.json, real-mcp-off.json
+
+AGENT_EVAL_LOG_ON=.agent-eval/sessions/real-mcp-on.json \
+AGENT_EVAL_LOG_OFF=.agent-eval/sessions/real-mcp-off.json \
+bash scripts/agent-eval/run-arms.sh
+# still runs probe/live first, then compares logs
+
+AGENT_EVAL_CAPTURE=1 bash scripts/agent-eval/run-arms.sh
+# capture + compare after probe/live (honors fixture/probes/scenarios env)
+```
+
+Log-only (no probe/live): run `capture-real-sessions.ts`, then `compare-live-logs.ts` directly.
+
+Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EVAL_SCENARIOS`, `AGENT_EVAL_PROBES`, **`AGENT_EVAL_MODE`** (`probe` | `live`), **`AGENT_EVAL_RUNS`**, **`AGENT_EVAL_LOG_ON`**, **`AGENT_EVAL_LOG_OFF`**, **`AGENT_EVAL_LOG`**, **`AGENT_EVAL_LOG_OUTPUT`**, **`AGENT_EVAL_CAPTURE`**, **`AGENT_EVAL_SESSION_DIR`**, **`AGENT_EVAL_SKIP_INDEX`**, **`AGENT_EVAL_PRINT_SUMMARY`**. **`AGENT_EVAL_RUNS`** (or `--runs`) repeats each probe and **averages** `wallMs`, `estTokens`, `resultCount`, and `toolCallCount` (rounded; `estTokens` re-ceiled after averaging); `toolSequence` stays from the first run. **`--skip-index`** on `run-probes.ts` / `run-arms.sh` skips a full reindex when `.codemap/index.db` already exists (CI smoke reuses the index left by `test:golden`); capture mirrors that when `AGENT_EVAL_SKIP_INDEX=1` (set automatically by `AGENT_EVAL_CAPTURE=1` when the index exists). **Log comparison:** `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` write `.agent-eval/log-comparison.json` (override path with `AGENT_EVAL_LOG_OUTPUT`) and print a summary. Optional single-log parse: `AGENT_EVAL_LOG=path/to/export.json bash scripts/agent-eval/run-arms.sh`.
 
 **Metrics (per scenario and summary):** tool-call sequence + count, wall time, estimated tokens (`chars / 4` on prompt + payload). Probe MCP-on counts resolved SQL + bind values + JSON rows; live MCP-on counts tool name + args + handler JSON payload (recipe probes use `query_recipe`, not `query` — tool counts differ from probe mode). MCP-off includes bytes read + grep hits. Log mode also counts assistant output chars from exports. Per-arm `success` (non-empty results) plus `scenarioSuccess` when both arms succeed in probe/live. Results stay local JSON — no telemetry upload (benchmark harness floor).
 

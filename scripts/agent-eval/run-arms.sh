@@ -37,6 +37,23 @@ if [[ "${AGENT_EVAL_PRINT_SUMMARY:-0}" == "1" && -f "$OUT" ]]; then
 fi
 
 LOG_EXIT=0
+if [[ "${AGENT_EVAL_CAPTURE:-}" == "1" ]]; then
+  echo "=== agent-eval: capture synthetic log sessions ==="
+  SESSION_DIR="${AGENT_EVAL_SESSION_DIR:-$REPO_ROOT/.agent-eval/sessions}"
+  CAPTURE_ENV=(
+    AGENT_EVAL_FIXTURE_ROOT="$FIXTURE_ROOT"
+    AGENT_EVAL_SCENARIOS="$SCENARIOS"
+    AGENT_EVAL_PROBES="$PROBES"
+    AGENT_EVAL_SESSION_DIR="$SESSION_DIR"
+  )
+  if [[ -f "$INDEX_DB" ]]; then
+    CAPTURE_ENV+=(AGENT_EVAL_SKIP_INDEX=1)
+  fi
+  env "${CAPTURE_ENV[@]}" bun "$SCRIPT_DIR/capture-real-sessions.ts"
+  export AGENT_EVAL_LOG_ON="${AGENT_EVAL_LOG_ON:-$SESSION_DIR/real-mcp-on.json}"
+  export AGENT_EVAL_LOG_OFF="${AGENT_EVAL_LOG_OFF:-$SESSION_DIR/real-mcp-off.json}"
+fi
+
 if [[ -n "${AGENT_EVAL_LOG:-}" ]]; then
   echo "=== agent-eval: parse agent log $AGENT_EVAL_LOG ==="
   bun "$SCRIPT_DIR/print-log-metrics.ts" "$AGENT_EVAL_LOG"
