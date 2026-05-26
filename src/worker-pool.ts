@@ -32,7 +32,7 @@ const RECYCLE_EVERY_RE = /^\d+$/;
 
 const DEFAULT_WORKER_RECYCLE_EVERY = 250;
 /** Avoid worker spawn tax on tiny targeted/incremental batches. */
-export const INLINE_PARSE_MAX = 12;
+const INLINE_PARSE_MAX = 12;
 /** Cap a single worker message budget so one hung file cannot block a huge chunk until sum(timeouts). */
 const CHUNK_TIMEOUT_CAP_MS = 120_000;
 

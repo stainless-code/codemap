@@ -5,7 +5,6 @@ import { resolveCodemapConfig } from "./config";
 import { globSync } from "./glob-sync";
 import { initCodemap } from "./runtime";
 import {
-  INLINE_PARSE_MAX,
   parseFilesParallel,
   parseParseWorkerCountOverride,
   parseWorkerRecycleEvery,
@@ -13,6 +12,8 @@ import {
 
 const repoRoot = join(import.meta.dir, "..");
 const minimalRoot = join(repoRoot, "fixtures", "minimal");
+/** Mirrors `INLINE_PARSE_MAX` in `worker-pool.ts`. */
+const WORKER_POOL_INLINE_PARSE_MAX = 12;
 
 describe("parseParseWorkerCountOverride", () => {
   test("accepts valid decimal integers", () => {
@@ -53,7 +54,7 @@ describe("parseFilesParallel", () => {
   test("returns parsed results via the worker pool path", async () => {
     initCodemap(resolveCodemapConfig(minimalRoot, undefined));
     const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
-    expect(files.length).toBeGreaterThan(INLINE_PARSE_MAX);
+    expect(files.length).toBeGreaterThan(WORKER_POOL_INLINE_PARSE_MAX);
 
     const results = await parseFilesParallel(files);
     expect(results.length).toBe(files.length);
@@ -61,18 +62,19 @@ describe("parseFilesParallel", () => {
 
   test("subprocess exits promptly after worker-pool parse (no orphaned timers)", async () => {
     const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
-    expect(files.length).toBeGreaterThan(INLINE_PARSE_MAX);
+    expect(files.length).toBeGreaterThan(WORKER_POOL_INLINE_PARSE_MAX);
 
     const script = `
 import { resolveCodemapConfig } from "./src/config.ts";
 import { globSync } from "./src/glob-sync.ts";
 import { initCodemap } from "./src/runtime.ts";
-import { INLINE_PARSE_MAX, parseFilesParallel } from "./src/worker-pool.ts";
+import { parseFilesParallel } from "./src/worker-pool.ts";
 
+const inlineParseMax = ${WORKER_POOL_INLINE_PARSE_MAX};
 const root = ${JSON.stringify(minimalRoot)};
 initCodemap(resolveCodemapConfig(root, undefined));
 const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], root);
-if (files.length <= INLINE_PARSE_MAX) {
+if (files.length <= inlineParseMax) {
   throw new Error("fixture too small for worker-pool path");
 }
 await parseFilesParallel(files);
