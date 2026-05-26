@@ -131,9 +131,10 @@ jobs:
       # Full rebuild exercises multi-statement DDL (`runSql`), `dropAll`, workers path — Node only.
       - name: Node full index (fixtures/minimal)
         run: |
+          set -euo pipefail
           export CODEMAP_ROOT="$GITHUB_WORKSPACE/fixtures/minimal"
           rm -f "$CODEMAP_ROOT/.codemap.db"
-          node dist/index.mjs --full
+          timeout 45 node dist/index.mjs --full
           node dist/index.mjs query "SELECT COUNT(*) AS files FROM files"
 
   benchmark:

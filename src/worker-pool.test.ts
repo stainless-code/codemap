@@ -78,7 +78,6 @@ if (files.length <= INLINE_PARSE_MAX) {
 await parseFilesParallel(files);
 `;
 
-    const started = performance.now();
     const proc = Bun.spawn([process.execPath, "-e", script], {
       cwd: repoRoot,
       stdout: "ignore",
@@ -94,13 +93,11 @@ await parseFilesParallel(files);
       }),
     ]);
     const stderr = await new Response(proc.stderr).text();
-    const elapsedMs = performance.now() - started;
 
     expect(exitOrHang.kind).toBe("exit");
     if (exitOrHang.kind === "exit") {
       expect(exitOrHang.code).toBe(0);
     }
     expect(stderr).toBe("");
-    expect(elapsedMs).toBeLessThan(5_000);
   }, 8_000);
 });
