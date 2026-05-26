@@ -47,7 +47,7 @@
 
 ## Dependencies
 
-- Synergy with [field-qualified-search](./field-qualified-search.md) when FTS joined to symbol filters
+- Synergy with field-qualified `show --query` / `snippet --query` ([agents.md](../agents.md)) when FTS joins symbol filters
 
 ---
 

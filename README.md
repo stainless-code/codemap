@@ -222,8 +222,10 @@ codemap rule                                                    # full codemap r
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio; one tool per CLI verb plus query_batch
-# Tools: query, query_batch (MCP-only — N statements in one round-trip), query_recipe, audit,
-#        save_baseline, list_baselines, drop_baseline, context, validate, show, snippet, impact, apply
+# Tools (17): query, query_batch (MCP-only), query_recipe, audit, save_baseline,
+#        list_baselines, drop_baseline, context, validate, show, snippet, impact,
+#        affected, trace, explore, node, apply
+# query_batch has no CLI twin; all other tools mirror a CLI verb's --json envelope.
 # Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
@@ -236,6 +238,7 @@ codemap --root /path/to/repo --full
 codemap --config /path/to/config.json --full
 # Override the state directory (default `.codemap/`):
 codemap --state-dir .cm --full        # or: CODEMAP_STATE_DIR=.cm codemap --full
+codemap unlock                        # clear stale <state-dir>/index.lock after a crashed indexer
 
 # Re-index only given paths (relative to project root)
 codemap --files src/a.ts src/b.tsx

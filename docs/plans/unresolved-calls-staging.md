@@ -59,4 +59,4 @@ CREATE TABLE unresolved_calls (
 ## Dependencies
 
 - Pairs with [callback-dispatch-synthesis](./callback-dispatch-synthesis.md) (runs after base resolve)
-- [index-lock-and-error-log](./index-lock-and-error-log.md) for concurrent index safety
+- [agents.md](../agents.md) — concurrent index safety via `<state-dir>/index.lock` / `codemap unlock`

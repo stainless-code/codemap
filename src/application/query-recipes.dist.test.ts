@@ -1,7 +1,7 @@
 /**
  * Regression for the 0.6.0 → 0.6.1 resolver fix — the bundled-recipes
  * resolver walked one directory too far up the tree, so `--recipes-json`
- * returned `[]` even though the tarball shipped the 40 recipes correctly.
+ * returned `[]` even though the tarball shipped the bundled recipes correctly.
  * Binary-level dist smoke lives in `.github/workflows/ci.yml`.
  */
 

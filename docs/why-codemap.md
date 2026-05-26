@@ -143,7 +143,7 @@ Several tools pre-index repos for AI agents (tree-sitter or AST parsers → SQLi
 | Explore codebase in a 3D graph UI                   | Graph visualization products (different lane)           |
 | Ask NL questions over the whole repo                | Agent host + embeddings (not codemap)                   |
 
-Backlog items for test-impact selection and framework route extraction are trigger-gated in [roadmap § Backlog](./roadmap.md#backlog) — not committed work.
+**Test-impact selection** ships via **`codemap affected`** and the MCP **`affected`** tool (dep-graph walk → test paths). **Framework route extraction** (Express / React Router / NestJS inventory) remains trigger-gated in [roadmap § Backlog](./roadmap.md#backlog).
 
 For more on what Codemap deliberately does **not** do, see [When to reach for something else](#when-to-reach-for-something-else) above and [docs/roadmap.md § Non-goals](./roadmap.md#non-goals-v1).
 

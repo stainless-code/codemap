@@ -47,4 +47,4 @@ Ship when a consumer runs multi-root MCP or opens an issue with concrete layout.
 
 ## Dependencies
 
-- [index-lock-and-error-log](./index-lock-and-error-log.md) — clarify lock is per state-dir, not global singleton confusion
+- [agents.md](../agents.md) — `index.lock` is per `<state-dir>`, not a global singleton
