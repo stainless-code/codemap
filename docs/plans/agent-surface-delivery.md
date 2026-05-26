@@ -89,8 +89,8 @@ Do not rush with P0/P1. **2–4 separate PRs** after P1 completes.
 
 When opening or merging a PR:
 
-1. Update **Quick resume** and the relevant row **Status** (`planned` → `open` → `merged`).
-2. On merge, check off the matching items in [`roadmap.md`](../roadmap.md#agent--indexing-ops).
-3. Close individual plan files per [docs-governance](../../.agents/skills/docs-governance/SKILL.md) when the feature ships.
+1. Update **Quick resume** and the relevant row **Status** (`planned` → `open` → `merged` / partial).
+2. On merge of a **shipped** Wave item: **delete** its plan file and lift any unique ops detail to [`agents.md`](../agents.md) / [`architecture.md`](../architecture.md); **prune** matching `[x]` lines from [`roadmap.md`](../roadmap.md#agent--indexing-ops) per [docs-governance Rule 2](../../.agents/skills/docs-governance/SKILL.md) (do not leave completed checkboxes in the backlog).
+3. **Keep** plan files while work is partial (e.g. agent-eval probe shipped, live arms open) — update status header and acceptance checkboxes instead of deleting.
 
-Status values: `planned` · `open` · `merged` · `cancelled`
+Status values: `planned` · `open` · `merged` · `partial` · `cancelled`

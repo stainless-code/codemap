@@ -225,7 +225,7 @@ codemap mcp                                                     # JSON-RPC on st
 # Tools (17): query, query_batch (MCP-only), query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
-# query_batch has no CLI twin; all other tools mirror a CLI verb's --json envelope.
+# MCP-only (no CLI verb): query_batch, trace, explore, node. Other tools mirror a CLI --json envelope.
 # Resources: codemap://schema, codemap://skill, codemap://rule (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
@@ -250,7 +250,7 @@ codemap agents init --mcp                                    # project MCP confi
 codemap agents init --interactive   # -i; IDE wiring + symlink vs copy
 ```
 
-**Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**; **`--state-dir`** overrides **`CODEMAP_STATE_DIR`** (default `.codemap/`); **`CODEMAP_WATCH=0`** / **`CODEMAP_NO_WATCH=1`** opt out of the default-ON watcher on `mcp` / `serve` (mirrors `--no-watch`); **`CODEMAP_FORCE_WATCH=1`** overrides WSL `/mnt/*` auto-disable. Use **`codemap agents init --git-hooks`** when the watcher is off for background sync on git events. **`CODEMAP_MCP_TOOLS`** registers a subset of MCP tools (comma-separated snake_case names; see [agents.md § MCP tool allowlist](docs/agents.md#mcp-tool-allowlist)). Indexing a project outside this clone: [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).
+**Environment / flags:** `--root` overrides **`CODEMAP_ROOT`** / **`CODEMAP_TEST_BENCH`**, then **`process.cwd()`**; **`--state-dir`** overrides **`CODEMAP_STATE_DIR`** (default `.codemap/`); **`CODEMAP_WATCH=0`** / **`CODEMAP_NO_WATCH=1`** opt out of the default-ON watcher on `mcp` / `serve` (mirrors `--no-watch`); **`CODEMAP_FORCE_WATCH=1`** overrides WSL `/mnt/*` auto-disable. Use **`codemap agents init --git-hooks`** when the watcher is off for background sync on git events. **`CODEMAP_MCP_TOOLS`** registers a subset of MCP tools (comma-separated snake_case names; see [agents.md § MCP tool allowlist](docs/agents.md#mcp-tool-allowlist)). **`CODEMAP_PARSE_TIMEOUT_MS`** — fixed per-file parse budget (ms); unset uses 10s + size scaling capped at 30s. **`CODEMAP_WORKER_RECYCLE_EVERY`** — recycle worker threads after N files (default **250**). **`CODEMAP_PARSE_WORKERS`** — worker pool size (positive integer, max 32). Indexing a project outside this clone: [docs/benchmark.md § Indexing another project](docs/benchmark.md#indexing-another-project).
 
 **Configuration:** optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; default export object or async factory). Shape: [codemap.config.example.json](codemap.config.example.json). Runtime validation (**Zod**, strict keys) and API surface: [docs/architecture.md § User config](docs/architecture.md#user-config). When developing inside this repo you can use `defineConfig` from `@stainless-code/codemap` or `./src/config`. If you set **`include`**, it **replaces** the default glob list entirely. **Self-healing files (D11):** `<state-dir>/.gitignore` is rewritten to canonical on every codemap boot; JSON config gets unknown-key pruning + key-sort drift; TS/JS configs are validate-only.
 

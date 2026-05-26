@@ -4,7 +4,7 @@
 >
 > **Motivator:** Codemap claims agent-discovery wins ([why-codemap.md](../why-codemap.md), [benchmark.md](../benchmark.md)). PR CI now gates golden SQL plus deterministic probe A/B smoke on `fixtures/minimal`; still need falsifiable **live** agent runs (MCP on vs off) and external-fixture benchmarks measuring tool-call count and tokens on fixed tasks.
 >
-> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (falsifiable benchmark item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1)
+> **Roadmap:** [§ Backlog](../roadmap.md#backlog) (falsifiable benchmark item) · [agent-surface-and-ops § P1](./agent-surface-and-ops.md#p1--open)
 
 ---
 

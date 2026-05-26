@@ -4,7 +4,7 @@
 >
 > **Motivator:** Some agent setups index multiple repos (monorepo + packages, microservices). A single MCP server could query another indexed tree if given an explicit root path — without restarting the server.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2)
+> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets)
 
 ---
 

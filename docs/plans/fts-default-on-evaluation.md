@@ -4,7 +4,7 @@
 >
 > **Motivator:** Body search requires `--with-fts` / `fts5: true` today. Agents miss content matches unless configured. Default-on improves discoverability but may inflate `.codemap/index.db` size and index time.
 >
-> **Roadmap:** [§ Floors — Full-text search default-on](../roadmap.md#floors-v1-product-shape) · [agent-surface-and-ops § P2](./agent-surface-and-ops.md#p2)
+> **Roadmap:** [§ Floors — Full-text search default-on](../roadmap.md#floors-v1-product-shape) · [agent-surface-and-ops § P2](./agent-surface-and-ops.md#p2--strategic-bets)
 
 ---
 

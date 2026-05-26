@@ -4,7 +4,7 @@
 >
 > **Motivator:** Static AST `calls` edges miss EventEmitter wiring, React `setState`→render, and JSX parent→child composition. Call-path and impact queries stop early on real TS/React codebases without heuristic edges — but heuristics must be tagged so agents don't treat them as type-checked facts.
 >
-> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2)
+> **Roadmap:** [§ Backlog — Agent surface & ops](./agent-surface-and-ops.md#p2--strategic-bets)
 
 ---
 

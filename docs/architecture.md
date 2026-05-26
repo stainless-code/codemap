@@ -752,7 +752,7 @@ The full rebuild (`--full`) applies several optimizations that are not safe for 
 
 ### Worker thread parallelism
 
-File I/O and parsing dominate full rebuild time. The indexer spawns N worker threads (capped at CPU count, min 2, max 6) via `parse-worker.ts`. Each worker receives a chunk of file paths, reads files from disk, and runs the appropriate parser (oxc-parser, lightningcss, or regex). Workers return structured `ParsedFile` results to the main thread, which handles import resolution and database inserts serially.
+File I/O and parsing dominate full rebuild time. The indexer spawns N worker threads (capped at CPU count, min 2, max 6; override **`CODEMAP_PARSE_WORKERS`**, max 32) via `parse-worker.ts`. Each worker receives a chunk of file paths, reads files from disk, and runs the appropriate parser (oxc-parser, lightningcss, or regex). Per-file parse budget: **`CODEMAP_PARSE_TIMEOUT_MS`** when set, else 10s + ~1ms per 50KB file size capped at 30s (`parse-timeout.ts`). Workers recycle after **`CODEMAP_WORKER_RECYCLE_EVERY`** files (default 250) to limit memory growth. Timeouts and other per-file failures append to `<state-dir>/errors.log` without aborting the run. Workers return structured `ParsedFile` results to the main thread, which handles import resolution and database inserts serially.
 
 ### Deferred index creation
 
