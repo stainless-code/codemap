@@ -738,15 +738,15 @@ Flags:
                           Recipe actions, when defined, attach to the added rows only.
   --baselines             List saved baselines (name, recipe_id, row_count, git_ref, created_at).
   --drop-baseline <name>  Delete a saved baseline. Exits 1 if the name doesn't exist.
-  --recipe, -r <id>       Run bundled SQL (no SQL string on the command line).
+  --recipe, -r <id>       Run recipe SQL by id (bundled or project-local; no SQL string on the command line).
   --params <k=v[,k=v]>    Bind params for a parametrised recipe. May be repeated;
                           last value wins on duplicate keys. Example:
                           --params kind=function,name_pattern=%Query%
-  --recipes-json          Print all bundled recipes (id, description, sql) as JSON to stdout. No DB.
+  --recipes-json          Print the full recipe catalog (id, description, sql, source, …) as JSON. No DB.
   --print-sql <id>        Print one recipe's SQL text to stdout (does not run the query). No DB.
   --help, -h              Show this help.
 
-Bundled recipes:
+Recipe catalog:
 ${recipeBlock}
 
 Examples:

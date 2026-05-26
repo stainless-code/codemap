@@ -256,8 +256,8 @@ export function printAuditCmdHelp(): void {
 Diff the current codemap index (default \`.codemap/index.db\`) against per-delta baselines (saved by \`codemap query --save-baseline\`)
 or against a git ref (\`--base <ref>\` materialises via \`git archive | tar -x\` + reindex), and emit structural deltas
 as a {head, deltas} envelope. Each delta carries its own \`base\` metadata. v1 ships three deltas:
-files, dependencies, deprecated. No verdict / threshold / non-zero exit codes — compose --json + jq
-for CI exit codes.
+files, dependencies, deprecated. No built-in verdict / threshold config — compose --json + jq
+for CI exit codes, or use --ci (aliases --format sarif + non-zero exit on additions).
 
 Snapshot sources (one of these must resolve; --base and --baseline are mutually exclusive):
 

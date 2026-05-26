@@ -62,11 +62,11 @@ git diff --name-only origin/main | codemap affected --stdin --json
 codemap query --json --recipe affected-tests --params changed_files=src/foo.ts
 ```
 
-**Resources** — same URI set over MCP **and** HTTP (`GET /resources/{encoded-uri}` against `codemap serve`); shared `readResource()` handler so bodies are identical. Catalog / static resources lazy-cache once per process; recipes + per-file / per-symbol lookups read live so inline recency fields stay fresh.
+**Resources** — same URI set over MCP **and** HTTP (`GET /resources/{encoded-uri}` against `codemap serve`); shared `readResource()` handler so bodies are identical. Freshness split: `schema` / `skill` / `rule` / `mcp-instructions` lazy-cache per server process; `recipes` / `recipes/{id}` / `files/{path}` / `symbols/{name}` read live every call so recency fields and index mutations under `--watch` stay fresh.
 
 - **`codemap://recipes`** — full catalog (same as `--recipes-json`). Each row carries `source: "bundled" | "project"`, optional `shadows: true`, plus `last_run_at` / `run_count` recency fields.
 - **`codemap://recipes/{id}`** — one recipe `{id, description, body?, sql, actions?, source, shadows?, last_run_at, run_count}` (replaces `--print-sql <id>`).
-- **`codemap://schema`** — live DDL of every table in `<state-dir>/index.db` (default `.codemap/index.db`; also embedded inline below).
+- **`codemap://schema`** — DDL of every table in `<state-dir>/index.db` (default `.codemap/index.db`; cached after first read per server process; also embedded inline below).
 - **`codemap://skill`** / **`codemap://rule`** — full text of this skill / the codemap rule. Same content `codemap skill` / `codemap rule` print.
 - **`codemap://mcp-instructions`** — MCP initialize tool-selection playbook (also injected as `instructions` on handshake).
 - **`codemap://files/{path}`** — per-file roll-up `{path, language, line_count, symbols, imports, exports, coverage}`; URI-encode path segments (MCP template uses `{+path}`). Live.
