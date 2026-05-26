@@ -121,7 +121,7 @@ function renderRecipesSection(): string {
   lines.push("## Recipe catalog (auto-generated)");
   lines.push("");
   lines.push(
-    "Every recipe id you can pass to `codemap query --recipe <id>`. This section is regenerated from the live catalog on every fetch, so new recipes appear automatically (no template edit required).",
+    "Every recipe id you can pass to `codemap query --recipe <id>`. Rendered from the live on-disk catalog at assembly time (`codemap skill` every call; MCP/HTTP `codemap://skill` memoizes the assembled body per server process).",
   );
   lines.push("");
   lines.push("| id | source | params | description |");
@@ -242,7 +242,7 @@ function renderSchemaSection(): string {
   lines.push("## Schema reference (auto-generated)");
   lines.push("");
   lines.push(
-    "Every table in `.codemap/index.db`. Sourced from the live `createTables()` DDL in `src/db.ts`; this section regenerates on every fetch so column additions show up automatically.",
+    "Every table in `.codemap/index.db`. Sourced from the live `createTables()` DDL in `src/db.ts`; rendered at assembly time (`codemap skill` every call; MCP/HTTP `codemap://skill` memoizes per server process).",
   );
   lines.push("");
   for (const r of rows) {

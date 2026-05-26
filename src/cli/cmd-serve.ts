@@ -192,14 +192,19 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
   POST /tool/query_batch
   POST /tool/query_recipe
   POST /tool/audit
+  POST /tool/save_baseline
+  POST /tool/list_baselines
+  POST /tool/drop_baseline
   POST /tool/context
   POST /tool/validate
   POST /tool/show
   POST /tool/snippet
   POST /tool/impact
-  POST /tool/save_baseline
-  POST /tool/list_baselines
-  POST /tool/drop_baseline
+  POST /tool/affected
+  POST /tool/trace
+  POST /tool/explore
+  POST /tool/node
+  POST /tool/apply
   GET  /health                        Liveness probe (auth-exempt).
   GET  /tools                         Tool catalog.
   GET  /resources                     Resource catalog.
@@ -209,6 +214,7 @@ Routes (every MCP tool maps to POST /tool/<name>; output shape matches
                                         codemap://schema
                                         codemap://skill
                                         codemap://rule
+                                        codemap://mcp-instructions
                                         codemap://files/{path}
                                         codemap://symbols/{name}
 

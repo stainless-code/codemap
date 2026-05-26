@@ -388,7 +388,7 @@ function registerResources(server: McpServer): void {
     server,
     "schema",
     "codemap://schema",
-    "DDL of every table in the codemap index (default `.codemap/index.db`; queried live from sqlite_schema). Tells the agent what tables and columns exist.",
+    "DDL of every table in the codemap index (default `.codemap/index.db`; cached after first read from sqlite_schema). Tells the agent what tables and columns exist.",
   );
   registerStaticResource(
     server,

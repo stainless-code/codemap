@@ -85,10 +85,10 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
+Tools (17; snake_case — one per CLI verb plus MCP-only helpers):
   query                One read-only SQL statement.
   query_batch          N statements in one round-trip (MCP-only).
-  query_recipe         Bundled SQL recipe by id; per-row \`actions\` hints.
+  query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
   audit                Structural-drift audit ({head, deltas} envelope).
   save_baseline        Snapshot rows under a name (sql or recipe).
   list_baselines       Catalog of saved baselines.
@@ -99,12 +99,18 @@ Tools (one per CLI verb plus the MCP-only batch helper; snake_case):
   snippet              Same lookup + source text from disk.
   impact               Symbol/file blast-radius walker (callers, callees,
                        dependents, dependencies).
+  affected             Reverse-dependency walk to test paths.
+  trace                Shortest call path + budget-capped snippets.
+  explore              Multi-name neighborhood survey.
+  node                 One-hop symbol card (show + depth-1 neighborhood).
+  apply                Apply recipe diff rows to disk (confirmation gated).
 
 Resources:
   Lazy-cached (constant for the server-process lifetime):
-    codemap://schema             Live DDL of every table (cached after first read).
-    codemap://skill              Bundled SKILL.md.
-    codemap://rule               Bundled codemap rule markdown.
+    codemap://schema             DDL of every table (cached after first read).
+    codemap://skill              Assembled skill markdown.
+    codemap://rule               Assembled codemap rule markdown.
+    codemap://mcp-instructions   MCP initialize tool-selection playbook.
   Live read-per-call (no caching — see latest indexed state every read):
     codemap://recipes            Full recipe catalog (recency fields stay fresh).
     codemap://recipes/{id}       Single recipe (id, description, sql).
