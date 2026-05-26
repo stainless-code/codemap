@@ -14,13 +14,5 @@
     "descendant_file_path": "src/types/hierarchy.ts",
     "descendant_line_start": 5,
     "relation": "extends"
-  },
-  {
-    "depth": 2,
-    "descendant_name": "Dog",
-    "descendant_kind": "class",
-    "descendant_file_path": "src/types/hierarchy.ts",
-    "descendant_line_start": 15,
-    "relation": "extends"
   }
 ]

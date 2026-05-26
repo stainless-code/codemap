@@ -1,6 +1,7 @@
+-- Shared heritage CTEs: templates/recipes-fragments/heritage-edges.sql
 WITH RECURSIVE
-params(symbol_name, kind_filter, max_depth) AS (
-  SELECT ?, ?, COALESCE(?, 10)
+params(symbol_name, kind_filter, max_depth, file_path) AS (
+  SELECT ?, ?, COALESCE(?, 10), ?
 ),
 typed_symbols AS (
   SELECT name, kind, file_path, line_start, signature
@@ -128,12 +129,33 @@ heritage_edges AS (
   FROM split_clause
   WHERE token_raw != ''
 ),
+resolved_edges AS (
+  SELECT child_name, child_file_path, child_kind, child_line_start, relation, base_name, parent_file_path
+  FROM (
+    SELECT
+      he.child_name,
+      he.child_file_path,
+      he.child_kind,
+      he.child_line_start,
+      he.relation,
+      he.base_name,
+      p2.file_path AS parent_file_path,
+      ROW_NUMBER() OVER (
+        PARTITION BY he.child_name, he.child_file_path, he.relation, he.base_name
+        ORDER BY CASE WHEN p2.file_path = he.child_file_path THEN 0 ELSE 1 END, p2.file_path
+      ) AS rn
+    FROM heritage_edges he
+    JOIN typed_symbols p2 ON p2.name = he.base_name
+  )
+  WHERE rn = 1
+),
 start_symbols AS (
   SELECT s.name, s.kind, s.file_path, s.line_start
   FROM typed_symbols s
   CROSS JOIN params p
   WHERE s.name = p.symbol_name
     AND (p.kind_filter IS NULL OR p.kind_filter = '' OR s.kind = p.kind_filter)
+    AND (p.file_path IS NULL OR p.file_path = '' OR s.file_path = p.file_path)
 ),
 ancestors(
   depth,
@@ -151,13 +173,15 @@ ancestors(
     parent.file_path,
     parent.line_start,
     he.relation,
-    char(30) || he.base_name || char(30)
+    char(30) || he.base_name || char(30) || parent.file_path || char(30)
   FROM start_symbols ss
-  JOIN heritage_edges he
+  JOIN resolved_edges he
     ON he.child_name = ss.name
     AND he.child_file_path = ss.file_path
     AND he.relation = 'extends'
-  JOIN typed_symbols parent ON parent.name = he.base_name
+  JOIN typed_symbols parent
+    ON parent.name = he.base_name
+    AND parent.file_path = he.parent_file_path
   UNION ALL
   SELECT
     a.depth + 1,
@@ -166,16 +190,19 @@ ancestors(
     parent.file_path,
     parent.line_start,
     'extends',
-    a.visited || he.base_name || char(30)
+    a.visited || he.base_name || char(30) || parent.file_path || char(30)
   FROM ancestors a
-  JOIN heritage_edges he
+  JOIN resolved_edges he
     ON he.child_name = a.ancestor_name
+    AND he.child_file_path = a.ancestor_file_path
     AND he.relation = 'extends'
-  JOIN typed_symbols parent ON parent.name = he.base_name
+  JOIN typed_symbols parent
+    ON parent.name = he.base_name
+    AND parent.file_path = he.parent_file_path
   CROSS JOIN params p
   WHERE a.relation = 'extends'
     AND a.depth < p.max_depth
-    AND instr(a.visited, char(30) || he.base_name || char(30)) = 0
+    AND instr(a.visited, char(30) || he.base_name || char(30) || parent.file_path || char(30)) = 0
 ),
 direct_implements AS (
   SELECT
@@ -186,11 +213,13 @@ direct_implements AS (
     parent.line_start AS ancestor_line_start,
     'implements' AS relation
   FROM start_symbols ss
-  JOIN heritage_edges he
+  JOIN resolved_edges he
     ON he.child_name = ss.name
     AND he.child_file_path = ss.file_path
     AND he.relation = 'implements'
-  JOIN typed_symbols parent ON parent.name = he.base_name
+  JOIN typed_symbols parent
+    ON parent.name = he.base_name
+    AND parent.file_path = he.parent_file_path
 )
 SELECT
   depth,

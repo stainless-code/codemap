@@ -1,0 +1,18 @@
+[
+  {
+    "depth": 1,
+    "ancestor_name": "Mammal",
+    "ancestor_kind": "interface",
+    "ancestor_file_path": "src/types/hierarchy.ts",
+    "ancestor_line_start": 5,
+    "relation": "extends"
+  },
+  {
+    "depth": 1,
+    "ancestor_name": "Pet",
+    "ancestor_kind": "interface",
+    "ancestor_file_path": "src/types/hierarchy.ts",
+    "ancestor_line_start": 9,
+    "relation": "implements"
+  }
+]

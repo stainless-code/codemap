@@ -1,0 +1,18 @@
+[
+  {
+    "depth": 1,
+    "ancestor_name": "CycleB",
+    "ancestor_kind": "interface",
+    "ancestor_file_path": "src/types/type-cycle.ts",
+    "ancestor_line_start": 3,
+    "relation": "extends"
+  },
+  {
+    "depth": 2,
+    "ancestor_name": "CycleA",
+    "ancestor_kind": "interface",
+    "ancestor_file_path": "src/types/type-cycle.ts",
+    "ancestor_line_start": 1,
+    "relation": "extends"
+  }
+]

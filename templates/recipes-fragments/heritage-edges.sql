@@ -1,4 +1,5 @@
--- Shared heritage CTEs: templates/recipes-fragments/heritage-edges.sql
+-- Canonical heritage CTE block for type-ancestors.sql and type-descendants.sql.
+-- Keep both recipe files in sync with this fragment (loader has no include mechanism).
 WITH RECURSIVE
 params(symbol_name, kind_filter, max_depth, file_path) AS (
   SELECT ?, ?, COALESCE(?, 10), ?
@@ -129,61 +130,3 @@ heritage_edges AS (
   FROM split_clause
   WHERE token_raw != ''
 ),
-base_symbols AS (
-  SELECT s.name, s.file_path
-  FROM typed_symbols s
-  CROSS JOIN params p
-  WHERE s.name = p.symbol_name
-    AND (p.file_path IS NULL OR p.file_path = '' OR s.file_path = p.file_path)
-),
-descendants(
-  depth,
-  descendant_name,
-  descendant_kind,
-  descendant_file_path,
-  descendant_line_start,
-  relation,
-  visited
-) AS (
-  SELECT
-    1,
-    he.child_name,
-    he.child_kind,
-    he.child_file_path,
-    he.child_line_start,
-    he.relation,
-    char(30) || he.child_name || char(30) || he.child_file_path || char(30)
-  FROM base_symbols bs
-  JOIN heritage_edges he ON he.base_name = bs.name
-  UNION ALL
-  SELECT
-    d.depth + 1,
-    he.child_name,
-    he.child_kind,
-    he.child_file_path,
-    he.child_line_start,
-    'extends',
-    d.visited || he.child_name || char(30) || he.child_file_path || char(30)
-  FROM descendants d
-  JOIN heritage_edges he
-    ON he.base_name = d.descendant_name
-    AND he.child_file_path = d.descendant_file_path
-    AND he.relation = 'extends'
-  CROSS JOIN params p
-  WHERE d.relation = 'extends'
-    AND d.depth < p.max_depth
-    AND instr(d.visited, char(30) || he.child_name || char(30) || he.child_file_path || char(30)) = 0
-)
-SELECT
-  d.depth,
-  d.descendant_name,
-  d.descendant_kind,
-  d.descendant_file_path,
-  d.descendant_line_start,
-  d.relation
-FROM descendants d
-CROSS JOIN params p
-WHERE p.kind_filter IS NULL
-  OR p.kind_filter = ''
-  OR d.descendant_kind = p.kind_filter
-ORDER BY d.depth ASC, d.relation ASC, d.descendant_name ASC, d.descendant_file_path ASC;

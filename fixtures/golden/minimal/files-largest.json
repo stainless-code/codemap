@@ -8,7 +8,7 @@
   {
     "path": "README.md",
     "line_count": 52,
-    "size": 8499,
+    "size": 8471,
     "language": "md"
   },
   {
@@ -48,6 +48,12 @@
     "language": "tsx"
   },
   {
+    "path": "src/types/hierarchy.ts",
+    "line_count": 18,
+    "size": 272,
+    "language": "ts"
+  },
+  {
     "path": "tsconfig.json",
     "line_count": 18,
     "size": 363,
@@ -70,12 +76,6 @@
     "line_count": 16,
     "size": 167,
     "language": "css"
-  },
-  {
-    "path": "src/types/hierarchy.ts",
-    "line_count": 16,
-    "size": 226,
-    "language": "ts"
   },
   {
     "path": "src/lib/store.ts",

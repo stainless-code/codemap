@@ -4,15 +4,15 @@
     "exports": 7
   },
   {
+    "file_path": "src/types/hierarchy.ts",
+    "exports": 5
+  },
+  {
     "file_path": "src/components/shop/index.ts",
     "exports": 4
   },
   {
     "file_path": "src/lib/complexity-fixture.ts",
-    "exports": 4
-  },
-  {
-    "file_path": "src/types/hierarchy.ts",
     "exports": 4
   },
   {
@@ -44,6 +44,10 @@
     "exports": 2
   },
   {
+    "file_path": "src/types/type-cycle.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/utils/format.ts",
     "exports": 2
   },
@@ -61,6 +65,10 @@
   },
   {
     "file_path": "src/components/shop/ShopButton.default.ts",
+    "exports": 1
+  },
+  {
+    "file_path": "src/types/homonym-mammal.ts",
     "exports": 1
   },
   {
