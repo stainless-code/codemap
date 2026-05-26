@@ -80,6 +80,14 @@
     "risk_score": 100
   },
   {
+    "file_path": "src/types/hierarchy.ts",
+    "exported_count": 4,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
     "file_path": "src/types/status.ts",
     "exported_count": 1,
     "fan_in": 0,

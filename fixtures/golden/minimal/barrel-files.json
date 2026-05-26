@@ -12,6 +12,10 @@
     "exports": 4
   },
   {
+    "file_path": "src/types/hierarchy.ts",
+    "exports": 4
+  },
+  {
     "file_path": "src/utils/date.ts",
     "exports": 4
   },

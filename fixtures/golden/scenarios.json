@@ -183,6 +183,30 @@
       "params": { "name": "nonexistentSymbol", "depth": 1 }
     },
     {
+      "id": "type-ancestors-dog",
+      "prompt": "Extends + implements ancestors of Dog",
+      "recipe": "type-ancestors",
+      "params": { "symbol_name": "Dog" }
+    },
+    {
+      "id": "type-descendants-animal",
+      "prompt": "Transitive extends descendants of Animal",
+      "recipe": "type-descendants",
+      "params": { "symbol_name": "Animal" }
+    },
+    {
+      "id": "type-descendants-pet-class",
+      "prompt": "Classes implementing Pet",
+      "recipe": "type-descendants",
+      "params": { "symbol_name": "Pet", "kind": "class" }
+    },
+    {
+      "id": "type-ancestors-unknown",
+      "prompt": "Unknown symbol returns empty type ancestors",
+      "recipe": "type-ancestors",
+      "params": { "symbol_name": "nonexistentType" }
+    },
+    {
       "id": "affected-tests-complexity",
       "prompt": "Test file importing changed complexity fixture",
       "recipe": "affected-tests",

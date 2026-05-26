@@ -119,6 +119,34 @@
     "re_export_source": null
   },
   {
+    "name": "Animal",
+    "kind": "type",
+    "file_path": "src/types/hierarchy.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "Dog",
+    "kind": "value",
+    "file_path": "src/types/hierarchy.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "Mammal",
+    "kind": "type",
+    "file_path": "src/types/hierarchy.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "Pet",
+    "kind": "type",
+    "file_path": "src/types/hierarchy.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "OrderStatus",
     "kind": "value",
     "file_path": "src/types/status.ts",

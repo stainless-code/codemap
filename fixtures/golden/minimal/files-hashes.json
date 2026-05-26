@@ -132,6 +132,12 @@
     "line_count": 9
   },
   {
+    "path": "src/types/hierarchy.ts",
+    "content_hash": "cb041218dfaa6c9564b9504eb9b54fb9e70bbfcbf83b670009ee0972271f1264",
+    "language": "ts",
+    "line_count": 16
+  },
+  {
     "path": "src/types/status.ts",
     "content_hash": "85a4d68b1bcffdd9b00c25293b5b81be1ce690a7525b444c6315dcf2b8876b7b",
     "language": "ts",

@@ -1,6 +1,6 @@
 # Call path and type hierarchy recipes — plan
 
-> **Status:** open · **Priority:** P2 · **Effort:** M (~1–2 weeks)
+> **Status:** shipped · **Priority:** P2 · **Effort:** M (~1–2 weeks)
 >
 > **Motivator:** Shortest-path and type-ancestor queries are common agent tasks. `impact` walks radius but doesn't find minimal paths. `type_members` exists but no bundled recipe for extends/implements chains.
 >
@@ -50,9 +50,9 @@
 
 ## Acceptance
 
-- [ ] `type-ancestors` returns expected chain on fixture with extends
-- [ ] Documented limitations when extends not extracted
-- [ ] Golden-query CI covers new recipes
+- [x] `type-ancestors` returns expected chain on fixture with extends
+- [x] Documented limitations when extends not extracted (signature parsing — see recipe `.md` bodies)
+- [x] Golden-query CI covers new recipes (`type-ancestors-dog`, `type-descendants-animal`, `type-descendants-pet-class`, `type-ancestors-unknown`)
 
 ---
 

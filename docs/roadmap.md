@@ -69,7 +69,6 @@ Wave 1–2 (MCP instructions, allowlist, WSL watch, git hooks, trace/explore/nod
 - [ ] **Unresolved calls staging** — two-phase call resolution queue. Plan: [`plans/unresolved-calls-staging.md`](./plans/unresolved-calls-staging.md). Effort: L.
 - [ ] **Cross-project MCP root** — optional `root` on tools + DB cache. Plan: [`plans/cross-project-mcp-root.md`](./plans/cross-project-mcp-root.md). Effort: M.
 - [ ] **FTS default-on evaluation** — measure DB size tax; maybe flip default. Plan: [`plans/fts-default-on-evaluation.md`](./plans/fts-default-on-evaluation.md). Effort: S–M.
-- [ ] **Call path + type hierarchy recipes** — `type-ancestors` / descendants. Plan: [`plans/call-path-type-hierarchy-recipes.md`](./plans/call-path-type-hierarchy-recipes.md). Effort: M.
 
 ---
 
