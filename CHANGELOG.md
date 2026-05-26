@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.9.1
+
+### Patch Changes
+
+- [#146](https://github.com/stainless-code/codemap/pull/146) [`7afc9eb`](https://github.com/stainless-code/codemap/commit/7afc9eba451720ae463dd0567eef71ac4e500bda) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix `codemap --full` (and other worker-pool parses) appearing to hang ~120s after stats print — clear parse timeout timers when workers respond instead of leaving orphaned `setTimeout` handles on the event loop.
+
 ## 0.9.0
 
 ### Minor Changes
