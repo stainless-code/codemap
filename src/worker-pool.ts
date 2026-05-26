@@ -7,7 +7,6 @@ import { Worker as NodeWorker } from "node:worker_threads";
 import {
   ParseTimeoutError,
   computeParseTimeoutMs,
-  delay,
   parseParseTimeoutMsOverride,
 } from "./application/parse-timeout";
 import { CODEMAP_BUILD_OUTPUT_DIR } from "./build-output";
@@ -89,60 +88,106 @@ interface ParseWorkerSession {
   dispose(): void;
 }
 
+interface PendingParse {
+  gen: number;
+  resolve: (value: WorkerOutput) => void;
+  reject: (err: Error) => void;
+  clearTimer: () => void;
+}
+
 function createParseWorkerSession(): ParseWorkerSession {
   let generation = 0;
-  let pending:
-    | {
-        gen: number;
-        resolve: (value: WorkerOutput) => void;
-        reject: (err: Error) => void;
-      }
-    | undefined;
+  let pending: PendingParse | undefined;
+
+  const clearPending = (): void => {
+    if (pending === undefined) return;
+    pending.clearTimer();
+    pending = undefined;
+  };
+
+  const settleSuccess = (data: WorkerOutput): void => {
+    if (!pending || pending.gen !== generation) return;
+    const { resolve, clearTimer } = pending;
+    clearTimer();
+    pending = undefined;
+    resolve(data);
+  };
+
+  const settleError = (err: Error): void => {
+    if (!pending || pending.gen !== generation) return;
+    const { reject, clearTimer } = pending;
+    clearTimer();
+    pending = undefined;
+    reject(err);
+  };
+
+  const parseWithTimeout = (
+    timeoutMs: number,
+    postMessage: () => void,
+    recycleWorker: () => void,
+  ): Promise<WorkerOutput> => {
+    const gen = generation;
+    return new Promise<WorkerOutput>((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(() => {
+        timer = undefined;
+        if (!pending || pending.gen !== gen) return;
+        pending = undefined;
+        generation++;
+        recycleWorker();
+        reject(new ParseTimeoutError(timeoutMs));
+      }, timeoutMs);
+
+      pending = {
+        gen,
+        resolve,
+        reject,
+        clearTimer: () => {
+          if (timer !== undefined) {
+            clearTimeout(timer);
+            timer = undefined;
+          }
+        },
+      };
+      postMessage();
+    });
+  };
+
+  const disposeSession = (terminateWorker: () => void): void => {
+    clearPending();
+    generation++;
+    terminateWorker();
+  };
 
   if (IS_BUN) {
     let worker = new Worker(WORKER_URL_BUN);
     const attach = (): void => {
       worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
-        if (!pending || pending.gen !== generation) return;
-        const { resolve } = pending;
-        pending = undefined;
-        resolve(event.data);
+        settleSuccess(event.data);
       };
       worker.onerror = (event: ErrorEvent) => {
-        if (!pending || pending.gen !== generation) return;
-        const { reject } = pending;
-        pending = undefined;
-        reject(event.error ?? new Error(event.message));
+        settleError(event.error ?? new Error(event.message));
       };
     };
     attach();
 
     return {
       parse(input, timeoutMs) {
-        const gen = generation;
-        return Promise.race([
-          new Promise<WorkerOutput>((resolve, reject) => {
-            pending = { gen, resolve, reject };
+        return parseWithTimeout(
+          timeoutMs,
+          () => {
             worker.postMessage(input);
-          }),
-          delay(timeoutMs).then(() => {
-            throw new ParseTimeoutError(timeoutMs);
-          }),
-        ]).catch((err) => {
-          if (err instanceof ParseTimeoutError) {
-            generation++;
-            pending = undefined;
+          },
+          () => {
             worker.terminate();
             worker = new Worker(WORKER_URL_BUN);
             attach();
-          }
-          throw err;
-        });
+          },
+        );
       },
       dispose() {
-        pending = undefined;
-        generation++;
-        worker.terminate();
+        disposeSession(() => {
+          worker.terminate();
+        });
       },
     };
   }
@@ -153,48 +198,34 @@ function createParseWorkerSession(): ParseWorkerSession {
 
   const attachNode = (): void => {
     worker.on("message", (data: WorkerOutput) => {
-      if (!pending || pending.gen !== generation) return;
-      const { resolve } = pending;
-      pending = undefined;
-      resolve(data);
+      settleSuccess(data);
     });
     worker.on("error", (err: Error) => {
-      if (!pending || pending.gen !== generation) return;
-      const { reject } = pending;
-      pending = undefined;
-      reject(err);
+      settleError(err);
     });
   };
   attachNode();
 
   return {
     parse(input, timeoutMs) {
-      const gen = generation;
-      return Promise.race([
-        new Promise<WorkerOutput>((resolve, reject) => {
-          pending = { gen, resolve, reject };
+      return parseWithTimeout(
+        timeoutMs,
+        () => {
           worker.postMessage(input);
-        }),
-        delay(timeoutMs).then(() => {
-          throw new ParseTimeoutError(timeoutMs);
-        }),
-      ]).catch((err) => {
-        if (err instanceof ParseTimeoutError) {
-          generation++;
-          pending = undefined;
+        },
+        () => {
           void worker.terminate();
           worker = new NodeWorker(NODE_WORKER_PATH, {
             type: "module",
           } as import("node:worker_threads").WorkerOptions);
           attachNode();
-        }
-        throw err;
-      });
+        },
+      );
     },
     dispose() {
-      pending = undefined;
-      generation++;
-      void worker.terminate();
+      disposeSession(() => {
+        void worker.terminate();
+      });
     },
   };
 }

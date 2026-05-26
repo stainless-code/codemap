@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 
+import { resolveCodemapConfig } from "./config";
+import { globSync } from "./glob-sync";
+import { initCodemap } from "./runtime";
 import {
   parseFilesParallel,
   parseParseWorkerCountOverride,
   parseWorkerRecycleEvery,
 } from "./worker-pool";
+
+const minimalRoot = join(import.meta.dir, "..", "fixtures", "minimal");
 
 describe("parseParseWorkerCountOverride", () => {
   test("accepts valid decimal integers", () => {
@@ -41,4 +47,17 @@ describe("parseFilesParallel", () => {
   test("resolves immediately for an empty file list", async () => {
     await expect(parseFilesParallel([])).resolves.toEqual([]);
   });
+
+  test("returns promptly after worker-pool parse (no orphaned timeout timers)", async () => {
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
+    expect(files.length).toBeGreaterThan(12);
+
+    const started = performance.now();
+    const results = await parseFilesParallel(files);
+    const elapsedMs = performance.now() - started;
+
+    expect(results.length).toBe(files.length);
+    expect(elapsedMs).toBeLessThan(5_000);
+  }, 10_000);
 });
