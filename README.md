@@ -128,7 +128,7 @@ codemap audit --base origin/main --ci                           # CI shortcut: -
 codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override
 # --base materialises <ref> via `git archive | tar -x` to .codemap/audit-cache/<sha>/, reindexes into
 # a temp DB, then diffs. Cache hit on second run against same sha is sub-100ms. Requires git;
-# non-git projects get a clean `--base requires a git repository` error.
+# non-git projects get a clean `codemap audit: --base requires a git repository.` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
 # --format <text|json|sarif|annotations|mermaid|diff|diff-json> — pipe results into GitHub Code Scanning

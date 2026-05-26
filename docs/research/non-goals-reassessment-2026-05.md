@@ -14,7 +14,7 @@
 
 ## 0. Reframing question
 
-The original [`Non-goals (v1)`](../roadmap.md#non-goals-v1) list was a **product-shape** constraint: "stay a SQL-index primitive, don't become a verdict tool, don't render visualisations, don't ship an LSP." That shape held when codemap had ~5 recipes, a single transport, and no engine reuse. It no longer holds — the surface ships 15+ bundled recipes, three transport-agnostic engines (CLI, MCP, HTTP), watch mode, coverage / audit / impact / show / snippet, SARIF + GitHub annotations + Mermaid formatters, recipe `actions` templates, and a self-healing `<state-dir>` reconciler pattern.
+The original [`Non-goals (v1)`](../roadmap.md#non-goals-v1) list was a **product-shape** constraint: "stay a SQL-index primitive, don't become a verdict tool, don't render visualisations, don't ship an LSP." That shape held when codemap had a small bundled recipe set, a single transport, and no engine reuse. It no longer holds — the surface ships a large bundled recipe catalog plus project-local recipes, three transports (CLI, MCP, HTTP) over shared `application/` engines, watch mode, coverage / audit / impact / show / snippet, SARIF + GitHub annotations + Mermaid formatters, recipe `actions` templates, and a self-healing `<state-dir>` reconciler pattern.
 
 The right framing now: **what does the SQL-index-with-three-transports + worker-pool + watcher actually unlock that no other tool in the ecosystem does?** That re-framing produced the analysis in §§ 2 and 5, the moat lift in [`roadmap.md § Non-goals (v1) → Moats`](../roadmap.md#moats-load-bearing), and the backlog distribution in [§ 7](#7-lifted-to).
 

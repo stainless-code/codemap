@@ -678,7 +678,7 @@ function formatRecipeHelpLines(): string {
 }
 
 /**
- * Print **`codemap query`** usage, flags, and bundled recipe ids to stdout.
+ * Print **`codemap query`** usage, flags, and recipe catalog ids to stdout.
  */
 export function printQueryCmdHelp(): void {
   const recipeBlock = formatRecipeHelpLines();

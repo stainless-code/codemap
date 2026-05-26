@@ -206,7 +206,7 @@ function registerAuditTool(server: McpServer): void {
     "audit",
     {
       description:
-        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a temp DB, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
+        "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a temp DB, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository.'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
       inputSchema: auditArgsSchema,
     },
     async (args) => wrapToolResult(await handleAudit(args)),
@@ -557,10 +557,10 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
 }
 
 /**
- * Starts the MCP server over stdio (the only transport in v1; HTTP is
- * deferred to v1.x — see plan § 2). Resolves when the transport closes
- * (stdin EOF). Logs to stderr per MCP convention so stdout stays
- * dedicated to JSON-RPC framing.
+ * Starts the MCP server over stdio. HTTP consumers use `codemap serve`
+ * (`src/application/http-server.ts`) against the same tool handlers.
+ * Resolves when the transport closes (stdin EOF). Logs to stderr per MCP
+ * convention so stdout stays dedicated to JSON-RPC framing.
  */
 export async function runMcpServer(opts: ServerOpts): Promise<void> {
   await bootstrapForMcp(opts);
