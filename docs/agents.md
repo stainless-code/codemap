@@ -107,6 +107,21 @@ Recipe ids cited in the playbook are machine-validated in tests against the live
 
 Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 
+**Agent eval live arms** — minimal subset for A/B runs against indexed fixtures:
+
+```bash
+CODEMAP_MCP_TOOLS=query,query_recipe AGENT_EVAL_MODE=live bash scripts/agent-eval/run-arms.sh
+AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms.sh   # probe mode (default)
+```
+
+When unset, live mode defaults to `query,query_recipe`. Compare exported session logs:
+
+```bash
+AGENT_EVAL_LOG_ON=path/to/mcp-on.json AGENT_EVAL_LOG_OFF=path/to/mcp-off.json bash scripts/agent-eval/run-arms.sh
+```
+
+See [benchmark.md § Agent eval harness](../docs/benchmark.md#agent-eval-harness).
+
 ## MCP wiring via `agents init`
 
 **`codemap agents init --mcp`** (or the interactive prompt) writes project MCP config without duplicating skill/rule markdown. Registry source of truth: **`src/agents-init-mcp-registry.ts`** (`AGENTS_INIT_MCP_REGISTRY`).

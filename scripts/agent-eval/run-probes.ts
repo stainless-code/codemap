@@ -9,6 +9,11 @@ import { resolveCodemapConfig } from "../../src/config";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import { parseScenariosJson } from "../query-golden/schema";
 import type { GoldenScenario } from "../query-golden/schema";
+import { runLiveMcpArm } from "./live-mcp-arm";
+import {
+  defaultLiveEvalMcpToolsEnv,
+  resolveLiveEvalMcpTools,
+} from "./mcp-allowlist";
 import {
   estimateProbeTokens,
   mcpOffPayloadChars,
@@ -20,6 +25,8 @@ import {
   runTraditionalProbe,
   traditionalToolSequence,
 } from "./traditional-probe";
+
+export type AgentEvalMode = "probe" | "live";
 
 const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(EVAL_DIR, "../..");
@@ -59,8 +66,10 @@ export interface ScenarioComparison {
 export interface AgentEvalComparison {
   /** ISO-8601 timestamp when the report was generated. */
   generatedAt: string;
-  /** Fixed `"probe"` — deterministic harness mode (no LLM). */
-  mode: "probe";
+  /** `probe` = queryRows; `live` = transport-agnostic MCP handlers. */
+  mode: AgentEvalMode;
+  /** Active subset when `mode` is `live` (from `CODEMAP_MCP_TOOLS`). */
+  mcpTools?: readonly string[];
   /** Indexed corpus root passed to `--fixture-root`. */
   fixtureRoot: string;
   /** Repeat count per probe (`--runs` / `AGENT_EVAL_RUNS`). */
@@ -94,11 +103,19 @@ function parseArgs(argv: string[]) {
   let fixtureRoot = join(REPO_ROOT, "fixtures/minimal");
   let scenariosPath = join(REPO_ROOT, "fixtures/golden/scenarios.json");
   let probesPath = join(EVAL_DIR, "scenarios.json");
+  let mode: AgentEvalMode = "probe";
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") help = true;
     else if (a === "--skip-index") skipIndex = true;
-    else if (a === "--output") {
+    else if (a === "--mode") {
+      const v = optValue(argv, i, a);
+      i++;
+      if (v !== "probe" && v !== "live") {
+        throw new Error('--mode must be "probe" or "live"');
+      }
+      mode = v;
+    } else if (a === "--output") {
       output = resolve(optValue(argv, i, a));
       i++;
     } else if (a === "--runs") {
@@ -127,6 +144,7 @@ function parseArgs(argv: string[]) {
     fixtureRoot,
     scenariosPath,
     probesPath,
+    mode,
   };
 }
 
@@ -171,6 +189,8 @@ function runMcpOffArm(prompt: string, probe: AgentEvalProbe): ArmRunMetrics {
 export function runProbeOnce(
   probe: AgentEvalProbe,
   goldenById: Map<string, GoldenScenario>,
+  mode: AgentEvalMode = "probe",
+  fixtureRoot?: string,
 ): ScenarioComparison {
   const golden = goldenById.get(probe.goldenId);
   if (golden === undefined) {
@@ -179,8 +199,13 @@ export function runProbeOnce(
     );
   }
   const prompt = golden.prompt ?? probe.id;
-  const { sql, bindValues } = resolveGoldenQuery(golden);
-  const mcpOn = runMcpOnArm(prompt, sql, bindValues);
+  const mcpOn =
+    mode === "live"
+      ? runLiveMcpArm(golden, fixtureRoot!, prompt)
+      : (() => {
+          const { sql, bindValues } = resolveGoldenQuery(golden);
+          return runMcpOnArm(prompt, sql, bindValues);
+        })();
   const mcpOff = runMcpOffArm(prompt, probe);
   return {
     id: probe.id,
@@ -247,10 +272,10 @@ async function main(): Promise<void> {
   if (args.help) {
     console.log(`Usage: bun scripts/agent-eval/run-probes.ts [options]
 
-Deterministic A/B probe: codemap query (MCP-on arm) vs glob+read+grep (MCP-off arm).
-Indexes fixtures/minimal by default; writes comparison JSON locally (no upload).
+A/B probe: MCP-on arm vs glob+read+grep (MCP-off arm). Indexes fixtures/minimal by default.
 
 Options:
+  --mode MODE         probe (queryRows, default) or live (handleQuery / handleQueryRecipe)
   --output FILE       Output JSON path (default: .agent-eval/comparison.json)
   --runs N            Repeat each probe N times; averages wallMs/estTokens (toolSequence from run 1)
   --fixture-root DIR  Corpus to index (default: fixtures/minimal)
@@ -258,6 +283,8 @@ Options:
   --probes FILE       Probe definitions JSON (default: scripts/agent-eval/scenarios.json)
   --skip-index        Skip full index when .codemap/index.db already exists (CI reuse after test:golden)
   -h, --help
+
+Live mode sets CODEMAP_MCP_TOOLS=query,query_recipe when unset.
 `);
     process.exit(0);
   }
@@ -277,7 +304,11 @@ Options:
   }
 
   const priorCodeMapRoot = process.env.CODEMAP_ROOT;
+  const priorMcpTools = process.env.CODEMAP_MCP_TOOLS;
   process.env.CODEMAP_ROOT = args.fixtureRoot;
+  if (args.mode === "live" && priorMcpTools === undefined) {
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+  }
 
   try {
     const cm = await createCodemap({ root: args.fixtureRoot });
@@ -298,7 +329,9 @@ Options:
     const aggregated: ScenarioComparison[] = probes.map((probe) => {
       const samples: ScenarioComparison[] = [];
       for (let i = 0; i < args.runs; i++) {
-        samples.push(runProbeOnce(probe, goldenById));
+        samples.push(
+          runProbeOnce(probe, goldenById, args.mode, args.fixtureRoot),
+        );
       }
       if (args.runs === 1) return samples[0]!;
       return averageSamples(probe.id, samples);
@@ -306,9 +339,12 @@ Options:
 
     const report: AgentEvalComparison = {
       generatedAt: new Date().toISOString(),
-      mode: "probe",
+      mode: args.mode,
       fixtureRoot: args.fixtureRoot,
       runs: args.runs,
+      ...(args.mode === "live"
+        ? { mcpTools: resolveLiveEvalMcpTools(process.env) }
+        : {}),
       scenarios: aggregated,
       summary: summarize(aggregated),
     };
@@ -327,6 +363,11 @@ Options:
       delete process.env.CODEMAP_ROOT;
     } else {
       process.env.CODEMAP_ROOT = priorCodeMapRoot;
+    }
+    if (priorMcpTools === undefined) {
+      delete process.env.CODEMAP_MCP_TOOLS;
+    } else {
+      process.env.CODEMAP_MCP_TOOLS = priorMcpTools;
     }
   }
 }

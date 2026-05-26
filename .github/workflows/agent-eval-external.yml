@@ -1,0 +1,52 @@
+# Optional manual / nightly agent-eval on an indexed fixture (public trees only).
+# Default fixture is fixtures/minimal; override with workflow_dispatch input.
+name: Agent eval (external)
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixture_root:
+        description: "Path to indexed project root (relative to repo or absolute in runner)"
+        required: false
+        default: fixtures/minimal
+      mode:
+        description: "Harness mode — probe (queryRows) or live (MCP handlers)"
+        required: false
+        default: probe
+        type: choice
+        options:
+          - probe
+          - live
+      runs:
+        description: "Repeat count per probe"
+        required: false
+        default: "1"
+
+jobs:
+  agent-eval-external:
+    name: Agent eval (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Golden index (fixtures/minimal when using default)
+        run: bun run test:golden
+
+      - name: Run agent-eval harness
+        env:
+          AGENT_EVAL_MODE: ${{ inputs.mode }}
+          AGENT_EVAL_FIXTURE_ROOT: ${{ github.workspace }}/${{ inputs.fixture_root }}
+          AGENT_EVAL_RUNS: ${{ inputs.runs }}
+          AGENT_EVAL_PRINT_SUMMARY: "1"
+        run: bash scripts/agent-eval/run-arms.sh
+
+      - name: Upload comparison artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-comparison
+          path: .agent-eval/comparison.json
+          if-no-files-found: error

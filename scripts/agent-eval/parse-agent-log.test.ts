@@ -6,8 +6,16 @@ import { join } from "node:path";
 import { resolveCodemapConfig } from "../../src/config";
 import { initCodemap } from "../../src/runtime";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
+import { compareLogArms, summarizeLogComparison } from "./compare-live-logs";
+import { runLiveMcpArm } from "./live-mcp-arm";
+import {
+  assertLiveEvalToolEnabled,
+  defaultLiveEvalMcpToolsEnv,
+  requiredMcpToolForGolden,
+} from "./mcp-allowlist";
 import { jsonCharLength } from "./metrics";
 import { parseAgentLog, parseAgentLogFile } from "./parse-agent-log";
+import { formatComparisonMarkdown } from "./print-comparison-summary";
 import {
   estimateProbeTokens,
   mcpOffPayloadChars,
@@ -22,6 +30,7 @@ import {
 } from "./run-probes";
 import type { ArmRunMetrics, ScenarioComparison } from "./run-probes";
 import { parseProbesJson } from "./schema";
+import { resultCountFromToolPayload } from "./tool-payload";
 import {
   runTraditionalProbe,
   traditionalToolSequence,
@@ -449,4 +458,157 @@ describe("run-probes smoke", () => {
       rmSync(tmp, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it("indexes fixtures/minimal in live MCP mode", async () => {
+    const { spawnSync } = await import("node:child_process");
+    const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
+    const tmp = mkdtempSync(join(tmpdir(), "agent-eval-live-"));
+    const out = join(tmp, "comparison.json");
+    const indexDb = join(fixtureRoot, ".codemap", "index.db");
+    const args = [
+      join(import.meta.dir, "run-probes.ts"),
+      "--mode",
+      "live",
+      "--output",
+      out,
+      "--fixture-root",
+      fixtureRoot,
+    ];
+    if (existsSync(indexDb)) args.push("--skip-index");
+    try {
+      const result = spawnSync("bun", args, {
+        encoding: "utf-8",
+        cwd: join(import.meta.dir, "../.."),
+        env: {
+          ...process.env,
+          CODEMAP_MCP_TOOLS: defaultLiveEvalMcpToolsEnv(),
+        },
+      });
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(await Bun.file(out).text()) as {
+        mode: string;
+        mcpTools?: string[];
+        scenarios: ScenarioComparison[];
+        summary: { successCount: number };
+      };
+      expect(parsed.mode).toBe("live");
+      expect(parsed.mcpTools).toEqual(["query", "query_recipe"]);
+      expect(parsed.scenarios).toHaveLength(3);
+      expect(parsed.summary.successCount).toBe(3);
+      expect(parsed.scenarios[2]!.mcpOn.toolSequence).toEqual(["query_recipe"]);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }, 120_000);
+});
+
+describe("live MCP arm", () => {
+  it("requiredMcpToolForGolden picks query vs query_recipe", () => {
+    expect(
+      requiredMcpToolForGolden({
+        id: "sql",
+        sql: "SELECT 1",
+      }),
+    ).toBe("query");
+    expect(
+      requiredMcpToolForGolden({
+        id: "recipe",
+        recipe: "find-call-sites",
+        params: { callee: "x" },
+      }),
+    ).toBe("query_recipe");
+  });
+
+  it("assertLiveEvalToolEnabled rejects trimmed allowlist", () => {
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = "query";
+    try {
+      expect(() => assertLiveEvalToolEnabled("query_recipe")).toThrow(
+        /not enabled/,
+      );
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+
+  it("runLiveMcpArm returns rows via handleQuery", () => {
+    const root = join(import.meta.dir, "../../fixtures/minimal");
+    initCodemap(resolveCodemapConfig(root, undefined));
+    const prior = process.env.CODEMAP_MCP_TOOLS;
+    process.env.CODEMAP_MCP_TOOLS = defaultLiveEvalMcpToolsEnv();
+    try {
+      const metrics = runLiveMcpArm(
+        {
+          id: "symbol-usePermissions",
+          prompt: "Where is usePermissions?",
+          sql: "SELECT name FROM symbols WHERE name = 'usePermissions'",
+        },
+        root,
+        "Where is usePermissions?",
+      );
+      expect(metrics.toolSequence).toEqual(["query"]);
+      expect(metrics.success).toBe(true);
+      expect(metrics.resultCount).toBeGreaterThan(0);
+    } finally {
+      if (prior === undefined) delete process.env.CODEMAP_MCP_TOOLS;
+      else process.env.CODEMAP_MCP_TOOLS = prior;
+    }
+  });
+});
+
+describe("compare-live-logs", () => {
+  it("compares MCP-on vs MCP-off sample logs", () => {
+    const onLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-cursor-log.json",
+    );
+    const offLog = join(
+      import.meta.dir,
+      "../../fixtures/agent-eval/sample-no-mcp-log.json",
+    );
+    const scenario = compareLogArms(onLog, offLog, "usePermissions");
+    expect(scenario.mcpOn.toolCallCount).toBe(1);
+    expect(scenario.mcpOff.toolCallCount).toBe(3);
+    expect(scenario.delta.toolCallCount).toBe(2);
+    const summary = summarizeLogComparison([scenario]);
+    expect(summary.mcpOnTotalToolCalls).toBe(1);
+    expect(summary.mcpOffTotalToolCalls).toBe(3);
+  });
+});
+
+describe("print-comparison-summary", () => {
+  it("renders probe comparison markdown", () => {
+    const md = formatComparisonMarkdown({
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      mode: "probe",
+      fixtureRoot: "/tmp",
+      runs: 1,
+      scenarios: [
+        scenario({
+          id: "a",
+          delta: { toolCallCount: 2, wallMs: 1, estTokens: 50 },
+          mcpOff: arm({ toolCallCount: 3, estTokens: 60 }),
+        }),
+      ],
+      summary: {
+        mcpOnTotalToolCalls: 1,
+        mcpOffTotalToolCalls: 3,
+        mcpOnTotalWallMs: 1,
+        mcpOffTotalWallMs: 2,
+        mcpOnTotalEstTokens: 10,
+        mcpOffTotalEstTokens: 60,
+        successCount: 1,
+      },
+    });
+    expect(md).toContain("| a |");
+    expect(md).toContain("probe (queryRows)");
+  });
+});
+
+describe("tool-payload", () => {
+  it("resultCountFromToolPayload handles arrays and count envelopes", () => {
+    expect(resultCountFromToolPayload([{ a: 1 }, { a: 2 }])).toBe(2);
+    expect(resultCountFromToolPayload({ count: 5 })).toBe(5);
+  });
 });

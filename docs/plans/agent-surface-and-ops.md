@@ -1,6 +1,6 @@
 # Agent surface & indexing ops — plan index
 
-> **Status:** partial (Wave 1–2 + probe eval shipped; live agent-eval arms open) · **Created:** 2026-05-24
+> **Status:** partial (Wave 1–2 + agent-eval shipped; P2 strategic bets open) · **Created:** 2026-05-24
 >
 > **Purpose:** Prioritized work queue for agent UX, MCP ergonomics, indexing reliability, and TS/JS graph substrate gaps. Open items have plan files; shipped Wave 1–2 work lives in [agents.md](../agents.md) and the PR tracker.
 >
@@ -16,13 +16,13 @@ MCP initialize instructions + `codemap://mcp-instructions`, `CODEMAP_MCP_TOOLS`,
 
 Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](./agent-surface-delivery.md).
 
+**Agent eval harness** (probe + live MCP arms + log comparison): [benchmark § Agent eval harness](../benchmark.md#agent-eval-harness) — shipped; optional external runs via [`.github/workflows/agent-eval-external.yml`](../../.github/workflows/agent-eval-external.yml).
+
 ---
 
 ## P1 — Open
 
-| Plan                                          | Effort | Summary                                                                                        |
-| --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------- |
-| [agent-eval-harness](./agent-eval-harness.md) | M      | Probe A/B + PR CI ([#139](https://github.com/stainless-code/codemap/pull/139)); live arms open |
+_(none)_
 
 ---
 
