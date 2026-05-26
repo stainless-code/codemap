@@ -84,14 +84,23 @@ await parseFilesParallel(files);
       stdout: "ignore",
       stderr: "pipe",
     });
-    const [exitCode, stderr] = await Promise.all([
-      proc.exited,
-      new Response(proc.stderr).text(),
+    const hangMs = 6_000;
+    const exitOrHang = await Promise.race([
+      proc.exited.then((code) => ({ kind: "exit" as const, code })),
+      Bun.sleep(hangMs).then(async () => {
+        proc.kill();
+        await proc.exited;
+        return { kind: "hang" as const };
+      }),
     ]);
+    const stderr = await new Response(proc.stderr).text();
     const elapsedMs = performance.now() - started;
 
-    expect(exitCode).toBe(0);
+    expect(exitOrHang.kind).toBe("exit");
+    if (exitOrHang.kind === "exit") {
+      expect(exitOrHang.code).toBe(0);
+    }
     expect(stderr).toBe("");
     expect(elapsedMs).toBeLessThan(5_000);
-  }, 10_000);
+  }, 8_000);
 });
