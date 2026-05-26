@@ -139,9 +139,9 @@
   },
   {
     "path": "src/types/hierarchy.ts",
-    "content_hash": "68ab089d7f22ae9212b84f8ffe20ff1c46d9b2b86b1af3af6062dd5e59503034",
+    "content_hash": "3639ab0a9cacce8474394cb823048166b254240146791ab521a009b29ebdd52b",
     "language": "ts",
-    "line_count": 18
+    "line_count": 20
   },
   {
     "path": "src/types/homonym-mammal.ts",

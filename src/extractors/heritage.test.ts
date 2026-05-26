@@ -39,6 +39,29 @@ class Dog extends Mammal implements Pet {}
     );
   });
 
+  it("records class superClass generics from superTypeArguments", () => {
+    const src = `
+class Dog extends Animal<string> {}
+`;
+    const result = parseSync("x.ts", src);
+    const lineMap = buildLineMap(src);
+    const rows = extractHeritageFromSource("x.ts", result.program, lineMap);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.type_args).toBe("string");
+  });
+
+  it("records unresolved row for complex extends expression", () => {
+    const src = `
+interface Weird extends (A | B) {}
+`;
+    const result = parseSync("x.ts", src);
+    const lineMap = buildLineMap(src);
+    const rows = extractHeritageFromSource("x.ts", result.program, lineMap);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.base_qualified_name).toBe("(expression)");
+    expect(rows[0]?.resolution_kind).toBe("unresolved");
+  });
+
   it("marks qualified extends as qualified-unresolved", () => {
     const src = `
 namespace pkg {

@@ -55,9 +55,9 @@ export interface IndexPerformanceReport {
   heritage_ms: number;
   /**
    * `indexFiles` wall-clock — `parse + insert + index_create + DDL + bindings
-   * + module_cycles + re_export_chains`. Does **not** include `collect_ms`
-   * (collect happens before `indexFiles`); the end-to-end run wall is
-   * `collect_ms + total_ms`.
+   * + module_cycles + re_export_chains + heritage_ms`. Does **not** include
+   * `collect_ms` (collect happens before `indexFiles`); the end-to-end run wall
+   * is `collect_ms + total_ms`.
    */
   total_ms: number;
   /** Up to 10 files with the highest per-file parse time, descending. */

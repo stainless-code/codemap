@@ -10,6 +10,15 @@ start_symbols AS (
     AND s.name = p.symbol_name
     AND (p.kind_filter IS NULL OR p.kind_filter = '' OR s.kind = p.kind_filter)
     AND (p.file_path IS NULL OR p.file_path = '' OR s.file_path = p.file_path)
+    AND s.id = (
+      SELECT s2.id
+      FROM symbols s2
+      WHERE s2.name = s.name
+        AND s2.file_path = s.file_path
+        AND s2.kind IN ('class', 'interface')
+      ORDER BY CASE WHEN s2.scope_local_id = 0 THEN 0 ELSE 1 END, s2.id
+      LIMIT 1
+    )
 ),
 resolved_bases AS (
   SELECT
@@ -26,8 +35,15 @@ resolved_bases AS (
     OR (
       th.base_symbol_id IS NULL
       AND th.base_file_path IS NOT NULL
-      AND parent.name = th.base_simple_name
-      AND parent.file_path = th.base_file_path
+      AND parent.id = (
+        SELECT s2.id
+        FROM symbols s2
+        WHERE s2.name = th.base_simple_name
+          AND s2.file_path = th.base_file_path
+          AND s2.kind IN ('class', 'interface', 'type')
+        ORDER BY CASE WHEN s2.scope_local_id = 0 THEN 0 ELSE 1 END, s2.id
+        LIMIT 1
+      )
     )
   )
   WHERE th.resolution_kind IN ('same-file', 'imported')

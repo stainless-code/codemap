@@ -29,6 +29,25 @@ function qualifiedNameOf(node: any): string | null {
   return null;
 }
 
+function unwrapExpression(node: any): any {
+  let cur = node;
+  while (cur?.type === "ParenthesizedExpression") cur = cur.expression;
+  return cur;
+}
+
+function bestEffortSimpleName(node: any): string | null {
+  const unwrapped = unwrapExpression(node);
+  if (!unwrapped) return null;
+  if (unwrapped.type === "Identifier") return unwrapped.name ?? null;
+  if (unwrapped.type === "BinaryExpression" && unwrapped.operator === "|") {
+    return bestEffortSimpleName(unwrapped.left);
+  }
+  if (unwrapped.type === "MemberExpression" && !unwrapped.computed) {
+    return unwrapped.property?.name ?? bestEffortSimpleName(unwrapped.object);
+  }
+  return null;
+}
+
 function heritageBaseFromTypeRef(
   node: any,
   heritageNode?: any,
@@ -110,10 +129,26 @@ function recordHeritageBase(
   heritageNode: any,
   relation: HeritageRelation,
 ) {
-  const expr =
-    heritageNode?.expression ?? heritageNode?.typeName ?? heritageNode;
+  const expr = unwrapExpression(
+    heritageNode?.expression ?? heritageNode?.typeName ?? heritageNode,
+  );
   const base = heritageBaseFromTypeRef(expr, heritageNode);
-  if (!base) return;
+  if (!base) {
+    const simple = bestEffortSimpleName(expr);
+    if (!simple) return;
+    pushHeritageRow(ctx, {
+      child_file_path: child.file_path,
+      child_name: child.name,
+      child_kind: child.kind,
+      child_line_start: child.line_start,
+      relation,
+      base_simple_name: simple,
+      base_qualified_name: "(expression)",
+      type_args: null,
+      resolution_kind: "unresolved",
+    });
+    return;
+  }
   pushHeritageRow(ctx, {
     child_file_path: child.file_path,
     child_name: child.name,
@@ -160,7 +195,15 @@ export function recordClassHeritage(
     line_start: lineStart,
   };
   if (node.superClass) {
-    recordHeritageBase(ctx, child, node.superClass, "extends");
+    recordHeritageBase(
+      ctx,
+      child,
+      {
+        expression: node.superClass,
+        typeArguments: node.superTypeArguments ?? node.superTypeParameters,
+      },
+      "extends",
+    );
   }
   for (const impl of node.implements ?? []) {
     recordHeritageBase(ctx, child, impl, "implements");

@@ -12,6 +12,8 @@ export interface Pet {
 
 export interface Both extends Animal, Pet {}
 
+export interface GenericBoth extends Animal, Map<string, Pet> {}
+
 export class Dog extends Mammal implements Pet {
   breed: string;
 }

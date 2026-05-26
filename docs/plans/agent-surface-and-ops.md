@@ -40,12 +40,11 @@ Details: [agents.md](../agents.md). Merge history: [agent-surface-delivery.md](.
 
 ## Related existing plans
 
-| Plan                                                          | Relationship                                                                                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [c9-plugin-layer](./c9-plugin-layer.md)                       | Prerequisite for [framework-route-extraction](./framework-route-extraction.md)                               |
-| [github-marketplace-action](./github-marketplace-action.md)   | May add `affected` mode (shipped CLI/MCP `affected` + `affected-tests` recipe)                               |
-| [perf-triangulation-rollout](./perf-triangulation-rollout.md) | Parse-worker hardening shipped #130; Phase 3 deferrals remain in rollout plan                                |
-| [type-heritage-substrate](./type-heritage-substrate.md)       | Lifts [#141](https://github.com/stainless-code/codemap/pull/141) recipe limits via `type_heritage` substrate |
+| Plan                                                          | Relationship                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [c9-plugin-layer](./c9-plugin-layer.md)                       | Prerequisite for [framework-route-extraction](./framework-route-extraction.md) |
+| [github-marketplace-action](./github-marketplace-action.md)   | May add `affected` mode (shipped CLI/MCP `affected` + `affected-tests` recipe) |
+| [perf-triangulation-rollout](./perf-triangulation-rollout.md) | Parse-worker hardening shipped #130; Phase 3 deferrals remain in rollout plan  |
 
 ---
 

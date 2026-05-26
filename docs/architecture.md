@@ -151,7 +151,7 @@ A local SQLite database (`.codemap/index.db`) indexes the project tree and store
 
 **Watch wiring:** **`src/cli/cmd-watch.ts`** (argv — `--debounce <ms>` / `--quiet`; bootstrap absorbs `--root`/`--config`) + **`src/application/watcher.ts`** (engine — pure debouncer + glob filter + injectable backend; production wires [chokidar v5](https://github.com/paulmillr/chokidar) selected via the 6-watcher audit in PR #46 — pure JS, runs identically on Bun + Node, ~30M repos use it). On every change/add/unlink event chokidar emits, the engine filters via `shouldIndexPath` (same indexed extensions as the indexer + project-local recipes; skips `node_modules` / `.git` / `dist`), debounces with a sliding window (default 250 ms), then calls `createReindexOnChange` which opens a DB, runs `runCodemapIndex({mode: 'files', files: [...changed]})`, closes the DB, and logs `reindex N file(s) in Mms` to stderr unless `--quiet`. SIGINT / SIGTERM drains pending edits via `flushNow()` before the watcher closes. **Default-ON for `mcp` / `serve` since 2026-05:** both transports boot the watcher in-process so every tool reads a live index — eliminates the per-request reindex prelude. Opt out with `--no-watch`, `CODEMAP_WATCH=0`, or `CODEMAP_NO_WATCH=1`. **`src/application/watch-policy.ts`** disables the watcher on WSL2 Windows drive mounts (`/mnt/*`) unless `CODEMAP_FORCE_WATCH=1`; stderr points at `codemap agents init --git-hooks` for git-triggered freshness. Standalone `codemap watch` runs the watcher decoupled from a transport for users wiring it next to a separate MCP / HTTP process. **Audit prelude optimization:** module-level `watchActive` flag; `handleAudit` skips its incremental-index prelude when active (and marks the close as readonly to avoid a wasted checkpoint). Explicit `no_index: false` still forces the prelude.
 
-**Performance wiring:** **`--performance`** plumbs through **`RunIndexOptions.performance`** → **`indexFiles({ performance, collectMs })`**. `parse-worker-core.ts` records per-file **`parseMs`** on each `ParsedFile`; main thread times the seven phases (`collect`, `parse`, `insert`, `index_create`, `bindings`, `module_cycles`, `re_export_chains`) and assembles **`IndexPerformanceReport`** under `IndexRunStats.performance`. Note: `total_ms` is `indexFiles` wall-clock (parse + insert + DDL + bindings + cycles + re_exports), **not** end-to-end run wall — `collect_ms` happens before `indexFiles` and is reported separately. Env var **`CODEMAP_PERFORMANCE_JSON=<path>`** dumps the report as JSON post-run (consumed by [`bun run check:perf-baseline`](./benchmark.md#perf-baseline-regression-guardrail) for CI regression-gating).
+**Performance wiring:** **`--performance`** plumbs through **`RunIndexOptions.performance`** → **`indexFiles({ performance, collectMs })`**. `parse-worker-core.ts` records per-file **`parseMs`** on each `ParsedFile`; main thread times the eight phases (`collect`, `parse`, `insert`, `index_create`, `bindings`, `module_cycles`, `re_export_chains`, `heritage`) and assembles **`IndexPerformanceReport`** under `IndexRunStats.performance`. Note: `total_ms` is `indexFiles` wall-clock (parse + insert + DDL + bindings + cycles + re_exports + heritage), **not** end-to-end run wall — `collect_ms` happens before `indexFiles` and is reported separately. Env var **`CODEMAP_PERFORMANCE_JSON=<path>`** dumps the report as JSON post-run (consumed by [`bun run check:perf-baseline`](./benchmark.md#perf-baseline-regression-guardrail) for CI regression-gating).
 
 **Agent templates:** `codemap agents init` writes thin pointer files (~16-line SKILL + ~22-line rule) to consumer disk; full content is served live by `codemap skill` / `codemap rule` (CLI) and `codemap://skill` / `codemap://rule` (MCP / HTTP) from `templates/agent-content/<kind>/*.md`. Section files concatenate in lexical order; `*.gen.md` sections dispatch to renderers in `application/agent-content.ts` so recipe catalog + schema DDL auto-register. Pointer-version stamp (`<!-- codemap-pointer-version: N -->`) + once-per-process stderr nag (`maybeWarnStalePointers`) flag stale consumer templates; cure is `codemap agents init --force`. Full matrix: [agents.md](./agents.md).
 
@@ -271,22 +271,22 @@ Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `
 
 ### `type_heritage` — Class/interface extends and implements edges (`STRICT`)
 
-| Column              | Type       | Description                                                                            |
-| ------------------- | ---------- | -------------------------------------------------------------------------------------- |
-| id                  | INTEGER PK | Auto-increment row id                                                                  |
-| child_file_path     | TEXT FK    | File defining the child type                                                           |
-| child_name          | TEXT       | Child class or interface name                                                          |
-| child_kind          | TEXT       | `class` or `interface`                                                                 |
-| child_line_start    | INTEGER    | Child definition line                                                                  |
-| relation            | TEXT       | `extends` or `implements`                                                              |
-| base_simple_name    | TEXT       | Unqualified base name used for graph walks                                             |
-| base_qualified_name | TEXT       | Qualified base when present (e.g. `pkg.Type`); nullable                                |
-| base_file_path      | TEXT       | Resolved definition file (null until resolve pass)                                     |
-| base_symbol_id      | INTEGER FK | Resolved `symbols.id` (null when unresolved)                                           |
-| resolution_kind     | TEXT       | `same-file`, `imported`, `qualified-unresolved`, or `unresolved`                       |
-| type_args           | TEXT       | Comma-separated generic args when present (display only; walks use `base_simple_name`) |
+| Column              | Type       | Description                                                                                                                         |
+| ------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| id                  | INTEGER PK | Auto-increment row id                                                                                                               |
+| child_file_path     | TEXT FK    | File defining the child type                                                                                                        |
+| child_name          | TEXT       | Child class or interface name                                                                                                       |
+| child_kind          | TEXT       | `class` or `interface`                                                                                                              |
+| child_line_start    | INTEGER    | Child definition line                                                                                                               |
+| relation            | TEXT       | `extends` or `implements`                                                                                                           |
+| base_simple_name    | TEXT       | Unqualified base name used for graph walks                                                                                          |
+| base_qualified_name | TEXT       | Qualified base when present (e.g. `pkg.Type`); `(expression)` marks non-simple extends/implements expressions excluded from resolve |
+| base_file_path      | TEXT       | Resolved definition file (null until resolve pass)                                                                                  |
+| base_symbol_id      | INTEGER FK | Resolved `symbols.id` (null when unresolved)                                                                                        |
+| resolution_kind     | TEXT       | `same-file`, `imported`, `qualified-unresolved`, or `unresolved`                                                                    |
+| type_args           | TEXT       | Comma-separated generic args when present (display only; walks use `base_simple_name`)                                              |
 
-Populated at parse time from oxc AST; `heritage-resolver` fills `base_file_path` / `base_symbol_id` after bindings on full rebuild (scoped on incremental). Powers `type-ancestors` and `type-descendants` recipes.
+Populated at parse time from oxc AST; `heritage-resolver` fills `base_file_path` / `base_symbol_id` after bindings on full rebuild. Incremental `--files` re-resolves rows in changed files plus importers and consumers pointing at changed base files. Powers `type-ancestors` and `type-descendants` recipes.
 
 ### `imports` — Import statements (`STRICT`)
 

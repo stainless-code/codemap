@@ -26,7 +26,7 @@ actions:
 
 Transitive **`extends`** chain plus direct **`implements`** interfaces for a class or interface.
 
-Heritage edges come from the indexed **`type_heritage`** table (AST extraction + import-aware resolve pass). Generic type arguments are stored in `type_args` but graph walks use `base_simple_name`. Rows with `resolution_kind` of `qualified-unresolved` or `unresolved` are omitted from walks.
+Heritage edges come from the indexed **`type_heritage`** table (AST extraction + import-aware resolve pass). Generic type arguments are stored in `type_args` but graph walks use `base_simple_name`. Rows with `resolution_kind` of `qualified-unresolved` or `unresolved` are omitted from walks (including non-simple expressions marked with `base_qualified_name = '(expression)'`).
 
 **Gaps:** qualified namespace extends (`pkg.Type`) stay unresolved until a namespace map exists. Direct `implements` edges are depth 1 only (not transitive).
 
