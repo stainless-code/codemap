@@ -80,6 +80,16 @@ function validateCodemapVersionInput(version) {
   }
 }
 
+/** `package-manager-detector` reports Berry as `{ agent: "yarn", version: "berry" }`. */
+/** @param {{ agent?: string; version?: string } | null | undefined} detected @returns {string} */
+function normalizeDetectedAgent(detected) {
+  const agent = detected?.agent ?? "npm";
+  if (agent === "yarn" && detected?.version === "berry") {
+    return "yarn@berry";
+  }
+  return agent;
+}
+
 /**
  * @param {{ projectRoot: string; packageManager?: string; version?: string }} opts
  * @returns {Promise<ResolvedCodemapInvocation>}
@@ -97,7 +107,7 @@ export async function resolveCodemapCliInvocation(opts) {
   }
   if (agent === "") {
     const detected = await detect({ cwd: projectRoot });
-    agent = detected?.agent ?? "npm";
+    agent = normalizeDetectedAgent(detected);
   }
 
   /** @type {"execute" | "execute-local"} */
@@ -123,7 +133,8 @@ export async function resolveCodemapCliInvocation(opts) {
   const resolved = resolveCommand(agent, intent, commandArgs);
   if (resolved === null) {
     throw new Error(
-      `package-manager-detector returned null for agent="${agent}", intent="${intent}".`,
+      `package-manager-detector returned null for agent="${agent}", intent="${intent}". ` +
+        `Check that the agent supports this intent (npm/pnpm/yarn/yarn@berry/bun execute-local or dlx).`,
     );
   }
   const normalized = normalizeSpawnCommand(resolved.command, resolved.args);

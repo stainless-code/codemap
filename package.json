@@ -70,7 +70,7 @@
     "test:coverage": "bun test --coverage ./src",
     "test:golden": "bun scripts/query-golden.ts",
     "test:golden:external": "bun scripts/query-golden.ts --corpus external",
-    "test:scripts": "bun test $(find scripts -name '*.test.mjs')",
+    "test:scripts": "bash -c 'files=$(find scripts -name \"*.test.mjs\"); if [ -z \"$files\" ]; then echo \"no scripts test files found\" >&2; exit 1; fi; exec bun test $files'",
     "typecheck": "tsgo --noEmit",
     "version": "changeset version && bun run format CHANGELOG.md"
   },

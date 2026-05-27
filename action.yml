@@ -143,18 +143,10 @@ runs:
       run: |
         ACTION_STAGE="$RUNNER_TEMP/codemap-action"
         WORK_DIR="${{ inputs.working-directory }}"
-        if [[ "$WORK_DIR" == *".."* ]]; then
-          echo "::error::codemap action: working-directory must not contain .."
-          exit 1
-        fi
-        if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "." ]; then
-          RESOLVED_WORKDIR="$GITHUB_WORKSPACE"
-        else
-          RESOLVED_WORKDIR="$GITHUB_WORKSPACE/$WORK_DIR"
-        fi
+        RESOLVED_WORKDIR="$(bash "${{ github.action_path }}/scripts/action-resolve-working-directory.sh" "$GITHUB_WORKSPACE" "$WORK_DIR")"
         # Action runs without its own node_modules; install the detector lazily.
         # Pinned to a known version so consumers get reproducible builds.
-        npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0 >/dev/null
+        npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0
         cp "${{ github.action_path }}/scripts/detect-pm.mjs" \
           "${{ github.action_path }}/scripts/codemap-invocation.mjs" \
           "$ACTION_STAGE/"

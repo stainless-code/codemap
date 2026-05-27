@@ -545,7 +545,7 @@ export async function applyAgentsInitMcp(
       upsertVsCodeMcpFile({
         path,
         label: def.label,
-        entry: buildCodemapMcpSpawn(invocation, false),
+        entry,
         force,
       });
     } else {

@@ -53,6 +53,16 @@ function seedPnpmInstalledCodemapProject(dir: string): void {
   writeFileSync(join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
 }
 
+function seedBunInstalledCodemapProject(dir: string): void {
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({
+      devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+    }),
+  );
+  writeFileSync(join(dir, "bun.lock"), "");
+}
+
 describe("buildCodemapMcpSpawn", () => {
   it("includes workspace root for Cursor", () => {
     expect(buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true)).toEqual({
@@ -245,6 +255,29 @@ describe("applyAgentsInitMcp", () => {
       expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("pnpm");
       expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
         "exec",
+        "codemap",
+        "mcp",
+        "--watch",
+        "--root",
+        "${workspaceFolder}",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes bunx spawn when bun.lock is present", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-bun-"));
+    try {
+      seedBunInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
+      const cursor = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<string, { command: string; args: string[] }>;
+      };
+      expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("bunx");
+      expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
         "codemap",
         "mcp",
         "--watch",

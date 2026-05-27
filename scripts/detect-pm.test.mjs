@@ -239,6 +239,19 @@ describe("scripts/detect-pm.mjs", () => {
     expect(out.agent).toBe("pnpm");
   });
 
+  it("autodetects yarn@berry from packageManager field", () => {
+    const dir = makeFixture("yarn-berry-autodetect", {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@berry@4.0.0",
+        name: "berry-app",
+      }),
+      "yarn.lock": "",
+    });
+    const out = runDetect({ WORKING_DIRECTORY: dir });
+    expect(out.agent).toBe("yarn@berry");
+    expect(out.exec).toContain("yarn dlx");
+  });
+
   it("runs from an Action-style isolated stage with both script files", () => {
     const stage = join(workRoot, "action-stage");
     mkdirSync(stage, { recursive: true });

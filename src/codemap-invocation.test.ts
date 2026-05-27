@@ -6,8 +6,10 @@ import { dirname, join } from "node:path";
 import {
   buildCodemapMcpSpawn,
   codemapInProjectDependencies,
+  formatCodemapExec,
   normalizeSpawnCommand,
   resolveCodemapCliInvocation,
+  SAFE_CODEMAP_VERSION_RE,
 } from "./codemap-invocation";
 
 let workRoot: string;
@@ -182,6 +184,104 @@ describe("resolveCodemapCliInvocation", () => {
       }),
     ).rejects.toThrow(/line breaks/);
   });
+
+  it("uses dlx-pinned when version is set", async () => {
+    const dir = makeFixture("dlx-pinned", {
+      "package.json": JSON.stringify({ name: "no-codemap" }),
+      "package-lock.json": "{}",
+    });
+    const resolved = await resolveCodemapCliInvocation({
+      projectRoot: dir,
+      packageManager: "npm",
+      version: "1.2.3",
+    });
+    expect(resolved.installMethod).toBe("dlx-pinned");
+    expect(resolved.args).toEqual(["@stainless-code/codemap@1.2.3"]);
+  });
+
+  it("uses pnpm dlx when codemap is not installed locally", async () => {
+    const dir = makeFixture("pnpm-dlx", {
+      "package.json": JSON.stringify({ name: "no-codemap" }),
+      "pnpm-lock.yaml": "lockfileVersion: 9\n",
+    });
+    const resolved = await resolveCodemapCliInvocation({
+      projectRoot: dir,
+      packageManager: "pnpm",
+    });
+    expect(resolved.installMethod).toBe("dlx-latest");
+    expect(resolved.command).toBe("pnpm");
+    expect(resolved.args[0]).toBe("dlx");
+    expect(resolved.args).toContain("@stainless-code/codemap@latest");
+  });
+
+  it("uses npx for yarn classic dlx (detector quirk)", async () => {
+    const dir = makeFixture("yarn-dlx", {
+      "package.json": JSON.stringify({ name: "no-codemap" }),
+      "yarn.lock": "",
+    });
+    const resolved = await resolveCodemapCliInvocation({
+      projectRoot: dir,
+      packageManager: "yarn",
+    });
+    expect(resolved.installMethod).toBe("dlx-latest");
+    expect(resolved.command).toBe("npx");
+    expect(resolved.args).toEqual(["@stainless-code/codemap@latest"]);
+  });
+
+  it("autodetects package manager from lockfile", async () => {
+    const dir = makeFixture("autodetect-pnpm", {
+      "package.json": JSON.stringify({ name: "no-codemap" }),
+      "pnpm-lock.yaml": "lockfileVersion: 9\n",
+    });
+    const resolved = await resolveCodemapCliInvocation({ projectRoot: dir });
+    expect(resolved.agent).toBe("pnpm");
+  });
+
+  it("autodetects yarn@berry from packageManager field", async () => {
+    const dir = makeFixture("yarn-berry-autodetect", {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@berry@4.0.0",
+        name: "no-codemap",
+      }),
+      "yarn.lock": "",
+    });
+    const resolved = await resolveCodemapCliInvocation({ projectRoot: dir });
+    expect(resolved.agent).toBe("yarn@berry");
+    expect(resolved.installMethod).toBe("dlx-latest");
+    expect(resolved.args[0]).toBe("dlx");
+  });
+
+  it("rejects unknown package-manager values", async () => {
+    const dir = makeFixture("bad-pm", {
+      "package.json": JSON.stringify({ name: "x" }),
+    });
+    await expect(
+      resolveCodemapCliInvocation({
+        projectRoot: dir,
+        packageManager: "rye",
+      }),
+    ).rejects.toThrow(/not recognised/);
+  });
+});
+
+describe("formatCodemapExec", () => {
+  it("joins command and args", () => {
+    expect(
+      formatCodemapExec({ command: "pnpm", args: ["exec", "codemap"] }),
+    ).toBe("pnpm exec codemap");
+  });
+});
+
+describe("SAFE_CODEMAP_VERSION_RE", () => {
+  it("accepts semver pins and dist-tags", () => {
+    expect(SAFE_CODEMAP_VERSION_RE.test("1.2.3")).toBe(true);
+    expect(SAFE_CODEMAP_VERSION_RE.test("latest")).toBe(true);
+    expect(SAFE_CODEMAP_VERSION_RE.test("1.0.0-beta.1")).toBe(true);
+  });
+
+  it("rejects shell metacharacters", () => {
+    expect(SAFE_CODEMAP_VERSION_RE.test("1.0.0;")).toBe(false);
+  });
 });
 
 describe("buildCodemapMcpSpawn", () => {
@@ -191,6 +291,15 @@ describe("buildCodemapMcpSpawn", () => {
     ).toEqual({
       command: "bunx",
       args: ["codemap", "mcp", "--watch", "--root", "${workspaceFolder}"],
+    });
+  });
+
+  it("omits workspace root when includeWorkspaceRoot is false", () => {
+    expect(
+      buildCodemapMcpSpawn({ command: "npx", args: ["codemap"] }, false),
+    ).toEqual({
+      command: "npx",
+      args: ["codemap", "mcp", "--watch"],
     });
   });
 });

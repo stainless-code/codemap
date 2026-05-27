@@ -13,12 +13,14 @@ import {
   formatCodemapExec as execFromTs,
   normalizeSpawnCommand as normalizeFromTs,
   resolveCodemapCliInvocation as resolveFromTs,
+  SAFE_CODEMAP_VERSION_RE as versionReFromTs,
 } from "../src/codemap-invocation.ts";
 import {
   buildCodemapMcpSpawn as spawnFromMjs,
   formatCodemapExec as execFromMjs,
   normalizeSpawnCommand as normalizeFromMjs,
   resolveCodemapCliInvocation as resolveFromMjs,
+  SAFE_CODEMAP_VERSION_RE as versionReFromMjs,
 } from "./codemap-invocation.mjs";
 
 let workRoot;
@@ -92,6 +94,46 @@ const CASES = [
     },
     opts: { projectRoot: "", packageManager: "yarn@berry" },
   },
+  {
+    label: "yarn classic exec local",
+    fixture: {
+      "package.json": JSON.stringify({
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "yarn.lock": "",
+    },
+    opts: { projectRoot: "", packageManager: "yarn" },
+  },
+  {
+    label: "pnpm dlx-latest",
+    fixture: {
+      "package.json": JSON.stringify({ name: "empty" }),
+      "pnpm-lock.yaml": "lockfileVersion: 9\n",
+    },
+    opts: { projectRoot: "", packageManager: "pnpm" },
+  },
+  {
+    label: "monorepo parent walk-up",
+    fixture: {
+      "package.json": JSON.stringify({
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "pnpm-lock.yaml": "lockfileVersion: 9\n",
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
+    },
+    opts: { projectRoot: "", packageManager: "pnpm" },
+  },
+  {
+    label: "yarn berry autodetect dlx",
+    fixture: {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@berry@4.0.0",
+        name: "empty",
+      }),
+      "yarn.lock": "",
+    },
+    opts: { projectRoot: "" },
+  },
 ];
 
 describe("codemap-invocation TS ↔ mjs sync", () => {
@@ -101,7 +143,11 @@ describe("codemap-invocation TS ↔ mjs sync", () => {
         testCase.label.replace(/\s+/g, "-"),
         testCase.fixture,
       );
-      const opts = { ...testCase.opts, projectRoot: dir };
+      const projectRoot =
+        testCase.label === "monorepo parent walk-up"
+          ? join(dir, "apps", "web")
+          : dir;
+      const opts = { ...testCase.opts, projectRoot };
       const ts = await resolveFromTs(opts);
       const mjs = await resolveFromMjs(opts);
       expect(mjs).toEqual(ts);
@@ -126,5 +172,9 @@ describe("codemap-invocation TS ↔ mjs sync", () => {
   it("formatCodemapExec matches", () => {
     const prefix = { command: "pnpm", args: ["exec", "codemap"] };
     expect(execFromMjs(prefix)).toEqual(execFromTs(prefix));
+  });
+
+  it("SAFE_CODEMAP_VERSION_RE matches", () => {
+    expect(String(versionReFromMjs)).toBe(String(versionReFromTs));
   });
 });
