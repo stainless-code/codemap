@@ -187,9 +187,9 @@ Flags:
                   watcher is active (default; no-op with --no-watch).
   --help, -h      Show this help.
 
-With --watch, chokidar starts on the first tool request (not on GET
-/health) and stops 5s after the last request completes. That release
-grace stops the watcher between stateless POSTs — not an idle shutdown
+With --watch, chokidar starts on the first authenticated non-/health
+request and stops 5s after the last request completes. That release
+grace stops the watcher between stateless requests — not an idle shutdown
 of the HTTP listener itself.
 
 Routes (every MCP tool maps to POST /tool/<name>; HTTP returns each

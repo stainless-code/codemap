@@ -111,6 +111,7 @@ export function createManagedWatchSession(
   let clients = 0;
   let handle: { stop: () => Promise<void>; ready: Promise<void> } | undefined;
   let starting: Promise<void> | undefined;
+  let stopInFlight: Promise<void> | undefined;
   let stopTimer: ReturnType<typeof setTimeout> | undefined;
   const releaseGraceMs = opts.releaseGraceMs ?? 0;
 
@@ -155,14 +156,26 @@ export function createManagedWatchSession(
     if (handle === undefined) return;
     const current = handle;
     handle = undefined;
-    await current.stop();
+    const stopping = current.stop().finally(() => {
+      if (stopInFlight === stopping) stopInFlight = undefined;
+    });
+    stopInFlight = stopping;
+    await stopping;
   };
 
   return {
     async acquireClient() {
       cancelScheduledStop();
+      if (stopInFlight !== undefined) {
+        await stopInFlight;
+      }
       clients++;
-      await ensureStarted();
+      try {
+        await ensureStarted();
+      } catch (err) {
+        clients--;
+        throw err;
+      }
     },
     async releaseClient() {
       if (clients <= 0) return;

@@ -220,6 +220,27 @@ describe("createManagedWatchSession", () => {
     expect(session.isWatching()).toBe(true);
     await session.forceStop();
   });
+
+  it("rolls back client count when ensureStarted fails", async () => {
+    const session = createManagedWatchSession({
+      root: "/tmp",
+      excludeDirNames: new Set(["node_modules"]),
+      recipesWatchPrefix: ".codemap/recipes/",
+      debounceMs: 0,
+      onChange: () => {},
+      releaseGraceMs: 0,
+      backend: {
+        start() {
+          throw new Error("start failed");
+        },
+        async stop() {},
+      },
+    });
+
+    await expect(session.acquireClient()).rejects.toThrow("start failed");
+    expect(session.clientCount()).toBe(0);
+    expect(session.isWatching()).toBe(false);
+  });
 });
 
 describe("bindWatchClientRelease", () => {
