@@ -12,8 +12,11 @@ codemap
 # Full rebuild — after rebase, branch switch, or stale index
 codemap --full
 
-# Check index freshness
-codemap query --json "SELECT key, value FROM meta"
+# Check index freshness (index-level — HEAD drift, pending sync, disk-ahead)
+codemap context --compact --json | jq '.index_freshness'
+
+# Per-file staleness (content_hash drift)
+codemap validate --json
 ```
 
 **Prefer `--files`** when you know which files you changed — it skips git diff and filesystem scanning for the rest of the tree. Deleted files passed to `--files` are auto-removed from the index.

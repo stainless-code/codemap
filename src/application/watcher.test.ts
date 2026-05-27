@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   _resetWatchStateForTests,
   createDebouncer,
+  getWatchSyncState,
   isWatchActive,
   runWatchLoop,
   shouldIndexPath,
@@ -345,10 +346,12 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     // Backend started, but flag still false because prime hasn't run.
     expect(backend.started).toBe(true);
     expect(isWatchActive()).toBe(false);
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
     // Release the prime → flag flips.
     releasePrime!();
-    await new Promise((r) => setTimeout(r, 10));
+    await handle.ready;
     expect(isWatchActive()).toBe(true);
+    expect(getWatchSyncState().reindex_in_flight).toBe(false);
     await handle.stop();
     expect(isWatchActive()).toBe(false);
   });
@@ -410,6 +413,44 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     // stop() flushes the pending batch + awaits its async onChange.
     await handle.stop();
     expect(onChangeFinished).toBe(true);
+  });
+
+  it("reindex_in_flight stays true while chained batches wait on inFlight", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let releaseBatch1: (() => void) | undefined;
+    const batch1Gate = new Promise<void>((resolve) => {
+      releaseBatch1 = resolve;
+    });
+    let batchCount = 0;
+
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: async () => {
+        batchCount++;
+        if (batchCount === 1) {
+          await batch1Gate;
+        }
+      },
+      debounceMs: 10,
+      backend,
+    });
+
+    backend.fire("change", "/tmp/proj/src/a.ts");
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
+
+    backend.fire("change", "/tmp/proj/src/b.ts");
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().pending_paths).toBe(0);
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
+
+    releaseBatch1!();
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().reindex_in_flight).toBe(false);
+
+    await handle.stop();
   });
 
   it("treats unlink as a path requiring reindex (caller handles deletes)", async () => {

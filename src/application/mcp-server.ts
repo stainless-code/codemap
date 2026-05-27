@@ -14,6 +14,13 @@ import {
 } from "../runtime";
 import { assembleMcpInstructions } from "./agent-content";
 import {
+  formatIndexFreshnessMcpBlock,
+  jsonPayloadNeedsMcpFreshnessBlock,
+  mergeIndexFreshnessIntoJsonPayload,
+  resolveTransportIndexFreshness,
+  warnIndexFreshnessToStderr,
+} from "./index-freshness";
+import {
   isMcpToolEnabled,
   logMcpToolAllowlist,
   resolveMcpToolAllowlist,
@@ -110,9 +117,18 @@ function wrapToolResult(r: ToolResult) {
     };
   }
   if (r.format === "json") {
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(r.payload) }],
-    };
+    const freshness = resolveTransportIndexFreshness(r.payload);
+    const payload = mergeIndexFreshnessIntoJsonPayload(r.payload, freshness);
+    const content: Array<{ type: "text"; text: string }> = [
+      { type: "text", text: JSON.stringify(payload) },
+    ];
+    if (freshness !== null && jsonPayloadNeedsMcpFreshnessBlock(r.payload)) {
+      content.push({
+        type: "text",
+        text: formatIndexFreshnessMcpBlock(freshness),
+      });
+    }
+    return { content };
   }
   return { content: [{ type: "text" as const, text: r.payload }] };
 }
@@ -564,35 +580,41 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
  */
 export async function runMcpServer(opts: ServerOpts): Promise<void> {
   await bootstrapForMcp(opts);
-  const server = createMcpServer(opts);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
 
   let stopWatch: (() => Promise<void>) | undefined;
+  let watchReady: Promise<void> = Promise.resolve();
   if (opts.watch === true) {
     // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
     console.error("codemap mcp: --watch enabled, booting file watcher...");
-    try {
-      const handle = runWatchLoop({
-        root: getProjectRoot(),
-        excludeDirNames: getExcludeDirNames(),
-        recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
-        debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-        onPrime: createPrimeIndex({ quiet: false, label: "codemap mcp" }),
-        onChange: createReindexOnChange({
-          quiet: false,
-          label: "codemap mcp",
-        }),
-      });
-      stopWatch = handle.stop;
-    } catch (err) {
-      // Watcher boot threw — close the MCP transport so the agent host
-      // sees the disconnect cleanly instead of a half-alive server.
-      // Caught by CodeRabbit on PR #47.
-      await server.close();
-      throw err;
-    }
+    const prime = createPrimeIndex({ quiet: false, label: "codemap mcp" });
+    const handle = runWatchLoop({
+      root: getProjectRoot(),
+      excludeDirNames: getExcludeDirNames(),
+      recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
+      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      onPrime: async () => {
+        try {
+          await prime();
+        } finally {
+          warnIndexFreshnessToStderr("codemap mcp");
+        }
+      },
+      onChange: createReindexOnChange({
+        quiet: false,
+        label: "codemap mcp",
+      }),
+    });
+    stopWatch = handle.stop;
+    watchReady = handle.ready;
+  } else {
+    warnIndexFreshnessToStderr("codemap mcp");
   }
+
+  await watchReady;
+
+  const server = createMcpServer(opts);
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
 
   await new Promise<void>((resolve) => {
     transport.onclose = () => resolve();

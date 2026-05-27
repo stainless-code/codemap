@@ -1,6 +1,8 @@
 import { getMeta, SCHEMA_VERSION } from "../db";
 import type { CodemapDatabase } from "../db";
 import { CODEMAP_VERSION } from "../version";
+import { computeIndexFreshness } from "./index-freshness";
+import type { IndexFreshness } from "./index-freshness";
 import { QUERY_RECIPES } from "./query-recipes";
 
 /**
@@ -32,6 +34,7 @@ export interface ContextEnvelope {
     content: string;
   }[];
   recipes: { id: string; description: string }[];
+  index_freshness: IndexFreshness;
   intent?: {
     input: string;
     classified_as: string;
@@ -136,6 +139,7 @@ export function buildContextEnvelope(
       id,
       description: meta.description,
     })),
+    index_freshness: computeIndexFreshness(db, { include_disk_drift: true }),
   };
 
   if (!opts.compact) {

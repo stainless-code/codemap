@@ -12,6 +12,12 @@ import {
   getTsconfigPath,
   initCodemap,
 } from "../runtime";
+import {
+  readCheapIndexFreshness,
+  resolveTransportIndexFreshness,
+  warnIndexFreshnessToStderr,
+} from "./index-freshness";
+import type { IndexFreshness } from "./index-freshness";
 import { listResources, readResource } from "./resource-handlers";
 import {
   affectedArgsSchema,
@@ -118,6 +124,35 @@ const TOOL_NAMES = [
 export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
   await bootstrapForServe(opts);
 
+  let stopWatch: (() => Promise<void>) | undefined;
+  let watchReady: Promise<void> = Promise.resolve();
+  if (opts.watch === true) {
+    const prime = createPrimeIndex({ quiet: false, label: "codemap serve" });
+    const handle = runWatchLoop({
+      root: getProjectRoot(),
+      excludeDirNames: getExcludeDirNames(),
+      recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
+      debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      onPrime: async () => {
+        try {
+          await prime();
+        } finally {
+          warnIndexFreshnessToStderr("codemap serve");
+        }
+      },
+      onChange: createReindexOnChange({
+        quiet: false,
+        label: "codemap serve",
+      }),
+    });
+    stopWatch = handle.stop;
+    watchReady = handle.ready;
+  } else {
+    warnIndexFreshnessToStderr("codemap serve");
+  }
+
+  await watchReady;
+
   const server = createServer((req, res) => {
     handleRequest(req, res, opts).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
@@ -137,30 +172,6 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       resolve();
     });
   });
-
-  let stopWatch: (() => Promise<void>) | undefined;
-  if (opts.watch === true) {
-    try {
-      const handle = runWatchLoop({
-        root: getProjectRoot(),
-        excludeDirNames: getExcludeDirNames(),
-        recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
-        debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-        onPrime: createPrimeIndex({ quiet: false, label: "codemap serve" }),
-        onChange: createReindexOnChange({
-          quiet: false,
-          label: "codemap serve",
-        }),
-      });
-      stopWatch = handle.stop;
-    } catch (err) {
-      // Watcher boot threw AFTER `server.listen()` resolved — close
-      // the listener so we don't leak an orphaned HTTP socket on a
-      // failed boot. Caught by CodeRabbit on PR #47.
-      await new Promise<void>((res) => server.close(() => res()));
-      throw err;
-    }
-  }
 
   await new Promise<void>((resolve) => {
     const shutdown = (signal: string) => {
@@ -248,10 +259,16 @@ export async function handleRequest(
 
   // Liveness probe — auth-exempt so monitoring works without the token.
   if (method === "GET" && path === "/health") {
+    const freshness = readCheapIndexFreshness();
+    applyIndexFreshnessHeaders(res, freshness);
     return writeJson(
       res,
       200,
-      { ok: true, version: opts.version },
+      {
+        ok: true,
+        version: opts.version,
+        ...(freshness !== null ? { index_freshness: freshness } : {}),
+      },
       opts.version,
     );
   }
@@ -385,11 +402,36 @@ async function readJsonBody(
  * 4xx / 5xx with `{"error": "..."}` (same shape `codemap query --json`
  * prints on failure — agents and CLI consumers unwrap identically).
  */
+function applyIndexFreshnessHeaders(
+  res: ServerResponse,
+  freshness: IndexFreshness | null,
+): void {
+  if (freshness === null) return;
+  res.setHeader(
+    "X-Codemap-Pending-Sync",
+    freshness.pending_sync ? "true" : "false",
+  );
+  res.setHeader(
+    "X-Codemap-Commit-Drift",
+    freshness.commit_drift ? "true" : "false",
+  );
+  if (freshness.warning !== null) {
+    res.setHeader("X-Codemap-Warning", freshness.warning);
+  }
+}
+
 function writeToolResult(
   res: ServerResponse,
   result: ToolResult,
   version: string,
 ): void {
+  const freshness = result.ok
+    ? result.format === "json"
+      ? resolveTransportIndexFreshness(result.payload)
+      : readCheapIndexFreshness()
+    : null;
+  applyIndexFreshnessHeaders(res, freshness);
+
   if (!result.ok) {
     return writeJson(
       res,

@@ -179,6 +179,26 @@ export const DEFAULT_DEBOUNCE_MS = 250;
  */
 let watchActive = false;
 
+/** Debouncer + in-flight reindex state for index freshness metadata. */
+let watchDebouncer: Debouncer | undefined;
+let watchReindexInFlight = false;
+let watchPrimeInFlight = false;
+/** Batches chained on `inFlight` but not yet running or still running. */
+let watchReindexPendingBatches = 0;
+
+export function getWatchSyncState(): Readonly<{
+  pending_paths: number;
+  reindex_in_flight: boolean;
+}> {
+  return {
+    pending_paths: watchDebouncer?.pendingSize() ?? 0,
+    reindex_in_flight:
+      watchReindexInFlight ||
+      watchPrimeInFlight ||
+      watchReindexPendingBatches > 0,
+  };
+}
+
 export function isWatchActive(): boolean {
   return watchActive;
 }
@@ -186,6 +206,10 @@ export function isWatchActive(): boolean {
 /** Test-only escape hatch — drops the flag so a test that booted a fake watcher leaves a clean slate for siblings. */
 export function _resetWatchStateForTests(): void {
   watchActive = false;
+  watchDebouncer = undefined;
+  watchReindexInFlight = false;
+  watchPrimeInFlight = false;
+  watchReindexPendingBatches = 0;
 }
 
 /** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
@@ -318,6 +342,8 @@ export interface WatchBackend {
  */
 export function runWatchLoop(opts: WatchLoopOpts): {
   stop: () => Promise<void>;
+  /** Resolves when optional `onPrime` finishes (immediate when absent). */
+  ready: Promise<void>;
 } {
   const debounceMs = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const recipesPrefix = opts.recipesWatchPrefix ?? DEFAULT_RECIPES_WATCH_PREFIX;
@@ -330,14 +356,24 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   // re-indexing left the DB in a half-state).
   let inFlight: Promise<void> = Promise.resolve();
   const debouncer = createDebouncer((paths) => {
+    watchReindexPendingBatches++;
     inFlight = inFlight
-      .then(() => Promise.resolve(opts.onChange(paths)))
+      .then(async () => {
+        watchReindexInFlight = true;
+        try {
+          await Promise.resolve(opts.onChange(paths));
+        } finally {
+          watchReindexInFlight = false;
+          watchReindexPendingBatches--;
+        }
+      })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console -- intentional onChange-error log
         console.error(`codemap watch: onChange failed — ${msg}`);
       });
   }, debounceMs);
+  watchDebouncer = debouncer;
 
   const backend: WatchBackend =
     opts.backend ?? createChokidarBackend({ recipesPrefix, stateDirRel });
@@ -372,6 +408,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
     primingDone = Promise.resolve();
   } else {
     primingDone = (async () => {
+      watchPrimeInFlight = true;
       try {
         await opts.onPrime!();
         if (!stopped) watchActive = true;
@@ -384,11 +421,14 @@ export function runWatchLoop(opts: WatchLoopOpts): {
         // Leave watchActive = false; embedder may decide to stop or
         // tolerate. We don't tear down here — the watcher is still
         // catching new edits, just can't promise historical freshness.
+      } finally {
+        watchPrimeInFlight = false;
       }
     })();
   }
 
   return {
+    ready: primingDone,
     async stop() {
       // Stop early so handleAudit doesn't keep skipping prelude while
       // we're shutting down (any in-flight audit reads a "stale"
@@ -404,6 +444,9 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       // ones still re-indexing).
       await inFlight;
       await backend.stop();
+      watchDebouncer = undefined;
+      watchReindexInFlight = false;
+      watchPrimeInFlight = false;
       watchActive = false;
     },
   };
