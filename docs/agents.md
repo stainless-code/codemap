@@ -103,6 +103,8 @@ Recipe ids cited in the playbook are machine-validated in tests against the live
 
 ## MCP tool allowlist
 
+**`context.index_freshness`** — session bootstrap includes index-level freshness metadata: `commit_drift` (HEAD ≠ `last_indexed_commit`), `pending_sync` (watcher debounce queue or in-flight reindex), optional disk-drift counts when watch is off, and a single `warning` string when agents should pause or re-index. Complements per-file `validate` / snippet `stale`. Plan: [`plans/index-freshness-trust-bundle.md`](./plans/index-freshness-trust-bundle.md).
+
 **`CODEMAP_MCP_TOOLS`** — comma-separated snake_case MCP tool names. When set, only listed tools register (stderr lists the active set). Unknown names are ignored with a warning. Unset = all tools (default). **`query_batch`** registers only when listed or when unset (eval ablation).
 
 Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`

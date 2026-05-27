@@ -179,6 +179,20 @@ export const DEFAULT_DEBOUNCE_MS = 250;
  */
 let watchActive = false;
 
+/** Debouncer + in-flight reindex state for index freshness metadata. */
+let watchDebouncer: Debouncer | undefined;
+let watchReindexInFlight = false;
+
+export function getWatchSyncState(): Readonly<{
+  pending_paths: number;
+  reindex_in_flight: boolean;
+}> {
+  return {
+    pending_paths: watchDebouncer?.pendingSize() ?? 0,
+    reindex_in_flight: watchReindexInFlight,
+  };
+}
+
 export function isWatchActive(): boolean {
   return watchActive;
 }
@@ -186,6 +200,8 @@ export function isWatchActive(): boolean {
 /** Test-only escape hatch — drops the flag so a test that booted a fake watcher leaves a clean slate for siblings. */
 export function _resetWatchStateForTests(): void {
   watchActive = false;
+  watchDebouncer = undefined;
+  watchReindexInFlight = false;
 }
 
 /** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
@@ -331,13 +347,21 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   let inFlight: Promise<void> = Promise.resolve();
   const debouncer = createDebouncer((paths) => {
     inFlight = inFlight
-      .then(() => Promise.resolve(opts.onChange(paths)))
+      .then(async () => {
+        watchReindexInFlight = true;
+        try {
+          await Promise.resolve(opts.onChange(paths));
+        } finally {
+          watchReindexInFlight = false;
+        }
+      })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console -- intentional onChange-error log
         console.error(`codemap watch: onChange failed — ${msg}`);
       });
   }, debounceMs);
+  watchDebouncer = debouncer;
 
   const backend: WatchBackend =
     opts.backend ?? createChokidarBackend({ recipesPrefix, stateDirRel });
@@ -404,6 +428,8 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       // ones still re-indexing).
       await inFlight;
       await backend.stop();
+      watchDebouncer = undefined;
+      watchReindexInFlight = false;
       watchActive = false;
     },
   };

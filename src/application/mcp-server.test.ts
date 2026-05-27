@@ -604,6 +604,10 @@ describe("MCP server — audit / context / validate tools", () => {
       expect(json).toMatchObject({
         codemap: { schema_version: expect.any(Number) },
         project: { root: expect.any(String), file_count: expect.any(Number) },
+        index_freshness: expect.objectContaining({
+          pending_sync: expect.any(Boolean),
+          commit_drift: expect.any(Boolean),
+        }),
       });
     } finally {
       await server.close();
