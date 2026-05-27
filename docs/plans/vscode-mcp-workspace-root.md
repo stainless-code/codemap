@@ -110,7 +110,7 @@ Optional follow-up: document **`--no-watch`** as a consumer override when file w
 
 ## Consumer guidance
 
-Projects with `.vscode/mcp.json` from **older** init output (no `--root`) should re-run **`codemap agents init --mcp`** (or target **`copilot`** only) to upsert the codemap server entry. Init merge is idempotent and preserves foreign `servers`.
+Projects with `.vscode/mcp.json` from **older** init output (no `--root`) should re-run **`codemap agents init --mcp`** (or **`--interactive`** and select Copilot only) to upsert the codemap server entry. Init merge is idempotent and preserves foreign `servers`.
 
 Custom overrides remain valid:
 
