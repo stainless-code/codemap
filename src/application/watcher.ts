@@ -182,6 +182,7 @@ let watchActive = false;
 /** Debouncer + in-flight reindex state for index freshness metadata. */
 let watchDebouncer: Debouncer | undefined;
 let watchReindexInFlight = false;
+let watchPrimeInFlight = false;
 
 export function getWatchSyncState(): Readonly<{
   pending_paths: number;
@@ -189,7 +190,7 @@ export function getWatchSyncState(): Readonly<{
 }> {
   return {
     pending_paths: watchDebouncer?.pendingSize() ?? 0,
-    reindex_in_flight: watchReindexInFlight,
+    reindex_in_flight: watchReindexInFlight || watchPrimeInFlight,
   };
 }
 
@@ -202,6 +203,7 @@ export function _resetWatchStateForTests(): void {
   watchActive = false;
   watchDebouncer = undefined;
   watchReindexInFlight = false;
+  watchPrimeInFlight = false;
 }
 
 /** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
@@ -334,6 +336,8 @@ export interface WatchBackend {
  */
 export function runWatchLoop(opts: WatchLoopOpts): {
   stop: () => Promise<void>;
+  /** Resolves when optional `onPrime` finishes (immediate when absent). */
+  ready: Promise<void>;
 } {
   const debounceMs = opts.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const recipesPrefix = opts.recipesWatchPrefix ?? DEFAULT_RECIPES_WATCH_PREFIX;
@@ -396,6 +400,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
     primingDone = Promise.resolve();
   } else {
     primingDone = (async () => {
+      watchPrimeInFlight = true;
       try {
         await opts.onPrime!();
         if (!stopped) watchActive = true;
@@ -408,11 +413,14 @@ export function runWatchLoop(opts: WatchLoopOpts): {
         // Leave watchActive = false; embedder may decide to stop or
         // tolerate. We don't tear down here — the watcher is still
         // catching new edits, just can't promise historical freshness.
+      } finally {
+        watchPrimeInFlight = false;
       }
     })();
   }
 
   return {
+    ready: primingDone,
     async stop() {
       // Stop early so handleAudit doesn't keep skipping prelude while
       // we're shutting down (any in-flight audit reads a "stale"
@@ -430,6 +438,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
       await backend.stop();
       watchDebouncer = undefined;
       watchReindexInFlight = false;
+      watchPrimeInFlight = false;
       watchActive = false;
     },
   };

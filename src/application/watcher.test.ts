@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   _resetWatchStateForTests,
   createDebouncer,
+  getWatchSyncState,
   isWatchActive,
   runWatchLoop,
   shouldIndexPath,
@@ -345,10 +346,12 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     // Backend started, but flag still false because prime hasn't run.
     expect(backend.started).toBe(true);
     expect(isWatchActive()).toBe(false);
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
     // Release the prime → flag flips.
     releasePrime!();
-    await new Promise((r) => setTimeout(r, 10));
+    await handle.ready;
     expect(isWatchActive()).toBe(true);
+    expect(getWatchSyncState().reindex_in_flight).toBe(false);
     await handle.stop();
     expect(isWatchActive()).toBe(false);
   });

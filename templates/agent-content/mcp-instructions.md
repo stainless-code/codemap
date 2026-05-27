@@ -10,7 +10,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Index freshness
 
-Every JSON tool response carries index-level freshness metadata (not a pass/fail verdict):
+Every successful JSON tool response carries index-level freshness metadata (not a pass/fail verdict):
 
 | Surface                                          | Where to read it                                                                                      |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |

@@ -1,5 +1,3 @@
-import type { ServerResponse } from "node:http";
-
 import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
 import { getMeta } from "../db";
@@ -173,6 +171,27 @@ export function readCheapIndexFreshness(): IndexFreshness | null {
 }
 
 /**
+ * Freshness for MCP/HTTP JSON tool wrappers. Reuses embedded
+ * `index_freshness` from `context` (avoids a second DB open).
+ */
+export function resolveTransportIndexFreshness(
+  payload: unknown,
+): IndexFreshness | null {
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    "index_freshness" in payload
+  ) {
+    const embedded = (payload as { index_freshness?: unknown }).index_freshness;
+    if (embedded !== null && typeof embedded === "object") {
+      return embedded as IndexFreshness;
+    }
+  }
+  return readCheapIndexFreshness();
+}
+
+/**
  * One-line stderr warning when freshness concerns remain after boot / prime.
  * Used by `codemap mcp` and `codemap serve` only — stdout stays JSON-RPC clean.
  */
@@ -184,25 +203,6 @@ export function warnIndexFreshnessToStderr(
   if (freshness?.warning === null || freshness?.warning === undefined) return;
   // eslint-disable-next-line no-console -- intentional bootstrap warning on stderr
   console.error(`${label}: ${freshness.warning}`);
-}
-
-/** HTTP response headers mirroring cheap freshness signals (slice 2). */
-export function applyIndexFreshnessHeaders(
-  res: ServerResponse,
-  freshness: IndexFreshness | null,
-): void {
-  if (freshness === null) return;
-  res.setHeader(
-    "X-Codemap-Pending-Sync",
-    freshness.pending_sync ? "true" : "false",
-  );
-  res.setHeader(
-    "X-Codemap-Commit-Drift",
-    freshness.commit_drift ? "true" : "false",
-  );
-  if (freshness.warning !== null) {
-    res.setHeader("X-Codemap-Warning", freshness.warning);
-  }
 }
 
 export function formatIndexFreshnessMcpBlock(

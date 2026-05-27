@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
+import * as dbModule from "../db";
 import { closeDb, createTables, openDb, setMeta } from "../db";
 import { initCodemap } from "../runtime";
 import { buildContextEnvelope } from "./context-engine";
@@ -11,6 +12,7 @@ import * as indexEngine from "./index-engine";
 import {
   computeIndexFreshness,
   mergeIndexFreshnessIntoJsonPayload,
+  resolveTransportIndexFreshness,
   warnIndexFreshnessToStderr,
 } from "./index-freshness";
 import { _resetWatchStateForTests, runWatchLoop } from "./watcher";
@@ -120,6 +122,68 @@ describe("computeIndexFreshness", () => {
     });
 
     await handle.stop();
+  });
+
+  it("reports history_incompatible when getChangedFiles returns null", () => {
+    spyOn(indexEngine, "getCurrentCommit").mockReturnValue("d".repeat(40));
+    const changedFiles = spyOn(indexEngine, "getChangedFiles").mockReturnValue(
+      null,
+    );
+
+    try {
+      withEmptyDb((db) => {
+        setMeta(db, "last_indexed_commit", "e".repeat(40));
+        const f = computeIndexFreshness(db, { include_disk_drift: true });
+        expect(f.history_incompatible).toBe(true);
+        expect(f.warning).toContain("Git history is incompatible");
+      });
+    } finally {
+      changedFiles.mockRestore();
+    }
+  });
+
+  it("reports disk-ahead with unindexed change count", () => {
+    const head = "f".repeat(40);
+    spyOn(indexEngine, "getCurrentCommit").mockReturnValue(head);
+    spyOn(indexEngine, "getChangedFiles").mockReturnValue({
+      changed: ["src/a.ts", "src/b.ts"],
+      deleted: ["src/c.ts"],
+      existingPaths: new Set(),
+      sourceCache: new Map(),
+      existingHashes: new Map(),
+    });
+
+    withEmptyDb((db) => {
+      setMeta(db, "last_indexed_commit", head);
+      const f = computeIndexFreshness(db, { include_disk_drift: true });
+      expect(f.disk_ahead_of_index).toBe(true);
+      expect(f.unindexed_change_count).toBe(3);
+      expect(f.warning).toContain("3 unindexed change");
+    });
+  });
+});
+
+describe("resolveTransportIndexFreshness", () => {
+  it("reuses embedded index_freshness without opening the DB", () => {
+    const embedded = {
+      head_commit: null,
+      last_indexed_commit: null,
+      commit_drift: false,
+      watch_active: false,
+      pending_sync: false,
+      pending_paths: 0,
+      reindex_in_flight: false,
+      warning: null,
+    };
+    const openDbSpy = spyOn(dbModule, "openDb");
+    try {
+      expect(
+        resolveTransportIndexFreshness({ index_freshness: embedded }),
+      ).toBe(embedded);
+      expect(openDbSpy).not.toHaveBeenCalled();
+    } finally {
+      openDbSpy.mockRestore();
+    }
   });
 });
 

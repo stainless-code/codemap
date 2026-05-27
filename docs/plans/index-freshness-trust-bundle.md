@@ -8,13 +8,13 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                                                                                                              | Source                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| L.1 | **`index_freshness` is metadata, not a verdict** — structured fields + optional `warning` string; never `pass`/`fail`.                                                                                | [Moat A](../roadmap.md#moats-load-bearing)                        |
-| L.2 | **Canonical shape in one module** — `src/application/index-freshness.ts`; `context`, MCP, HTTP, and CLI all call `computeIndexFreshness()`.                                                           | Same seam as `validate-engine` / `context-engine`                 |
-| L.3 | **`pending_sync` = watcher queue OR in-flight reindex** — true when debouncer has paths **or** a targeted `--files` reindex is running. Not “SQLite mid-transaction” (writes stay transactional).     | [roadmap § No split-brain](../roadmap.md#floors-v1-product-shape) |
-| L.4 | **Cheap vs full freshness** — every transport gets cheap signals (HEAD drift, pending sync, watch active). **Disk drift** (`getChangedFiles`) runs on `context` and opt-in full mode only (git cost). | Avoid git subprocess on every `query` row                         |
-| L.5 | **JSON tool payloads stay backward-compatible in v1 slice** — slice 1 enriches `context` only; slice 2 adds HTTP headers + MCP `_meta` wrapper without breaking array-shaped `query` results.         | Agent eval / golden harness consume raw arrays today              |
+| #   | Decision                                                                                                                                                                                                             | Source                                                            |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| L.1 | **`index_freshness` is metadata, not a verdict** — structured fields + optional `warning` string; never `pass`/`fail`.                                                                                               | [Moat A](../roadmap.md#moats-load-bearing)                        |
+| L.2 | **Canonical shape in one module** — `src/application/index-freshness.ts`; `context`, MCP, HTTP, and CLI all call `computeIndexFreshness()`.                                                                          | Same seam as `validate-engine` / `context-engine`                 |
+| L.3 | **`pending_sync` = watcher queue OR in-flight reindex** — true when debouncer has paths **or** a targeted `--files` reindex is running. Not “SQLite mid-transaction” (writes stay transactional).                    | [roadmap § No split-brain](../roadmap.md#floors-v1-product-shape) |
+| L.4 | **Cheap vs full freshness** — every transport gets cheap signals (HEAD drift, pending sync, watch active). **Disk drift** (`getChangedFiles`) runs on `context` and opt-in full mode only (git cost).                | Avoid git subprocess on every `query` row                         |
+| L.5 | **JSON tool payloads stay backward-compatible** — HTTP headers only (array bodies unchanged); MCP object payloads merge `index_freshness` inline; MCP array payloads append `@codemap/index_freshness` second block. | Agent eval / golden harness consume raw arrays today              |
 
 ---
 
