@@ -30,6 +30,11 @@ import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import type { ResourcePayload } from "./resource-handlers";
 import {
+  createManagedWatchSession,
+  createStdioDisconnectMonitor,
+} from "./session-lifecycle";
+import type { ManagedWatchSession } from "./session-lifecycle";
+import {
   affectedArgsSchema,
   applyArgsSchema,
   auditArgsSchema,
@@ -71,7 +76,6 @@ import {
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
   resolveRecipesWatchPrefix,
-  runWatchLoop,
 } from "./watcher";
 
 /**
@@ -573,28 +577,25 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
 }
 
 /**
- * Starts the MCP server over stdio. HTTP consumers use `codemap serve`
- * (`src/application/http-server.ts`) against the same tool handlers.
- * Resolves when the transport closes (stdin EOF). Logs to stderr per MCP
- * convention so stdout stays dedicated to JSON-RPC framing.
+ * Starts the MCP server over stdio. Resolves on client disconnect
+ * (`session-lifecycle.ts`). Logs to stderr per MCP convention.
  */
 export async function runMcpServer(opts: ServerOpts): Promise<void> {
   await bootstrapForMcp(opts);
 
-  let stopWatch: (() => Promise<void>) | undefined;
-  let watchReady: Promise<void> = Promise.resolve();
+  let watchSession: ManagedWatchSession | undefined;
   if (opts.watch === true) {
     // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
     console.error("codemap mcp: --watch enabled, booting file watcher...");
-    const prime = createPrimeIndex({ quiet: false, label: "codemap mcp" });
-    const handle = runWatchLoop({
+    watchSession = createManagedWatchSession({
       root: getProjectRoot(),
       excludeDirNames: getExcludeDirNames(),
       recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
       debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      releaseGraceMs: 0,
       onPrime: async () => {
         try {
-          await prime();
+          await createPrimeIndex({ quiet: false, label: "codemap mcp" })();
         } finally {
           warnIndexFreshnessToStderr("codemap mcp");
         }
@@ -604,29 +605,61 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
         label: "codemap mcp",
       }),
     });
-    stopWatch = handle.stop;
-    watchReady = handle.ready;
   } else {
     warnIndexFreshnessToStderr("codemap mcp");
   }
 
-  await watchReady;
-
   const server = createMcpServer(opts);
   const transport = new StdioServerTransport();
+
+  if (watchSession !== undefined) {
+    await watchSession.acquireClient();
+  }
+
   await server.connect(transport);
 
+  let shuttingDown = false;
   await new Promise<void>((resolve) => {
-    transport.onclose = () => resolve();
-  });
+    const shutdown = (reason: string): void => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      // eslint-disable-next-line no-console -- intentional shutdown log on stderr
+      console.error(`codemap mcp: ${reason}, shutting down...`);
+      disconnectMonitor.dispose();
+      void (async () => {
+        try {
+          await server.close();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // eslint-disable-next-line no-console -- intentional shutdown-error log
+          console.error(`codemap mcp: server close failed — ${msg}`);
+        }
+        if (watchSession !== undefined) {
+          try {
+            await watchSession.forceStop();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console -- intentional shutdown-error log
+            console.error(`codemap mcp: watcher stop failed — ${msg}`);
+          }
+        }
+        resolve();
+      })();
+    };
 
-  if (stopWatch !== undefined) {
-    try {
-      await stopWatch();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console -- intentional shutdown-error log
-      console.error(`codemap mcp: watcher stop failed — ${msg}`);
-    }
-  }
+    transport.onclose = () => {
+      shutdown("transport closed");
+    };
+
+    const disconnectMonitor = createStdioDisconnectMonitor((reason) => {
+      shutdown(reason);
+    });
+
+    process.once("SIGINT", () => {
+      shutdown("SIGINT");
+    });
+    process.once("SIGTERM", () => {
+      shutdown("SIGTERM");
+    });
+  });
 }

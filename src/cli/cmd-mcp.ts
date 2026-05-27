@@ -147,14 +147,17 @@ Global flags (parsed by bootstrap, forwarded to the server):
   --config <file>   Config file path (defaults to <state-dir>/config.{ts,js,json},
                     i.e. .codemap/config.{ts,js,json} unless --state-dir overrides).
 
-The server stays running until stdin closes (the agent host disconnects).
-With --watch, the file watcher is drained before the server exits.
+The server stays running until the MCP client disconnects (stdin EOF,
+stdout broken pipe, parent process exit, or SIGINT/SIGTERM). There is
+no idle timeout — silence without tool calls does not exit the process
+(the IDE host would not reliably respawn it mid-session). With --watch,
+the file watcher starts before connect and is drained before exit.
 `);
 }
 
 /**
  * Entry-point for `codemap mcp`. Boots the MCP server over stdio and
- * resolves when the transport closes (clean shutdown via stdin EOF).
+ * resolves when the client disconnects (see session-lifecycle.ts).
  * With `watch: true`, also boots an in-process file watcher so the
  * server's tools always read live data. Bootstrap / DB / SDK errors
  * propagate as exit code 1 via main.
