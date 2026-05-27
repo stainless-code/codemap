@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb } from "../db";
+import { closeDb, createTables, insertFile, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import {
   composeExploreResult,
@@ -299,4 +299,160 @@ describe("composeExploreResult dedupe", () => {
     expect(r.result.truncated).toBe(true);
     expect(r.result.truncation?.rows).toBe(true);
   });
+
+  it("applies adaptive explore row limit when rowLimit omitted on large index", () => {
+    seedWideCallGraph(130);
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 5000);
+    } finally {
+      closeDb(db);
+    }
+    const r = composeExploreResult({ root: benchDir, names: ["hub"] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result.rows.length).toBeLessThanOrEqual(125);
+    expect(r.result.truncation?.rows).toBe(true);
+  });
 });
+
+function seedBulkFiles(db: ReturnType<typeof openDb>, count: number): void {
+  for (let i = 0; i < count; i++) {
+    insertFile(db, {
+      path: `src/bulk/${i}.ts`,
+      content_hash: `hb${i}`,
+      size: 1,
+      line_count: 1,
+      language: "typescript",
+      last_modified: 1,
+      indexed_at: 1,
+    });
+  }
+}
+
+function seedWideCallGraph(calleeCount: number): void {
+  const bodyLines = [`export function hub() {`];
+  for (let i = 0; i < calleeCount; i++) {
+    bodyLines.push(`  fn${i}();`);
+  }
+  bodyLines.push("}");
+  for (let i = 0; i < calleeCount; i++) {
+    bodyLines.push(`export function fn${i}() { return ${i}; }`);
+  }
+  writeFileSync(join(benchDir, "src", "wide.ts"), `${bodyLines.join("\n")}\n`);
+
+  const db = openDb();
+  try {
+    createTables(db);
+    db.run(
+      `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+       VALUES ('src/wide.ts', 'hw', 500, ${calleeCount + 3}, 'typescript', 1, 1)`,
+    );
+    const symbolValues: string[] = [
+      "('hub', 'function', 'src/wide.ts', 1, 2, 'hub()', 1, NULL, 'export')",
+    ];
+    for (let i = 0; i < calleeCount; i++) {
+      const line = 3 + i;
+      symbolValues.push(
+        `('fn${i}', 'function', 'src/wide.ts', ${line}, ${line}, 'fn${i}()', 1, NULL, 'export')`,
+      );
+    }
+    db.run(
+      `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+       VALUES ${symbolValues.join(",")}`,
+    );
+    const callValues: string[] = [];
+    for (let i = 0; i < calleeCount; i++) {
+      callValues.push(`('src/wide.ts', 'hub', 'hub', 'fn${i}', 2, 0, 0)`);
+    }
+    db.run(
+      `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+       VALUES ${callValues.join(",")}`,
+    );
+  } finally {
+    closeDb(db);
+  }
+}
+
+describe("adaptive output budgets", () => {
+  it("composeTraceResult uses adaptive snippet budget when budgetChars omitted", () => {
+    seedLongSnippetCallGraph();
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 5999);
+    } finally {
+      closeDb(db);
+    }
+    const path = executeCallPath({ root: benchDir, from: "foo", to: "bar" });
+    expect(path.ok).toBe(true);
+    if (!path.ok) return;
+    const adaptive = composeTraceResult({
+      root: benchDir,
+      from: "foo",
+      to: "bar",
+      path: path.rows,
+    });
+    const explicit = composeTraceResult({
+      root: benchDir,
+      from: "foo",
+      to: "bar",
+      path: path.rows,
+      budgetChars: 15_000,
+    });
+    expect(adaptive.truncated).toBe(true);
+    expect(explicit.truncated).toBe(false);
+  });
+
+  it("composeNodeResult uses adaptive snippet budget when budgetChars omitted", () => {
+    seedLongSnippetCallGraph();
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 5999);
+    } finally {
+      closeDb(db);
+    }
+    const adaptive = composeNodeResult({
+      root: benchDir,
+      name: "foo",
+      includeSnippets: true,
+    });
+    const explicit = composeNodeResult({
+      root: benchDir,
+      name: "foo",
+      includeSnippets: true,
+      budgetChars: 15_000,
+    });
+    expect(adaptive.ok).toBe(true);
+    expect(explicit.ok).toBe(true);
+    if (!adaptive.ok || !explicit.ok) return;
+    expect(adaptive.result.truncated).toBe(true);
+    expect(explicit.result.truncated).toBe(false);
+  });
+});
+
+function seedLongSnippetCallGraph(): void {
+  const pad = (label: string) => `  // ${label}${"x".repeat(4000)}\n`;
+  writeFileSync(
+    join(benchDir, "src", "a.ts"),
+    `export function foo() {\n${pad("foo")}  return bar();\n}\nexport function bar() {\n${pad("bar")}  return 1;\n}\n`,
+  );
+  const db = openDb();
+  try {
+    createTables(db);
+    db.run(
+      `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+       VALUES ('src/a.ts', 'h1', 9000, 6, 'typescript', 1, 1)`,
+    );
+    db.run(
+      `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+       VALUES ('foo', 'function', 'src/a.ts', 1, 3, 'foo()', 1, NULL, 'export'),
+              ('bar', 'function', 'src/a.ts', 4, 6, 'bar()', 1, NULL, 'export')`,
+    );
+    db.run(
+      `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+       VALUES ('src/a.ts', 'foo', 'foo', 'bar', 2, 0, 0)`,
+    );
+  } finally {
+    closeDb(db);
+  }
+}

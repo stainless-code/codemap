@@ -12,6 +12,7 @@ import {
   DEFAULT_OUTPUT_CHAR_BUDGET,
   readIndexedFileCount,
   resolveEffectiveExploreRowLimit,
+  resolveEffectiveOutputBudget,
   resolveEffectiveSnippetBudget,
   resolveOutputBudget,
 } from "./output-budget";
@@ -100,6 +101,29 @@ describe("resolveEffectiveSnippetBudget", () => {
       closeDb(large);
       rmSync(smallDir, { recursive: true, force: true });
       rmSync(largeDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("resolveEffectiveOutputBudget", () => {
+  it("resolves both caps in one indexed file count read", () => {
+    const db = seedFileCount(501);
+    try {
+      expect(resolveEffectiveOutputBudget(db)).toEqual({
+        snippet_char_budget: 10_000,
+        explore_row_limit: 250,
+      });
+      expect(
+        resolveEffectiveOutputBudget(db, {
+          budgetChars: 42,
+          rowLimit: 7,
+        }),
+      ).toEqual({
+        snippet_char_budget: 42,
+        explore_row_limit: 7,
+      });
+    } finally {
+      closeDb(db);
     }
   });
 });

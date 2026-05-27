@@ -7,7 +7,7 @@ import type { CodemapDatabase } from "../db";
 import { closeDb, openDb } from "../db";
 import {
   applySourceCharBudget,
-  resolveEffectiveExploreRowLimit,
+  resolveEffectiveOutputBudget,
   resolveEffectiveSnippetBudget,
 } from "./output-budget";
 import { executeQuery } from "./query-engine";
@@ -423,10 +423,13 @@ export function composeExploreResult(opts: {
   const rowLimit = opts.rowLimit;
   const db = openDb();
   try {
-    const effectiveRowLimit = resolveEffectiveExploreRowLimit(db, rowLimit);
-    const rowCapped = applyRowCap(merged, effectiveRowLimit);
+    const effective = resolveEffectiveOutputBudget(db, {
+      budgetChars: opts.budgetChars,
+      rowLimit,
+    });
+    const rowCapped = applyRowCap(merged, effective.explore_row_limit);
 
-    const budget = resolveEffectiveSnippetBudget(db, opts.budgetChars);
+    const budget = effective.snippet_char_budget;
     const allSnippets = snippetsForNeighborhoodRows({
       db,
       rows: rowCapped.rows,

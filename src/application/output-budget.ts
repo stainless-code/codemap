@@ -41,6 +41,18 @@ export function readIndexedFileCount(db: CodemapDatabase): number {
   return row.n;
 }
 
+/** Resolve snippet + explore caps with one indexed file count read. */
+export function resolveEffectiveOutputBudget(
+  db: CodemapDatabase,
+  opts?: { budgetChars?: number; rowLimit?: number },
+): OutputBudget {
+  const adaptive = resolveOutputBudget(readIndexedFileCount(db));
+  return {
+    snippet_char_budget: opts?.budgetChars ?? adaptive.snippet_char_budget,
+    explore_row_limit: opts?.rowLimit ?? adaptive.explore_row_limit,
+  };
+}
+
 /** Explicit `budget_chars` wins; otherwise adaptive cap from indexed file count. */
 export function resolveEffectiveSnippetBudget(
   db: CodemapDatabase,
