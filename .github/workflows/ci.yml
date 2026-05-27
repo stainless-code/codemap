@@ -92,6 +92,9 @@ jobs:
       - name: Run unit tests with coverage
         run: bun run test:coverage
 
+      - name: Run scripts tests (Action helpers + TS↔mjs sync)
+        run: bun run test:scripts
+
       - name: Golden query regression (fixtures/minimal)
         run: bun run test:golden
 

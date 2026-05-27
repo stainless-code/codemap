@@ -11,6 +11,12 @@ import type {
   AgentsInitMcpTarget,
   AgentsInitMcpTargetDef,
 } from "./agents-init-mcp-registry";
+import {
+  buildCodemapMcpSpawn,
+  formatCodemapExec,
+  resolveCodemapCliInvocation,
+} from "./codemap-invocation";
+import type { ResolvedCodemapInvocation } from "./codemap-invocation";
 
 /** MCP server key in Cursor / Claude / Windsurf `mcpServers` maps and VS Code `servers`. */
 export const CODEMAP_MCP_SERVER_KEY = "codemap";
@@ -46,23 +52,12 @@ export interface ClaudeSettingsFile {
   };
 }
 
-export function buildCodemapMcpServerEntry(opts?: {
-  includeWorkspaceRoot?: boolean | undefined;
-}): McpServerEntry {
-  const args = ["mcp", "--watch"];
-  if (opts?.includeWorkspaceRoot === true) {
-    args.push("--root", "${workspaceFolder}");
-  }
-  return { command: "codemap", args };
-}
-
 /** Host-specific codemap MCP entry (Cursor root arg, Amazon Q IDE transport fields, …). */
 export function buildMcpServerEntryForDef(
   def: Pick<AgentsInitMcpTargetDef, "format" | "workspaceRootArg">,
+  invocation: ResolvedCodemapInvocation,
 ): McpServerEntry {
-  const base = buildCodemapMcpServerEntry({
-    includeWorkspaceRoot: def.workspaceRootArg === true,
-  });
+  const base = buildCodemapMcpSpawn(invocation, def.workspaceRootArg === true);
   if (def.format === "amazon-q-ide") {
     return {
       ...base,
@@ -519,7 +514,9 @@ export interface ApplyAgentsInitMcpOptions {
  * Write MCP config for selected integrations. Cursor uses
  * `${workspaceFolder}` root injection; most other clients rely on workspace cwd.
  */
-export function applyAgentsInitMcp(opts: ApplyAgentsInitMcpOptions): void {
+export async function applyAgentsInitMcp(
+  opts: ApplyAgentsInitMcpOptions,
+): Promise<void> {
   const targets = opts.targets ?? [...DEFAULT_AGENTS_INIT_MCP_TARGETS];
   if (targets.length === 0) {
     console.log(
@@ -532,17 +529,23 @@ export function applyAgentsInitMcp(opts: ApplyAgentsInitMcpOptions): void {
     projectRoot: opts.projectRoot,
     homeDir: opts.homeDir ?? homedir(),
   };
+  const invocation = await resolveCodemapCliInvocation({
+    projectRoot: opts.projectRoot,
+  });
+  console.log(
+    `  MCP CLI: ${formatCodemapExec(invocation)} (${invocation.installMethod})`,
+  );
 
   for (const id of targets) {
     const def = getAgentsInitMcpTargetDef(id);
-    const entry = buildMcpServerEntryForDef(def);
+    const entry = buildMcpServerEntryForDef(def, invocation);
     const path = resolveMcpConfigPath(def, roots);
 
     if (def.format === "vscode-servers") {
       upsertVsCodeMcpFile({
         path,
         label: def.label,
-        entry: buildCodemapMcpServerEntry(),
+        entry,
         force,
       });
     } else {

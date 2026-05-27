@@ -55,7 +55,7 @@ codemap context --compact --for "refactor auth"              # JSON envelope + i
 codemap ingest-coverage coverage/coverage-final.json --json  # Istanbul / LCOV (auto-detected) → coverage table; joins with symbols
 NODE_V8_COVERAGE=.cov bun test && codemap ingest-coverage .cov --runtime --json  # V8 protocol (per-process dumps); local-only
 codemap agents init                                          # scaffold .agents/ rules + skills
-codemap agents init --mcp                                    # project MCP config (see docs/agents.md)
+codemap agents init --mcp                                    # PM-aware project MCP config (see docs/agents.md)
 codemap apply rename-preview --params old=foo,new=bar --dry-run  # preview recipe-driven edits (substrate executor)
 ```
 
@@ -246,7 +246,7 @@ codemap --files src/a.ts src/b.tsx
 # Scaffold .agents/ from bundled templates — full matrix: docs/agents.md
 codemap agents init
 codemap agents init --force
-codemap agents init --mcp                                    # project MCP config for supported IDEs
+codemap agents init --mcp                                    # PM-aware project MCP config (see docs/agents.md)
 codemap agents init --interactive   # -i; IDE wiring + symlink vs copy
 ```
 

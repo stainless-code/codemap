@@ -31,4 +31,5 @@ export default {
   "*.{css,json,md,mdc,html,yaml,yml}": "bun run format:check",
   "*.{ts,tsx}": typecheckStagedFiles,
   "*.test.ts": "bun test",
+  "scripts/**/*.test.mjs": "bun test",
 };

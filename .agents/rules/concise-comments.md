@@ -30,6 +30,11 @@ For every comment you wrote, ask: **"Could a teammate (human or AI) re-derive th
 - Section headers in short files (`// === Helpers ===`).
 - Author / date stamps (git tracks this).
 - Multi-line prose where one clause does the job.
+- **Prose inside JSDoc** when `@param` / `@returns` / `@typedef` already carry the meaning — types stay; narrating them does not.
+
+## Exception: JSDoc as types (`.mjs`, `@ts-check`)
+
+Untyped JS has no `.ts` surface — **`@typedef`, `@param`, `@returns`, and inline `@type` are the type system; keep them.** Apply the decision test only to **prose** in those blocks (keep non-obvious _why_ like `bunx` vs `bun x`; cut restatements of param names or return shapes).
 
 ## Reconcile with `preserve-comments`
 

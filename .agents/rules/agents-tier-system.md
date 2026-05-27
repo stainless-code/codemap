@@ -33,6 +33,7 @@ Genuinely cross-cutting. Apply to every turn regardless of file:
 - `pr-comment-fact-check` — fires the fact-check skill on PR-comment intent triggers
 - `preserve-comments` — never silently delete TODOs / commented-out code
 - `tracer-bullets` — small end-to-end slices, not horizontal layers
+- `consumer-surfaces` — consumer-facing text describes user-visible behavior only
 - `verify-after-each-step` — run the project's checks per milestone, not at commit time
 
 ### Tier 2 — Auto-attached technical rules (this rule's tier)

@@ -485,9 +485,11 @@ function applyCursorIntegration(
   );
 }
 
-function maybeApplyAgentsInitMcp(options: AgentsInitOptions): void {
+async function maybeApplyAgentsInitMcp(
+  options: AgentsInitOptions,
+): Promise<void> {
   if (options.mcp === true) {
-    applyAgentsInitMcp({
+    await applyAgentsInitMcp({
       projectRoot: options.projectRoot,
       force: !!options.force,
       targets: resolveAgentsInitMcpTargets(options.targets),
@@ -500,11 +502,13 @@ function maybeApplyAgentsInitMcp(options: AgentsInitOptions): void {
  * **`--force`** deletes only template-backed files, then writes those files again with per-file copies — your other files under **`.agents/`**, **`rules/`**, or **`skills/`** stay.
  * @returns `false` when `.agents/` exists and `--force` was not used (unless only side effects like `--git-hooks` / `--mcp`).
  */
-export function runAgentsInit(options: AgentsInitOptions): boolean {
+export async function runAgentsInit(
+  options: AgentsInitOptions,
+): Promise<boolean> {
   if (options.gitHooks === "uninstall") {
     uninstallGitHooks(options.projectRoot);
     console.log("  Removed codemap blocks from git hooks");
-    maybeApplyAgentsInitMcp(options);
+    await maybeApplyAgentsInitMcp(options);
     return true;
   }
 
@@ -536,11 +540,11 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
         console.log(
           "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
         );
-        maybeApplyAgentsInitMcp(options);
+        await maybeApplyAgentsInitMcp(options);
         return true;
       }
       if (options.mcp === true) {
-        maybeApplyAgentsInitMcp(options);
+        await maybeApplyAgentsInitMcp(options);
         return true;
       }
       console.error(
@@ -583,7 +587,7 @@ export function runAgentsInit(options: AgentsInitOptions): boolean {
     );
   }
 
-  maybeApplyAgentsInitMcp(options);
+  await maybeApplyAgentsInitMcp(options);
 
   return true;
 }

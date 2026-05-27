@@ -86,7 +86,7 @@ inputs:
 
 outputs:
   agent:
-    description: "Resolved package manager (npm / pnpm / yarn / bun)."
+    description: "Resolved package manager (npm / pnpm / yarn / yarn@berry / bun)."
     value: ${{ steps.detect-pm.outputs.agent }}
   exec:
     description: "Shell-ready command used to invoke codemap."
@@ -140,14 +140,18 @@ runs:
       env:
         PACKAGE_MANAGER: ${{ inputs.package-manager }}
         VERSION: ${{ inputs.version }}
-        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
+        ACTION_STAGE="$RUNNER_TEMP/codemap-action"
+        WORK_DIR="${{ inputs.working-directory }}"
+        RESOLVED_WORKDIR="$(bash "${{ github.action_path }}/scripts/action-resolve-working-directory.sh" "$GITHUB_WORKSPACE" "$WORK_DIR")"
         # Action runs without its own node_modules; install the detector lazily.
         # Pinned to a known version so consumers get reproducible builds.
-        npm install --no-save --prefix "$RUNNER_TEMP/codemap-action" package-manager-detector@1.6.0 >/dev/null
-        cp "${{ github.action_path }}/scripts/detect-pm.mjs" "$RUNNER_TEMP/codemap-action/detect-pm.mjs"
-        cd "$RUNNER_TEMP/codemap-action"
-        node detect-pm.mjs
+        npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0
+        cp "${{ github.action_path }}/scripts/detect-pm.mjs" \
+          "${{ github.action_path }}/scripts/codemap-invocation.mjs" \
+          "$ACTION_STAGE/"
+        cd "$ACTION_STAGE"
+        WORKING_DIRECTORY="$RESOLVED_WORKDIR" node detect-pm.mjs
 
     - name: Validate inputs (mode + flag interactions)
       if: steps.gate.outputs.skip != 'true'

@@ -29,10 +29,10 @@ import {
 } from "./application/git-hooks";
 
 describe("runAgentsInit", () => {
-  it("copies templates into .agents/", () => {
+  it("copies templates into .agents/", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
-      const ok = runAgentsInit({ projectRoot: dir, force: true });
+      const ok = await runAgentsInit({ projectRoot: dir, force: true });
       expect(ok).toBe(true);
       const skill = readFileSync(
         join(dir, ".agents", "skills", "codemap", "SKILL.md"),
@@ -47,7 +47,7 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with --force refreshes only template file paths; user files under rules/ and skills/ remain", () => {
+  it("runAgentsInit with --force refreshes only template file paths; user files under rules/ and skills/ remain", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
@@ -63,7 +63,7 @@ describe("runAgentsInit", () => {
         "user skill",
         "utf-8",
       );
-      expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
+      expect(await runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
       expect(readFileSync(join(dir, ".agents", "USER_NOTES.md"), "utf-8")).toBe(
         "keep me",
       );
@@ -84,11 +84,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with mcp and empty targets skips MCP writes", () => {
+  it("runAgentsInit with mcp and empty targets skips MCP writes", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           mcp: true,
@@ -102,11 +102,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with amazon-q target writes both Amazon Q MCP files", () => {
+  it("runAgentsInit with amazon-q target writes both Amazon Q MCP files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["amazon-q"],
@@ -121,17 +121,20 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with mcp writes default project-local MCP configs", () => {
+  it("runAgentsInit with mcp writes default project-local MCP configs", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
-      expect(runAgentsInit({ projectRoot: dir, force: true, mcp: true })).toBe(
-        true,
-      );
+      expect(
+        await runAgentsInit({ projectRoot: dir, force: true, mcp: true }),
+      ).toBe(true);
       expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
       const cursor = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
-      ) as { mcpServers: Record<string, { command: string }> };
-      expect(cursor.mcpServers.codemap?.command).toBe("codemap");
+      ) as { mcpServers: Record<string, { command: string; args: string[] }> };
+      expect(cursor.mcpServers.codemap?.command).toBe("npx");
+      expect(cursor.mcpServers.codemap?.args[0]).toBe(
+        "@stainless-code/codemap@latest",
+      );
 
       expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
@@ -149,12 +152,12 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit --mcp on existing .agents/ without --force writes MCP only", () => {
+  it("runAgentsInit --mcp on existing .agents/ without --force writes MCP only", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".agents"), { recursive: true });
       writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
-      expect(runAgentsInit({ projectRoot: dir, mcp: true })).toBe(true);
+      expect(await runAgentsInit({ projectRoot: dir, mcp: true })).toBe(true);
       expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
         "keep",
       );
@@ -164,15 +167,15 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit --git-hooks on existing .agents/ without --force installs hooks only", () => {
+  it("runAgentsInit --git-hooks on existing .agents/ without --force installs hooks only", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".agents"), { recursive: true });
       mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
       writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
-      expect(runAgentsInit({ projectRoot: dir, gitHooks: "install" })).toBe(
-        true,
-      );
+      expect(
+        await runAgentsInit({ projectRoot: dir, gitHooks: "install" }),
+      ).toBe(true);
       expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
         "keep",
       );
@@ -184,14 +187,14 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit --git-hooks --mcp on existing .agents/ installs hooks and MCP", () => {
+  it("runAgentsInit --git-hooks --mcp on existing .agents/ installs hooks and MCP", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".agents"), { recursive: true });
       mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
       writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           gitHooks: "install",
           mcp: true,
@@ -210,7 +213,7 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit --no-git-hooks --mcp uninstalls hooks and writes MCP", () => {
+  it("runAgentsInit --no-git-hooks --mcp uninstalls hooks and writes MCP", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
@@ -220,7 +223,7 @@ describe("runAgentsInit", () => {
         "utf-8",
       );
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           gitHooks: "uninstall",
           mcp: true,
@@ -238,7 +241,7 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("listRegularFilesRecursive matches bundled rules and skills files", () => {
+  it("listRegularFilesRecursive matches bundled rules and skills files", async () => {
     const root = resolveAgentsTemplateDir();
     const rules = listRegularFilesRecursive(join(root, "rules")).sort();
     const skills = listRegularFilesRecursive(join(root, "skills")).sort();
@@ -246,22 +249,24 @@ describe("runAgentsInit", () => {
     expect(skills).toContain("codemap/SKILL.md");
   });
 
-  it("returns false when .agents exists without force", () => {
+  it("returns false when .agents exists without force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".agents"), { recursive: true });
-      expect(runAgentsInit({ projectRoot: dir, force: false })).toBe(false);
+      expect(await runAgentsInit({ projectRoot: dir, force: false })).toBe(
+        false,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("resolveAgentsTemplateDir points at templates/agents", () => {
+  it("resolveAgentsTemplateDir points at templates/agents", async () => {
     const p = resolveAgentsTemplateDir().replace(/\\/g, "/");
     expect(p.endsWith("/templates/agents")).toBe(true);
   });
 
-  it("ensureGitignoreCodemapPattern writes <state-dir>/.gitignore (root untouched)", () => {
+  it("ensureGitignoreCodemapPattern writes <state-dir>/.gitignore (root untouched)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       const rootGi = join(dir, ".gitignore");
@@ -277,7 +282,7 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("ensureGitignoreCodemapPattern is idempotent (no rewrite on steady state)", () => {
+  it("ensureGitignoreCodemapPattern is idempotent (no rewrite on steady state)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       ensureGitignoreCodemapPattern(dir);
@@ -290,10 +295,10 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit calls the reconciler — produces <state-dir>/.gitignore", () => {
+  it("runAgentsInit calls the reconciler — produces <state-dir>/.gitignore", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
-      expect(runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
+      expect(await runAgentsInit({ projectRoot: dir, force: true })).toBe(true);
       const stateGi = join(dir, ".codemap", ".gitignore");
       expect(existsSync(stateGi)).toBe(true);
     } finally {
@@ -301,11 +306,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with Cursor target copies into .cursor/", () => {
+  it("runAgentsInit with Cursor target copies into .cursor/", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["cursor"],
@@ -326,11 +331,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with Cursor symlink creates per-file symlinks, not directory symlinks", () => {
+  it("runAgentsInit with Cursor symlink creates per-file symlinks, not directory symlinks", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["cursor"],
@@ -367,11 +372,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with claude-md writes CLAUDE.md", () => {
+  it("runAgentsInit with claude-md writes CLAUDE.md", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["claude-md"],
@@ -386,18 +391,18 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("targetsNeedLinkMode is true only for symlink-style integrations", () => {
+  it("targetsNeedLinkMode is true only for symlink-style integrations", async () => {
     expect(targetsNeedLinkMode([])).toBe(false);
     expect(targetsNeedLinkMode(["claude-md", "copilot"])).toBe(false);
     expect(targetsNeedLinkMode(["cursor"])).toBe(true);
     expect(targetsNeedLinkMode(["windsurf", "agents-md"])).toBe(true);
   });
 
-  it("runAgentsInit writes Copilot and pointer files", () => {
+  it("runAgentsInit writes Copilot and pointer files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["copilot", "agents-md", "gemini-md"],
@@ -417,11 +422,11 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit with Windsurf copies .windsurf/rules", () => {
+  it("runAgentsInit with Windsurf copies .windsurf/rules", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       expect(
-        runAgentsInit({
+        await runAgentsInit({
           projectRoot: dir,
           force: true,
           targets: ["windsurf"],
@@ -436,19 +441,19 @@ describe("runAgentsInit", () => {
     }
   });
 
-  it("runAgentsInit refuses Cursor wiring when .cursor/rules exists without force", () => {
+  it("runAgentsInit refuses Cursor wiring when .cursor/rules exists without force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {
       mkdirSync(join(dir, ".cursor", "rules"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "rules", "x.mdc"), "", "utf-8");
-      expect(() =>
+      await expect(
         runAgentsInit({
           projectRoot: dir,
           force: false,
           targets: ["cursor"],
           linkMode: "copy",
         }),
-      ).toThrow(/\.cursor\/rules already exists/);
+      ).rejects.toThrow(/\.cursor\/rules already exists/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -470,7 +475,7 @@ function wrapPointerTest(inner: string): string {
 }
 
 describe("upsertCodemapPointerFile", () => {
-  it("appends managed section to existing non-Codemap file", () => {
+  it("appends managed section to existing non-Codemap file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "AGENTS.md");
     try {
@@ -488,7 +493,7 @@ describe("upsertCodemapPointerFile", () => {
     }
   });
 
-  it("replaces managed section in place on second run (no duplicate blocks)", () => {
+  it("replaces managed section in place on second run (no duplicate blocks)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "NOTE.md");
     try {
@@ -508,7 +513,7 @@ describe("upsertCodemapPointerFile", () => {
     }
   });
 
-  it("migrates legacy unmarked Codemap pointer file to managed section", () => {
+  it("migrates legacy unmarked Codemap pointer file to managed section", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "CLAUDE.md");
     try {
@@ -528,7 +533,7 @@ describe("upsertCodemapPointerFile", () => {
     }
   });
 
-  it("replaces ALL managed sections when file has two blocks", () => {
+  it("replaces ALL managed sections when file has two blocks", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "NOTE.md");
     try {
@@ -553,7 +558,7 @@ describe("upsertCodemapPointerFile", () => {
     }
   });
 
-  it("--force replaces entire file with managed section", () => {
+  it("--force replaces entire file with managed section", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-pointer-"));
     const p = join(dir, "AGENTS.md");
     try {
@@ -569,33 +574,33 @@ describe("upsertCodemapPointerFile", () => {
 });
 
 describe("relPathToAbsSegments — defence-in-depth path safety", () => {
-  it("returns segments for a normal relative path", () => {
+  it("returns segments for a normal relative path", async () => {
     expect(relPathToAbsSegments("rules/codemap.md")).toEqual([
       "rules",
       "codemap.md",
     ]);
   });
 
-  it("filters empty segments (leading / trailing / double slashes)", () => {
+  it("filters empty segments (leading / trailing / double slashes)", async () => {
     expect(relPathToAbsSegments("/rules//codemap.md/")).toEqual([
       "rules",
       "codemap.md",
     ]);
   });
 
-  it("rejects `..` segment", () => {
+  it("rejects `..` segment", async () => {
     expect(() => relPathToAbsSegments("../etc/passwd")).toThrow(
       /refusing path with ".." segment/,
     );
   });
 
-  it("rejects `..` segment in the middle of the path", () => {
+  it("rejects `..` segment in the middle of the path", async () => {
     expect(() => relPathToAbsSegments("rules/../../etc/passwd")).toThrow(
       /refusing path with ".." segment/,
     );
   });
 
-  it("rejects `.` segment", () => {
+  it("rejects `.` segment", async () => {
     expect(() => relPathToAbsSegments("rules/./codemap.md")).toThrow(
       /refusing path with "." segment/,
     );
