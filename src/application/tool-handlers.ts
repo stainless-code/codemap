@@ -40,7 +40,7 @@ import {
   runAudit,
   runAuditFromRef,
 } from "./audit-engine";
-import { buildContextEnvelope, normalizeContextIntent } from "./context-engine";
+import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit, queryRows } from "./index-engine";
@@ -517,7 +517,7 @@ export function handleContext(args: ContextArgs): ToolResult {
     try {
       const envelope = buildContextEnvelope(db, getProjectRoot(), {
         compact: args.compact === true,
-        intent: normalizeContextIntent(args.intent),
+        intent: args.intent ?? null,
         include_snippets: args.include_snippets,
       });
       return ok(envelope);

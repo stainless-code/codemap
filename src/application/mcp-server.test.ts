@@ -684,6 +684,36 @@ describe("MCP server — audit / context / validate tools", () => {
     }
   });
 
+  it("context compact omits start_here even with include_snippets", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { compact: true, include_snippets: true },
+      });
+      const json = readJson(r);
+      expect(json.start_here).toBeUndefined();
+      expect(json.hubs).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context treats whitespace-only intent as no intent", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { intent: "   " },
+      });
+      const json = readJson(r);
+      expect(json.start_here?.classified_as).toBe("default");
+      expect(json.intent).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
   it("validate runs without error on the seeded files", async () => {
     const { client, server } = await makeClient();
     try {

@@ -177,11 +177,13 @@ describe("resolveContextBudget", () => {
   it("uses full caps on small repos", () => {
     expect(resolveContextBudget(100).hub_limit).toBe(5);
     expect(resolveContextBudget(100).signatures_per_hub).toBe(3);
+    expect(resolveContextBudget(100).marker_limit).toBe(20);
     expect(resolveContextBudget(500).hub_limit).toBe(5);
   });
 
   it("tightens caps on mid-size repos", () => {
     expect(resolveContextBudget(501).hub_limit).toBe(3);
+    expect(resolveContextBudget(501).marker_limit).toBe(15);
     expect(resolveContextBudget(5000).hub_limit).toBe(3);
     expect(resolveContextBudget(5000).signatures_per_hub).toBe(2);
   });
@@ -189,6 +191,7 @@ describe("resolveContextBudget", () => {
   it("tightens caps on large repos", () => {
     expect(resolveContextBudget(6000).hub_limit).toBe(2);
     expect(resolveContextBudget(6000).signature_max_chars).toBe(60);
+    expect(resolveContextBudget(6000).marker_limit).toBe(10);
   });
 });
 
@@ -500,6 +503,68 @@ describe("buildContextEnvelope", () => {
     }
   });
 
+  it("returns more legacy hubs than budget-capped hub_leaders", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        for (let i = 0; i < 16; i++) {
+          const hubPath = `src/extra-hub-${i}.ts`;
+          insertFile(db, {
+            path: hubPath,
+            content_hash: `eh${i}`,
+            size: 10,
+            line_count: 1,
+            language: "typescript",
+            last_modified: 1,
+            indexed_at: 1,
+          });
+          insertSymbols(db, [
+            {
+              file_path: hubPath,
+              name: `hubFn${i}`,
+              kind: "function",
+              line_start: 1,
+              line_end: 1,
+              signature: `export function hubFn${i}()`,
+              is_exported: 1,
+              is_default_export: 0,
+              members: null,
+              doc_comment: null,
+              value: null,
+              parent_name: null,
+              visibility: null,
+              complexity: null,
+              name_column_start: 0,
+              name_column_end: 0,
+              scope_local_id: 0,
+              body_line_count: null,
+              param_count: null,
+              nesting_depth: null,
+              return_type: null,
+              is_async: 0,
+              is_generator: 0,
+            },
+          ]);
+          insertDependencies(db, [
+            { from_path: "src/leaf.ts", to_path: hubPath },
+          ]);
+        }
+
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(envelope.hubs!.length).toBeGreaterThan(
+          envelope.start_here!.hub_leaders.length,
+        );
+        expect(envelope.hubs!.length).toBeLessThanOrEqual(15);
+        expect(envelope.start_here!.hub_leaders.length).toBeLessThanOrEqual(5);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
   it("keeps hub_leaders as a budget-capped prefix of legacy hubs", () => {
     const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
     try {
@@ -550,6 +615,39 @@ describe("buildContextEnvelope", () => {
         expect(envelope.start_here).toBeUndefined();
         expect(envelope.hubs).toBeUndefined();
         expect(envelope.intent?.classified_as).toBe("debug");
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("caps sample_markers at the large-repo marker_limit", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        for (let i = 0; i < 4998; i++) {
+          insertFile(db, {
+            path: `src/bulk/${i}.ts`,
+            content_hash: `hb${i}`,
+            size: 1,
+            line_count: 1,
+            language: "typescript",
+            last_modified: 1,
+            indexed_at: 1,
+          });
+        }
+        for (let i = 0; i < 25; i++) {
+          db.run(
+            "INSERT INTO markers (file_path, line_number, kind, content) VALUES (?, ?, 'NOTE', ?)",
+            [`src/bulk/${i}.ts`, 1, `marker ${i}`],
+          );
+        }
+
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(envelope.sample_markers!.length).toBeLessThanOrEqual(10);
       });
     } finally {
       revParse.mockRestore();
