@@ -101,6 +101,16 @@ All three transports resolve to the same `assembleAgentContent(kind)` function i
 
 Recipe ids cited in the playbook are machine-validated in tests against the live catalog (`extractMcpInstructionRecipeIds`).
 
+## MCP session lifecycle
+
+Long-running **`codemap mcp`** stays up for the whole IDE session while the stdio pipe is open — **there is no idle timeout** that exits after N minutes without tool calls. Cursor / Claude Code spawn MCP once; they do not reliably respawn it mid-conversation, so an idle shutdown would break long pauses with no recovery path.
+
+**Exit triggers (MCP):** client disconnect only — stdin EOF, stdout broken pipe (`EPIPE`), boot parent process gone, or SIGINT/SIGTERM. Implementation: `src/application/session-lifecycle.ts` (`createStdioDisconnectMonitor`).
+
+**Not idle timeout:** HTTP **`serve --watch`** uses a 5s **watch release grace** after the last tool request — that stops chokidar between stateless POSTs, not the MCP/HTTP process. **`GET /health`** never acquires a watch client.
+
+See [architecture.md § Session lifecycle wiring](./architecture.md#cli-usage).
+
 ## MCP tool allowlist
 
 **`context.index_freshness`** — session bootstrap includes index-level freshness metadata: `commit_drift` (HEAD ≠ `last_indexed_commit`), `pending_sync` (watcher debounce queue or in-flight reindex), optional disk-drift counts when watch is off, and a single `warning` string when agents should pause or re-index. **`context.start_here`** (non-compact) adds inline index summary, intent-ranked `query_recipe` cards, and top hub files with export signatures (adaptive caps by file count; optional MCP/HTTP `include_snippets` for one-line previews). Debug intent biases `sample_markers` toward FIXME/TODO. **MCP:** array-shaped JSON tools (`query`, …) keep row payloads verbatim and append a second `content` block prefixed `@codemap/index_freshness`; object-shaped tools merge `index_freshness` inline. **HTTP:** `POST /tool/*` adds `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, and `X-Codemap-Warning` headers without changing JSON bodies; **`GET /health`** includes full cheap `index_freshness` when the DB is readable. Complements per-file `validate` / snippet `stale`. See [`architecture.md` § Context wiring](./architecture.md).

@@ -9,6 +9,8 @@ import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import { handleRequest } from "./http-server";
+import { createManagedWatchSession } from "./session-lifecycle";
+import { _resetWatchStateForTests } from "./watcher";
 
 let benchDir: string;
 let serverHandle: { close: () => Promise<void>; port: number } | undefined;
@@ -37,6 +39,7 @@ afterEach(async () => {
     await serverHandle.close();
     serverHandle = undefined;
   }
+  _resetWatchStateForTests();
   rmSync(benchDir, { recursive: true, force: true });
 });
 
@@ -131,6 +134,73 @@ describe("http-server — health + tools catalog", () => {
     serverHandle = await startServer();
     const r = await fetch(`http://127.0.0.1:${serverHandle.port}/nope`);
     expect(r.status).toBe(404);
+  });
+});
+
+describe("http-server — managed watch session", () => {
+  it("acquires a watch client for tool routes but not /health", async () => {
+    let backendStarted = false;
+    const session = createManagedWatchSession({
+      root: benchDir,
+      excludeDirNames: new Set(["node_modules", ".git", "dist"]),
+      recipesWatchPrefix: ".codemap/recipes/",
+      debounceMs: 0,
+      onChange: () => {},
+      releaseGraceMs: 25,
+      backend: {
+        start() {
+          backendStarted = true;
+        },
+        async stop() {},
+      },
+    });
+
+    const serverRef: Server = createServer((req, res) => {
+      void handleRequest(req, res, {
+        version: "0.0.0-test",
+        root: benchDir,
+        host: "127.0.0.1",
+        port: 0,
+        token: undefined,
+        managedWatchSession: session,
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: msg }));
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      serverRef.once("error", reject);
+      serverRef.listen(0, "127.0.0.1", () => resolve());
+    });
+    const addr = serverRef.address();
+    if (typeof addr !== "object" || addr === null) {
+      throw new Error("expected AddressInfo");
+    }
+
+    try {
+      expect(session.isWatching()).toBe(false);
+      const health = await fetch(`http://127.0.0.1:${addr.port}/health`);
+      expect(health.status).toBe(200);
+      expect(session.clientCount()).toBe(0);
+      expect(session.isWatching()).toBe(false);
+      expect(backendStarted).toBe(false);
+
+      const tool = await postTool(addr.port, "query", {
+        sql: "SELECT COUNT(*) AS count FROM symbols",
+      });
+      expect(tool.status).toBe(200);
+      expect(session.clientCount()).toBe(0);
+      expect(backendStarted).toBe(true);
+      expect(session.isWatching()).toBe(true);
+
+      await Bun.sleep(50);
+      await session.forceStop();
+    } finally {
+      await new Promise<void>((resolve) => {
+        serverRef.close(() => resolve());
+      });
+    }
   });
 });
 

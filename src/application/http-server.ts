@@ -20,6 +20,12 @@ import {
 import type { IndexFreshness } from "./index-freshness";
 import { listResources, readResource } from "./resource-handlers";
 import {
+  bindWatchClientRelease,
+  createManagedWatchSession,
+  HTTP_WATCH_RELEASE_GRACE_MS,
+} from "./session-lifecycle";
+import type { ManagedWatchSession } from "./session-lifecycle";
+import {
   affectedArgsSchema,
   applyArgsSchema,
   auditArgsSchema,
@@ -61,7 +67,6 @@ import {
   createReindexOnChange,
   DEFAULT_DEBOUNCE_MS,
   resolveRecipesWatchPrefix,
-  runWatchLoop,
 } from "./watcher";
 
 /**
@@ -93,6 +98,8 @@ export interface HttpServerOpts {
   watch?: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
   debounceMs?: number;
+  /** Injected by `runHttpServer` or tests. */
+  managedWatchSession?: ManagedWatchSession;
 }
 
 const TOOL_NAMES = [
@@ -124,18 +131,17 @@ const TOOL_NAMES = [
 export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
   await bootstrapForServe(opts);
 
-  let stopWatch: (() => Promise<void>) | undefined;
-  let watchReady: Promise<void> = Promise.resolve();
+  let managedWatchSession: ManagedWatchSession | undefined;
   if (opts.watch === true) {
-    const prime = createPrimeIndex({ quiet: false, label: "codemap serve" });
-    const handle = runWatchLoop({
+    managedWatchSession = createManagedWatchSession({
       root: getProjectRoot(),
       excludeDirNames: getExcludeDirNames(),
       recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
       debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
+      releaseGraceMs: HTTP_WATCH_RELEASE_GRACE_MS,
       onPrime: async () => {
         try {
-          await prime();
+          await createPrimeIndex({ quiet: false, label: "codemap serve" })();
         } finally {
           warnIndexFreshnessToStderr("codemap serve");
         }
@@ -145,16 +151,17 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
         label: "codemap serve",
       }),
     });
-    stopWatch = handle.stop;
-    watchReady = handle.ready;
   } else {
     warnIndexFreshnessToStderr("codemap serve");
   }
 
-  await watchReady;
+  const serveOpts: HttpServerOpts = {
+    ...opts,
+    managedWatchSession,
+  };
 
   const server = createServer((req, res) => {
-    handleRequest(req, res, opts).catch((err: unknown) => {
+    handleRequest(req, res, serveOpts).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : String(err);
       writeJson(res, 500, { error: msg }, opts.version);
     });
@@ -180,12 +187,9 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       const closeServer = (): void => {
         server.close(() => resolve());
       };
-      if (stopWatch !== undefined) {
-        // .finally(closeServer) so a watcher stop() rejection still
-        // closes the HTTP listener — without it, a rejected stop()
-        // means closeServer never runs and runHttpServer never resolves
-        // on SIGTERM/SIGINT (caught by CodeRabbit on PR #47).
-        stopWatch()
+      if (managedWatchSession !== undefined) {
+        managedWatchSession
+          .forceStop()
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : String(err);
             // eslint-disable-next-line no-console -- intentional shutdown-error log
@@ -257,7 +261,7 @@ export async function handleRequest(
     );
   }
 
-  // Liveness probe — auth-exempt so monitoring works without the token.
+  // Liveness probe — auth-exempt; no watch client (probes must not keep chokidar hot).
   if (method === "GET" && path === "/health") {
     const freshness = readCheapIndexFreshness();
     applyIndexFreshnessHeaders(res, freshness);
@@ -287,6 +291,11 @@ export async function handleRequest(
         opts.version,
       );
     }
+  }
+
+  if (opts.managedWatchSession !== undefined) {
+    await opts.managedWatchSession.acquireClient();
+    bindWatchClientRelease(res, opts.managedWatchSession);
   }
 
   if (method === "GET" && path === "/tools") {
