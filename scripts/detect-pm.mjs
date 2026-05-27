@@ -21,19 +21,11 @@ import {
   resolveCodemapCliInvocation,
 } from "./codemap-invocation.mjs";
 
-const VALID_AGENTS = new Set(["npm", "pnpm", "yarn", "yarn@berry", "bun"]);
-
 async function main() {
   const explicitAgent = (process.env["PACKAGE_MANAGER"] ?? "").trim();
   const versionInput = (process.env["VERSION"] ?? "").trim();
   const workingDir =
     (process.env["WORKING_DIRECTORY"] ?? "").trim() || process.cwd();
-
-  if (explicitAgent !== "" && !VALID_AGENTS.has(explicitAgent)) {
-    fail(
-      `package-manager input "${explicitAgent}" not recognised. Expected one of: ${[...VALID_AGENTS].join(", ")}.`,
-    );
-  }
 
   const resolved = await resolveCodemapCliInvocation({
     projectRoot: workingDir,

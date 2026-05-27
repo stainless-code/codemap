@@ -10,10 +10,14 @@ import { dirname, join } from "node:path";
 
 import {
   buildCodemapMcpSpawn as spawnFromTs,
+  formatCodemapExec as execFromTs,
+  normalizeSpawnCommand as normalizeFromTs,
   resolveCodemapCliInvocation as resolveFromTs,
 } from "../src/codemap-invocation.ts";
 import {
   buildCodemapMcpSpawn as spawnFromMjs,
+  formatCodemapExec as execFromMjs,
+  normalizeSpawnCommand as normalizeFromMjs,
   resolveCodemapCliInvocation as resolveFromMjs,
 } from "./codemap-invocation.mjs";
 
@@ -60,6 +64,14 @@ const CASES = [
     opts: { projectRoot: "", packageManager: "npm" },
   },
   {
+    label: "npm dlx-pinned",
+    fixture: {
+      "package.json": JSON.stringify({ name: "empty" }),
+      "package-lock.json": "{}",
+    },
+    opts: { projectRoot: "", packageManager: "npm", version: "1.2.3" },
+  },
+  {
     label: "bun bunx local",
     fixture: {
       "package.json": JSON.stringify({
@@ -96,9 +108,23 @@ describe("codemap-invocation TS ↔ mjs sync", () => {
     });
   }
 
+  it("normalizeSpawnCommand matches", () => {
+    expect(normalizeFromMjs("bun", ["x", "codemap"])).toEqual(
+      normalizeFromTs("bun", ["x", "codemap"]),
+    );
+    expect(normalizeFromMjs("pnpm", ["exec", "codemap"])).toEqual(
+      normalizeFromTs("pnpm", ["exec", "codemap"]),
+    );
+  });
+
   it("buildCodemapMcpSpawn matches", () => {
     const prefix = { command: "npx", args: ["codemap"] };
     expect(spawnFromMjs(prefix, true)).toEqual(spawnFromTs(prefix, true));
     expect(spawnFromMjs(prefix, false)).toEqual(spawnFromTs(prefix, false));
+  });
+
+  it("formatCodemapExec matches", () => {
+    const prefix = { command: "pnpm", args: ["exec", "codemap"] };
+    expect(execFromMjs(prefix)).toEqual(execFromTs(prefix));
   });
 });

@@ -43,6 +43,16 @@ function seedInstalledCodemapProject(dir: string): void {
   writeFileSync(join(dir, "package-lock.json"), "{}");
 }
 
+function seedPnpmInstalledCodemapProject(dir: string): void {
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({
+      devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+    }),
+  );
+  writeFileSync(join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
+}
+
 describe("buildCodemapMcpSpawn", () => {
   it("includes workspace root for Cursor", () => {
     expect(buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true)).toEqual({
@@ -222,6 +232,30 @@ describe("verifyCodemapMcpServersFile", () => {
 });
 
 describe("applyAgentsInitMcp", () => {
+  it("writes pnpm exec spawn when pnpm-lock is present", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-pnpm-"));
+    try {
+      seedPnpmInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
+      const cursor = JSON.parse(
+        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
+      ) as {
+        mcpServers: Record<string, { command: string; args: string[] }>;
+      };
+      expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("pnpm");
+      expect(cursor.mcpServers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
+        "exec",
+        "codemap",
+        "mcp",
+        "--watch",
+        "--root",
+        "${workspaceFolder}",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("writes all default project MCP files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-all-"));
     const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-home-"));
