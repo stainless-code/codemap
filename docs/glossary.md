@@ -165,7 +165,7 @@ Column on the `files` table. Lowercase SHA-256 hex of file bytes computed by `sr
 
 ### `ContextEnvelope`
 
-TS shape for the JSON emitted by `codemap context`. Stable contract; agents can key off field names.
+TS shape for the JSON emitted by `codemap context`. Stable contract; agents can key off field names. Non-compact payloads include **`start_here`**: intent-ranked recipe cards (`tool: "query_recipe"`) and **`hub_leaders`** (top fan-in files with exported-symbol signatures).
 
 ### covering index
 

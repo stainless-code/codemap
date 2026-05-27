@@ -68,6 +68,7 @@ describe("MCP server — initialize instructions", () => {
       expect(instructions).toContain("Session start");
       expect(instructions).toContain("codemap://rule");
       expect(instructions).toContain("index_freshness");
+      expect(instructions).toContain("start_here");
       expect(instructions).toContain("pending_sync");
     } finally {
       await server.close();
@@ -632,6 +633,10 @@ describe("MCP server — audit / context / validate tools", () => {
       expect(json).toMatchObject({
         codemap: { schema_version: expect.any(Number) },
         project: { root: expect.any(String), file_count: expect.any(Number) },
+        start_here: expect.objectContaining({
+          recipes: expect.any(Array),
+          hub_leaders: expect.any(Array),
+        }),
         index_freshness: expect.objectContaining({
           pending_sync: expect.any(Boolean),
           commit_drift: expect.any(Boolean),

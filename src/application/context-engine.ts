@@ -5,6 +5,15 @@ import { computeIndexFreshness } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
 import { QUERY_RECIPES } from "./query-recipes";
 
+/** Max recipe cards in `start_here.recipes`. */
+const START_HERE_RECIPE_LIMIT = 4;
+/** Top dependency hubs surfaced with signatures. */
+const START_HERE_HUB_LIMIT = 5;
+/** Exported symbols sampled per hub leader. */
+const SIGNATURES_PER_HUB = 3;
+/** Truncate long `symbols.signature` strings in the envelope. */
+const SIGNATURE_MAX_CHARS = 120;
+
 /**
  * Snapshot envelope emitted by `codemap context`. Stable JSON shape any agent
  * or CLI can pipe into a prompt without parsing prose.
@@ -33,6 +42,11 @@ export interface ContextEnvelope {
     kind: string;
     content: string;
   }[];
+  /**
+   * Session-start shortcuts: intent-ranked recipe cards + hub files with export
+   * signatures. Replaces a common show → explore chain after bootstrap.
+   */
+  start_here?: ContextStartHere;
   recipes: { id: string; description: string }[];
   index_freshness: IndexFreshness;
   intent?: {
@@ -41,6 +55,25 @@ export interface ContextEnvelope {
     matched_recipes: string[];
     hint: string;
   };
+}
+
+export interface ContextRecipeStarter {
+  id: string;
+  description: string;
+  tool: "query_recipe";
+}
+
+export interface ContextHubLeader {
+  file_path: string;
+  fan_in: number;
+  signatures: { name: string; kind: string; signature: string }[];
+}
+
+export interface ContextStartHere {
+  classified_as: string;
+  hint: string;
+  recipes: ContextRecipeStarter[];
+  hub_leaders: ContextHubLeader[];
 }
 
 /**
@@ -105,6 +138,13 @@ export function classifyIntent(intent: string): {
   };
 }
 
+/** Default session starters when no `--for` / MCP `intent` is supplied. */
+export function defaultStartHereClassification(): ReturnType<
+  typeof classifyIntent
+> {
+  return classifyIntent("explore this codebase");
+}
+
 /**
  * Build the envelope from an open DB. Pure-ish (reads from DB but takes no I/O
  * outside of it) — covered by unit tests against a temp DB.
@@ -151,6 +191,12 @@ export function buildContextEnvelope(
         "SELECT file_path, line_number, kind, content FROM markers ORDER BY file_path ASC, line_number ASC LIMIT 20",
       )
       .all() as ContextEnvelope["sample_markers"];
+
+    const classification =
+      opts.intent !== null
+        ? classifyIntent(opts.intent)
+        : defaultStartHereClassification();
+    envelope.start_here = composeStartHere(db, classification);
   }
 
   if (opts.intent !== null) {
@@ -159,6 +205,93 @@ export function buildContextEnvelope(
   }
 
   return envelope;
+}
+
+/**
+ * Compose session-start shortcuts from a classification result. Exported for
+ * unit tests.
+ */
+export function composeStartHere(
+  db: CodemapDatabase,
+  classification: ReturnType<typeof classifyIntent>,
+): ContextStartHere {
+  return {
+    classified_as: classification.classified_as,
+    hint: classification.hint,
+    recipes: composeRecipeStarters(classification.matched_recipes),
+    hub_leaders: composeHubLeaders(db),
+  };
+}
+
+function composeRecipeStarters(recipeIds: string[]): ContextRecipeStarter[] {
+  const starters: ContextRecipeStarter[] = [];
+  for (const id of recipeIds) {
+    if (starters.length >= START_HERE_RECIPE_LIMIT) break;
+    const meta = QUERY_RECIPES[id];
+    if (meta === undefined) continue;
+    starters.push({
+      id,
+      description: meta.description,
+      tool: "query_recipe",
+    });
+  }
+  return starters;
+}
+
+function composeHubLeaders(db: CodemapDatabase): ContextHubLeader[] {
+  const hubs = db
+    .query(
+      `SELECT to_path AS file_path, COUNT(*) AS fan_in
+       FROM dependencies
+       GROUP BY to_path
+       ORDER BY fan_in DESC, to_path ASC
+       LIMIT ?`,
+    )
+    .all(START_HERE_HUB_LIMIT) as { file_path: string; fan_in: number }[];
+
+  return hubs.map((hub) => ({
+    file_path: hub.file_path,
+    fan_in: hub.fan_in,
+    signatures: readHubSignatures(db, hub.file_path),
+  }));
+}
+
+function readHubSignatures(
+  db: CodemapDatabase,
+  filePath: string,
+): ContextHubLeader["signatures"] {
+  const rows = db
+    .query(
+      `SELECT name, kind, signature
+       FROM symbols
+       WHERE file_path = ? AND is_exported = 1
+       ORDER BY
+         CASE kind
+           WHEN 'function' THEN 0
+           WHEN 'class' THEN 1
+           WHEN 'interface' THEN 2
+           WHEN 'type' THEN 3
+           ELSE 4
+         END,
+         line_start ASC
+       LIMIT ?`,
+    )
+    .all(filePath, SIGNATURES_PER_HUB) as {
+    name: string;
+    kind: string;
+    signature: string;
+  }[];
+
+  return rows.map((row) => ({
+    name: row.name,
+    kind: row.kind,
+    signature: truncateSignature(row.signature),
+  }));
+}
+
+function truncateSignature(signature: string): string {
+  if (signature.length <= SIGNATURE_MAX_CHARS) return signature;
+  return `${signature.slice(0, SIGNATURE_MAX_CHARS - 1)}…`;
 }
 
 function readScalarInt(db: CodemapDatabase, sql: string): number {

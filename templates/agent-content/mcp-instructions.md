@@ -4,7 +4,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file count, language breakdown, recipe summary, **`index_freshness`** (one call replaces 4–5 queries).
+1. **`context`** — project root, schema version, file count, language breakdown, recipe summary, **`start_here`** (intent-ranked recipe cards + hub leaders with export signatures), **`index_freshness`** (one call replaces 4–5 queries).
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
 
@@ -14,7 +14,7 @@ Every successful JSON tool response carries index-level freshness metadata (not 
 
 | Surface                                          | Where to read it                                                                                      |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **`context`**                                    | `index_freshness` object (includes disk-drift counts)                                                 |
+| **`context`**                                    | `index_freshness` object (includes disk-drift counts); **`start_here`** when not `compact`            |
 | **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                       |
 | **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                            |
 | **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged) |
