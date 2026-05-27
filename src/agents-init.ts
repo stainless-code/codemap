@@ -592,6 +592,23 @@ async function maybeApplyAgentsInitMcp(
   }
 }
 
+/** Side-effect-only path when `.agents/` exists and `--force` is off. */
+function applyMaybeAgentsInitTargetsOnExisting(
+  options: AgentsInitOptions,
+): void {
+  const targets = options.targets ?? [];
+  if (targets.length === 0) {
+    return;
+  }
+  applyAgentsInitTargets(
+    options.projectRoot,
+    targets,
+    options.linkMode ?? "symlink",
+    false,
+  );
+  ensureGitignoreCodemapPattern(options.projectRoot);
+}
+
 /**
  * Copy bundled `rules/` and `skills/` into `<projectRoot>/.agents/`, optional integrations, `.gitignore` hint.
  * **`--force`** deletes only template-backed files, then writes those files again with per-file copies — your other files under **`.agents/`**, **`rules/`**, or **`skills/`** stay.
@@ -603,6 +620,7 @@ export async function runAgentsInit(
   if (options.gitHooks === "uninstall") {
     uninstallGitHooks(options.projectRoot);
     console.log("  Removed codemap blocks from git hooks");
+    applyMaybeAgentsInitTargetsOnExisting(options);
     await maybeApplyAgentsInitMcp(options);
     return true;
   }
@@ -635,22 +653,18 @@ export async function runAgentsInit(
         console.log(
           "  Installed git hooks (post-commit, post-merge, post-checkout) for background codemap sync",
         );
+        applyMaybeAgentsInitTargetsOnExisting(options);
         await maybeApplyAgentsInitMcp(options);
         return true;
       }
       if (options.mcp === true) {
+        applyMaybeAgentsInitTargetsOnExisting(options);
         await maybeApplyAgentsInitMcp(options);
         return true;
       }
       const targets = options.targets ?? [];
       if (targets.length > 0) {
-        applyAgentsInitTargets(
-          options.projectRoot,
-          targets,
-          options.linkMode ?? "symlink",
-          false,
-        );
-        ensureGitignoreCodemapPattern(options.projectRoot);
+        applyMaybeAgentsInitTargetsOnExisting(options);
         await maybeApplyAgentsInitMcp(options);
         return true;
       }
