@@ -731,6 +731,8 @@ The indexer uses git to detect changes since the last indexed commit:
 5. Deleted files are removed via `ON DELETE CASCADE` — deleting from `files` cascades to all related tables
 6. Falls back to full rebuild if commit history is incompatible (e.g. force push, branch switch)
 
+Product-shape constraint: [No split-brain incremental index](./roadmap.md#floors-v1-product-shape).
+
 ## File Artifacts
 
 Running the indexer produces up to three files under **`<state-dir>/`** (default `.codemap/`), reconciled by the self-managed **`<state-dir>/.gitignore`** on boot — not in the project root:
