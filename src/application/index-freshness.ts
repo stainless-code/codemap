@@ -1,3 +1,6 @@
+import type { ServerResponse } from "node:http";
+
+import { closeDb, openDb } from "../db";
 import type { CodemapDatabase } from "../db";
 import { getMeta } from "../db";
 import { getChangedFiles, getCurrentCommit } from "./index-engine";
@@ -139,4 +142,80 @@ function buildFreshnessWarning(
     return "Working tree may be ahead of the index; run `codemap` before trusting structural queries.";
   }
   return null;
+}
+
+/** Prefix for the MCP secondary content block carrying cheap freshness metadata. */
+export const INDEX_FRESHNESS_MCP_PREFIX = "@codemap/index_freshness\n";
+
+/**
+ * Read cheap freshness (no disk-drift git walk) from the live index DB.
+ * Returns null when the DB is unavailable — transports omit headers/blocks.
+ */
+export function readCheapIndexFreshness(): IndexFreshness | null {
+  try {
+    const db = openDb();
+    try {
+      return computeIndexFreshness(db);
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** HTTP response headers mirroring cheap freshness signals (slice 2). */
+export function applyIndexFreshnessHeaders(
+  res: ServerResponse,
+  freshness: IndexFreshness | null,
+): void {
+  if (freshness === null) return;
+  res.setHeader(
+    "X-Codemap-Pending-Sync",
+    freshness.pending_sync ? "true" : "false",
+  );
+  res.setHeader(
+    "X-Codemap-Commit-Drift",
+    freshness.commit_drift ? "true" : "false",
+  );
+  if (freshness.warning !== null) {
+    res.setHeader("X-Codemap-Warning", freshness.warning);
+  }
+}
+
+export function formatIndexFreshnessMcpBlock(
+  freshness: IndexFreshness,
+): string {
+  return INDEX_FRESHNESS_MCP_PREFIX + JSON.stringify(freshness);
+}
+
+/**
+ * Merge `index_freshness` into JSON object tool payloads. Array payloads stay
+ * verbatim — MCP attaches {@link formatIndexFreshnessMcpBlock} as a second block.
+ * Skips when the payload already carries freshness (`context` tool).
+ */
+export function mergeIndexFreshnessIntoJsonPayload(
+  payload: unknown,
+  freshness: IndexFreshness | null,
+): unknown {
+  if (freshness === null) return payload;
+  if (Array.isArray(payload)) return payload;
+  if (
+    payload !== null &&
+    typeof payload === "object" &&
+    "index_freshness" in payload
+  ) {
+    return payload;
+  }
+  if (payload !== null && typeof payload === "object") {
+    return {
+      ...(payload as Record<string, unknown>),
+      index_freshness: freshness,
+    };
+  }
+  return { result: payload, index_freshness: freshness };
+}
+
+export function jsonPayloadNeedsMcpFreshnessBlock(payload: unknown): boolean {
+  return Array.isArray(payload);
 }

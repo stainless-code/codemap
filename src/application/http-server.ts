@@ -12,6 +12,10 @@ import {
   getTsconfigPath,
   initCodemap,
 } from "../runtime";
+import {
+  applyIndexFreshnessHeaders,
+  readCheapIndexFreshness,
+} from "./index-freshness";
 import { listResources, readResource } from "./resource-handlers";
 import {
   affectedArgsSchema,
@@ -248,10 +252,16 @@ export async function handleRequest(
 
   // Liveness probe — auth-exempt so monitoring works without the token.
   if (method === "GET" && path === "/health") {
+    const freshness = readCheapIndexFreshness();
+    applyIndexFreshnessHeaders(res, freshness);
     return writeJson(
       res,
       200,
-      { ok: true, version: opts.version },
+      {
+        ok: true,
+        version: opts.version,
+        ...(freshness !== null ? { index_freshness: freshness } : {}),
+      },
       opts.version,
     );
   }
@@ -390,6 +400,9 @@ function writeToolResult(
   result: ToolResult,
   version: string,
 ): void {
+  const freshness = result.ok ? readCheapIndexFreshness() : null;
+  applyIndexFreshnessHeaders(res, freshness);
+
   if (!result.ok) {
     return writeJson(
       res,

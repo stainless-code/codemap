@@ -151,7 +151,33 @@ describe("MCP server — query tool", () => {
         name: "query",
         arguments: { sql: "SELECT path FROM files", summary: true },
       });
-      expect(readJson(r)).toEqual({ count: 3 });
+      expect(readJson(r)).toMatchObject({
+        count: 3,
+        index_freshness: expect.objectContaining({
+          pending_sync: expect.any(Boolean),
+        }),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("query array payloads keep rows verbatim and attach freshness block", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query",
+        arguments: { sql: "SELECT path FROM files ORDER BY path" },
+      });
+      const blocks =
+        (r as { content?: Array<{ text?: string }> }).content ?? [];
+      expect(blocks).toHaveLength(2);
+      expect(JSON.parse(blocks[0]!.text!)).toEqual([
+        { path: "docs/c.md" },
+        { path: "src/a.ts" },
+        { path: "src/b.ts" },
+      ]);
+      expect(blocks[1]!.text).toStartWith("@codemap/index_freshness\n");
     } finally {
       await server.close();
     }
@@ -364,7 +390,7 @@ describe("MCP server — query_recipe tool", () => {
         name: "query_recipe",
         arguments: { recipe: "deprecated-symbols", summary: true },
       });
-      expect(readJson(r)).toEqual({ count: 0 });
+      expect(readJson(r)).toMatchObject({ count: 0 });
     } finally {
       await server.close();
     }
@@ -746,7 +772,7 @@ describe("MCP server — baseline tools", () => {
         name: "drop_baseline",
         arguments: { name: "to-drop" },
       });
-      expect(readJson(first)).toEqual({ dropped: "to-drop" });
+      expect(readJson(first)).toMatchObject({ dropped: "to-drop" });
 
       const second = await client.callTool({
         name: "drop_baseline",
@@ -1105,7 +1131,7 @@ describe("MCP server — show + snippet tools", () => {
       });
       expect(r.isError).not.toBe(true);
       const json = readJson(r);
-      expect(json).toEqual({ matches: [] });
+      expect(json).toMatchObject({ matches: [] });
     } finally {
       await server.close();
     }

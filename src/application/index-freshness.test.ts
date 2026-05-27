@@ -8,7 +8,10 @@ import { closeDb, createTables, openDb, setMeta } from "../db";
 import { initCodemap } from "../runtime";
 import { buildContextEnvelope } from "./context-engine";
 import * as indexEngine from "./index-engine";
-import { computeIndexFreshness } from "./index-freshness";
+import {
+  computeIndexFreshness,
+  mergeIndexFreshnessIntoJsonPayload,
+} from "./index-freshness";
 import { _resetWatchStateForTests, runWatchLoop } from "./watcher";
 import type { WatchBackend } from "./watcher";
 
@@ -116,6 +119,37 @@ describe("computeIndexFreshness", () => {
     });
 
     await handle.stop();
+  });
+});
+
+describe("mergeIndexFreshnessIntoJsonPayload", () => {
+  const freshness = {
+    head_commit: "a".repeat(40),
+    last_indexed_commit: "b".repeat(40),
+    commit_drift: true,
+    watch_active: false,
+    pending_sync: false,
+    pending_paths: 0,
+    reindex_in_flight: false,
+    warning: "drift",
+  };
+
+  it("leaves array payloads unchanged", () => {
+    const rows = [{ path: "src/a.ts" }];
+    expect(mergeIndexFreshnessIntoJsonPayload(rows, freshness)).toBe(rows);
+  });
+
+  it("merges into object payloads", () => {
+    expect(mergeIndexFreshnessIntoJsonPayload({ count: 3 }, freshness)).toEqual(
+      { count: 3, index_freshness: freshness },
+    );
+  });
+
+  it("skips when index_freshness is already present", () => {
+    const payload = { index_freshness: freshness, file_count: 1 };
+    expect(mergeIndexFreshnessIntoJsonPayload(payload, freshness)).toBe(
+      payload,
+    );
   });
 });
 

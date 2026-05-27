@@ -142,6 +142,8 @@ describe("http-server — POST /tool/query", () => {
     });
     expect(r.status).toBe(200);
     expect(r.headers.get("content-type")).toContain("application/json");
+    expect(r.headers.get("X-Codemap-Pending-Sync")).toBe("false");
+    expect(r.headers.get("X-Codemap-Commit-Drift")).toBe("false");
     expect(r.json).toEqual([
       { name: "bar", kind: "const" },
       { name: "foo", kind: "function" },

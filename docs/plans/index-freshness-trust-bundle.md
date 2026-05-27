@@ -1,6 +1,6 @@
 # Index freshness trust bundle — plan
 
-> **Status:** in progress · **Priority:** agent session · **Effort:** S (~3–5 days) · **Roadmap:** [§ Index staleness surfacing](../roadmap.md#agent-session--warm-path-economics), [§ HEAD / index freshness warning](../roadmap.md#agent-session--warm-path-economics)
+> **Status:** in progress (slice 2 shipped on branch) · **Priority:** agent session · **Effort:** S (~3–5 days) · **Roadmap:** [§ Index staleness surfacing](../roadmap.md#agent-session--warm-path-economics), [§ HEAD / index freshness warning](../roadmap.md#agent-session--warm-path-economics)
 >
 > **Motivator:** Agents treat MCP / HTTP / `context` output as ground truth. Today they can query during watcher debounce (disk ahead of index), after a branch switch (`last_indexed_commit` ≠ `HEAD`), or with a dirty working tree when watch is off — with no signal except running `validate` manually. Wrong structural verdicts follow.
 
@@ -53,15 +53,21 @@ interface IndexFreshness {
 
 **Acceptance**
 
-- [ ] `codemap context --json` includes `index_freshness` with `warning` when HEAD ≠ `last_indexed_commit`
-- [ ] Fake watcher with pending debounce → `pending_sync: true`
-- [ ] Non-git fixture → `head_commit: null`, no throw
+- [x] `codemap context --json` includes `index_freshness` with `warning` when HEAD ≠ `last_indexed_commit`
+- [x] Fake watcher with pending debounce → `pending_sync: true`
+- [x] Non-git fixture → `head_commit: null`, no throw
 
 ### Slice 2 — all MCP / HTTP tool responses
 
 1. **HTTP response headers** on `POST /tool/*`: `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` (when set).
-2. **MCP `wrapToolResult`** — for JSON tools, wrap as `{ result, index_freshness }` **or** append a second `content` block with type `text` prefixed `@codemap/index_freshness` (pick in plan-PR review; default: wrapper object for object payloads, header-equivalent second block for arrays — document in MCP instructions).
-3. **`/health`** — include cheap freshness when DB exists (optional).
+2. **MCP `wrapToolResult`** — object JSON payloads merge `index_freshness` inline; array payloads append a second `content` block prefixed `@codemap/index_freshness`.
+3. **`/health`** — include cheap `index_freshness` when DB exists.
+
+**Acceptance**
+
+- [x] HTTP `query` row array body unchanged; freshness headers present
+- [x] MCP `query` array → second content block with `@codemap/index_freshness`
+- [x] MCP object payloads (`query` summary, `show`, …) merge `index_freshness` inline
 
 ### Slice 3 — stderr + MCP initialize (optional)
 

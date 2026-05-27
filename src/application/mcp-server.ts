@@ -14,6 +14,12 @@ import {
 } from "../runtime";
 import { assembleMcpInstructions } from "./agent-content";
 import {
+  formatIndexFreshnessMcpBlock,
+  jsonPayloadNeedsMcpFreshnessBlock,
+  mergeIndexFreshnessIntoJsonPayload,
+  readCheapIndexFreshness,
+} from "./index-freshness";
+import {
   isMcpToolEnabled,
   logMcpToolAllowlist,
   resolveMcpToolAllowlist,
@@ -110,9 +116,18 @@ function wrapToolResult(r: ToolResult) {
     };
   }
   if (r.format === "json") {
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify(r.payload) }],
-    };
+    const freshness = readCheapIndexFreshness();
+    const payload = mergeIndexFreshnessIntoJsonPayload(r.payload, freshness);
+    const content: Array<{ type: "text"; text: string }> = [
+      { type: "text", text: JSON.stringify(payload) },
+    ];
+    if (freshness !== null && jsonPayloadNeedsMcpFreshnessBlock(r.payload)) {
+      content.push({
+        type: "text",
+        text: formatIndexFreshnessMcpBlock(freshness),
+      });
+    }
+    return { content };
   }
   return { content: [{ type: "text" as const, text: r.payload }] };
 }
