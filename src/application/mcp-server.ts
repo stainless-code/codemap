@@ -342,7 +342,7 @@ function registerTraceTool(server: McpServer, opts: ServerOpts): void {
     "trace",
     {
       description:
-        "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads (cross-file callee lookup). Args: from, to, max_depth?, via (calls|dependencies|all), budget_chars (default 15000, snippet source text only). Returns {from, to, via?, path, snippets, truncated, truncation?, snippets_skipped_reason?}. `truncated` is true when snippet budget hit (`truncation.snippets`); dependency hops omit auto-snippets (`snippets_skipped_reason`). Fall back to `query_recipe` call-path when unsure.",
+        "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads (cross-file callee lookup). Args: from, to, max_depth?, via (calls|dependencies|all), budget_chars (adaptive default from indexed file count when omitted; snippet source text only). Returns {from, to, via?, path, snippets, truncated, truncation?, snippets_skipped_reason?}. `truncated` is true when snippet budget hit (`truncation.snippets`); dependency hops omit auto-snippets (`snippets_skipped_reason`). Fall back to `query_recipe` call-path when unsure.",
       inputSchema: traceArgsSchema,
     },
     (args) => wrapToolResult(handleTrace(args, opts.root)),
@@ -354,7 +354,7 @@ function registerExploreTool(server: McpServer, opts: ServerOpts): void {
     "explore",
     {
       description:
-        "Multi-symbol neighborhood survey with budget-capped snippets. Composes `symbol-neighborhood` (once per deduped name) + disk reads. Args: names (non-empty array), depth?, kind?, budget_chars (default 15000, snippet source only). Returns {names, rows, snippets, truncated, truncation?} — `truncation.rows` when row cap (500) hit, `truncation.snippets` when budget hit. Fall back to `query_recipe` symbol-neighborhood.",
+        "Multi-symbol neighborhood survey with budget-capped snippets. Composes `symbol-neighborhood` (once per deduped name) + disk reads. Args: names (non-empty array), depth?, kind?, budget_chars (adaptive default when omitted; snippet source only). Returns {names, rows, snippets, truncated, truncation?} — `truncation.rows` when adaptive row cap hit, `truncation.snippets` when budget hit. Fall back to `query_recipe` symbol-neighborhood.",
       inputSchema: exploreArgsSchema,
     },
     (args) => wrapToolResult(handleExplore(args, opts.root)),
@@ -366,7 +366,7 @@ function registerNodeTool(server: McpServer, opts: ServerOpts): void {
     "node",
     {
       description:
-        "One-hop symbol survey: `show` center + scoped depth-1 `symbol-neighborhood` + optional inline snippets. When center is unique (`in` or single match), neighborhood filters to that instance's connected files. Args: name, kind?, in?, include_snippets (default false), budget_chars? (default 15000 when snippets enabled; snippet source only). Returns {center, neighborhood, snippets, truncated, truncation?}. `truncated` only when `include_snippets: true` and snippet budget hit.",
+        "One-hop symbol survey: `show` center + scoped depth-1 `symbol-neighborhood` + optional inline snippets. When center is unique (`in` or single match), neighborhood filters to that instance's connected files. Args: name, kind?, in?, include_snippets (default false), budget_chars? (adaptive default when snippets enabled and omitted; snippet source only). Returns {center, neighborhood, snippets, truncated, truncation?}. `truncated` only when `include_snippets: true` and snippet budget hit.",
       inputSchema: nodeArgsSchema,
     },
     (args) => wrapToolResult(handleNode(args, opts.root)),

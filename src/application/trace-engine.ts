@@ -7,7 +7,8 @@ import type { CodemapDatabase } from "../db";
 import { closeDb, openDb } from "../db";
 import {
   applySourceCharBudget,
-  DEFAULT_OUTPUT_CHAR_BUDGET,
+  resolveEffectiveExploreRowLimit,
+  resolveEffectiveSnippetBudget,
 } from "./output-budget";
 import { executeQuery } from "./query-engine";
 import {
@@ -24,9 +25,6 @@ import {
 import type { ShowResult, SnippetMatch, SymbolMatch } from "./show-engine";
 
 export type TraceFailureKind = "param" | "query" | "internal";
-
-/** Default row cap for explore before `truncation.rows` (structural payload guard). */
-export const DEFAULT_EXPLORE_ROW_LIMIT = 500;
 
 export interface CallPathHop {
   file_path: string;
@@ -340,9 +338,9 @@ export function composeTraceResult(opts: {
   path: CallPathHop[];
   budgetChars?: number | undefined;
 }): TraceComposeResult {
-  const budget = opts.budgetChars ?? DEFAULT_OUTPUT_CHAR_BUDGET;
   const db = openDb();
   try {
+    const budget = resolveEffectiveSnippetBudget(db, opts.budgetChars);
     const seen = new Set<string>();
     const matches: SymbolMatch[] = [];
     for (const hop of opts.path) {
@@ -422,12 +420,13 @@ export function composeExploreResult(opts: {
     }
   }
 
-  const rowLimit = opts.rowLimit ?? DEFAULT_EXPLORE_ROW_LIMIT;
-  const rowCapped = applyRowCap(merged, rowLimit);
-
-  const budget = opts.budgetChars ?? DEFAULT_OUTPUT_CHAR_BUDGET;
+  const rowLimit = opts.rowLimit;
   const db = openDb();
   try {
+    const effectiveRowLimit = resolveEffectiveExploreRowLimit(db, rowLimit);
+    const rowCapped = applyRowCap(merged, effectiveRowLimit);
+
+    const budget = resolveEffectiveSnippetBudget(db, opts.budgetChars);
     const allSnippets = snippetsForNeighborhoodRows({
       db,
       rows: rowCapped.rows,
@@ -495,7 +494,7 @@ export function composeNodeResult(opts: {
     let snippets: SnippetMatch[] = [];
     let truncated = false;
     if (opts.includeSnippets === true) {
-      const budget = opts.budgetChars ?? DEFAULT_OUTPUT_CHAR_BUDGET;
+      const budget = resolveEffectiveSnippetBudget(db, opts.budgetChars);
       const centerSnippets = snippetsForSymbolMatches({
         db,
         matches,
