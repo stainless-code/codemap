@@ -140,7 +140,7 @@ With **`--mcp`** and no `--target` filter, all **project-local** rows above are 
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. **`command` / spawn args are resolved from the project** (package-manager `execute-local` when `@stainless-code/codemap` is listed in `package.json`, otherwise PM dlx of `@stainless-code/codemap@latest`; e.g. `npx codemap`, `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`; Bun uses **`bunx`**, not `bun x`). Init logs the chosen invocation (`MCP CLI: …`).
 
-**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` or `--git-hooks` still applies MCP/hook changes without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (which replaces the whole file and drops foreign entries — a warning is printed).
+**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` or `--git-hooks` still applies MCP/hook changes without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (full file replace; foreign MCP entries dropped — warning printed). Invalid `mcpServers` / `servers` **shape** with `--force` replaces only that map and preserves other top-level keys.
 
 ## Section assembler and `*.gen.md`
 

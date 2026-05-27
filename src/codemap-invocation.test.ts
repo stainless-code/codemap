@@ -138,6 +138,50 @@ describe("resolveCodemapCliInvocation", () => {
     expect(resolved.command).toBe("npx");
     expect(resolved.args).toEqual(["@stainless-code/codemap@latest"]);
   });
+
+  it("uses yarn berry exec for execute-local", async () => {
+    const dir = makeFixture("yarn-berry-local", {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@berry@4.0.0",
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "yarn.lock": "",
+    });
+    const resolved = await resolveCodemapCliInvocation({
+      projectRoot: dir,
+      packageManager: "yarn@berry",
+    });
+    expect(resolved.installMethod).toBe("project-installed");
+    expect(resolved.command).toBe("yarn");
+    expect(resolved.args[0]).toBe("exec");
+    expect(resolved.args).toContain("codemap");
+  });
+
+  it("rejects VERSION with shell metacharacters", async () => {
+    const dir = makeFixture("version-bad-char", {
+      "package.json": JSON.stringify({ name: "x" }),
+    });
+    await expect(
+      resolveCodemapCliInvocation({
+        projectRoot: dir,
+        packageManager: "npm",
+        version: "1.0.0;",
+      }),
+    ).rejects.toThrow(/invalid characters/);
+  });
+
+  it("rejects VERSION with embedded newline", async () => {
+    const dir = makeFixture("version-newline", {
+      "package.json": JSON.stringify({ name: "x" }),
+    });
+    await expect(
+      resolveCodemapCliInvocation({
+        projectRoot: dir,
+        packageManager: "npm",
+        version: "1.0.0\nlatest",
+      }),
+    ).rejects.toThrow(/line breaks/);
+  });
 });
 
 describe("buildCodemapMcpSpawn", () => {

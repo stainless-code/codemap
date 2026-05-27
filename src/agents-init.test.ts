@@ -446,14 +446,14 @@ describe("runAgentsInit", () => {
     try {
       mkdirSync(join(dir, ".cursor", "rules"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "rules", "x.mdc"), "", "utf-8");
-      expect(() =>
+      await expect(
         runAgentsInit({
           projectRoot: dir,
           force: false,
           targets: ["cursor"],
           linkMode: "copy",
         }),
-      ).toThrow(/\.cursor\/rules already exists/);
+      ).rejects.toThrow(/\.cursor\/rules already exists/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

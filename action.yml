@@ -140,16 +140,22 @@ runs:
       env:
         PACKAGE_MANAGER: ${{ inputs.package-manager }}
         VERSION: ${{ inputs.version }}
-        WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
+        ACTION_STAGE="$RUNNER_TEMP/codemap-action"
+        WORK_DIR="${{ inputs.working-directory }}"
+        if [ -z "$WORK_DIR" ] || [ "$WORK_DIR" = "." ]; then
+          RESOLVED_WORKDIR="$GITHUB_WORKSPACE"
+        else
+          RESOLVED_WORKDIR="$GITHUB_WORKSPACE/$WORK_DIR"
+        fi
         # Action runs without its own node_modules; install the detector lazily.
         # Pinned to a known version so consumers get reproducible builds.
-        npm install --no-save --prefix "$RUNNER_TEMP/codemap-action" package-manager-detector@1.6.0 >/dev/null
+        npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0 >/dev/null
         cp "${{ github.action_path }}/scripts/detect-pm.mjs" \
           "${{ github.action_path }}/scripts/codemap-invocation.mjs" \
-          "$RUNNER_TEMP/codemap-action/"
-        cd "$RUNNER_TEMP/codemap-action"
-        node detect-pm.mjs
+          "$ACTION_STAGE/"
+        cd "$ACTION_STAGE"
+        WORKING_DIRECTORY="$RESOLVED_WORKDIR" node detect-pm.mjs
 
     - name: Validate inputs (mode + flag interactions)
       if: steps.gate.outputs.skip != 'true'

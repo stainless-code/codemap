@@ -19,7 +19,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 const SCRIPT = join(import.meta.dirname, "detect-pm.mjs");
 const REPO_NODE_MODULES = join(import.meta.dirname, "..", "node_modules");
@@ -39,7 +39,9 @@ function makeFixture(name, files) {
   const dir = join(workRoot, name);
   mkdirSync(dir, { recursive: true });
   for (const [path, contents] of Object.entries(files)) {
-    writeFileSync(join(dir, path), contents);
+    const filePath = join(dir, path);
+    mkdirSync(dirname(filePath), { recursive: true });
+    writeFileSync(filePath, contents);
   }
   return dir;
 }
@@ -250,7 +252,9 @@ describe("scripts/detect-pm.mjs", () => {
     );
     symlinkSync(REPO_NODE_MODULES, join(stage, "node_modules"), "dir");
     const dir = makeFixture("action-stage-project", {
-      "package.json": "{}",
+      "package.json": JSON.stringify({
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
       "package-lock.json": "{}",
     });
     const result = spawnSync("node", ["detect-pm.mjs"], {
@@ -268,5 +272,22 @@ describe("scripts/detect-pm.mjs", () => {
       );
     }
     expect(result.stdout).toContain("agent=npm");
+    expect(result.stdout).toContain("install_method=project-installed");
+  });
+
+  it("resolve walk-up from monorepo child via absolute WORKING_DIRECTORY", () => {
+    const root = makeFixture("monorepo-detect-pm", {
+      "package.json": JSON.stringify({
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "package-lock.json": "{}",
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
+    });
+    const out = runDetect({
+      WORKING_DIRECTORY: join(root, "apps", "web"),
+      PACKAGE_MANAGER: "npm",
+    });
+    expect(out.install_method).toBe("project-installed");
+    expect(out.exec).toContain("codemap");
   });
 });

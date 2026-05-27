@@ -450,7 +450,6 @@ describe("applyAgentsInitMcp", () => {
       seedInstalledCodemapProject(dir);
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
-      seedInstalledCodemapProject(dir);
       await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
       ).rejects.toThrow(/could not parse/);
@@ -470,7 +469,6 @@ describe("applyAgentsInitMcp", () => {
         `${JSON.stringify({ mcpServers: "bad" }, null, 2)}\n`,
         "utf-8",
       );
-      seedInstalledCodemapProject(dir);
       await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
       ).rejects.toThrow(/mcpServers must be a JSON object/);
@@ -511,6 +509,46 @@ describe("applyAgentsInitMcp", () => {
       expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
       expect(
         stderr.some((line) => line.includes("invalid mcpServers shape")),
+      ).toBe(true);
+    } finally {
+      console.error = prevError;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("force-replaces invalid VS Code servers shape and preserves other keys", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vscode-"));
+    const stderr: string[] = [];
+    const prevError = console.error;
+    console.error = (...args: unknown[]) => {
+      stderr.push(
+        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
+      );
+      prevError(...args);
+    };
+    try {
+      mkdirSync(join(dir, ".vscode"), { recursive: true });
+      writeFileSync(
+        join(dir, ".vscode", "mcp.json"),
+        `${JSON.stringify({ servers: "bad", editor: "vscode" }, null, 2)}\n`,
+        "utf-8",
+      );
+      await applyAgentsInitMcp({
+        projectRoot: dir,
+        targets: ["vscode"],
+        force: true,
+      });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as {
+        editor: string;
+        servers: Record<string, { type: string; command: string }>;
+      };
+      expect(parsed.editor).toBe("vscode");
+      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
+      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
+      expect(
+        stderr.some((line) => line.includes("invalid servers shape")),
       ).toBe(true);
     } finally {
       console.error = prevError;
@@ -683,7 +721,6 @@ describe("applyAgentsInitMcp", () => {
         `${JSON.stringify({ permissions: { allow: "bad" } }, null, 2)}\n`,
         "utf-8",
       );
-      seedInstalledCodemapProject(dir);
       await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] }),
       ).rejects.toThrow(/permissions\.allow must be a string\[\]/);

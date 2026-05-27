@@ -71,7 +71,7 @@ export function codemapInProjectDependencies(workingDir: string): boolean {
   }
 }
 
-export function validateCodemapVersionInput(version: string): void {
+function validateCodemapVersionInput(version: string): void {
   if (version === "") return;
   if (version.includes("\n") || version.includes("\r")) {
     throw new Error("VERSION must not contain line breaks.");
@@ -137,7 +137,7 @@ export async function resolveCodemapCliInvocation(opts: {
   };
 }
 
-export function codemapMcpTailArgs(
+function codemapMcpTailArgs(
   includeWorkspaceRoot: boolean | undefined,
 ): string[] {
   const args = ["mcp", "--watch"];
