@@ -86,7 +86,7 @@ inputs:
 
 outputs:
   agent:
-    description: "Resolved package manager (npm / pnpm / yarn / bun)."
+    description: "Resolved package manager (npm / pnpm / yarn / yarn@berry / bun)."
     value: ${{ steps.detect-pm.outputs.agent }}
   exec:
     description: "Shell-ready command used to invoke codemap."
