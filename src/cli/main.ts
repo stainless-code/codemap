@@ -59,61 +59,36 @@ export async function main(): Promise<void> {
 
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
-      console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--mcp] [--git-hooks] [--no-git-hooks]
+      console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--mcp] [--targets <ids>] [--link-mode symlink|copy] [--git-hooks] [--no-git-hooks]
 
 Copies bundled agent templates into .agents/ under the project root.
   --force        Refresh only files that ship in templates/agents (merge into rules/ & skills/)
   --interactive  Pick IDEs (Cursor, Copilot, Windsurf, …) and symlink vs copy
-  --mcp          Write PM-aware MCP config for supported IDEs (see docs/agents.md)
+  --mcp          Write PM-aware MCP config (all defaults, or subset when --targets is set)
+  --targets      Comma-separated integrations (cursor, copilot, claude-md, …); wires IDE mirrors
+  --link-mode    symlink | copy — when --targets includes rule mirrors (default: symlink)
   --git-hooks    Install background incremental index hooks (post-commit, post-merge, post-checkout)
   --no-git-hooks Remove codemap blocks from git hooks
 `);
       return;
     }
     const initRest = rest.slice(2);
-    const knownInit = new Set([
-      "--force",
-      "--interactive",
-      "-i",
-      "--mcp",
-      "--git-hooks",
-      "--no-git-hooks",
-      "--help",
-      "-h",
-    ]);
-    for (const a of initRest) {
-      if (knownInit.has(a)) {
-        continue;
-      }
-      if (a.startsWith("-")) {
-        console.error(`codemap: unknown option "${a}"`);
-      } else {
-        console.error(`codemap: unexpected argument "${a}"`);
-      }
+    const { parseAgentsInitRest, runAgentsInitCmd } =
+      await import("./cmd-agents.js");
+    const parsed = parseAgentsInitRest(initRest);
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
       console.error("Run codemap agents init --help for usage.");
-      process.exit(1);
-    }
-    const { runAgentsInitCmd } = await import("./cmd-agents.js");
-    const gitHooks = rest.includes("--no-git-hooks")
-      ? "uninstall"
-      : rest.includes("--git-hooks")
-        ? "install"
-        : undefined;
-    if (
-      gitHooks !== undefined &&
-      (rest.includes("--interactive") || rest.includes("-i"))
-    ) {
-      console.error(
-        "codemap: --git-hooks / --no-git-hooks cannot be combined with --interactive.",
-      );
       process.exit(1);
     }
     const ok = await runAgentsInitCmd({
       projectRoot: root,
-      force: rest.includes("--force"),
-      interactive: rest.includes("--interactive") || rest.includes("-i"),
-      gitHooks,
-      mcp: rest.includes("--mcp") ? true : undefined,
+      force: parsed.force,
+      interactive: parsed.interactive,
+      gitHooks: parsed.gitHooks,
+      mcp: parsed.mcp,
+      targets: parsed.targets,
+      linkMode: parsed.linkMode,
     });
     if (!ok) process.exit(1);
     return;

@@ -215,6 +215,76 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit --git-hooks --targets cursor on existing .agents/ composes hooks and wiring", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
+      mkdirSync(join(dir, ".agents", "skills", "codemap"), {
+        recursive: true,
+      });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(
+        join(dir, ".agents", "rules", "codemap.md"),
+        `${CODMAP_INIT_MANAGED}\n`,
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".agents", "skills", "codemap", "SKILL.md"),
+        `${CODMAP_INIT_MANAGED}\n`,
+        "utf-8",
+      );
+      expect(
+        await runAgentsInit({
+          projectRoot: dir,
+          gitHooks: "install",
+          targets: ["cursor"],
+        }),
+      ).toBe(true);
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "rules", "codemap.mdc"))).toBe(
+        true,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit --mcp --targets cursor on existing .agents/ composes MCP and wiring", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
+      mkdirSync(join(dir, ".agents", "skills", "codemap"), {
+        recursive: true,
+      });
+      writeFileSync(
+        join(dir, ".agents", "rules", "codemap.md"),
+        `${CODMAP_INIT_MANAGED}\n`,
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".agents", "skills", "codemap", "SKILL.md"),
+        `${CODMAP_INIT_MANAGED}\n`,
+        "utf-8",
+      );
+      expect(
+        await runAgentsInit({
+          projectRoot: dir,
+          mcp: true,
+          targets: ["cursor"],
+        }),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "rules", "codemap.mdc"))).toBe(
+        true,
+      );
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runAgentsInit --no-git-hooks --mcp uninstalls hooks and writes MCP", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {

@@ -28,12 +28,17 @@ codemap agents init
 codemap agents init --force
 codemap agents init --interactive   # or -i; requires a TTY
 codemap agents init --mcp             # project MCP config (default project-local targets; Windsurf opt-in via -i)
+codemap agents init --targets cursor,copilot --mcp   # non-interactive: subset of integrations + MCP
+codemap agents init --targets copilot                    # Copilot instructions only (no MCP)
+codemap agents init --targets windsurf --link-mode copy  # rule mirrors as copies (sandboxes / Windows)
 codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
 
 - **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. IDE mirrors (`.cursor/rules`, …) sync **only bundled template paths** (today `rules/codemap.md` and `skills/codemap/SKILL.md`) — not your whole **`.agents/`** tree. **`--force`** overwrites an existing IDE mirror **only** when it has **`<!-- codemap-init:managed -->`** or matches the **legacy mirror heuristic** (see [§ IDE mirror provenance](#ide-mirror-provenance-codemap-initmanaged)). Pointer files (`CLAUDE.md`, …): **`--force`** refreshes the `codemap-pointer` section only; your prose outside the markers is kept. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
-- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **bundled** **`.agents/rules`** paths (and Cursor also bundled **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
+- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **bundled** **`.agents/rules`** paths (and Cursor also bundled **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error. Mutually exclusive with **`--targets`**.
+- **`--targets`** — comma-separated integration ids (`cursor`, `copilot`, `claude-md`, `windsurf`, `continue`, `cline`, `amazon-q`, `agents-md`, `gemini-md`) or repeated `--targets` flags. Wires IDE mirrors without a TTY. With **`--mcp`**, only MCP configs for the selected integrations are written (e.g. `cursor` alone → `.cursor/mcp.json` only, not root `.mcp.json`). Default **`--link-mode`** is **symlink** when omitted. Unknown ids exit 1 with the valid list.
+- **`--link-mode`** — `symlink` or `copy`; only valid when **`--targets`** includes a rule-mirror integration (`cursor`, `windsurf`, `continue`, `cline`, `amazon-q`).
 
 ## Git and `.gitignore`
 
@@ -149,7 +154,7 @@ Example: `CODEMAP_MCP_TOOLS=query,context,show codemap mcp --no-watch`
 | Cline              | `.cline/mcp.json` ([Cline CLI reference](https://docs.cline.bot/cli/cli-reference); global IDE settings may also use `~/.cline/data/settings/cline_mcp_settings.json`)                                                                               |
 | Windsurf (Cascade) | `~/.codeium/windsurf/mcp_config.json` ([Windsurf docs](https://docs.windsurf.com/windsurf/cascade/mcp) — user-global only; written when Windsurf integration is selected)                                                                            |
 
-With **`--mcp`** and no `--target` filter, all **project-local** rows above are written except **Windsurf**, which has no documented workspace MCP path.
+With **`--mcp`** and no **`--targets`** filter, all **project-local** rows above are written except **Windsurf**, which has no documented workspace MCP path.
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. **`command` / spawn args are resolved from the project** (when `@stainless-code/codemap` is listed in `package.json`, the local PM runner is used — e.g. `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`; otherwise PM dlx of `@stainless-code/codemap@latest` — e.g. `npx @stainless-code/codemap@latest`, `pnpm dlx @stainless-code/codemap@latest`, `yarn dlx @stainless-code/codemap@latest`; yarn classic may fall back to `npx` per `package-manager-detector`; Bun uses **`bunx`**, not `bun x`). Init logs the chosen invocation (`MCP CLI: …`).
 

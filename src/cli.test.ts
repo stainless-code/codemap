@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -245,6 +246,335 @@ describe("CLI unknown / invalid args", () => {
       expect(
         isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
       ).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets cursor --mcp writes Cursor MCP and rules only", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-cursor-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--targets",
+        "cursor",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "rules"))).toBe(true);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+      expect(existsSync(join(dir, ".continue"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets cursor,copilot --mcp writes Cursor and VS Code MCP only", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-targets-cc-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--targets",
+        "cursor,copilot",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".continue"))).toBe(false);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets cursor --interactive exits 1", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-targets-i-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--targets",
+        "cursor",
+        "--interactive",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("cannot be combined with --interactive");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets nope exits 1 with valid ids", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-targets-bad-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--targets",
+        "nope",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("unknown integration");
+      expect(err).toContain("cursor");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets windsurf --link-mode copy uses copies not symlinks", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-targets-ws-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--targets",
+        "windsurf",
+        "--link-mode",
+        "copy",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      const rulePath = join(dir, ".windsurf", "rules", "codemap.md");
+      expect(existsSync(rulePath)).toBe(true);
+      expect(lstatSync(rulePath).isSymbolicLink()).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets copilot --link-mode copy exits 1", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-lm-copilot-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--targets",
+        "copilot",
+        "--link-mode",
+        "copy",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("--link-mode is only valid");
+      expect(err).toContain("copilot");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --link-mode symlink without --targets exits 1", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-lm-alone-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--link-mode",
+        "symlink",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("--link-mode is only valid");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets without value exits 1", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-empty-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--targets",
+      ]);
+      expect(exitCode).toBe(1);
+      expect(err).toContain("--targets requires");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets cursor without --mcp wires rules only", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-no-mcp-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--targets",
+        "cursor",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".cursor", "rules"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets claude-md --mcp writes root .mcp.json only", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-claude-"),
+    );
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--targets",
+        "claude-md",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --force --mcp still writes full default MCP set", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-defaults-"));
+    try {
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--force",
+        "--mcp",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+      expect(
+        existsSync(join(dir, ".continue", "mcpServers", "codemap-mcp.json")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cline", "mcp.json"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --targets copilot on existing .agents/ writes copilot instructions only", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-targets-copilot-"),
+    );
+    try {
+      mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
+      mkdirSync(join(dir, ".agents", "skills", "codemap"), {
+        recursive: true,
+      });
+      writeFileSync(join(dir, ".agents", "USER.md"), "keep", "utf-8");
+      writeFileSync(
+        join(dir, ".agents", "rules", "codemap.md"),
+        "<!-- codemap-init:managed -->\n",
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".agents", "skills", "codemap", "SKILL.md"),
+        "<!-- codemap-init:managed -->\n",
+        "utf-8",
+      );
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--targets",
+        "copilot",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(readFileSync(join(dir, ".agents", "USER.md"), "utf-8")).toBe(
+        "keep",
+      );
+      expect(
+        readFileSync(join(dir, ".github", "copilot-instructions.md"), "utf-8"),
+      ).toContain("Codemap");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("agents init --git-hooks --targets cursor on existing .agents/ composes", async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), "codemap-cli-agents-hooks-targets-"),
+    );
+    try {
+      mkdirSync(join(dir, ".agents", "rules"), { recursive: true });
+      mkdirSync(join(dir, ".agents", "skills", "codemap"), {
+        recursive: true,
+      });
+      mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+      writeFileSync(
+        join(dir, ".agents", "rules", "codemap.md"),
+        "<!-- codemap-init:managed -->\n",
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".agents", "skills", "codemap", "SKILL.md"),
+        "<!-- codemap-init:managed -->\n",
+        "utf-8",
+      );
+      const { exitCode, err } = await runCli([
+        "--root",
+        dir,
+        "agents",
+        "init",
+        "--git-hooks",
+        "--targets",
+        "cursor",
+      ]);
+      expect(exitCode).toBe(0);
+      expect(err).toBe("");
+      expect(
+        isCodemapHookInstalled(join(dir, ".git", "hooks", "post-commit")),
+      ).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "rules", "codemap.mdc"))).toBe(
+        true,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
