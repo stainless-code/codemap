@@ -428,6 +428,30 @@ describe("adaptive output budgets", () => {
     expect(adaptive.result.truncated).toBe(true);
     expect(explicit.result.truncated).toBe(false);
   });
+
+  it("composeExploreResult uses adaptive snippet budget when budgetChars omitted", () => {
+    seedLongSnippetCallGraph();
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 5999);
+    } finally {
+      closeDb(db);
+    }
+    const adaptive = composeExploreResult({
+      root: benchDir,
+      names: ["foo", "bar"],
+    });
+    const explicit = composeExploreResult({
+      root: benchDir,
+      names: ["foo", "bar"],
+      budgetChars: 15_000,
+    });
+    expect(adaptive.ok).toBe(true);
+    expect(explicit.ok).toBe(true);
+    if (!adaptive.ok || !explicit.ok) return;
+    expect(adaptive.result.truncation?.snippets).toBe(true);
+    expect(explicit.result.truncation?.snippets).toBeUndefined();
+  });
 });
 
 function seedLongSnippetCallGraph(): void {
