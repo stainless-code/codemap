@@ -32,8 +32,8 @@ codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
 
-- **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
-- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **`.agents/rules`** (and Cursor also **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
+- **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. IDE mirrors (`.cursor/rules`, …) sync **only bundled template paths** (today `rules/codemap.md` and `skills/codemap/SKILL.md`) — not your whole **`.agents/`** tree. **`--force`** overwrites an existing mirror file **only** when it contains **`<!-- codemap-init:managed -->`** (written by init from bundled templates). Pointer files (`CLAUDE.md`, …): **`--force`** refreshes the `codemap-pointer` section only; your prose outside the markers is kept. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
+- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **bundled** **`.agents/rules`** paths (and Cursor also bundled **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
 
 ## Git and `.gitignore`
 
@@ -73,7 +73,7 @@ Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md
 | File exists, section present                                                 | **Replace only** that section — idempotent re-runs, no duplicate blocks; template updates fix **stale** text. |
 | File exists, no section, but content looks like an **old** Codemap-only file | **Replace whole file** with the managed section (one-time migration).                                         |
 | File exists with other content (e.g. your team intro)                        | **Append** the managed section **once**.                                                                      |
-| **`--force`**                                                                | Replace the **entire file** with the latest managed section.                                                  |
+| **`--force`**                                                                | Refresh the **managed pointer section** only; user content outside markers is preserved.                      |
 
 Append alone would duplicate on every run — markers + replace are what prevent duplicates and staleness.
 
@@ -140,7 +140,7 @@ With **`--mcp`** and no `--target` filter, all **project-local** rows above are 
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. **`command` / spawn args are resolved from the project** (when `@stainless-code/codemap` is listed in `package.json`, the local PM runner is used — e.g. `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`; otherwise PM dlx of `@stainless-code/codemap@latest` — e.g. `npx @stainless-code/codemap@latest`, `pnpm dlx @stainless-code/codemap@latest`, `yarn dlx @stainless-code/codemap@latest`; yarn classic may fall back to `npx` per `package-manager-detector`; Bun uses **`bunx`**, not `bun x`). Init logs the chosen invocation (`MCP CLI: …`).
 
-**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` or `--git-hooks` still applies MCP/hook changes without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (full file replace; foreign MCP entries dropped — warning printed). Invalid `mcpServers` / `servers` **shape** with `--force` replaces only that map and preserves other top-level keys.
+**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp`, **`--interactive`** target wiring (or any explicit integration targets), or `--git-hooks` still apply without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON and invalid `mcpServers` / `servers` **shape** are **rejected** (fix the file manually — init never wipes or resets those maps, even with `--force`). Foreign MCP servers in a valid map are always preserved on merge.
 
 ## Section assembler and `*.gen.md`
 

@@ -80,19 +80,12 @@ function entriesEqual(a: McpServerEntry, b: McpServerEntry): boolean {
 /** Validate top-level file + optional `mcpServers` map before merge. */
 export function normalizeExistingMcpServersFile(
   parsed: unknown,
-  opts: { label: string; force: boolean },
-): {
-  existing: McpServersFile;
-  replacedInvalid: boolean;
-  invalidReason?: "shape" | undefined;
-} {
+  opts: { label: string },
+): { existing: McpServersFile } {
   if (!isPlainObject(parsed)) {
-    if (!opts.force) {
-      throw new Error(
-        `Codemap: ${opts.label} is not a JSON object — use --force to replace.`,
-      );
-    }
-    return { existing: {}, replacedInvalid: true };
+    throw new Error(
+      `Codemap: ${opts.label} is not a JSON object — fix JSON manually, then re-run init --mcp.`,
+    );
   }
   const file = parsed as McpServersFile & Record<string, unknown>;
   const ms = file.mcpServers;
@@ -100,37 +93,22 @@ export function normalizeExistingMcpServersFile(
     ms !== undefined &&
     (ms === null || typeof ms !== "object" || Array.isArray(ms))
   ) {
-    if (!opts.force) {
-      throw new Error(
-        `Codemap: ${opts.label} mcpServers must be a JSON object — use --force to replace.`,
-      );
-    }
-    const { mcpServers: _drop, ...rest } = file;
-    return {
-      existing: rest as McpServersFile,
-      replacedInvalid: true,
-      invalidReason: "shape",
-    };
+    throw new Error(
+      `Codemap: ${opts.label} mcpServers must be a JSON object — fix manually, then re-run init --mcp.`,
+    );
   }
-  return { existing: file, replacedInvalid: false };
+  return { existing: file };
 }
 
 /** Validate top-level file + optional VS Code `servers` map before merge. */
 export function normalizeExistingVsCodeMcpFile(
   parsed: unknown,
-  opts: { label: string; force: boolean },
-): {
-  existing: VsCodeMcpFile;
-  replacedInvalid: boolean;
-  invalidReason?: "shape" | undefined;
-} {
+  opts: { label: string },
+): { existing: VsCodeMcpFile } {
   if (!isPlainObject(parsed)) {
-    if (!opts.force) {
-      throw new Error(
-        `Codemap: ${opts.label} is not a JSON object — use --force to replace.`,
-      );
-    }
-    return { existing: {}, replacedInvalid: true };
+    throw new Error(
+      `Codemap: ${opts.label} is not a JSON object — fix JSON manually, then re-run init --mcp.`,
+    );
   }
   const file = parsed as VsCodeMcpFile & Record<string, unknown>;
   const servers = file.servers;
@@ -138,19 +116,11 @@ export function normalizeExistingVsCodeMcpFile(
     servers !== undefined &&
     (servers === null || typeof servers !== "object" || Array.isArray(servers))
   ) {
-    if (!opts.force) {
-      throw new Error(
-        `Codemap: ${opts.label} servers must be a JSON object — use --force to replace.`,
-      );
-    }
-    const { servers: _drop, ...rest } = file;
-    return {
-      existing: rest as VsCodeMcpFile,
-      replacedInvalid: true,
-      invalidReason: "shape",
-    };
+    throw new Error(
+      `Codemap: ${opts.label} servers must be a JSON object — fix manually, then re-run init --mcp.`,
+    );
   }
-  return { existing: file, replacedInvalid: false };
+  return { existing: file };
 }
 
 export function mergeCodemapMcpServer(
@@ -199,16 +169,6 @@ function writeJsonIfChanged(path: string, value: unknown, label: string): void {
   console.log(`  Wrote ${label}`);
 }
 
-function formatMcpReplaceWarning(
-  label: string,
-  reason: "unparseable" | "invalid-shape",
-  key: "mcpServers" | "servers" = "mcpServers",
-): string {
-  const detail =
-    reason === "invalid-shape" ? `invalid ${key} shape` : "unparseable JSON";
-  return `  Warning: replacing ${detail} in ${label} (--force); foreign MCP entries in that file are dropped.`;
-}
-
 /** Post-write check — mirrors TanStack Intent's verify-before-success pattern. */
 export function verifyCodemapMcpServersFile(opts: {
   path: string;
@@ -229,7 +189,6 @@ export function verifyCodemapMcpServersFile(opts: {
   }
   const normalized = normalizeExistingMcpServersFile(parsed, {
     label: opts.label,
-    force: true,
   });
   const written = normalized.existing.mcpServers?.[CODEMAP_MCP_SERVER_KEY];
   if (written === undefined) {
@@ -263,7 +222,6 @@ export function verifyCodemapVsCodeMcpFile(opts: {
   }
   const normalized = normalizeExistingVsCodeMcpFile(parsed, {
     label: opts.label,
-    force: true,
   });
   const written = normalized.existing.servers?.[CODEMAP_MCP_SERVER_KEY];
   const expected = { type: "stdio" as const, ...opts.expectedEntry };
@@ -329,34 +287,20 @@ export function upsertMcpServersFile(opts: {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: McpServersFile = {};
   if (existsSync(opts.path)) {
-    let replaceReason: "unparseable" | "invalid-shape" | undefined;
     try {
       const parsed = readJsonFile(opts.path);
       const normalized = normalizeExistingMcpServersFile(parsed, {
         label: opts.label,
-        force: opts.force,
       });
       existing = normalized.existing;
-      if (normalized.replacedInvalid) {
-        replaceReason =
-          normalized.invalidReason === "shape"
-            ? "invalid-shape"
-            : "unparseable";
-      }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("Codemap:")) {
         throw err;
       }
-      if (!opts.force) {
-        throw new Error(
-          `Codemap: could not parse ${opts.label} — fix JSON or use --force to replace (${String(err)})`,
-          { cause: err },
-        );
-      }
-      replaceReason = "unparseable";
-    }
-    if (replaceReason !== undefined) {
-      console.error(formatMcpReplaceWarning(opts.label, replaceReason));
+      throw new Error(
+        `Codemap: could not parse ${opts.label} — fix JSON manually, then re-run init --mcp (${String(err)})`,
+        { cause: err },
+      );
     }
   }
   const merged = mergeCodemapMcpServer(existing, opts.entry);
@@ -378,35 +322,19 @@ export function upsertVsCodeMcpFile(opts: {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: VsCodeMcpFile = {};
   if (existsSync(opts.path)) {
-    let replaceReason: "unparseable" | "invalid-shape" | undefined;
     try {
       const parsed = readJsonFile(opts.path);
       const normalized = normalizeExistingVsCodeMcpFile(parsed, {
         label: opts.label,
-        force: opts.force,
       });
       existing = normalized.existing;
-      if (normalized.replacedInvalid) {
-        replaceReason =
-          normalized.invalidReason === "shape"
-            ? "invalid-shape"
-            : "unparseable";
-      }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("Codemap:")) {
         throw err;
       }
-      if (!opts.force) {
-        throw new Error(
-          `Codemap: could not parse ${opts.label} — fix JSON or use --force to replace (${String(err)})`,
-          { cause: err },
-        );
-      }
-      replaceReason = "unparseable";
-    }
-    if (replaceReason !== undefined) {
-      console.error(
-        formatMcpReplaceWarning(opts.label, replaceReason, "servers"),
+      throw new Error(
+        `Codemap: could not parse ${opts.label} — fix JSON manually, then re-run init --mcp (${String(err)})`,
+        { cause: err },
       );
     }
   }
@@ -450,7 +378,6 @@ export function upsertClaudeSettingsPermissions(opts: {
   mkdirSync(dirname(path), { recursive: true });
   let existing: ClaudeSettingsFile = {};
   if (existsSync(path)) {
-    let replacedUnparseable = false;
     try {
       const parsed = readJsonFile(path);
       if (
@@ -466,35 +393,33 @@ export function upsertClaudeSettingsPermissions(opts: {
         ) {
           if (!opts.force) {
             throw new Error(
-              "Codemap: .claude/settings.json permissions.allow must be a string[] — use --force to replace.",
+              "Codemap: .claude/settings.json permissions.allow must be a string[] — use --force to coerce invalid entries.",
             );
           }
-          replacedUnparseable = true;
+          existing = {
+            ...candidate,
+            permissions: {
+              ...candidate.permissions,
+              allow: Array.isArray(allow)
+                ? allow.filter((x): x is string => typeof x === "string")
+                : [],
+            },
+          };
         } else {
           existing = candidate;
         }
-      } else if (!opts.force) {
-        throw new Error(
-          "Codemap: .claude/settings.json is not a JSON object — use --force to replace.",
-        );
       } else {
-        replacedUnparseable = true;
+        throw new Error(
+          "Codemap: .claude/settings.json is not a JSON object — fix JSON manually, then re-run init --mcp.",
+        );
       }
     } catch (err) {
       if (err instanceof Error && err.message.startsWith("Codemap:")) {
         throw err;
       }
-      if (!opts.force) {
-        throw new Error(
-          `Codemap: could not parse .claude/settings.json — fix JSON or use --force (${String(err)})`,
-          { cause: err },
-        );
-      }
-      replacedUnparseable = true;
-    }
-    if (replacedUnparseable) {
-      console.error(
-        "  Warning: replacing unparseable JSON in .claude/settings.json (--force); prior keys in that file are dropped.",
+      throw new Error(
+        `Codemap: could not parse .claude/settings.json — fix JSON manually, then re-run init --mcp (${String(err)})`,
+        { cause: err },
       );
     }
   }

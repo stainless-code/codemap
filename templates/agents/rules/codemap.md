@@ -2,6 +2,8 @@
 alwaysApply: true
 ---
 
+<!-- codemap-init:managed -->
+
 # Codemap
 
 This project is indexed by **Codemap** — a local SQLite index of structure (symbols, imports, exports, components, dependencies, markers, scopes, references, bindings, call graphs, CSS variables, coverage).

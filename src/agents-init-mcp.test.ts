@@ -129,39 +129,22 @@ describe("mergeCodemapMcpServer", () => {
 });
 
 describe("normalizeExistingMcpServersFile", () => {
-  it("rejects non-object mcpServers without force", () => {
+  it("rejects non-object mcpServers", () => {
     expect(() =>
       normalizeExistingMcpServersFile(
         { mcpServers: "not-an-object" },
-        { label: ".cursor/mcp.json", force: false },
+        { label: ".cursor/mcp.json" },
       ),
     ).toThrow(/mcpServers must be a JSON object/);
   });
 
-  it("replaces non-object mcpServers with force", () => {
-    expect(
+  it("rejects non-object mcpServers even with force callers", () => {
+    expect(() =>
       normalizeExistingMcpServersFile(
         { mcpServers: ["a", "b"] },
-        { label: ".mcp.json", force: true },
+        { label: ".mcp.json" },
       ),
-    ).toEqual({
-      existing: {},
-      replacedInvalid: true,
-      invalidReason: "shape",
-    });
-  });
-
-  it("preserves non-mcpServers keys when force-replacing invalid mcpServers", () => {
-    expect(
-      normalizeExistingMcpServersFile(
-        { mcpServers: "bad", editor: "cursor" },
-        { label: ".cursor/mcp.json", force: true },
-      ),
-    ).toEqual({
-      existing: { editor: "cursor" },
-      replacedInvalid: true,
-      invalidReason: "shape",
-    });
+    ).toThrow(/mcpServers must be a JSON object/);
   });
 });
 
@@ -208,11 +191,11 @@ describe("mergeCodemapVsCodeServer", () => {
 });
 
 describe("normalizeExistingVsCodeMcpFile", () => {
-  it("rejects non-object servers without force", () => {
+  it("rejects non-object servers", () => {
     expect(() =>
       normalizeExistingVsCodeMcpFile(
         { servers: "bad" },
-        { label: ".vscode/mcp.json", force: false },
+        { label: ".vscode/mcp.json" },
       ),
     ).toThrow(/servers must be a JSON object/);
   });
@@ -544,16 +527,8 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("force-replaces invalid mcpServers shape and preserves other keys", async () => {
+  it("rejects invalid mcpServers shape even with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
-    const stderr: string[] = [];
-    const prevError = console.error;
-    console.error = (...args: unknown[]) => {
-      stderr.push(
-        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
-      );
-      prevError(...args);
-    };
     try {
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(
@@ -561,38 +536,25 @@ describe("applyAgentsInitMcp", () => {
         `${JSON.stringify({ mcpServers: "bad", editor: "cursor" }, null, 2)}\n`,
         "utf-8",
       );
-      await applyAgentsInitMcp({
-        projectRoot: dir,
-        targets: ["cursor"],
-        force: true,
-      });
+      await expect(
+        applyAgentsInitMcp({
+          projectRoot: dir,
+          targets: ["cursor"],
+          force: true,
+        }),
+      ).rejects.toThrow(/mcpServers must be a JSON object/);
       const parsed = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
-      ) as {
-        editor: string;
-        mcpServers: Record<string, { command: string }>;
-      };
+      ) as { editor: string; mcpServers: unknown };
       expect(parsed.editor).toBe("cursor");
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
-      expect(
-        stderr.some((line) => line.includes("invalid mcpServers shape")),
-      ).toBe(true);
+      expect(parsed.mcpServers).toBe("bad");
     } finally {
-      console.error = prevError;
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("force-replaces invalid VS Code servers shape and preserves other keys", async () => {
+  it("rejects invalid VS Code servers shape even with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vscode-"));
-    const stderr: string[] = [];
-    const prevError = console.error;
-    console.error = (...args: unknown[]) => {
-      stderr.push(
-        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
-      );
-      prevError(...args);
-    };
     try {
       mkdirSync(join(dir, ".vscode"), { recursive: true });
       writeFileSync(
@@ -600,107 +562,95 @@ describe("applyAgentsInitMcp", () => {
         `${JSON.stringify({ servers: "bad", editor: "vscode" }, null, 2)}\n`,
         "utf-8",
       );
-      await applyAgentsInitMcp({
-        projectRoot: dir,
-        targets: ["vscode"],
-        force: true,
-      });
+      await expect(
+        applyAgentsInitMcp({
+          projectRoot: dir,
+          targets: ["vscode"],
+          force: true,
+        }),
+      ).rejects.toThrow(/servers must be a JSON object/);
       const parsed = JSON.parse(
         readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
-      ) as {
-        editor: string;
-        servers: Record<string, { type: string; command: string }>;
-      };
+      ) as { editor: string; servers: unknown };
       expect(parsed.editor).toBe("vscode");
-      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
-      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
-      expect(
-        stderr.some((line) => line.includes("invalid servers shape")),
-      ).toBe(true);
+      expect(parsed.servers).toBe("bad");
     } finally {
-      console.error = prevError;
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("replaces invalid JSON with --force", async () => {
+  it("rejects unparseable MCP JSON even with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
-    const stderr: string[] = [];
-    const prevError = console.error;
-    console.error = (...args: unknown[]) => {
-      stderr.push(
-        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
-      );
-      prevError(...args);
-    };
     try {
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
-      await applyAgentsInitMcp({
-        projectRoot: dir,
-        targets: ["cursor"],
-        force: true,
-      });
-      const parsed = JSON.parse(
-        readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
-      ) as { mcpServers: Record<string, { command: string }> };
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
-      expect(stderr.some((line) => line.includes("unparseable JSON"))).toBe(
-        true,
+      await expect(
+        applyAgentsInitMcp({
+          projectRoot: dir,
+          targets: ["cursor"],
+          force: true,
+        }),
+      ).rejects.toThrow(/fix JSON manually/);
+      expect(readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8")).toBe(
+        "{ not json",
       );
     } finally {
-      console.error = prevError;
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("replaces invalid Claude .mcp.json with --force", async () => {
+  it("rejects unparseable Claude .mcp.json even with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
-    const stderr: string[] = [];
-    const prevError = console.error;
-    console.error = (...args: unknown[]) => {
-      stderr.push(
-        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
-      );
-      prevError(...args);
-    };
     try {
       writeFileSync(join(dir, ".mcp.json"), "{ not json", "utf-8");
-      await applyAgentsInitMcp({
-        projectRoot: dir,
-        targets: ["claude-code"],
-        force: true,
-      });
-      const parsed = JSON.parse(
-        readFileSync(join(dir, ".mcp.json"), "utf-8"),
-      ) as {
-        mcpServers: Record<string, { command: string }>;
-      };
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
-      expect(
-        stderr.some((line) => line.includes(".mcp.json (Claude Code)")),
-      ).toBe(true);
+      await expect(
+        applyAgentsInitMcp({
+          projectRoot: dir,
+          targets: ["claude-code"],
+          force: true,
+        }),
+      ).rejects.toThrow(/fix JSON manually/);
     } finally {
-      console.error = prevError;
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("replaces invalid .claude/settings.json with --force", async () => {
+  it("rejects unparseable .claude/settings.json even with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
-    const stderr: string[] = [];
-    const prevError = console.error;
-    console.error = (...args: unknown[]) => {
-      stderr.push(
-        args.map((a) => (typeof a === "string" ? a : String(a))).join(" "),
-      );
-      prevError(...args);
-    };
     try {
       mkdirSync(join(dir, ".claude"), { recursive: true });
       writeFileSync(
         join(dir, ".claude", "settings.json"),
         "{ not json",
+        "utf-8",
+      );
+      await expect(
+        applyAgentsInitMcp({
+          projectRoot: dir,
+          targets: ["claude-code"],
+          force: true,
+        }),
+      ).rejects.toThrow(/fix JSON manually/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("coerces malformed permissions.allow with --force without dropping other keys", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
+    try {
+      seedInstalledCodemapProject(dir);
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(dir, ".claude", "settings.json"),
+        `${JSON.stringify(
+          {
+            permissions: { allow: "bad", deny: ["WebFetch"] },
+            editor: "claude",
+          },
+          null,
+          2,
+        )}\n`,
         "utf-8",
       );
       await applyAgentsInitMcp({
@@ -710,15 +660,16 @@ describe("applyAgentsInitMcp", () => {
       });
       const settings = JSON.parse(
         readFileSync(join(dir, ".claude", "settings.json"), "utf-8"),
-      ) as { permissions: { allow: string[] } };
+      ) as {
+        editor: string;
+        permissions: { allow: string[]; deny: string[] };
+      };
+      expect(settings.editor).toBe("claude");
+      expect(settings.permissions.deny).toEqual(["WebFetch"]);
       expect(settings.permissions.allow).toContain(
         CODEMAP_MCP_PERMISSION_ALLOW,
       );
-      expect(
-        stderr.some((line) => line.includes(".claude/settings.json")),
-      ).toBe(true);
     } finally {
-      console.error = prevError;
       rmSync(dir, { recursive: true, force: true });
     }
   });
