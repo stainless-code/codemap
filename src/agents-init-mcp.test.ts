@@ -14,7 +14,6 @@ import {
   CODEMAP_MCP_PERMISSION_ALLOW,
   CODEMAP_MCP_SERVER_KEY,
   applyAgentsInitMcp,
-  buildCodemapMcpServerEntry,
   buildMcpServerEntryForDef,
   mergeClaudeCodemapPermissions,
   mergeCodemapMcpServer,
@@ -24,28 +23,50 @@ import {
   verifyCodemapMcpServersFile,
 } from "./agents-init-mcp";
 import { getAgentsInitMcpTargetDef } from "./agents-init-mcp-registry";
+import { buildCodemapMcpSpawn } from "./codemap-invocation";
+import type { ResolvedCodemapInvocation } from "./codemap-invocation";
 
-describe("buildCodemapMcpServerEntry", () => {
+const NPM_LOCAL_INVOCATION: ResolvedCodemapInvocation = {
+  command: "npx",
+  args: ["codemap"],
+  installMethod: "project-installed",
+  agent: "npm",
+};
+
+function seedInstalledCodemapProject(dir: string): void {
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({
+      devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+    }),
+  );
+  writeFileSync(join(dir, "package-lock.json"), "{}");
+}
+
+describe("buildCodemapMcpSpawn", () => {
   it("includes workspace root for Cursor", () => {
-    expect(buildCodemapMcpServerEntry({ includeWorkspaceRoot: true })).toEqual({
-      command: "codemap",
-      args: ["mcp", "--watch", "--root", "${workspaceFolder}"],
+    expect(buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true)).toEqual({
+      command: "npx",
+      args: ["codemap", "mcp", "--watch", "--root", "${workspaceFolder}"],
     });
   });
 
   it("omits --root for cwd-based clients", () => {
-    expect(buildCodemapMcpServerEntry()).toEqual({
-      command: "codemap",
-      args: ["mcp", "--watch"],
+    expect(buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false)).toEqual({
+      command: "npx",
+      args: ["codemap", "mcp", "--watch"],
     });
   });
 
   it("adds Amazon Q IDE transport fields for default.json", () => {
     expect(
-      buildMcpServerEntryForDef(getAgentsInitMcpTargetDef("amazon-q-default")),
+      buildMcpServerEntryForDef(
+        getAgentsInitMcpTargetDef("amazon-q-default"),
+        NPM_LOCAL_INVOCATION,
+      ),
     ).toEqual({
-      command: "codemap",
-      args: ["mcp", "--watch"],
+      command: "npx",
+      args: ["codemap", "mcp", "--watch"],
       transportType: "stdio",
       disabled: false,
       timeout: 60,
@@ -61,7 +82,7 @@ describe("mergeCodemapMcpServer", () => {
           other: { command: "npx", args: ["-y", "other-mcp"] },
         },
       },
-      buildCodemapMcpServerEntry({ includeWorkspaceRoot: true }),
+      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true),
     );
     expect(Object.keys(merged.mcpServers ?? {})).toEqual(["other", "codemap"]);
     expect(merged.mcpServers?.other?.command).toBe("npx");
@@ -73,13 +94,16 @@ describe("mergeCodemapMcpServer", () => {
   it("adds codemap to empty mcpServers", () => {
     const merged = mergeCodemapMcpServer(
       { mcpServers: {} },
-      buildCodemapMcpServerEntry(),
+      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false),
     );
     expect(Object.keys(merged.mcpServers ?? {})).toEqual(["codemap"]);
   });
 
   it("adds codemap when mcpServers key is missing", () => {
-    const merged = mergeCodemapMcpServer({}, buildCodemapMcpServerEntry());
+    const merged = mergeCodemapMcpServer(
+      {},
+      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false),
+    );
     expect(Object.keys(merged.mcpServers ?? {})).toEqual(["codemap"]);
   });
 });
@@ -152,13 +176,13 @@ describe("mergeCodemapVsCodeServer", () => {
           other: { command: "npx", args: ["-y", "other"] },
         },
       },
-      buildCodemapMcpServerEntry(),
+      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false),
     );
     expect(merged.servers?.other?.command).toBe("npx");
     expect(merged.servers?.[CODEMAP_MCP_SERVER_KEY]).toEqual({
       type: "stdio",
-      command: "codemap",
-      args: ["mcp", "--watch"],
+      command: "npx",
+      args: ["codemap", "mcp", "--watch"],
     });
   });
 });
@@ -188,7 +212,7 @@ describe("verifyCodemapMcpServersFile", () => {
         verifyCodemapMcpServersFile({
           path,
           label: "test mcp.json",
-          expectedEntry: buildCodemapMcpServerEntry(),
+          expectedEntry: buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false),
         }),
       ).toThrow(/missing codemap entry/);
     } finally {
@@ -198,11 +222,12 @@ describe("verifyCodemapMcpServersFile", () => {
 });
 
 describe("applyAgentsInitMcp", () => {
-  it("writes all default project MCP files", () => {
+  it("writes all default project MCP files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-all-"));
     const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-home-"));
     try {
-      applyAgentsInitMcp({ projectRoot: dir, homeDir: fakeHome });
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, homeDir: fakeHome });
       expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
       expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
@@ -217,9 +242,15 @@ describe("applyAgentsInitMcp", () => {
 
       const vscode = JSON.parse(
         readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
-      ) as { servers: Record<string, { type: string; command: string }> };
+      ) as {
+        servers: Record<
+          string,
+          { type: string; command: string; args?: string[] }
+        >;
+      };
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
-      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("codemap");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args?.[0]).toBe("codemap");
 
       const amazonDefault = JSON.parse(
         readFileSync(join(dir, ".amazonq", "default.json"), "utf-8"),
@@ -236,8 +267,8 @@ describe("applyAgentsInitMcp", () => {
         >;
       };
       expect(amazonDefault.mcpServers[CODEMAP_MCP_SERVER_KEY]).toEqual({
-        command: "codemap",
-        args: ["mcp", "--watch"],
+        command: "npx",
+        args: ["codemap", "mcp", "--watch"],
         transportType: "stdio",
         disabled: false,
         timeout: 60,
@@ -252,8 +283,8 @@ describe("applyAgentsInitMcp", () => {
         >;
       };
       expect(amazonLegacy.mcpServers[CODEMAP_MCP_SERVER_KEY]).toEqual({
-        command: "codemap",
-        args: ["mcp", "--watch"],
+        command: "npx",
+        args: ["codemap", "mcp", "--watch"],
       });
       expect(
         amazonLegacy.mcpServers[CODEMAP_MCP_SERVER_KEY]?.transportType,
@@ -264,10 +295,11 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("is idempotent for Amazon Q dual MCP files on re-run", () => {
+  it("is idempotent for Amazon Q dual MCP files on re-run", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-q-idem-"));
     try {
-      applyAgentsInitMcp({
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["amazon-q", "amazon-q-default"],
       });
@@ -279,7 +311,7 @@ describe("applyAgentsInitMcp", () => {
         join(dir, ".amazonq", "default.json"),
         "utf-8",
       );
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["amazon-q", "amazon-q-default"],
       });
@@ -294,11 +326,12 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("writes project .cline/mcp.json when cline target selected", () => {
+  it("writes project .cline/mcp.json when cline target selected", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-"));
     const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-home-"));
     try {
-      applyAgentsInitMcp({
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({
         projectRoot: dir,
         homeDir: fakeHome,
         targets: ["cline"],
@@ -312,11 +345,12 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("writes Windsurf global config only when windsurf target selected", () => {
+  it("writes Windsurf global config only when windsurf target selected", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-ws-"));
     const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-ws-home-"));
     try {
-      applyAgentsInitMcp({
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({
         projectRoot: dir,
         homeDir: fakeHome,
         targets: ["windsurf"],
@@ -331,10 +365,11 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("writes Cursor and Claude project MCP files", () => {
+  it("writes Cursor and Claude project MCP files", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
-      applyAgentsInitMcp({ projectRoot: dir });
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir });
       const cursor = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { args: string[] }> };
@@ -346,6 +381,7 @@ describe("applyAgentsInitMcp", () => {
         readFileSync(join(dir, ".mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { args: string[] }> };
       expect(claudeMcp.mcpServers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
+        "codemap",
         "mcp",
         "--watch",
       ]);
@@ -361,9 +397,10 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("merges into existing .cursor/mcp.json without clobbering other servers", () => {
+  it("merges into existing .cursor/mcp.json without clobbering other servers", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
+      seedInstalledCodemapProject(dir);
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(
         join(dir, ".cursor", "mcp.json"),
@@ -378,7 +415,7 @@ describe("applyAgentsInitMcp", () => {
         )}\n`,
         "utf-8",
       );
-      applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
       const parsed = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, unknown> };
@@ -392,12 +429,13 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("is idempotent on re-run", () => {
+  it("is idempotent on re-run", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
-      applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
       const before = readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8");
-      applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
       expect(readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8")).toBe(
         before,
       );
@@ -406,38 +444,42 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("rejects invalid JSON without --force", () => {
+  it("rejects invalid JSON without --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
+      seedInstalledCodemapProject(dir);
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
-      expect(() =>
+      seedInstalledCodemapProject(dir);
+      await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
-      ).toThrow(/could not parse/);
+      ).rejects.toThrow(/could not parse/);
       expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("rejects non-object mcpServers without --force", () => {
+  it("rejects non-object mcpServers without --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
+      seedInstalledCodemapProject(dir);
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(
         join(dir, ".cursor", "mcp.json"),
         `${JSON.stringify({ mcpServers: "bad" }, null, 2)}\n`,
         "utf-8",
       );
-      expect(() =>
+      seedInstalledCodemapProject(dir);
+      await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] }),
-      ).toThrow(/mcpServers must be a JSON object/);
+      ).rejects.toThrow(/mcpServers must be a JSON object/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("force-replaces invalid mcpServers shape and preserves other keys", () => {
+  it("force-replaces invalid mcpServers shape and preserves other keys", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
     const prevError = console.error;
@@ -454,7 +496,7 @@ describe("applyAgentsInitMcp", () => {
         `${JSON.stringify({ mcpServers: "bad", editor: "cursor" }, null, 2)}\n`,
         "utf-8",
       );
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["cursor"],
         force: true,
@@ -466,9 +508,7 @@ describe("applyAgentsInitMcp", () => {
         mcpServers: Record<string, { command: string }>;
       };
       expect(parsed.editor).toBe("cursor");
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
-        "codemap",
-      );
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
       expect(
         stderr.some((line) => line.includes("invalid mcpServers shape")),
       ).toBe(true);
@@ -478,7 +518,7 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("replaces invalid JSON with --force", () => {
+  it("replaces invalid JSON with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
     const prevError = console.error;
@@ -491,7 +531,7 @@ describe("applyAgentsInitMcp", () => {
     try {
       mkdirSync(join(dir, ".cursor"), { recursive: true });
       writeFileSync(join(dir, ".cursor", "mcp.json"), "{ not json", "utf-8");
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["cursor"],
         force: true,
@@ -499,9 +539,7 @@ describe("applyAgentsInitMcp", () => {
       const parsed = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { command: string }> };
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
-        "codemap",
-      );
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
       expect(stderr.some((line) => line.includes("unparseable JSON"))).toBe(
         true,
       );
@@ -511,7 +549,7 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("replaces invalid Claude .mcp.json with --force", () => {
+  it("replaces invalid Claude .mcp.json with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
     const prevError = console.error;
@@ -523,7 +561,7 @@ describe("applyAgentsInitMcp", () => {
     };
     try {
       writeFileSync(join(dir, ".mcp.json"), "{ not json", "utf-8");
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["claude-code"],
         force: true,
@@ -533,9 +571,7 @@ describe("applyAgentsInitMcp", () => {
       ) as {
         mcpServers: Record<string, { command: string }>;
       };
-      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe(
-        "codemap",
-      );
+      expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
       expect(
         stderr.some((line) => line.includes(".mcp.json (Claude Code)")),
       ).toBe(true);
@@ -545,7 +581,7 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("replaces invalid .claude/settings.json with --force", () => {
+  it("replaces invalid .claude/settings.json with --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     const stderr: string[] = [];
     const prevError = console.error;
@@ -562,7 +598,7 @@ describe("applyAgentsInitMcp", () => {
         "{ not json",
         "utf-8",
       );
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["claude-code"],
         force: true,
@@ -582,9 +618,10 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("merges Claude files without clobbering foreign servers or permissions", () => {
+  it("merges Claude files without clobbering foreign servers or permissions", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
+      seedInstalledCodemapProject(dir);
       writeFileSync(
         join(dir, ".mcp.json"),
         `${JSON.stringify(
@@ -613,7 +650,7 @@ describe("applyAgentsInitMcp", () => {
         )}\n`,
         "utf-8",
       );
-      applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] });
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] });
       const mcp = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf-8")) as {
         mcpServers: Record<string, unknown>;
       };
@@ -636,24 +673,26 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
-  it("rejects malformed permissions.allow without --force", () => {
+  it("rejects malformed permissions.allow without --force", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-"));
     try {
+      seedInstalledCodemapProject(dir);
       mkdirSync(join(dir, ".claude"), { recursive: true });
       writeFileSync(
         join(dir, ".claude", "settings.json"),
         `${JSON.stringify({ permissions: { allow: "bad" } }, null, 2)}\n`,
         "utf-8",
       );
-      expect(() =>
+      seedInstalledCodemapProject(dir);
+      await expect(
         applyAgentsInitMcp({ projectRoot: dir, targets: ["claude-code"] }),
-      ).toThrow(/permissions\.allow must be a string\[\]/);
+      ).rejects.toThrow(/permissions\.allow must be a string\[\]/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("merges Amazon Q default.json without clobbering foreign keys", () => {
+  it("merges Amazon Q default.json without clobbering foreign keys", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-q-"));
     try {
       mkdirSync(join(dir, ".amazonq"), { recursive: true });
@@ -675,7 +714,7 @@ describe("applyAgentsInitMcp", () => {
         )}\n`,
         "utf-8",
       );
-      applyAgentsInitMcp({
+      await applyAgentsInitMcp({
         projectRoot: dir,
         targets: ["amazon-q-default"],
       });
@@ -692,7 +731,7 @@ describe("applyAgentsInitMcp", () => {
         transportType: "stdio",
       });
       expect(parsed.mcpServers[CODEMAP_MCP_SERVER_KEY]).toMatchObject({
-        command: "codemap",
+        command: "npx",
         transportType: "stdio",
       });
     } finally {

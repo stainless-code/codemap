@@ -10,11 +10,19 @@
 
 import { describe, expect, it, beforeAll, afterAll } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const SCRIPT = join(import.meta.dirname, "detect-pm.mjs");
+const REPO_NODE_MODULES = join(import.meta.dirname, "..", "node_modules");
 let workRoot;
 
 beforeAll(() => {
@@ -106,6 +114,21 @@ describe("scripts/detect-pm.mjs", () => {
     // bin alias is `codemap` regardless of the scoped package name
     expect(out.exec).toContain("codemap");
     expect(out.exec).not.toContain("@stainless-code/codemap@");
+  });
+
+  it("uses bunx (not bun x) for bun execute-local", () => {
+    const dir = makeFixture("bun-local-fixture", {
+      "package.json": JSON.stringify({
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "bun.lock": "",
+    });
+    const out = runDetect({
+      WORKING_DIRECTORY: dir,
+      PACKAGE_MANAGER: "bun",
+    });
+    expect(out.install_method).toBe("project-installed");
+    expect(out.exec).toBe("bunx codemap");
   });
 
   it("uses execute-local when bare `codemap` key is set (workspace alias case)", () => {
@@ -212,5 +235,38 @@ describe("scripts/detect-pm.mjs", () => {
     });
     const out = runDetect({ WORKING_DIRECTORY: dir });
     expect(out.agent).toBe("pnpm");
+  });
+
+  it("runs from an Action-style isolated stage with both script files", () => {
+    const stage = join(workRoot, "action-stage");
+    mkdirSync(stage, { recursive: true });
+    copyFileSync(
+      join(import.meta.dirname, "detect-pm.mjs"),
+      join(stage, "detect-pm.mjs"),
+    );
+    copyFileSync(
+      join(import.meta.dirname, "codemap-invocation.mjs"),
+      join(stage, "codemap-invocation.mjs"),
+    );
+    symlinkSync(REPO_NODE_MODULES, join(stage, "node_modules"), "dir");
+    const dir = makeFixture("action-stage-project", {
+      "package.json": "{}",
+      "package-lock.json": "{}",
+    });
+    const result = spawnSync("node", ["detect-pm.mjs"], {
+      cwd: stage,
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: "",
+        WORKING_DIRECTORY: dir,
+      },
+      encoding: "utf8",
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `detect-pm action stage exited ${result.status}: ${result.stderr || result.stdout}`,
+      );
+    }
+    expect(result.stdout).toContain("agent=npm");
   });
 });

@@ -183,7 +183,7 @@ export async function runAgentsInitInteractive(
     mcp = offerMcp;
   }
 
-  const success = runAgentsInit({
+  const success = await runAgentsInit({
     projectRoot: opts.projectRoot,
     force: opts.force,
     targets,

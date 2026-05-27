@@ -72,7 +72,7 @@ codemap query --json --recipe affected-tests --params changed_files=src/foo.ts
 - **`codemap://files/{path}`** — per-file roll-up `{path, language, line_count, symbols, imports, exports, coverage}`; URI-encode path segments (MCP template uses `{+path}`). Live.
 - **`codemap://symbols/{name}`** — exact-name lookup only → `{matches, disambiguation?}`; optional `?in=<path-prefix>` filter. Use **`show`** / **`snippet`** tools (or CLI `--query`) for field-qualified discovery. Live.
 
-**Launching:** point your agent host at `codemap mcp` as the stdio command. Most hosts (Claude Code, Cursor, Codex) accept `{command: "codemap", args: ["mcp"], cwd: "/path/to/project"}`. The server inherits `cwd` as the project root unless `--root` overrides it.
+**Launching:** prefer **`codemap agents init --mcp`** — writes PM-aware spawn config (`npx codemap`, `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`, or dlx `@stainless-code/codemap@latest`) with `mcp --watch`. Manual wiring: stdio command + args `mcp` (add `--watch` to keep the index warm); spawn `cwd` is the project root unless `--root` overrides. Do not assume global `codemap` on PATH.
 
 **Determinism:** Bundled recipes use stable secondary **`ORDER BY`** tie-breakers (and ordered inner **`LIMIT`** samples where applicable). Prefer **`--recipe`** over pasting SQL when you need the maintained ordering. **Canonical SQL** is whatever **`codemap query --print-sql <id>`** or **`codemap query --recipes-json`** returns (single source in the CLI).
 

@@ -167,7 +167,7 @@ describe("CLI unknown / invalid args", () => {
       const parsed = JSON.parse(
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { command: string }> };
-      expect(parsed.mcpServers.codemap?.command).toBe("codemap");
+      expect(parsed.mcpServers.codemap?.command).toBe("npx");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -8,7 +8,7 @@ alwaysApply: false
 
 Before authoring or editing any doc in this repo, **read the [`docs-governance` skill](../skills/docs-governance/SKILL.md)** for the full reference. This rule is the priming layer.
 
-The canonical Rules (1–10) live in [`docs/README.md`](../../docs/README.md) — cite them by number; never restate them.
+The canonical Rules (1–10) live in [`docs/README.md`](../../docs/README.md) — cite them by number; never restate them. Consumer-surface policy: [`.agents/rules/consumer-surfaces.md`](./consumer-surfaces.md) (Rule 10 sub-bullet).
 
 ## Surface tiers (which subset of governance applies)
 
