@@ -150,7 +150,7 @@ describe("CLI unknown / invalid args", () => {
     }
   });
 
-  test("agents init --force --mcp writes .cursor/mcp.json under --root", async () => {
+  test("agents init --force --mcp writes project MCP configs under --root", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-"));
     try {
       const { exitCode, err } = await runCli([

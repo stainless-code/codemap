@@ -17,7 +17,7 @@
 | Is the VS Code scaffold **correct**?                   | **Yes after fix.** Init emits `mcp --watch --root ${workspaceFolder}` on `.vscode/mcp.json`.                                       |
 | Are consumer overrides wrong?                          | **No.** Overrides like `--no-watch` remain valid. Re-run `init --mcp` to pick up `--root` if `.vscode/mcp.json` predates this fix. |
 
-**Recommended fix:** add explicit workspace-root wiring for the `vscode` MCP target (prefer **`workspaceRootArg: true`** for parity with Cursor and with this repo's dogfood config).
+**Shipped fix:** Option **A** — `workspaceRootArg: true` on the `vscode` registry entry (parity with Cursor and dogfood `.vscode/mcp.json`).
 
 ---
 
@@ -73,7 +73,7 @@ Bundled skill (`templates/agent-content/skill/10-recipes-context.md`): _"spawn `
 
 ---
 
-## Options (ranked)
+## Options (decision record — **A** chosen)
 
 | #     | Change                                                                                 | Pros                                                                                                | Cons                                                                                                  |
 | ----- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -82,7 +82,7 @@ Bundled skill (`templates/agent-content/skill/10-recipes-context.md`): _"spawn `
 | **C** | `"env": { "CODEMAP_ROOT": "${workspaceFolder}" }`                                      | Avoids codemap-specific flag in args                                                                | Less visible in logs; env substitution still subject to VS Code variable bugs                         |
 | **D** | Document only — tell consumers to hand-patch                                           | Zero code change                                                                                    | Leaves init scaffold wrong vs dogfood; repeats support burden                                         |
 
-**Recommendation:** **A** (registry one-liner) + update **`docs/agents.md`** VS Code row + extend **`applyAgentsInitMcp`** integration test to assert VS Code args include `--root` and `${workspaceFolder}`.
+**Chosen:** **A** — implemented in PR #156 (`workspaceRootArg: true` + docs/tests/changeset).
 
 Optional follow-up: document **`--no-watch`** as a consumer override when file watcher hangs on large repos (out of scope for this plan's core fix).
 
@@ -117,7 +117,7 @@ Custom overrides remain valid:
 - **`--no-watch`** — still required when watch hangs on large repos.
 - **Hand-patched `--root ${workspaceFolder}`** — safe to keep; init will converge to the same args on re-run.
 
-Do **not** assume VS Code stdio spawn `cwd` equals workspace root — official docs do not guarantee it (see fact-check below).
+Do **not** assume VS Code stdio spawn `cwd` equals workspace root — official docs do not guarantee it (see [Fact-check vs official docs](#fact-check-vs-official-docs) above).
 
 ---
 
