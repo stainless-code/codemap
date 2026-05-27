@@ -1,8 +1,11 @@
+import { resolve } from "node:path";
+
 import { getMeta, SCHEMA_VERSION } from "../db";
 import type { CodemapDatabase } from "../db";
 import { CODEMAP_VERSION } from "../version";
 import { computeIndexFreshness } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
+import { pathEscapesProjectRoot } from "./path-containment";
 import { QUERY_RECIPES, getQueryRecipeSql } from "./query-recipes";
 import { getIndexedContentHash, readSymbolSource } from "./show-engine";
 
@@ -61,6 +64,7 @@ export interface ContextEnvelope {
     last_indexed_commit: string | null;
     languages: { language: string; files: number }[];
   };
+  /** Top fan-in files at the bundled `fan-in` recipe default limit; prefer `start_here.hub_leaders` for signatures. */
   hubs?: { to_path: string; fan_in: number }[];
   /**
    * Marker sample capped by `resolveContextBudget(file_count).marker_limit`.
@@ -120,6 +124,7 @@ export interface ContextIndexSummary {
 }
 
 export interface ContextStartHere {
+  /** User intent category, or `"default"` when no `--for` / MCP `intent` was supplied. */
   classified_as: string;
   hint: string;
   index_summary: ContextIndexSummary;
@@ -200,12 +205,14 @@ export function classifyIntent(intent: string): {
 export function defaultStartHereClassification(): ReturnType<
   typeof classifyIntent
 > {
-  return classifyIntent("explore this codebase");
+  const explore = classifyIntent("explore this codebase");
+  return { ...explore, classified_as: "default" };
 }
 
 /**
- * Build the envelope from an open DB. Pure-ish (reads from DB but takes no I/O
- * outside of it) — covered by unit tests against a temp DB.
+ * Build the envelope from an open DB. Reads SQLite + optional git for
+ * `index_freshness`; `include_snippets: true` adds bounded disk reads for hub
+ * leader one-liners (MCP/HTTP only — ignored when `compact: true`).
  */
 export function buildContextEnvelope(
   db: CodemapDatabase,
@@ -245,8 +252,9 @@ export function buildContextEnvelope(
     const markerIntentClass =
       opts.intent !== null ? classifyIntent(opts.intent).classified_as : null;
 
-    const fanInRows = readFanInHubs(db, budget.hub_limit);
-    envelope.hubs = fanInRows.map((row) => ({
+    const legacyHubLimit = readRecipeSqlLimit("fan-in") ?? 15;
+    const hubLeaderRows = readFanInHubs(db, budget.hub_limit);
+    envelope.hubs = readFanInHubs(db, legacyHubLimit).map((row) => ({
       to_path: row.to_path,
       fan_in: row.fan_in,
     }));
@@ -264,7 +272,7 @@ export function buildContextEnvelope(
       fileCount,
       projectRoot,
       includeSnippets: opts.include_snippets === true,
-      fanInRows,
+      fanInRows: hubLeaderRows,
     });
   }
 
@@ -322,11 +330,11 @@ export function readFanInHubs(
   return db.query(sql).all(...params) as FanInHubRow[];
 }
 
-function capRecipeSqlLimit(
+export function capRecipeSqlLimit(
   sql: string,
   limit: number,
 ): { sql: string; params: number[] } {
-  const trimmed = sql.trim().replace(/;\s*$/, "");
+  const trimmed = stripTrailingSqlLineComments(sql.trim()).replace(/;\s*$/, "");
   if (/\bLIMIT\s+\d+\s*$/im.test(trimmed)) {
     return {
       sql: trimmed.replace(/\bLIMIT\s+\d+\s*$/im, "LIMIT ?"),
@@ -334,6 +342,26 @@ function capRecipeSqlLimit(
     };
   }
   return { sql: `${trimmed} LIMIT ?`, params: [limit] };
+}
+
+/** Parse trailing numeric LIMIT from registered recipe SQL (bundled or project). */
+export function readRecipeSqlLimit(recipeId: string): number | undefined {
+  const base = getQueryRecipeSql(recipeId);
+  if (base === undefined) return undefined;
+  const trimmed = stripTrailingSqlLineComments(base.trim()).replace(
+    /;\s*$/,
+    "",
+  );
+  const match = trimmed.match(/\bLIMIT\s+(\d+)\s*$/im);
+  if (match === null) return undefined;
+  return Number(match[1]);
+}
+
+function stripTrailingSqlLineComments(sql: string): string {
+  return sql
+    .split("\n")
+    .map((line) => line.replace(/--[^\n]*$/, "").trimEnd())
+    .join("\n");
 }
 
 function readIndexSummary(db: CodemapDatabase): ContextIndexSummary {
@@ -458,30 +486,55 @@ function readHubSignatures(
       signature: truncateSignature(row.signature, opts.signatureMaxChars),
     };
     if (opts.includeSnippets) {
-      const indexedHash = getIndexedContentHash(db, filePath);
-      const read = readSymbolSource({
+      const snippet = readHubExportSnippet({
         projectRoot: opts.projectRoot,
-        match: {
-          file_path: filePath,
-          name: row.name,
-          kind: row.kind,
-          line_start: row.line_start,
-          line_end: row.line_start,
-          signature: row.signature,
-          is_exported: 1,
-          parent_name: null,
-          visibility: null,
-        },
-        indexedContentHash: indexedHash,
+        filePath,
+        lineStart: row.line_start,
+        indexedContentHash: getIndexedContentHash(db, filePath),
       });
-      if (read.source !== undefined) {
-        sig.snippet = read.source.split("\n")[0] ?? read.source;
-      }
-      if (read.stale === true) sig.stale = true;
-      if (read.missing === true) sig.missing = true;
+      if (snippet.snippet !== undefined) sig.snippet = snippet.snippet;
+      if (snippet.stale === true) sig.stale = true;
+      if (snippet.missing === true) sig.missing = true;
     }
     return sig;
   });
+}
+
+function readHubExportSnippet(opts: {
+  projectRoot: string;
+  filePath: string;
+  lineStart: number;
+  indexedContentHash?: string;
+}): { snippet?: string; stale?: boolean; missing?: boolean } {
+  if (pathEscapesProjectRoot(resolve(opts.projectRoot), opts.filePath)) {
+    return { missing: true };
+  }
+  try {
+    const read = readSymbolSource({
+      projectRoot: opts.projectRoot,
+      match: {
+        file_path: opts.filePath,
+        name: "",
+        kind: "",
+        line_start: opts.lineStart,
+        line_end: opts.lineStart,
+        signature: "",
+        is_exported: 1,
+        parent_name: null,
+        visibility: null,
+      },
+      indexedContentHash: opts.indexedContentHash,
+    });
+    if (read.missing === true) return { missing: true };
+    const line = read.source?.split("\n")[0];
+    if (line === undefined) return { missing: true };
+    return {
+      snippet: line,
+      ...(read.stale === true ? { stale: true } : {}),
+    };
+  } catch {
+    return { missing: true };
+  }
 }
 
 function truncateSignature(signature: string, maxChars: number): string {

@@ -42,7 +42,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`save_baseline`** — polymorphic `{name, sql? | recipe?}` (exactly one of `sql` / `recipe`).
 - **`list_baselines`** — no args; returns the array `codemap query --baselines --json` would print.
 - **`drop_baseline`** — `{name}` → `{dropped}` on success; structured `{error}` on unknown name (MCP sets `isError: true`).
-- **`context`** — `{compact?, intent?, include_snippets?}`. Session-start project envelope with `start_here` shortcuts (one call replaces 4-5 `query`s).
+- **`context`** — `{compact?, intent?, include_snippets?}`. Session-start project envelope with `start_here` shortcuts (one call replaces 4-5 `query`s). `include_snippets` adds one-line export previews on hub leaders; no-op when `compact: true` (compact omits `start_here`). Prefer `start_here.hub_leaders` over legacy `hubs` for signatures — `hubs` keeps the full bundled `fan-in` recipe limit for backward compatibility.
 - **`validate`** — `{paths?: string[]}`. SHA-256 vs `files.content_hash`; returns only out-of-sync rows (`stale` / `missing` / `unindexed` — fresh paths are omitted).
 - **`show`** — `{name, kind?, in?}` or `{query, with_fts?}`. Exact symbol lookup or field-qualified search (`kind:`, `name:`, `path:`, `in:` + free text) → `{matches, disambiguation?, warning?}`. CLI: `codemap show --query '…' [--print-sql]`.
 - **`snippet`** — same as `show` (`{name, kind?, in?}` or `{query, with_fts?}`) but each match also carries `source` (file text) + `stale` / `missing` flags → `{matches, disambiguation?, warning?}`. No reindex side-effects.

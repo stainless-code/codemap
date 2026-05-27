@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,9 +23,11 @@ import type { DependencyRow, SymbolRow } from "../db";
 import { initCodemap } from "../runtime";
 import {
   buildContextEnvelope,
+  capRecipeSqlLimit,
   classifyIntent,
   composeStartHere,
   defaultStartHereClassification,
+  readRecipeSqlLimit,
   resolveContextBudget,
 } from "./context-engine";
 import * as indexEngine from "./index-engine";
@@ -155,11 +163,47 @@ describe("resolveContextBudget", () => {
   it("uses full caps on small repos", () => {
     expect(resolveContextBudget(100).hub_limit).toBe(5);
     expect(resolveContextBudget(100).signatures_per_hub).toBe(3);
+    expect(resolveContextBudget(500).hub_limit).toBe(5);
+  });
+
+  it("tightens caps on mid-size repos", () => {
+    expect(resolveContextBudget(501).hub_limit).toBe(3);
+    expect(resolveContextBudget(5000).hub_limit).toBe(3);
+    expect(resolveContextBudget(5000).signatures_per_hub).toBe(2);
   });
 
   it("tightens caps on large repos", () => {
     expect(resolveContextBudget(6000).hub_limit).toBe(2);
     expect(resolveContextBudget(6000).signature_max_chars).toBe(60);
+  });
+});
+
+describe("capRecipeSqlLimit", () => {
+  it("rewrites a trailing LIMIT clause", () => {
+    const capped = capRecipeSqlLimit("SELECT 1 LIMIT 15", 5);
+    expect(capped.sql).toBe("SELECT 1 LIMIT ?");
+    expect(capped.params).toEqual([5]);
+  });
+
+  it("appends LIMIT when the recipe SQL has none", () => {
+    const capped = capRecipeSqlLimit("SELECT 1", 3);
+    expect(capped.sql).toBe("SELECT 1 LIMIT ?");
+    expect(capped.params).toEqual([3]);
+  });
+
+  it("ignores trailing line comments before LIMIT", () => {
+    const capped = capRecipeSqlLimit(
+      "SELECT to_path FROM dependencies\nLIMIT 15 -- top hubs",
+      2,
+    );
+    expect(capped.sql).toContain("LIMIT ?");
+    expect(capped.params).toEqual([2]);
+  });
+});
+
+describe("readRecipeSqlLimit", () => {
+  it("reads the bundled fan-in recipe default", () => {
+    expect(readRecipeSqlLimit("fan-in")).toBe(15);
   });
 });
 
@@ -198,7 +242,7 @@ describe("composeStartHere", () => {
         defaultStartHereClassification(),
         composeOpts(),
       );
-      expect(start.classified_as).toBe("explore");
+      expect(start.classified_as).toBe("default");
       expect(start.recipes.map((r) => r.id)).toContain("index-summary");
       expect(start.recipes.map((r) => r.id)).toContain("fan-in");
     });
@@ -214,6 +258,36 @@ describe("composeStartHere", () => {
         (s) => s.name === "hubFn",
       );
       expect(hubFn?.snippet).toContain("export function hubFn");
+    });
+  });
+
+  it("marks stale and missing snippets on hub leaders", () => {
+    withSeededDb((db) => {
+      db.run(
+        "UPDATE files SET content_hash = 'stale-hash' WHERE path = 'src/hub.ts'",
+      );
+      const staleStart = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        { ...composeOpts(), includeSnippets: true },
+      );
+      const staleSig = staleStart.hub_leaders[0]?.signatures.find(
+        (s) => s.name === "hubFn",
+      );
+      expect(staleSig?.snippet).toContain("export function hubFn");
+      expect(staleSig?.stale).toBe(true);
+
+      unlinkSync(join(benchDir, "src", "hub.ts"));
+      const missingStart = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        { ...composeOpts(), includeSnippets: true },
+      );
+      const missingSig = missingStart.hub_leaders[0]?.signatures.find(
+        (s) => s.name === "hubFn",
+      );
+      expect(missingSig?.missing).toBe(true);
+      expect(missingSig?.snippet).toBeUndefined();
     });
   });
 
@@ -250,7 +324,7 @@ describe("buildContextEnvelope", () => {
           compact: false,
           intent: null,
         });
-        expect(envelope.start_here?.classified_as).toBe("explore");
+        expect(envelope.start_here?.classified_as).toBe("default");
         expect(envelope.start_here?.index_summary.files).toBe(3);
         expect(envelope.start_here?.hub_leaders.length).toBeGreaterThan(0);
         expect(envelope.hubs?.[0]?.to_path).toBe("src/hub.ts");
@@ -300,7 +374,7 @@ describe("buildContextEnvelope", () => {
     }
   });
 
-  it("keeps hubs and hub_leaders aligned under adaptive budget", () => {
+  it("keeps hub_leaders as a budget-capped prefix of legacy hubs", () => {
     const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
     try {
       withSeededDb((db) => {
@@ -308,12 +382,31 @@ describe("buildContextEnvelope", () => {
           compact: false,
           intent: null,
         });
-        expect(envelope.hubs?.length).toBe(
-          envelope.start_here?.hub_leaders.length,
-        );
-        expect(envelope.hubs?.[0]?.to_path).toBe(
-          envelope.start_here?.hub_leaders[0]?.file_path,
-        );
+        const leaders = envelope.start_here?.hub_leaders ?? [];
+        const hubs = envelope.hubs ?? [];
+        expect(leaders.length).toBeLessThanOrEqual(hubs.length);
+        for (let i = 0; i < leaders.length; i++) {
+          expect(hubs[i]?.to_path).toBe(leaders[i]?.file_path);
+          expect(hubs[i]?.fan_in).toBe(leaders[i]?.fan_in);
+        }
+        expect(readRecipeSqlLimit("fan-in")).toBe(15);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("ignores include_snippets when compact", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: true,
+          intent: null,
+          include_snippets: true,
+        });
+        expect(envelope.start_here).toBeUndefined();
+        expect(envelope.hubs).toBeUndefined();
       });
     } finally {
       revParse.mockRestore();
