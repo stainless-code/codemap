@@ -204,10 +204,10 @@ Each tier is one tracer-bullet PR: parser visitor change + schema migration + 1-
 
 **Empirical post-Tier-1 cost** (clean rebuild, median of 3 runs):
 
-| Fixture                                            | Pre-Tier-1 DB | Post-Tier-1 DB | Δ DB | Pre-Tier-1 full | Post-Tier-1 full | Δ full | Targeted (post) |
-| -------------------------------------------------- | ------------- | -------------- | ---- | --------------- | ---------------- | ------ | --------------- |
-| codemap-self (924 files, 11.7k symbols)            | 11.4 MB       | 14.3 MB        | +25% | ~280 ms         | ~300 ms          | +7%    | ~15 ms          |
-| merchant-dashboard-v2 (2,120 files, 28.5k symbols) | 37.5 MB       | 50.1 MB        | +33% | ~740 ms         | ~900 ms          | +22%   | ~16 ms          |
+| Fixture                                 | Pre-Tier-1 DB | Post-Tier-1 DB | Δ DB | Pre-Tier-1 full | Post-Tier-1 full | Δ full | Targeted (post) |
+| --------------------------------------- | ------------- | -------------- | ---- | --------------- | ---------------- | ------ | --------------- |
+| codemap-self (924 files, 11.7k symbols) | 11.4 MB       | 14.3 MB        | +25% | ~280 ms         | ~300 ms          | +7%    | ~15 ms          |
+| large-app (2,120 files, 28.5k symbols)  | 37.5 MB       | 50.1 MB        | +33% | ~740 ms         | ~900 ms          | +22%   | ~16 ms          |
 
 Targeted reindex stays flat (~15 ms regardless of project size — Tier 1's adds are per-row not whole-table). Full reindex worst case: 0.9 s on a 2.1k-file enterprise React app — **66× under** R.10's 1-min pain threshold. DB growth (+25-33%) is well under R.9's "~5-10× total across 13 tiers" projection — Tier 1 used ~25-33% of that budget.
 
