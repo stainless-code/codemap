@@ -314,6 +314,41 @@ describe("composeExploreResult dedupe", () => {
     expect(r.result.rows.length).toBeLessThanOrEqual(125);
     expect(r.result.truncation?.rows).toBe(true);
   });
+
+  it("applies mid-tier explore row limit when rowLimit omitted", () => {
+    seedWideCallGraph(260);
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 500);
+    } finally {
+      closeDb(db);
+    }
+    const r = composeExploreResult({ root: benchDir, names: ["hub"] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result.rows.length).toBeLessThanOrEqual(250);
+    expect(r.result.truncation?.rows).toBe(true);
+  });
+
+  it("keeps adaptive explore row limit when budget_chars is explicit", () => {
+    seedWideCallGraph(130);
+    const db = openDb();
+    try {
+      seedBulkFiles(db, 5000);
+    } finally {
+      closeDb(db);
+    }
+    const r = composeExploreResult({
+      root: benchDir,
+      names: ["hub"],
+      budgetChars: 15_000,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.result.rows.length).toBeLessThanOrEqual(125);
+    expect(r.result.truncation?.rows).toBe(true);
+    expect(r.result.truncation?.snippets).toBeUndefined();
+  });
 });
 
 function seedBulkFiles(db: ReturnType<typeof openDb>, count: number): void {

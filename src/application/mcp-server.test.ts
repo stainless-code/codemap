@@ -7,7 +7,13 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
+import {
+  closeDb,
+  createTables,
+  insertFile,
+  openDb,
+  upsertQueryBaseline,
+} from "../db";
 import { initCodemap } from "../runtime";
 import { createMcpServer } from "./mcp-server";
 
@@ -1821,6 +1827,113 @@ describe("MCP server — trace / explore / node tools", () => {
       await server.close();
     }
   });
+
+  it("explore sets truncation.rows on large index without row transport override", async () => {
+    seedWideExploreGraph(130);
+    const db = openDb();
+    try {
+      seedBulkExploreFiles(db, 5000);
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "explore",
+        arguments: { names: ["hub"], budget_chars: 15_000 },
+      });
+      const json = readJson(r) as {
+        rows: unknown[];
+        truncation?: { rows?: boolean; snippets?: boolean };
+      };
+      expect(json.rows.length).toBeLessThanOrEqual(125);
+      expect(json.truncation?.rows).toBe(true);
+      expect(json.truncation?.snippets).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("node sets truncated when budget_chars is tiny", async () => {
+    seedTraceGraph();
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "node",
+        arguments: { name: "foo", include_snippets: true, budget_chars: 1 },
+      });
+      const json = readJson(r) as {
+        truncated: boolean;
+        truncation?: { snippets?: boolean };
+      };
+      expect(json.truncated).toBe(true);
+      expect(json.truncation?.snippets).toBe(true);
+    } finally {
+      await server.close();
+    }
+  });
+
+  function seedBulkExploreFiles(
+    db: ReturnType<typeof openDb>,
+    count: number,
+  ): void {
+    for (let i = 0; i < count; i++) {
+      insertFile(db, {
+        path: `src/bulk/${i}.ts`,
+        content_hash: `hb${i}`,
+        size: 1,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+    }
+  }
+
+  function seedWideExploreGraph(calleeCount: number): void {
+    const bodyLines = [`export function hub() {`];
+    for (let i = 0; i < calleeCount; i++) {
+      bodyLines.push(`  fn${i}();`);
+    }
+    bodyLines.push("}");
+    for (let i = 0; i < calleeCount; i++) {
+      bodyLines.push(`export function fn${i}() { return ${i}; }`);
+    }
+    writeFileSync(
+      join(benchDir, "src", "wide.ts"),
+      `${bodyLines.join("\n")}\n`,
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/wide.ts', 'hw', 500, ${calleeCount + 3}, 'typescript', 1, 1)`,
+      );
+      const symbolValues: string[] = [
+        "('hub', 'function', 'src/wide.ts', 1, 2, 'hub()', 1, NULL, 'export')",
+      ];
+      for (let i = 0; i < calleeCount; i++) {
+        const line = 3 + i;
+        symbolValues.push(
+          `('fn${i}', 'function', 'src/wide.ts', ${line}, ${line}, 'fn${i}()', 1, NULL, 'export')`,
+        );
+      }
+      db.run(
+        `INSERT INTO symbols (name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility)
+         VALUES ${symbolValues.join(",")}`,
+      );
+      const callValues: string[] = [];
+      for (let i = 0; i < calleeCount; i++) {
+        callValues.push(`('src/wide.ts', 'hub', 'hub', 'fn${i}', 2, 0, 0)`);
+      }
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ${callValues.join(",")}`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
 
   it("records recipe recency after trace and explore", async () => {
     seedTraceGraph();

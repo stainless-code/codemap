@@ -62,15 +62,6 @@ export function resolveEffectiveSnippetBudget(
   return resolveOutputBudget(readIndexedFileCount(db)).snippet_char_budget;
 }
 
-/** Explicit `rowLimit` wins; otherwise adaptive cap from indexed file count. */
-export function resolveEffectiveExploreRowLimit(
-  db: CodemapDatabase,
-  rowLimit?: number,
-): number {
-  if (rowLimit !== undefined) return rowLimit;
-  return resolveOutputBudget(readIndexedFileCount(db)).explore_row_limit;
-}
-
 export interface SourceCharBudgetResult<
   T extends { source?: string | undefined },
 > {

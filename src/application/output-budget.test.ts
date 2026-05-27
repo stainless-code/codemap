@@ -11,7 +11,6 @@ import {
   DEFAULT_EXPLORE_ROW_LIMIT,
   DEFAULT_OUTPUT_CHAR_BUDGET,
   readIndexedFileCount,
-  resolveEffectiveExploreRowLimit,
   resolveEffectiveOutputBudget,
   resolveEffectiveSnippetBudget,
   resolveOutputBudget,
@@ -122,28 +121,14 @@ describe("resolveEffectiveOutputBudget", () => {
         snippet_char_budget: 42,
         explore_row_limit: 7,
       });
+      expect(resolveEffectiveOutputBudget(db, { budgetChars: 99_999 })).toEqual(
+        {
+          snippet_char_budget: 99_999,
+          explore_row_limit: 250,
+        },
+      );
     } finally {
       closeDb(db);
-    }
-  });
-});
-
-describe("resolveEffectiveExploreRowLimit", () => {
-  it("honors explicit rowLimit", () => {
-    const db = seedFileCount(6000);
-    try {
-      expect(resolveEffectiveExploreRowLimit(db, 7)).toBe(7);
-    } finally {
-      closeDb(db);
-    }
-  });
-
-  it("derives adaptive cap from indexed file count", () => {
-    const mid = seedFileCount(501);
-    try {
-      expect(resolveEffectiveExploreRowLimit(mid)).toBe(250);
-    } finally {
-      closeDb(mid);
     }
   });
 });
