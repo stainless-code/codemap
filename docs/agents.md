@@ -107,7 +107,7 @@ Long-running **`codemap mcp`** stays up for the whole IDE session while the stdi
 
 **Exit triggers (MCP):** client disconnect only — stdin EOF, stdout broken pipe (`EPIPE`), boot parent process gone, or SIGINT/SIGTERM. Implementation: `src/application/session-lifecycle.ts` (`createStdioDisconnectMonitor`).
 
-**Not idle timeout:** HTTP **`serve --watch`** uses a 5s **watch release grace** after the last tool request — that stops chokidar between stateless POSTs, not the MCP/HTTP process. **`GET /health`** never acquires a watch client.
+**Not idle timeout:** HTTP **`serve --watch`** uses a 5s **watch release grace** after the last non-`/health` request — that stops chokidar between stateless requests, not the MCP/HTTP process. **`GET /health`** never acquires a watch client.
 
 See [architecture.md § Session lifecycle wiring](./architecture.md#cli-usage).
 

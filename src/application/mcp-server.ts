@@ -611,11 +611,12 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
 
   const server = createMcpServer(opts);
   const transport = new StdioServerTransport();
-  await server.connect(transport);
 
   if (watchSession !== undefined) {
     await watchSession.acquireClient();
   }
+
+  await server.connect(transport);
 
   let shuttingDown = false;
   await new Promise<void>((resolve) => {
