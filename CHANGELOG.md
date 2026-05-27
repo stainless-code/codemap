@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.9.4
+
+### Patch Changes
+
+- [#158](https://github.com/stainless-code/codemap/pull/158) [`e8ea640`](https://github.com/stainless-code/codemap/commit/e8ea64077028951b7c9d024e7f81d3f16de07fc5) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `codemap agents init --targets` and `--link-mode` for non-interactive IDE wiring. Combine with `--mcp` to write MCP config only for selected integrations (e.g. Cursor + Copilot without Continue/Cline). Mutually exclusive with `--interactive`.
+
 ## 0.9.3
 
 ### Patch Changes
