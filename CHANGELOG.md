@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.9.3
+
+### Patch Changes
+
+- [#156](https://github.com/stainless-code/codemap/pull/156) [`ae4a143`](https://github.com/stainless-code/codemap/commit/ae4a143ae0301f8750333feb5f386ff3479202a6) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap agents init --mcp` now includes `--root ${workspaceFolder}` in the VS Code / Copilot MCP config (`.vscode/mcp.json`), same as Cursor. Re-run `codemap agents init --mcp` to upgrade an existing `.vscode/mcp.json` from older init output (or `--interactive` and select Copilot only).
+
 ## 0.9.2
 
 ### Patch Changes
