@@ -153,6 +153,9 @@ export function createManagedWatchSession(
 
   const stopWatcher = async (): Promise<void> => {
     cancelScheduledStop();
+    if (starting !== undefined) {
+      await starting;
+    }
     if (handle === undefined) return;
     const current = handle;
     handle = undefined;
@@ -189,7 +192,11 @@ export function createManagedWatchSession(
       stopTimer = setTimeout(() => {
         stopTimer = undefined;
         if (clients === 0) {
-          void stopWatcher();
+          void stopWatcher().catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            // eslint-disable-next-line no-console -- grace stop failure should be visible
+            console.error(`codemap watch: grace stop failed — ${msg}`);
+          });
         }
       }, releaseGraceMs);
       stopTimer.unref?.();
@@ -215,7 +222,11 @@ export function bindWatchClientRelease(
   const release = (): void => {
     if (released) return;
     released = true;
-    void session.releaseClient();
+    void session.releaseClient().catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console -- release failure should be visible
+      console.error(`codemap watch: client release failed — ${msg}`);
+    });
   };
   res.once("finish", release);
   res.once("close", release);

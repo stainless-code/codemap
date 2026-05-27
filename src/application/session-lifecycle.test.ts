@@ -116,19 +116,22 @@ describe("createStdioDisconnectMonitor", () => {
       "isProcessAlive",
     ).mockReturnValue(false);
 
-    const reasons: string[] = [];
-    const monitor = createStdioDisconnectMonitor(
-      (reason) => reasons.push(reason),
-      {
-        parentPid: 42,
-        pollIntervalMs: 5,
-      },
-    );
+    try {
+      const reasons: string[] = [];
+      const monitor = createStdioDisconnectMonitor(
+        (reason) => reasons.push(reason),
+        {
+          parentPid: 42,
+          pollIntervalMs: 5,
+        },
+      );
 
-    await Bun.sleep(20);
-    expect(reasons).toEqual(["parent process exited"]);
-    monitor.dispose();
-    alive.mockRestore();
+      await Bun.sleep(20);
+      expect(reasons).toEqual(["parent process exited"]);
+      monitor.dispose();
+    } finally {
+      alive.mockRestore();
+    }
   });
 });
 
@@ -219,6 +222,45 @@ describe("createManagedWatchSession", () => {
     await Bun.sleep(graceMs + 20);
     expect(session.isWatching()).toBe(true);
     await session.forceStop();
+  });
+
+  it("forceStop waits for in-flight startup before returning", async () => {
+    const primeGate = Promise.withResolvers<void>();
+    let stopCalled = false;
+    const backend: WatchBackend = {
+      start() {},
+      async stop() {
+        stopCalled = true;
+      },
+    };
+
+    const session = createManagedWatchSession({
+      root: "/tmp",
+      excludeDirNames: new Set(["node_modules"]),
+      recipesWatchPrefix: ".codemap/recipes/",
+      debounceMs: 0,
+      onChange: () => {},
+      releaseGraceMs: 0,
+      onPrime: async () => {
+        await primeGate.promise;
+      },
+      backend,
+    });
+
+    const acquirePromise = session.acquireClient();
+    await Bun.sleep(0);
+    expect(session.isWatching()).toBe(false);
+
+    const forceStopPromise = session.forceStop();
+    await Bun.sleep(5);
+    expect(session.isWatching()).toBe(false);
+    expect(stopCalled).toBe(false);
+
+    primeGate.resolve();
+    await Promise.all([acquirePromise, forceStopPromise]);
+
+    expect(session.isWatching()).toBe(false);
+    expect(stopCalled).toBe(true);
   });
 
   it("rolls back client count when ensureStarted fails", async () => {
