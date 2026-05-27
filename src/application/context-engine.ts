@@ -3,7 +3,7 @@ import type { CodemapDatabase } from "../db";
 import { CODEMAP_VERSION } from "../version";
 import { computeIndexFreshness } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
-import { QUERY_RECIPES } from "./query-recipes";
+import { QUERY_RECIPES, getQueryRecipeSql } from "./query-recipes";
 import { getIndexedContentHash, readSymbolSource } from "./show-engine";
 
 /** Max recipe cards in `start_here.recipes`. */
@@ -63,10 +63,10 @@ export interface ContextEnvelope {
   };
   hubs?: { to_path: string; fan_in: number }[];
   /**
-   * A flavor sample of TODO/FIXME/HACK/NOTE markers — the alphabetically-first
-   * 20 across the repo, ordered by `(file_path, line_number)`. Not a recency
-   * signal; for time-ordered output query `markers` directly, joining
-   * `files.last_modified`. Debug intent biases toward FIXME/TODO kinds.
+   * Marker sample capped by `resolveContextBudget(file_count).marker_limit`.
+   * Default ordering is alphabetical by `(file_path, line_number)`; debug intent
+   * biases toward FIXME/TODO kinds. Not a recency signal — for time-ordered
+   * output query `markers` directly, joining `files.last_modified`.
    */
   sample_markers?: {
     file_path: string;
@@ -245,9 +245,11 @@ export function buildContextEnvelope(
     const markerIntentClass =
       opts.intent !== null ? classifyIntent(opts.intent).classified_as : null;
 
-    envelope.hubs = db
-      .query(QUERY_RECIPES["fan-in"]!.sql)
-      .all() as ContextEnvelope["hubs"];
+    const fanInRows = readFanInHubs(db, budget.hub_limit);
+    envelope.hubs = fanInRows.map((row) => ({
+      to_path: row.to_path,
+      fan_in: row.fan_in,
+    }));
     envelope.sample_markers = readSampleMarkers(
       db,
       markerIntentClass,
@@ -262,6 +264,7 @@ export function buildContextEnvelope(
       fileCount,
       projectRoot,
       includeSnippets: opts.include_snippets === true,
+      fanInRows,
     });
   }
 
@@ -284,20 +287,53 @@ export function composeStartHere(
     fileCount: number;
     projectRoot: string;
     includeSnippets?: boolean;
+    fanInRows?: FanInHubRow[];
   },
 ): ContextStartHere {
   const budget = resolveContextBudget(opts.fileCount);
+  const fanInRows = opts.fanInRows ?? readFanInHubs(db, budget.hub_limit);
   return {
     classified_as: classification.classified_as,
     hint: classification.hint,
     index_summary: readIndexSummary(db),
     recipes: composeRecipeStarters(classification.matched_recipes),
-    hub_leaders: composeHubLeaders(db, {
-      budget,
+    hub_leaders: composeHubLeadersFromRows(db, fanInRows, {
       projectRoot: opts.projectRoot,
       includeSnippets: opts.includeSnippets === true,
+      signatureMaxChars: budget.signature_max_chars,
+      signaturesPerHub: budget.signatures_per_hub,
     }),
   };
+}
+
+export interface FanInHubRow {
+  to_path: string;
+  fan_in: number;
+}
+
+/** Run the registered `fan-in` recipe with an adaptive row cap. */
+export function readFanInHubs(
+  db: CodemapDatabase,
+  limit: number,
+): FanInHubRow[] {
+  const base = getQueryRecipeSql("fan-in");
+  if (base === undefined) return [];
+  const { sql, params } = capRecipeSqlLimit(base, limit);
+  return db.query(sql).all(...params) as FanInHubRow[];
+}
+
+function capRecipeSqlLimit(
+  sql: string,
+  limit: number,
+): { sql: string; params: number[] } {
+  const trimmed = sql.trim().replace(/;\s*$/, "");
+  if (/\bLIMIT\s+\d+\s*$/im.test(trimmed)) {
+    return {
+      sql: trimmed.replace(/\bLIMIT\s+\d+\s*$/im, "LIMIT ?"),
+      params: [limit],
+    };
+  }
+  return { sql: `${trimmed} LIMIT ?`, params: [limit] };
 }
 
 function readIndexSummary(db: CodemapDatabase): ContextIndexSummary {
@@ -364,28 +400,20 @@ function composeRecipeStarters(recipeIds: string[]): ContextRecipeStarter[] {
   return starters;
 }
 
-function composeHubLeaders(
+function composeHubLeadersFromRows(
   db: CodemapDatabase,
+  fanInRows: FanInHubRow[],
   opts: {
-    budget: ContextBudget;
     projectRoot: string;
     includeSnippets: boolean;
+    signatureMaxChars: number;
+    signaturesPerHub: number;
   },
 ): ContextHubLeader[] {
-  const hubs = db
-    .query(
-      `SELECT to_path AS file_path, COUNT(*) AS fan_in
-       FROM dependencies
-       GROUP BY to_path
-       ORDER BY fan_in DESC, to_path ASC
-       LIMIT ?`,
-    )
-    .all(opts.budget.hub_limit) as { file_path: string; fan_in: number }[];
-
-  return hubs.map((hub) => ({
-    file_path: hub.file_path,
+  return fanInRows.map((hub) => ({
+    file_path: hub.to_path,
     fan_in: hub.fan_in,
-    signatures: readHubSignatures(db, hub.file_path, opts),
+    signatures: readHubSignatures(db, hub.to_path, opts),
   }));
 }
 
@@ -393,9 +421,10 @@ function readHubSignatures(
   db: CodemapDatabase,
   filePath: string,
   opts: {
-    budget: ContextBudget;
     projectRoot: string;
     includeSnippets: boolean;
+    signatureMaxChars: number;
+    signaturesPerHub: number;
   },
 ): ContextHubLeader["signatures"] {
   const rows = db
@@ -414,7 +443,7 @@ function readHubSignatures(
          line_start ASC
        LIMIT ?`,
     )
-    .all(filePath, opts.budget.signatures_per_hub) as {
+    .all(filePath, opts.signaturesPerHub) as {
     name: string;
     kind: string;
     signature: string;
@@ -426,10 +455,7 @@ function readHubSignatures(
     const sig: ContextHubSignature = {
       name: row.name,
       kind: row.kind,
-      signature: truncateSignature(
-        row.signature,
-        opts.budget.signature_max_chars,
-      ),
+      signature: truncateSignature(row.signature, opts.signatureMaxChars),
     };
     if (opts.includeSnippets) {
       const indexedHash = getIndexedContentHash(db, filePath);

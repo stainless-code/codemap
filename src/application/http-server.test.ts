@@ -240,6 +240,16 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.codemap.schema_version).toBeGreaterThan(0);
   });
 
+  it("context returns start_here and include_snippets on full envelope", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "context", {
+      include_snippets: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.start_here?.index_summary).toBeDefined();
+    expect(Array.isArray(r.json.start_here?.hub_leaders)).toBe(true);
+  });
+
   it("validate returns staleness rows", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "validate", {});

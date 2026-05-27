@@ -278,6 +278,48 @@ describe("buildContextEnvelope", () => {
     }
   });
 
+  it("maps intent to start_here classification and recipe cards", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: "refactor the auth module",
+        });
+        expect(envelope.start_here?.classified_as).toBe("refactor");
+        expect(envelope.start_here?.recipes.map((r) => r.id)).toEqual([
+          "fan-in",
+          "fan-out",
+          "barrel-files",
+          "deprecated-symbols",
+        ]);
+        expect(envelope.intent?.classified_as).toBe("refactor");
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("keeps hubs and hub_leaders aligned under adaptive budget", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(envelope.hubs?.length).toBe(
+          envelope.start_here?.hub_leaders.length,
+        );
+        expect(envelope.hubs?.[0]?.to_path).toBe(
+          envelope.start_here?.hub_leaders[0]?.file_path,
+        );
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
   it("omits start_here when compact", () => {
     const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
     try {
