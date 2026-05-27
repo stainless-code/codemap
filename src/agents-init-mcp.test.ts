@@ -64,7 +64,7 @@ function seedBunInstalledCodemapProject(dir: string): void {
 }
 
 describe("buildCodemapMcpSpawn", () => {
-  it("includes workspace root for Cursor", () => {
+  it("includes workspace root when includeWorkspaceRoot is true", () => {
     expect(buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true)).toEqual({
       command: "npx",
       args: ["codemap", "mcp", "--watch", "--root", "${workspaceFolder}"],
@@ -179,13 +179,13 @@ describe("mergeCodemapVsCodeServer", () => {
           other: { command: "npx", args: ["-y", "other"] },
         },
       },
-      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, false),
+      buildCodemapMcpSpawn(NPM_LOCAL_INVOCATION, true),
     );
     expect(merged.servers?.other?.command).toBe("npx");
     expect(merged.servers?.[CODEMAP_MCP_SERVER_KEY]).toEqual({
       type: "stdio",
       command: "npx",
-      args: ["codemap", "mcp", "--watch"],
+      args: ["codemap", "mcp", "--watch", "--root", "${workspaceFolder}"],
     });
   });
 });
@@ -300,7 +300,13 @@ describe("applyAgentsInitMcp", () => {
       };
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
-      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args?.[0]).toBe("codemap");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
+        "codemap",
+        "mcp",
+        "--watch",
+        "--root",
+        "${workspaceFolder}",
+      ]);
 
       const amazonDefault = JSON.parse(
         readFileSync(join(dir, ".amazonq", "default.json"), "utf-8"),
@@ -376,6 +382,31 @@ describe("applyAgentsInitMcp", () => {
     }
   });
 
+  it("writes project .vscode/mcp.json when vscode target selected", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vs-"));
+    try {
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["vscode"] });
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "mcp.json"))).toBe(false);
+      const vscode = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as {
+        servers: Record<
+          string,
+          { type: string; command: string; args: string[] }
+        >;
+      };
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]).toEqual({
+        type: "stdio",
+        command: "npx",
+        args: ["codemap", "mcp", "--watch", "--root", "${workspaceFolder}"],
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("writes project .cline/mcp.json when cline target selected", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-"));
     const fakeHome = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-cl-home-"));
@@ -442,6 +473,105 @@ describe("applyAgentsInitMcp", () => {
       expect(settings.permissions.allow).toContain(
         CODEMAP_MCP_PERMISSION_ALLOW,
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("merges into existing .vscode/mcp.json without clobbering other servers", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vs-merge-"));
+    try {
+      seedInstalledCodemapProject(dir);
+      mkdirSync(join(dir, ".vscode"), { recursive: true });
+      writeFileSync(
+        join(dir, ".vscode", "mcp.json"),
+        `${JSON.stringify(
+          {
+            servers: {
+              foreign: { type: "stdio", command: "node", args: ["server.js"] },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf-8",
+      );
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["vscode"] });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as {
+        servers: Record<
+          string,
+          { type?: string; command: string; args: string[] }
+        >;
+      };
+      expect(parsed.servers.foreign).toEqual({
+        type: "stdio",
+        command: "node",
+        args: ["server.js"],
+      });
+      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
+        "codemap",
+        "mcp",
+        "--watch",
+        "--root",
+        "${workspaceFolder}",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("is idempotent on vscode re-run", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vs-idem-"));
+    try {
+      seedInstalledCodemapProject(dir);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["vscode"] });
+      const before = readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8");
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["vscode"] });
+      expect(readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8")).toBe(
+        before,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("upgrades stale vscode codemap entry without --root on re-run", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-mcp-vs-upgrade-"));
+    try {
+      seedInstalledCodemapProject(dir);
+      mkdirSync(join(dir, ".vscode"), { recursive: true });
+      writeFileSync(
+        join(dir, ".vscode", "mcp.json"),
+        `${JSON.stringify(
+          {
+            servers: {
+              [CODEMAP_MCP_SERVER_KEY]: {
+                type: "stdio",
+                command: "npx",
+                args: ["codemap", "mcp", "--watch"],
+              },
+            },
+          },
+          null,
+          2,
+        )}\n`,
+        "utf-8",
+      );
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["vscode"] });
+      const parsed = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as {
+        servers: Record<string, { args: string[] }>;
+      };
+      expect(parsed.servers[CODEMAP_MCP_SERVER_KEY]?.args).toEqual([
+        "codemap",
+        "mcp",
+        "--watch",
+        "--root",
+        "${workspaceFolder}",
+      ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

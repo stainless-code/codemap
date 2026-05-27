@@ -52,7 +52,7 @@ export interface ClaudeSettingsFile {
   };
 }
 
-/** Host-specific codemap MCP entry (Cursor root arg, Amazon Q IDE transport fields, …). */
+/** Host-specific codemap MCP entry (workspace-root arg, Amazon Q IDE transport fields, …). */
 export function buildMcpServerEntryForDef(
   def: Pick<AgentsInitMcpTargetDef, "format" | "workspaceRootArg">,
   invocation: ResolvedCodemapInvocation,
@@ -434,8 +434,8 @@ export interface ApplyAgentsInitMcpOptions {
 }
 
 /**
- * Write MCP config for selected integrations. Cursor uses
- * `${workspaceFolder}` root injection; most other clients rely on workspace cwd.
+ * Write MCP config for selected integrations. Cursor and VS Code get
+ * `${workspaceFolder}` root injection; other cwd-based clients omit `--root`.
  */
 export async function applyAgentsInitMcp(
   opts: ApplyAgentsInitMcpOptions,

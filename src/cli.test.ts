@@ -150,7 +150,7 @@ describe("CLI unknown / invalid args", () => {
     }
   });
 
-  test("agents init --force --mcp writes .cursor/mcp.json under --root", async () => {
+  test("agents init --force --mcp writes project MCP configs under --root", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-cli-agents-mcp-"));
     try {
       const { exitCode, err } = await runCli([
@@ -168,6 +168,12 @@ describe("CLI unknown / invalid args", () => {
         readFileSync(join(dir, ".cursor", "mcp.json"), "utf-8"),
       ) as { mcpServers: Record<string, { command: string }> };
       expect(parsed.mcpServers.codemap?.command).toBe("npx");
+      expect(existsSync(join(dir, ".vscode", "mcp.json"))).toBe(true);
+      const vscode = JSON.parse(
+        readFileSync(join(dir, ".vscode", "mcp.json"), "utf-8"),
+      ) as { servers: Record<string, { args: string[] }> };
+      expect(vscode.servers.codemap?.args).toContain("--root");
+      expect(vscode.servers.codemap?.args).toContain("${workspaceFolder}");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
