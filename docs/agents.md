@@ -32,8 +32,8 @@ codemap agents init --git-hooks       # opt-in background index on git events
 codemap agents init --no-git-hooks    # remove codemap hook blocks
 ```
 
-- **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
-- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **`.agents/rules`** (and Cursor also **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
+- **`--force`** — if **`.agents/`** already exists, delete only the **same file paths** that ship in **`templates/agents`** (under **`rules/`** and **`skills/`**), then copy those files from the template. Any **other** files next to them (your custom rules, extra skill dirs, notes at **`.agents/`** root, etc.) are **not** removed. IDE mirrors (`.cursor/rules`, …) sync **only bundled template paths** (today `rules/codemap.md` and `skills/codemap/SKILL.md`) — not your whole **`.agents/`** tree. **`--force`** overwrites an existing IDE mirror **only** when it has **`<!-- codemap-init:managed -->`** or matches the **legacy mirror heuristic** (see [§ IDE mirror provenance](#ide-mirror-provenance-codemap-initmanaged)). Pointer files (`CLAUDE.md`, …): **`--force`** refreshes the `codemap-pointer` section only; your prose outside the markers is kept. Use **`--interactive`**, not a bare **`interactive`** argument (unknown tokens are rejected).
+- **`--interactive`** — multiselect which tools to wire (see below); choose **symlink** vs **copy** for integrations that mirror **bundled** **`.agents/rules`** paths (and Cursor also bundled **`.agents/skills`**). Uses [**@clack/prompts**](https://github.com/bombshell-dev/clack); **non-TTY** runs exit with an error.
 
 ## Git and `.gitignore`
 
@@ -45,17 +45,17 @@ The user's root **`.gitignore`** is no longer touched by `codemap agents init`. 
 
 All integrations reuse the **same** bundled content under **`.agents/`**. Symlink-style rows use one **link mode** for the whole run (**symlink** or **copy**) when any of them is selected.
 
-| Integration                           | What gets created                                          | Notes                                                                                                                               |
-| ------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → **`.agents/`** | Per-file symlink or copy (each rule/skill file, not a directory link).                                                              |
-| **Windsurf**                          | **`.windsurf/rules`** → **`.agents/rules`**                | Rules only.                                                                                                                         |
-| **Continue**                          | **`.continue/rules`** → **`.agents/rules`**                | [Continue rules](https://docs.continue.dev/customize/rules).                                                                        |
-| **Cline**                             | **`.clinerules`** → **`.agents/rules`**                    | Per-file symlink or copy.                                                                                                           |
-| **Amazon Q**                          | **`.amazonq/rules`** → **`.agents/rules`**                 | [AWS rules](https://aws.amazon.com/blogs/devops/mastering-amazon-q-developer-with-rules/).                                          |
-| **GitHub Copilot**                    | **`.github/copilot-instructions.md`**                      | Pointer + link to [GitHub Docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot). |
-| **Claude Code**                       | **`CLAUDE.md`**                                            | Root onboarding pointer.                                                                                                            |
-| **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                            | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
-| **Gemini**                            | **`GEMINI.md`**                                            | For integrations that load **`GEMINI.md`**.                                                                                         |
+| Integration                           | What gets created                                                        | Notes                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → bundled **`.agents/`** paths | Per-file symlink or copy of **bundled** rule/skill paths only (not your whole **`.agents/`** tree).                                 |
+| **Windsurf**                          | **`.windsurf/rules`** → bundled **`.agents/rules`** paths                | Bundled rules only.                                                                                                                 |
+| **Continue**                          | **`.continue/rules`** → bundled **`.agents/rules`** paths                | [Continue rules](https://docs.continue.dev/customize/rules).                                                                        |
+| **Cline**                             | **`.clinerules`** → bundled **`.agents/rules`** paths                    | Per-file symlink or copy (bundled paths only).                                                                                      |
+| **Amazon Q**                          | **`.amazonq/rules`** → bundled **`.agents/rules`** paths                 | [AWS rules](https://aws.amazon.com/blogs/devops/mastering-amazon-q-developer-with-rules/).                                          |
+| **GitHub Copilot**                    | **`.github/copilot-instructions.md`**                                    | Pointer + link to [GitHub Docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot). |
+| **Claude Code**                       | **`CLAUDE.md`**                                                          | Root onboarding pointer.                                                                                                            |
+| **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                                          | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
+| **Gemini**                            | **`GEMINI.md`**                                                          | For integrations that load **`GEMINI.md`**.                                                                                         |
 
 ## Git hooks (opt-in freshness)
 
@@ -73,9 +73,22 @@ Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md
 | File exists, section present                                                 | **Replace only** that section — idempotent re-runs, no duplicate blocks; template updates fix **stale** text. |
 | File exists, no section, but content looks like an **old** Codemap-only file | **Replace whole file** with the managed section (one-time migration).                                         |
 | File exists with other content (e.g. your team intro)                        | **Append** the managed section **once**.                                                                      |
-| **`--force`**                                                                | Replace the **entire file** with the latest managed section.                                                  |
+| **`--force`**                                                                | Refresh the **managed pointer section** only; user content outside markers is preserved.                      |
 
 Append alone would duplicate on every run — markers + replace are what prevent duplicates and staleness.
+
+## IDE mirror provenance (`codemap-init:managed`)
+
+Bundled templates ship **`<!-- codemap-init:managed -->`**. **Copy mode** writes that marker into IDE mirror files; **symlink mode** inherits it from the **`.agents/`** target (init checks marker content through the link).
+
+| Surface                                                                         | `--force` overwrite policy                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`.agents/`** bundled paths (`rules/codemap.md`, `skills/codemap/SKILL.md`, …) | Always refreshed — path whitelist only; marker not required.                                                                                                                                                                                                                                           |
+| **IDE mirrors** (`.cursor/`, `.windsurf/`, …)                                   | Only when the dest file has **`codemap-init:managed`**, or content matches a **legacy Codemap mirror** (pre-marker copy from bundled templates: `codemap query` plus `codemap-pointer-version`, `codemap://rule`, or `stainless-code/codemap`). User-owned files at those paths are never overwritten. |
+
+**Legacy heuristic caveat:** Long user-authored prose at a bundled mirror path that quotes official Codemap docs could match once — delete that file manually if **`--force`** refreshes something you did not intend.
+
+**Upgrading from pre-marker init:** Re-run **`codemap agents init --force`** with your IDE targets selected (or **`--interactive`**). Copy-mode mirrors from older inits are migrated once via the legacy heuristic; symlink mode needs no mirror migration (init reads markers through the link into **`.agents/`**). If **`--force`** still refuses a mirror path, delete that single file manually and re-run init.
 
 ## Live fetch surface (CLI + MCP + HTTP)
 
@@ -140,7 +153,7 @@ With **`--mcp`** and no `--target` filter, all **project-local** rows above are 
 
 Merge is idempotent: foreign MCP servers and existing settings keys are preserved; only the `codemap` server entry and permission pattern are upserted. **`command` / spawn args are resolved from the project** (when `@stainless-code/codemap` is listed in `package.json`, the local PM runner is used — e.g. `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`; otherwise PM dlx of `@stainless-code/codemap@latest` — e.g. `npx @stainless-code/codemap@latest`, `pnpm dlx @stainless-code/codemap@latest`, `yarn dlx @stainless-code/codemap@latest`; yarn classic may fall back to `npx` per `package-manager-detector`; Bun uses **`bunx`**, not `bun x`). Init logs the chosen invocation (`MCP CLI: …`).
 
-**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp` or `--git-hooks` still applies MCP/hook changes without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON is rejected unless `--force` (full file replace; foreign MCP entries dropped — warning printed). Invalid `mcpServers` / `servers` **shape** with `--force` replaces only that map and preserves other top-level keys.
+**Side-effect-only re-runs:** When `.agents/` already exists, `codemap agents init --mcp`, **`--interactive`** target wiring (or any explicit integration targets), or `--git-hooks` still apply without `--force`. `codemap agents init --no-git-hooks --mcp` uninstalls hook blocks and writes MCP even when `.agents/` is absent. Template refresh still requires `--force`. Unparseable MCP JSON and invalid `mcpServers` / `servers` **shape** are **rejected** (fix the file manually — init never wipes or resets those maps, even with `--force`). Foreign MCP servers in a valid map are always preserved on merge.
 
 ## Section assembler and `*.gen.md`
 

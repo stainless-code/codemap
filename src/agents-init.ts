@@ -1,9 +1,11 @@
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -64,28 +66,136 @@ export function relPathToAbsSegments(rel: string): string[] {
   return segments;
 }
 
-/** Copy only listed relative paths from `srcRoot` into `destRoot` (mkdir parents per file). */
+function removeManagedFileIfExists(abs: string, label: string): void {
+  if (!existsSync(abs)) {
+    return;
+  }
+  const st = statSync(abs);
+  if (st.isDirectory()) {
+    throw new Error(
+      `Codemap: ${label} is a directory — remove it manually; init only replaces codemap-managed files.`,
+    );
+  }
+  rmSync(abs, { force: true });
+}
+
+function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
+  for (const rel of relPaths) {
+    const abs = join(destBase, ...relPathToAbsSegments(rel));
+    removeManagedFileIfExists(abs, abs);
+  }
+}
+
+function isSymlinkTo(destFile: string, srcFile: string): boolean {
+  try {
+    if (!lstatSync(destFile).isSymbolicLink()) {
+      return false;
+    }
+    return readlinkSync(destFile) === relative(dirname(destFile), srcFile);
+  } catch {
+    return false;
+  }
+}
+
+function filesContentEqual(a: string, b: string): boolean {
+  return readFileSync(a).equals(readFileSync(b));
+}
+
+/** HTML comment — marks files init wrote or mirrors from bundled templates; `--force` overwrites only when present. */
+export const CODMAP_INIT_MANAGED = "<!-- codemap-init:managed -->";
+
+function fileHasCodemapInitMarker(path: string): boolean {
+  if (!existsSync(path)) {
+    return false;
+  }
+  try {
+    return readFileSync(path, "utf-8").includes(CODMAP_INIT_MANAGED);
+  } catch {
+    return false;
+  }
+}
+
+/** One-time upgrade for copy-mode mirrors written before {@link CODMAP_INIT_MANAGED} shipped. */
+function looksLikeLegacyCodemapMirror(content: string): boolean {
+  const t = content.trim();
+  if (t.length < 80) {
+    return false;
+  }
+  return (
+    t.includes("codemap query") &&
+    (t.includes("codemap-pointer-version") ||
+      t.includes("codemap://rule") ||
+      t.includes("stainless-code/codemap"))
+  );
+}
+
+function mirrorMayForceOverwrite(path: string): boolean {
+  if (fileHasCodemapInitMarker(path)) {
+    return true;
+  }
+  try {
+    return looksLikeLegacyCodemapMirror(readFileSync(path, "utf-8"));
+  } catch {
+    return false;
+  }
+}
+
+function refuseOverwriteNonManagedMirror(path: string): void {
+  throw new Error(
+    `Codemap: ${path} exists but is not codemap-managed (missing ${CODMAP_INIT_MANAGED}) — remove or edit manually; init will not overwrite.`,
+  );
+}
+
+/** Bundled template paths under `rules/` and `skills/` (IDE mirrors sync these only). */
+export function resolveBundledAgentMirrorPaths(templateRoot?: string): {
+  ruleFiles: string[];
+  skillFiles: string[];
+} {
+  const root = templateRoot ?? resolveAgentsTemplateDir();
+  return {
+    ruleFiles: listRegularFilesRecursive(join(root, "rules")),
+    skillFiles: listRegularFilesRecursive(join(root, "skills")),
+  };
+}
+
+/** Copy listed paths; never deletes paths outside `relPaths`. */
 function copyFilesGranular(
   srcRoot: string,
   destRoot: string,
   relPaths: string[],
+  force: boolean,
   renameFn?: (rel: string) => string,
 ): void {
   for (const rel of relPaths) {
     const destRel = renameFn ? renameFn(rel) : rel;
     const from = join(srcRoot, ...relPathToAbsSegments(rel));
     const to = join(destRoot, ...relPathToAbsSegments(destRel));
+    if (existsSync(to)) {
+      if (!force && filesContentEqual(from, to)) {
+        continue;
+      }
+      if (!force) {
+        throw new Error(
+          `Codemap: ${to} already exists — use --force to replace codemap-managed mirror files only.`,
+        );
+      }
+      if (!mirrorMayForceOverwrite(to)) {
+        refuseOverwriteNonManagedMirror(to);
+      }
+      removeManagedFileIfExists(to, to);
+    }
     mkdirSync(dirname(to), { recursive: true });
     copyFileSync(from, to);
   }
 }
 
-/** Symlink each file: `destRoot/<rel>` → relative path to `srcRoot/<rel>` (mkdir parents per file). */
+/** Symlink listed paths; never deletes paths outside `relPaths`. */
 function symlinkFilesGranular(
   srcRoot: string,
   destRoot: string,
   relPaths: string[],
   labelForErrors: string,
+  force: boolean,
   renameFn?: (rel: string) => string,
 ): void {
   mkdirSync(destRoot, { recursive: true });
@@ -93,6 +203,20 @@ function symlinkFilesGranular(
     const destRel = renameFn ? renameFn(rel) : rel;
     const srcFile = join(srcRoot, ...relPathToAbsSegments(rel));
     const destFile = join(destRoot, ...relPathToAbsSegments(destRel));
+    if (existsSync(destFile)) {
+      if (!force && isSymlinkTo(destFile, srcFile)) {
+        continue;
+      }
+      if (!force) {
+        throw new Error(
+          `Codemap: ${destFile} already exists — use --force to replace codemap-managed mirror files only.`,
+        );
+      }
+      if (!mirrorMayForceOverwrite(destFile)) {
+        refuseOverwriteNonManagedMirror(destFile);
+      }
+      removeManagedFileIfExists(destFile, destFile);
+    }
     mkdirSync(dirname(destFile), { recursive: true });
     const target = relative(dirname(destFile), srcFile);
     try {
@@ -103,16 +227,6 @@ function symlinkFilesGranular(
         { cause: err },
       );
     }
-  }
-}
-
-function removeBundledPathsIfExist(destBase: string, relPaths: string[]): void {
-  for (const rel of relPaths) {
-    const abs = join(destBase, ...relPathToAbsSegments(rel));
-    if (!existsSync(abs)) {
-      continue;
-    }
-    rmSync(abs, { recursive: true, force: true });
   }
 }
 
@@ -195,7 +309,7 @@ function looksLikeLegacyCodemapPointer(content: string): boolean {
  * - **Existing + markers:** replace inner section (updates stale template text).
  * - **Existing, no markers, legacy Codemap content:** replace whole file with managed block.
  * - **Existing, other content:** append managed block once.
- * - **`force`:** replace entire file with the latest managed block (same as a fresh write).
+ * - **`force`:** refresh the managed section only (never drops non-pointer content).
  */
 export function upsertCodemapPointerFile(
   path: string,
@@ -208,12 +322,6 @@ export function upsertCodemapPointerFile(
   if (!existsSync(path)) {
     writeFileSync(path, wrapped, "utf-8");
     console.log(`  Wrote ${label} with Codemap pointers`);
-    return;
-  }
-
-  if (force) {
-    writeFileSync(path, wrapped, "utf-8");
-    console.log(`  Replaced ${label} (--force)`);
     return;
   }
 
@@ -232,7 +340,11 @@ export function upsertCodemapPointerFile(
       return;
     }
     writeFileSync(path, next, "utf-8");
-    console.log(`  Updated Codemap section in ${label}`);
+    console.log(
+      force
+        ? `  Refreshed Codemap section in ${label} (--force)`
+        : `  Updated Codemap section in ${label}`,
+    );
     return;
   }
 
@@ -280,46 +392,27 @@ export function ensureGitignoreCodemapPattern(projectRoot: string): void {
   }
 }
 
-function removePathForRewrite(
-  path: string,
-  force: boolean,
-  label: string,
-): void {
-  if (!existsSync(path)) {
-    return;
-  }
-  if (!force) {
-    throw new Error(
-      `Codemap: ${label} already exists — use --force to replace, or remove it manually.`,
-    );
-  }
-  rmSync(path, { recursive: true, force: true });
-}
-
-/**
- * Map `.agents/rules` into a destination directory (symlink or copy).
- */
 function wireAgentsRulesTo(
   projectRoot: string,
   destPath: string,
   label: string,
+  ruleRelPaths: string[],
   linkMode: AgentsInitLinkMode,
   force: boolean,
 ): void {
   const agentsRules = join(projectRoot, ".agents", "rules");
   mkdirSync(dirname(destPath), { recursive: true });
-  removePathForRewrite(destPath, force, label);
   if (linkMode === "symlink") {
-    const ruleFiles = listRegularFilesRecursive(agentsRules);
-    symlinkFilesGranular(agentsRules, destPath, ruleFiles, label);
+    symlinkFilesGranular(agentsRules, destPath, ruleRelPaths, label, force);
     console.log(
-      `  Linked each file under ${label} → .agents/rules (${ruleFiles.length} files)`,
+      `  Linked ${ruleRelPaths.length} bundled rule file(s) under ${label} → .agents/rules`,
     );
     return;
   }
-  const ruleFiles = listRegularFilesRecursive(agentsRules);
-  copyFilesGranular(agentsRules, destPath, ruleFiles);
-  console.log(`  Copied .agents/rules → ${label}`);
+  copyFilesGranular(agentsRules, destPath, ruleRelPaths, force);
+  console.log(
+    `  Copied ${ruleRelPaths.length} bundled rule file(s) → ${label}`,
+  );
 }
 
 /**
@@ -339,10 +432,19 @@ export function applyAgentsInitTargets(
     );
   }
 
+  const { ruleFiles: bundledRuleFiles, skillFiles: bundledSkillFiles } =
+    resolveBundledAgentMirrorPaths();
+
   for (const t of targets) {
     switch (t) {
       case "cursor": {
-        applyCursorIntegration(projectRoot, linkMode, force);
+        applyCursorIntegration(
+          projectRoot,
+          bundledRuleFiles,
+          bundledSkillFiles,
+          linkMode,
+          force,
+        );
         break;
       }
       case "windsurf": {
@@ -350,6 +452,7 @@ export function applyAgentsInitTargets(
           projectRoot,
           join(projectRoot, ".windsurf", "rules"),
           ".windsurf/rules",
+          bundledRuleFiles,
           linkMode,
           force,
         );
@@ -360,6 +463,7 @@ export function applyAgentsInitTargets(
           projectRoot,
           join(projectRoot, ".continue", "rules"),
           ".continue/rules",
+          bundledRuleFiles,
           linkMode,
           force,
         );
@@ -370,6 +474,7 @@ export function applyAgentsInitTargets(
           projectRoot,
           join(projectRoot, ".clinerules"),
           ".clinerules",
+          bundledRuleFiles,
           linkMode,
           force,
         );
@@ -380,6 +485,7 @@ export function applyAgentsInitTargets(
           projectRoot,
           join(projectRoot, ".amazonq", "rules"),
           ".amazonq/rules",
+          bundledRuleFiles,
           linkMode,
           force,
         );
@@ -433,6 +539,8 @@ function mdToMdc(rel: string): string {
 
 function applyCursorIntegration(
   projectRoot: string,
+  ruleRelPaths: string[],
+  skillRelPaths: string[],
   linkMode: AgentsInitLinkMode,
   force: boolean,
 ): void {
@@ -444,44 +552,31 @@ function applyCursorIntegration(
   mkdirSync(join(projectRoot, ".cursor"), { recursive: true });
 
   if (linkMode === "symlink") {
-    removePathForRewrite(cursorRules, force, ".cursor/rules");
-    removePathForRewrite(cursorSkills, force, ".cursor/skills");
-    const ruleFiles = listRegularFilesRecursive(agentsRules);
-    const skillFiles = listRegularFilesRecursive(agentsSkills);
     symlinkFilesGranular(
       agentsRules,
       cursorRules,
-      ruleFiles,
+      ruleRelPaths,
       ".cursor/rules",
+      force,
       mdToMdc,
     );
     symlinkFilesGranular(
       agentsSkills,
       cursorSkills,
-      skillFiles,
+      skillRelPaths,
       ".cursor/skills",
+      force,
     );
     console.log(
-      `  Linked ${ruleFiles.length} rule file(s) and ${skillFiles.length} skill file(s) under .cursor/ → .agents/`,
+      `  Linked ${ruleRelPaths.length} bundled rule file(s) and ${skillRelPaths.length} bundled skill file(s) under .cursor/ → .agents/`,
     );
     return;
   }
 
-  removePathForRewrite(cursorRules, force, ".cursor/rules");
-  removePathForRewrite(cursorSkills, force, ".cursor/skills");
-  copyFilesGranular(
-    agentsRules,
-    cursorRules,
-    listRegularFilesRecursive(agentsRules),
-    mdToMdc,
-  );
-  copyFilesGranular(
-    agentsSkills,
-    cursorSkills,
-    listRegularFilesRecursive(agentsSkills),
-  );
+  copyFilesGranular(agentsRules, cursorRules, ruleRelPaths, force, mdToMdc);
+  copyFilesGranular(agentsSkills, cursorSkills, skillRelPaths, force);
   console.log(
-    "  Copied rules and skills into .cursor/rules and .cursor/skills",
+    "  Copied bundled rules and skills into .cursor/rules and .cursor/skills",
   );
 }
 
@@ -547,6 +642,18 @@ export async function runAgentsInit(
         await maybeApplyAgentsInitMcp(options);
         return true;
       }
+      const targets = options.targets ?? [];
+      if (targets.length > 0) {
+        applyAgentsInitTargets(
+          options.projectRoot,
+          targets,
+          options.linkMode ?? "symlink",
+          false,
+        );
+        ensureGitignoreCodemapPattern(options.projectRoot);
+        await maybeApplyAgentsInitMcp(options);
+        return true;
+      }
       console.error(
         `  .agents/ already exists at ${destRoot}. Re-run with --force to refresh bundled template files under rules/ and skills/, or remove the directory.`,
       );
@@ -558,8 +665,18 @@ export async function runAgentsInit(
     mkdirSync(destRoot, { recursive: true });
   }
 
-  copyFilesGranular(templateRules, destRules, bundledRuleFiles);
-  copyFilesGranular(templateSkills, destSkills, bundledSkillFiles);
+  copyFilesGranular(
+    templateRules,
+    destRules,
+    bundledRuleFiles,
+    !!options.force,
+  );
+  copyFilesGranular(
+    templateSkills,
+    destSkills,
+    bundledSkillFiles,
+    !!options.force,
+  );
 
   console.log(`  Wrote agent templates to ${destRoot}`);
 
