@@ -502,11 +502,13 @@ export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
 export const contextArgsSchema = {
   compact: z.boolean().optional(),
   intent: z.string().optional(),
+  include_snippets: z.boolean().optional(),
 };
 
 export interface ContextArgs {
   compact?: boolean;
   intent?: string;
+  include_snippets?: boolean;
 }
 
 export function handleContext(args: ContextArgs): ToolResult {
@@ -516,6 +518,7 @@ export function handleContext(args: ContextArgs): ToolResult {
       const envelope = buildContextEnvelope(db, getProjectRoot(), {
         compact: args.compact === true,
         intent: args.intent ?? null,
+        include_snippets: args.include_snippets,
       });
       return ok(envelope);
     } finally {

@@ -15,6 +15,7 @@ import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import {
   handleApply,
+  handleContext,
   handleQueryRecipe,
   handleShow,
   handleSnippet,
@@ -193,6 +194,43 @@ describe("handleApply", () => {
       expect(readFileSync(join(realRoot, "src", "query.ts"), "utf8")).toBe(
         "export function runQuery() {}\n",
       );
+    }
+  });
+});
+
+describe("handleContext", () => {
+  it("returns the bootstrap envelope with start_here", () => {
+    const result = handleContext({});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as Record<string, unknown>;
+      expect(payload.start_here).toBeDefined();
+      expect(payload.codemap).toMatchObject({
+        schema_version: expect.any(Number),
+      });
+    }
+  });
+
+  it("treats whitespace-only intent as no intent", () => {
+    const result = handleContext({ intent: "   " });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as {
+        start_here?: { classified_as: string };
+        intent?: unknown;
+      };
+      expect(payload.start_here?.classified_as).toBe("default");
+      expect(payload.intent).toBeUndefined();
+    }
+  });
+
+  it("omits start_here when compact even with include_snippets", () => {
+    const result = handleContext({ compact: true, include_snippets: true });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as Record<string, unknown>;
+      expect(payload.start_here).toBeUndefined();
+      expect(payload.hubs).toBeUndefined();
     }
   });
 });

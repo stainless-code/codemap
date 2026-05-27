@@ -68,6 +68,7 @@ describe("MCP server — initialize instructions", () => {
       expect(instructions).toContain("Session start");
       expect(instructions).toContain("codemap://rule");
       expect(instructions).toContain("index_freshness");
+      expect(instructions).toContain("start_here");
       expect(instructions).toContain("pending_sync");
     } finally {
       await server.close();
@@ -632,11 +633,82 @@ describe("MCP server — audit / context / validate tools", () => {
       expect(json).toMatchObject({
         codemap: { schema_version: expect.any(Number) },
         project: { root: expect.any(String), file_count: expect.any(Number) },
+        start_here: expect.objectContaining({
+          index_summary: expect.objectContaining({ files: expect.any(Number) }),
+          recipes: expect.any(Array),
+          hub_leaders: expect.any(Array),
+        }),
         index_freshness: expect.objectContaining({
           pending_sync: expect.any(Boolean),
           commit_drift: expect.any(Boolean),
         }),
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context include_snippets adds snippet on hub leader signatures", async () => {
+    writeFileSync(
+      join(benchDir, "src", "snippet.ts"),
+      "export const SNIP = 1;\n",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/snippet.ts', 'hs', 10, 1, 'typescript', 1, 1)",
+      );
+      db.run(
+        "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator) VALUES ('src/snippet.ts', 'SNIP', 'const', 1, 1, 'export const SNIP = 1', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0)",
+      );
+      db.run(
+        "INSERT INTO dependencies (from_path, to_path) VALUES ('src/a.ts', 'src/snippet.ts')",
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { include_snippets: true },
+      });
+      const json = readJson(r);
+      const leader = json.start_here?.hub_leaders?.find(
+        (h: { file_path: string }) => h.file_path === "src/snippet.ts",
+      );
+      expect(leader?.signatures?.[0]?.snippet).toContain("export const SNIP");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context compact omits start_here even with include_snippets", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { compact: true, include_snippets: true },
+      });
+      const json = readJson(r);
+      expect(json.start_here).toBeUndefined();
+      expect(json.hubs).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context treats whitespace-only intent as no intent", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { intent: "   " },
+      });
+      const json = readJson(r);
+      expect(json.start_here?.classified_as).toBe("default");
+      expect(json.intent).toBeUndefined();
     } finally {
       await server.close();
     }

@@ -105,7 +105,7 @@ Codemap-managed `.gitignore` inside `<state-dir>/` (blacklist of generated artif
 
 ### `codemap context`
 
-CLI subcommand emitting a JSON envelope (`ContextEnvelope`) with project metadata, top hubs, sample markers, recipe catalog, and optional intent classification via `--for "<intent>"`.
+CLI subcommand emitting a JSON envelope (`ContextEnvelope`) with project metadata, top hubs (full bundled `fan-in` recipe limit), sample markers, recipe catalog, optional intent via `--for "<intent>"`, and non-compact **`start_here`** shortcuts (index summary, intent-ranked recipe cards, budget-capped hub leaders with export signatures). `--compact` drops `hubs`, `sample_markers`, and `start_here`, emitting minified JSON; default mode pretty-prints with 2-space indent. Whitespace-only `--for` values are rejected.
 
 ### `--ci` (CLI flag)
 
@@ -165,7 +165,7 @@ Column on the `files` table. Lowercase SHA-256 hex of file bytes computed by `sr
 
 ### `ContextEnvelope`
 
-TS shape for the JSON emitted by `codemap context`. Stable contract; agents can key off field names.
+TS shape for the JSON emitted by `codemap context`. Stable contract; agents can key off field names. Non-compact payloads include **`start_here`**: inline **`index_summary`**, intent-ranked recipe cards (`tool: "query_recipe"`), and **`hub_leaders`** (budget-capped top fan-in files with exported-symbol signatures; optional **`snippet`** / **`stale`** / **`missing`** when MCP/HTTP `include_snippets: true`). Legacy **`hubs`** keeps the bundled `fan-in` recipe default limit; prefer **`hub_leaders`** for signatures. **`start_here.classified_as`** is `"default"` when no user intent was supplied.
 
 ### covering index
 

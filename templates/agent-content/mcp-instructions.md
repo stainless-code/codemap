@@ -4,7 +4,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file count, language breakdown, recipe summary, **`index_freshness`** (one call replaces 4–5 queries).
+1. **`context`** — project root, schema version, file count, language breakdown, **`start_here`** (index summary + recipe cards + hub leaders), recipe catalog, **`index_freshness`** (one call replaces 4–5 queries). Pass **`include_snippets: true`** for one-line export previews on hub leaders (ignored with **`compact: true`**). Prefer **`start_here.hub_leaders`** over legacy **`hubs`** for signatures.
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
 
@@ -14,7 +14,7 @@ Every successful JSON tool response carries index-level freshness metadata (not 
 
 | Surface                                          | Where to read it                                                                                      |
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **`context`**                                    | `index_freshness` object (includes disk-drift counts)                                                 |
+| **`context`**                                    | `index_freshness`; **`start_here`** when not `compact` (optional `include_snippets`)                  |
 | **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                       |
 | **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                            |
 | **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged) |

@@ -19,12 +19,13 @@ export function printContextCmdHelp(): void {
   console.log(`Usage: codemap context [--compact] [--for "<intent>"]
 
 Emit a JSON envelope describing the current index — project metadata, top
-hubs (fan-in), a sample of markers, and the recipe catalog (bundled + project-local). Designed
-for agents and editors that want a single-command "give me everything cheap".
+hubs (fan-in), a sample of markers, session-start shortcuts (start_here),
+and the recipe catalog (bundled + project-local). Designed for agents and
+editors that want a single-command "give me everything cheap".
 
 Flags:
-  --compact          Drop hubs and sample_markers; emit JSON without
-                     pretty-print (smaller payload).
+  --compact          Drop hubs, sample_markers, and start_here; emit JSON
+                     without pretty-print (smaller payload).
   --for "<intent>"   Pre-classify a free-text intent (refactor, debug, test,
                      feature, explore) and recommend recipes that match.
   --help, -h         Show this help.
