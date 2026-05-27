@@ -148,20 +148,42 @@ function buildFreshnessWarning(
 export const INDEX_FRESHNESS_MCP_PREFIX = "@codemap/index_freshness\n";
 
 /**
- * Read cheap freshness (no disk-drift git walk) from the live index DB.
- * Returns null when the DB is unavailable — transports omit headers/blocks.
+ * Read freshness from the live index DB. Returns null when unavailable.
+ * Default is cheap mode (no disk-drift git walk) — pass `{ include_disk_drift: true }`
+ * for boot-time / `context` diagnostics.
  */
-export function readCheapIndexFreshness(): IndexFreshness | null {
+export function readIndexFreshness(
+  opts: ComputeIndexFreshnessOpts = {},
+): IndexFreshness | null {
   try {
     const db = openDb();
     try {
-      return computeIndexFreshness(db);
+      return computeIndexFreshness(db, opts);
     } finally {
       closeDb(db, { readonly: true });
     }
   } catch {
     return null;
   }
+}
+
+/** Cheap per-tool freshness — no disk-drift git walk. */
+export function readCheapIndexFreshness(): IndexFreshness | null {
+  return readIndexFreshness();
+}
+
+/**
+ * One-line stderr warning when freshness concerns remain after boot / prime.
+ * Used by `codemap mcp` and `codemap serve` only — stdout stays JSON-RPC clean.
+ */
+export function warnIndexFreshnessToStderr(
+  label: string,
+  opts: ComputeIndexFreshnessOpts = { include_disk_drift: true },
+): void {
+  const freshness = readIndexFreshness(opts);
+  if (freshness?.warning === null || freshness?.warning === undefined) return;
+  // eslint-disable-next-line no-console -- intentional bootstrap warning on stderr
+  console.error(`${label}: ${freshness.warning}`);
 }
 
 /** HTTP response headers mirroring cheap freshness signals (slice 2). */

@@ -11,6 +11,7 @@ import * as indexEngine from "./index-engine";
 import {
   computeIndexFreshness,
   mergeIndexFreshnessIntoJsonPayload,
+  warnIndexFreshnessToStderr,
 } from "./index-freshness";
 import { _resetWatchStateForTests, runWatchLoop } from "./watcher";
 import type { WatchBackend } from "./watcher";
@@ -150,6 +151,59 @@ describe("mergeIndexFreshnessIntoJsonPayload", () => {
     expect(mergeIndexFreshnessIntoJsonPayload(payload, freshness)).toBe(
       payload,
     );
+  });
+});
+
+describe("warnIndexFreshnessToStderr", () => {
+  it("logs a one-line warning when freshness concerns remain", () => {
+    const errLog = spyOn(console, "error").mockImplementation(() => {});
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue(
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
+
+    try {
+      withEmptyDb((db) => {
+        setMeta(
+          db,
+          "last_indexed_commit",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+        warnIndexFreshnessToStderr("codemap mcp");
+      });
+      expect(errLog).toHaveBeenCalledWith(
+        expect.stringContaining("codemap mcp:"),
+      );
+    } finally {
+      errLog.mockRestore();
+      revParse.mockRestore();
+    }
+  });
+
+  it("stays silent when warning is null", () => {
+    const head = "cccccccccccccccccccccccccccccccccccccccc";
+    const errLog = spyOn(console, "error").mockImplementation(() => {});
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue(
+      head,
+    );
+    const changedFiles = spyOn(indexEngine, "getChangedFiles").mockReturnValue({
+      changed: [],
+      deleted: [],
+      existingPaths: new Set(),
+      sourceCache: new Map(),
+      existingHashes: new Map(),
+    });
+
+    try {
+      withEmptyDb((db) => {
+        setMeta(db, "last_indexed_commit", head);
+        warnIndexFreshnessToStderr("codemap serve");
+      });
+      expect(errLog).not.toHaveBeenCalled();
+    } finally {
+      errLog.mockRestore();
+      revParse.mockRestore();
+      changedFiles.mockRestore();
+    }
   });
 });
 

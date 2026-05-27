@@ -1,6 +1,6 @@
 # Index freshness trust bundle — plan
 
-> **Status:** in progress (slice 2 shipped on branch) · **Priority:** agent session · **Effort:** S (~3–5 days) · **Roadmap:** [§ Index staleness surfacing](../roadmap.md#agent-session--warm-path-economics), [§ HEAD / index freshness warning](../roadmap.md#agent-session--warm-path-economics)
+> **Status:** shipped · **Priority:** agent session · **Effort:** S (~3–5 days) · **PR:** [#149](https://github.com/stainless-code/codemap/pull/149)
 >
 > **Motivator:** Agents treat MCP / HTTP / `context` output as ground truth. Today they can query during watcher debounce (disk ahead of index), after a branch switch (`last_indexed_commit` ≠ `HEAD`), or with a dirty working tree when watch is off — with no signal except running `validate` manually. Wrong structural verdicts follow.
 
@@ -69,12 +69,21 @@ interface IndexFreshness {
 - [x] MCP `query` array → second content block with `@codemap/index_freshness`
 - [x] MCP object payloads (`query` summary, `show`, …) merge `index_freshness` inline
 
-### Slice 3 — stderr + MCP initialize (optional)
+### Slice 3 — stderr + MCP initialize
 
-1. **`codemap mcp` / `serve` boot** — one-line stderr when commit drift detected at prime time.
-2. **MCP `instructions` / `codemap://mcp-instructions`** — document freshness fields + agent guidance (“if `pending_sync`, retry after debounce or call `validate`”).
+1. **`codemap mcp` / `serve` boot** — one-line stderr when freshness concerns remain after bootstrap / watch prime.
+2. **MCP `instructions` / `codemap://mcp-instructions`** — document freshness fields + agent guidance.
+
+**Acceptance**
+
+- [x] `codemap mcp` / `serve` stderr warns when `index_freshness.warning` is set after prime
+- [x] MCP initialize instructions document `index_freshness`, `pending_sync`, and agent retry guidance
 
 ---
+
+## Shipped
+
+Trust bundle complete in [#149](https://github.com/stainless-code/codemap/pull/149) (slices 1–3). Roadmap items **Index staleness surfacing** and **HEAD / index freshness warning** satisfied via `index_freshness` metadata + transport headers + boot stderr.
 
 ## Dependencies
 

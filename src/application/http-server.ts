@@ -15,6 +15,7 @@ import {
 import {
   applyIndexFreshnessHeaders,
   readCheapIndexFreshness,
+  warnIndexFreshnessToStderr,
 } from "./index-freshness";
 import { listResources, readResource } from "./resource-handlers";
 import {
@@ -121,6 +122,9 @@ const TOOL_NAMES = [
  */
 export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
   await bootstrapForServe(opts);
+  if (opts.watch !== true) {
+    warnIndexFreshnessToStderr("codemap serve");
+  }
 
   const server = createServer((req, res) => {
     handleRequest(req, res, opts).catch((err: unknown) => {
@@ -145,12 +149,16 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
   let stopWatch: (() => Promise<void>) | undefined;
   if (opts.watch === true) {
     try {
+      const prime = createPrimeIndex({ quiet: false, label: "codemap serve" });
       const handle = runWatchLoop({
         root: getProjectRoot(),
         excludeDirNames: getExcludeDirNames(),
         recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
         debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-        onPrime: createPrimeIndex({ quiet: false, label: "codemap serve" }),
+        onPrime: async () => {
+          await prime();
+          warnIndexFreshnessToStderr("codemap serve");
+        },
         onChange: createReindexOnChange({
           quiet: false,
           label: "codemap serve",

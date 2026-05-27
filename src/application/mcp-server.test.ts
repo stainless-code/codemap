@@ -67,6 +67,8 @@ describe("MCP server — initialize instructions", () => {
       expect(instructions!.length).toBeGreaterThan(500);
       expect(instructions).toContain("Session start");
       expect(instructions).toContain("codemap://rule");
+      expect(instructions).toContain("index_freshness");
+      expect(instructions).toContain("pending_sync");
     } finally {
       await server.close();
     }

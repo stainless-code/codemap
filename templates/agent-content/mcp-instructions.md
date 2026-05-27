@@ -4,9 +4,28 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file count, language breakdown, recipe summary (one call replaces 4–5 queries).
+1. **`context`** — project root, schema version, file count, language breakdown, recipe summary, **`index_freshness`** (one call replaces 4–5 queries).
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
+
+## Index freshness
+
+Every JSON tool response carries index-level freshness metadata (not a pass/fail verdict):
+
+| Surface                                          | Where to read it                                                                                      |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **`context`**                                    | `index_freshness` object (includes disk-drift counts)                                                 |
+| **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                       |
+| **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                            |
+| **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged) |
+
+Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commit_drift` (`HEAD` ≠ `last_indexed_commit`), `warning` (single agent-readable line when anything is off).
+
+**Agent guidance**
+
+- If **`pending_sync: true`** — wait ~250ms (debounce) and retry, or call **`validate`** for per-file drift.
+- If **`commit_drift: true`** or **`warning`** is set — run **`codemap`** (or rely on watch prime) before treating structural queries as authoritative.
+- Prefer **`context`** at session start for the full disk-drift picture; use **`validate`** / snippet `stale` for individual files.
 
 ## Common tasks
 
@@ -25,7 +44,8 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 | CI / SARIF                       | **`query_recipe`** + `format: "sarif"`                                                     | `deprecated-symbols`, `boundary-violations`, …                                                                                              |
 | Ad-hoc SQL                       | **`query`**                                                                                | —                                                                                                                                           |
 | N statements / one round-trip    | **`query_batch`** (no CLI verb; MCP + HTTP)                                                | N × `query`                                                                                                                                 |
-| Index freshness                  | **`validate`**                                                                             | —                                                                                                                                           |
+| Index freshness (index-level)    | **`context`** (`index_freshness`) + tool metadata above                                    | —                                                                                                                                           |
+| Per-file staleness               | **`validate`**                                                                             | —                                                                                                                                           |
 | Drift vs baseline                | **`audit`** (`baseline_prefix` and/or per-delta `baselines`)                               | save via **`save_baseline`**; CLI-only diff via `codemap query --baseline`                                                                  |
 | Apply recipe diff rows           | **`apply`**                                                                                | recipe must emit `{file_path, line_start, before_pattern, after_pattern}` rows                                                              |
 

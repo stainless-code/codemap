@@ -18,6 +18,7 @@ import {
   jsonPayloadNeedsMcpFreshnessBlock,
   mergeIndexFreshnessIntoJsonPayload,
   readCheapIndexFreshness,
+  warnIndexFreshnessToStderr,
 } from "./index-freshness";
 import {
   isMcpToolEnabled,
@@ -579,6 +580,9 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
  */
 export async function runMcpServer(opts: ServerOpts): Promise<void> {
   await bootstrapForMcp(opts);
+  if (opts.watch !== true) {
+    warnIndexFreshnessToStderr("codemap mcp");
+  }
   const server = createMcpServer(opts);
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -588,12 +592,16 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
     console.error("codemap mcp: --watch enabled, booting file watcher...");
     try {
+      const prime = createPrimeIndex({ quiet: false, label: "codemap mcp" });
       const handle = runWatchLoop({
         root: getProjectRoot(),
         excludeDirNames: getExcludeDirNames(),
         recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
         debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
-        onPrime: createPrimeIndex({ quiet: false, label: "codemap mcp" }),
+        onPrime: async () => {
+          await prime();
+          warnIndexFreshnessToStderr("codemap mcp");
+        },
         onChange: createReindexOnChange({
           quiet: false,
           label: "codemap mcp",
