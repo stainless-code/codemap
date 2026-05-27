@@ -16,6 +16,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
 import {
@@ -32,7 +33,7 @@ import { isCodemapHookInstalled } from "../src/application/git-hooks.ts";
 const REPO_ROOT = join(import.meta.dirname, "..");
 const FIXTURE = join(REPO_ROOT, "fixtures/minimal");
 const CLI = join(REPO_ROOT, "src/index.ts");
-const E2E_TMP = join(REPO_ROOT, ".tmp", "agents-init-e2e");
+const E2E_TMP = join(tmpdir(), "codemap-agents-init-e2e");
 
 function copyDummyCorpus() {
   mkdirSync(E2E_TMP, { recursive: true });
@@ -105,10 +106,10 @@ describe("agents init on fixtures/minimal dummy corpus", () => {
             "gemini-md",
           ],
           linkMode: "copy",
-          mcp: true,
           gitHooks: "install",
         }),
       ).toBe(true);
+      await applyAgentsInitMcp({ projectRoot: dir, targets: ["cursor"] });
 
       expect(
         readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8"),

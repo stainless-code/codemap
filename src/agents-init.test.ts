@@ -540,7 +540,7 @@ describe("runAgentsInit", () => {
       mkdirSync(join(dir, ".cursor", "rules"), { recursive: true });
       writeFileSync(
         join(dir, ".cursor", "rules", "codemap.mdc"),
-        "stale codemap mirror without marker",
+        "# My team codemap override\n",
         "utf-8",
       );
       await expect(
@@ -553,7 +553,38 @@ describe("runAgentsInit", () => {
       ).rejects.toThrow(/not codemap-managed/);
       expect(
         readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
-      ).toBe("stale codemap mirror without marker");
+      ).toBe("# My team codemap override\n");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("runAgentsInit with --force migrates legacy copy-mode mirrors without codemap-init marker", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      await runAgentsInit({ projectRoot: dir, force: true });
+      mkdirSync(join(dir, ".cursor", "rules"), { recursive: true });
+      writeFileSync(
+        join(dir, ".cursor", "rules", "codemap.mdc"),
+        `${readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8")
+          .replace(CODMAP_INIT_MANAGED, "")
+          .trim()}\nstale mirror line`,
+        "utf-8",
+      );
+      expect(
+        await runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "copy",
+        }),
+      ).toBe(true);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).toContain(CODMAP_INIT_MANAGED);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).not.toContain("stale mirror line");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

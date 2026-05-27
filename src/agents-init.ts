@@ -104,12 +104,37 @@ function filesContentEqual(a: string, b: string): boolean {
 /** HTML comment — marks files init wrote or mirrors from bundled templates; `--force` overwrites only when present. */
 export const CODMAP_INIT_MANAGED = "<!-- codemap-init:managed -->";
 
-export function fileHasCodemapInitMarker(path: string): boolean {
+function fileHasCodemapInitMarker(path: string): boolean {
   if (!existsSync(path)) {
     return false;
   }
   try {
     return readFileSync(path, "utf-8").includes(CODMAP_INIT_MANAGED);
+  } catch {
+    return false;
+  }
+}
+
+/** One-time upgrade for copy-mode mirrors written before {@link CODMAP_INIT_MANAGED} shipped. */
+function looksLikeLegacyCodemapMirror(content: string): boolean {
+  const t = content.trim();
+  if (t.length < 80) {
+    return false;
+  }
+  return (
+    t.includes("codemap query") &&
+    (t.includes("codemap-pointer-version") ||
+      t.includes("codemap://rule") ||
+      t.includes("stainless-code/codemap"))
+  );
+}
+
+function mirrorMayForceOverwrite(path: string): boolean {
+  if (fileHasCodemapInitMarker(path)) {
+    return true;
+  }
+  try {
+    return looksLikeLegacyCodemapMirror(readFileSync(path, "utf-8"));
   } catch {
     return false;
   }
@@ -154,7 +179,7 @@ function copyFilesGranular(
           `Codemap: ${to} already exists — use --force to replace codemap-managed mirror files only.`,
         );
       }
-      if (!fileHasCodemapInitMarker(to)) {
+      if (!mirrorMayForceOverwrite(to)) {
         refuseOverwriteNonManagedMirror(to);
       }
       removeManagedFileIfExists(to, to);
@@ -187,7 +212,7 @@ function symlinkFilesGranular(
           `Codemap: ${destFile} already exists — use --force to replace codemap-managed mirror files only.`,
         );
       }
-      if (!fileHasCodemapInitMarker(destFile)) {
+      if (!mirrorMayForceOverwrite(destFile)) {
         refuseOverwriteNonManagedMirror(destFile);
       }
       removeManagedFileIfExists(destFile, destFile);

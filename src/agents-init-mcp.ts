@@ -282,7 +282,6 @@ export function upsertMcpServersFile(opts: {
   path: string;
   label: string;
   entry: McpServerEntry;
-  force: boolean;
 }): void {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: McpServersFile = {};
@@ -317,7 +316,6 @@ export function upsertVsCodeMcpFile(opts: {
   path: string;
   label: string;
   entry: McpServerEntry;
-  force: boolean;
 }): void {
   mkdirSync(dirname(opts.path), { recursive: true });
   let existing: VsCodeMcpFile = {};
@@ -471,14 +469,12 @@ export async function applyAgentsInitMcp(
         path,
         label: def.label,
         entry,
-        force,
       });
     } else {
       upsertMcpServersFile({
         path,
         label: def.label,
         entry,
-        force,
       });
     }
 

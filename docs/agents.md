@@ -45,17 +45,17 @@ The user's root **`.gitignore`** is no longer touched by `codemap agents init`. 
 
 All integrations reuse the **same** bundled content under **`.agents/`**. Symlink-style rows use one **link mode** for the whole run (**symlink** or **copy**) when any of them is selected.
 
-| Integration                           | What gets created                                          | Notes                                                                                                                               |
-| ------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → **`.agents/`** | Per-file symlink or copy (each rule/skill file, not a directory link).                                                              |
-| **Windsurf**                          | **`.windsurf/rules`** → **`.agents/rules`**                | Rules only.                                                                                                                         |
-| **Continue**                          | **`.continue/rules`** → **`.agents/rules`**                | [Continue rules](https://docs.continue.dev/customize/rules).                                                                        |
-| **Cline**                             | **`.clinerules`** → **`.agents/rules`**                    | Per-file symlink or copy.                                                                                                           |
-| **Amazon Q**                          | **`.amazonq/rules`** → **`.agents/rules`**                 | [AWS rules](https://aws.amazon.com/blogs/devops/mastering-amazon-q-developer-with-rules/).                                          |
-| **GitHub Copilot**                    | **`.github/copilot-instructions.md`**                      | Pointer + link to [GitHub Docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot). |
-| **Claude Code**                       | **`CLAUDE.md`**                                            | Root onboarding pointer.                                                                                                            |
-| **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                            | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
-| **Gemini**                            | **`GEMINI.md`**                                            | For integrations that load **`GEMINI.md`**.                                                                                         |
+| Integration                           | What gets created                                                        | Notes                                                                                                                               |
+| ------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Cursor**                            | **`.cursor/rules`**, **`.cursor/skills`** → bundled **`.agents/`** paths | Per-file symlink or copy of **bundled** rule/skill paths only (not your whole **`.agents/`** tree).                                 |
+| **Windsurf**                          | **`.windsurf/rules`** → bundled **`.agents/rules`** paths                | Bundled rules only.                                                                                                                 |
+| **Continue**                          | **`.continue/rules`** → bundled **`.agents/rules`** paths                | [Continue rules](https://docs.continue.dev/customize/rules).                                                                        |
+| **Cline**                             | **`.clinerules`** → bundled **`.agents/rules`** paths                    | Per-file symlink or copy (bundled paths only).                                                                                      |
+| **Amazon Q**                          | **`.amazonq/rules`** → bundled **`.agents/rules`** paths                 | [AWS rules](https://aws.amazon.com/blogs/devops/mastering-amazon-q-developer-with-rules/).                                          |
+| **GitHub Copilot**                    | **`.github/copilot-instructions.md`**                                    | Pointer + link to [GitHub Docs](https://docs.github.com/copilot/customizing-copilot/adding-custom-instructions-for-github-copilot). |
+| **Claude Code**                       | **`CLAUDE.md`**                                                          | Root onboarding pointer.                                                                                                            |
+| **Zed / JetBrains / Aider (generic)** | **`AGENTS.md`**                                                          | Many tools read root **`AGENTS.md`**; JetBrains/Aider have no single mandated path — this file is the shared hook.                  |
+| **Gemini**                            | **`GEMINI.md`**                                                          | For integrations that load **`GEMINI.md`**.                                                                                         |
 
 ## Git hooks (opt-in freshness)
 
@@ -76,6 +76,17 @@ Root / Copilot **pointer** files (**`CLAUDE.md`**, **`AGENTS.md`**, **`GEMINI.md
 | **`--force`**                                                                | Refresh the **managed pointer section** only; user content outside markers is preserved.                      |
 
 Append alone would duplicate on every run — markers + replace are what prevent duplicates and staleness.
+
+## IDE mirror provenance (`codemap-init:managed`)
+
+Bundled templates ship **`<!-- codemap-init:managed -->`**. IDE mirror files (`.cursor/rules/codemap.mdc`, …) get that marker when init copies or symlinks from **`.agents/`**.
+
+| Surface                                                                         | `--force` overwrite policy                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`.agents/`** bundled paths (`rules/codemap.md`, `skills/codemap/SKILL.md`, …) | Always refreshed — path whitelist only; marker not required.                                                                                                                                                                                  |
+| **IDE mirrors** (`.cursor/`, `.windsurf/`, …)                                   | Only when the dest file has **`codemap-init:managed`**, or content matches a **legacy Codemap mirror** (pre-marker copy from bundled templates — same heuristic as pointer migration). User-owned files at those paths are never overwritten. |
+
+**Upgrading from pre-marker init:** Re-run **`codemap agents init --force`** with your IDE targets selected (or **`--interactive`**). Copy-mode mirrors from older inits are migrated once via the legacy heuristic; symlink mode needs no mirror migration (init reads markers through the link into **`.agents/`**). If **`--force`** still refuses a mirror path, delete that single file manually and re-run init.
 
 ## Live fetch surface (CLI + MCP + HTTP)
 
