@@ -234,7 +234,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, language breakdown, recipe catalog summary, etc.). Designed for agent session-start: one call replaces 4-5 `query` calls.",
+        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders.",
       inputSchema: contextArgsSchema,
     },
     (args) => wrapToolResult(handleContext(args)),

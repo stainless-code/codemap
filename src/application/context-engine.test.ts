@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,6 +20,7 @@ import {
   classifyIntent,
   composeStartHere,
   defaultStartHereClassification,
+  resolveContextBudget,
 } from "./context-engine";
 import * as indexEngine from "./index-engine";
 
@@ -28,6 +29,11 @@ let benchDir: string;
 beforeEach(() => {
   benchDir = mkdtempSync(join(tmpdir(), "context-engine-"));
   mkdirSync(join(benchDir, ".codemap"), { recursive: true });
+  mkdirSync(join(benchDir, "src"), { recursive: true });
+  writeFileSync(
+    join(benchDir, "src", "hub.ts"),
+    "export function hubFn(x: number): string {\n  return String(x);\n}\nexport class HubClass {}\n",
+  );
   initCodemap(resolveCodemapConfig(benchDir, undefined));
 });
 
@@ -137,14 +143,34 @@ function seedContextFixture(db: ReturnType<typeof openDb>): void {
   insertDependencies(db, deps);
 
   db.run(
-    "INSERT INTO markers (file_path, line_number, kind, content) VALUES ('src/leaf.ts', 3, 'TODO', 'wire tests')",
+    "INSERT INTO markers (file_path, line_number, kind, content) VALUES ('src/leaf.ts', 3, 'TODO', 'wire tests'), ('src/leaf.ts', 8, 'NOTE', 'later'), ('src/other.ts', 2, 'FIXME', 'crash here')",
   );
 }
+
+function composeOpts(): { fileCount: number; projectRoot: string } {
+  return { fileCount: 3, projectRoot: benchDir };
+}
+
+describe("resolveContextBudget", () => {
+  it("uses full caps on small repos", () => {
+    expect(resolveContextBudget(100).hub_limit).toBe(5);
+    expect(resolveContextBudget(100).signatures_per_hub).toBe(3);
+  });
+
+  it("tightens caps on large repos", () => {
+    expect(resolveContextBudget(6000).hub_limit).toBe(2);
+    expect(resolveContextBudget(6000).signature_max_chars).toBe(60);
+  });
+});
 
 describe("composeStartHere", () => {
   it("includes intent-ranked recipe cards and hub leaders with signatures", () => {
     withSeededDb((db) => {
-      const start = composeStartHere(db, classifyIntent("refactor auth"));
+      const start = composeStartHere(
+        db,
+        classifyIntent("refactor auth"),
+        composeOpts(),
+      );
       expect(start.classified_as).toBe("refactor");
       expect(start.recipes.map((r) => r.id)).toEqual([
         "fan-in",
@@ -152,6 +178,7 @@ describe("composeStartHere", () => {
         "barrel-files",
         "deprecated-symbols",
       ]);
+      expect(start.index_summary.files).toBe(3);
       expect(start.recipes[0]?.tool).toBe("query_recipe");
       expect(start.hub_leaders[0]).toMatchObject({
         file_path: "src/hub.ts",
@@ -166,10 +193,38 @@ describe("composeStartHere", () => {
 
   it("uses explore defaults when no intent is supplied at envelope build time", () => {
     withSeededDb((db) => {
-      const start = composeStartHere(db, defaultStartHereClassification());
+      const start = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        composeOpts(),
+      );
       expect(start.classified_as).toBe("explore");
       expect(start.recipes.map((r) => r.id)).toContain("index-summary");
       expect(start.recipes.map((r) => r.id)).toContain("fan-in");
+    });
+  });
+
+  it("adds one-line snippets when includeSnippets is true", () => {
+    withSeededDb((db) => {
+      const start = composeStartHere(db, defaultStartHereClassification(), {
+        ...composeOpts(),
+        includeSnippets: true,
+      });
+      const hubFn = start.hub_leaders[0]?.signatures.find(
+        (s) => s.name === "hubFn",
+      );
+      expect(hubFn?.snippet).toContain("export function hubFn");
+    });
+  });
+
+  it("respects adaptive hub limits for large file counts", () => {
+    withSeededDb((db) => {
+      const start = composeStartHere(db, defaultStartHereClassification(), {
+        fileCount: 6000,
+        projectRoot: benchDir,
+      });
+      expect(start.hub_leaders.length).toBeLessThanOrEqual(2);
+      expect(start.hub_leaders[0]?.signatures.length).toBeLessThanOrEqual(1);
     });
   });
 });
@@ -196,6 +251,7 @@ describe("buildContextEnvelope", () => {
           intent: null,
         });
         expect(envelope.start_here?.classified_as).toBe("explore");
+        expect(envelope.start_here?.index_summary.files).toBe(3);
         expect(envelope.start_here?.hub_leaders.length).toBeGreaterThan(0);
         expect(envelope.hubs?.[0]?.to_path).toBe("src/hub.ts");
         expect(envelope.intent).toBeUndefined();
@@ -203,6 +259,22 @@ describe("buildContextEnvelope", () => {
     } finally {
       revParse.mockRestore();
       changedFiles.mockRestore();
+    }
+  });
+
+  it("biases sample_markers toward FIXME/TODO when debug intent is set", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: "fix this crash",
+        });
+        expect(envelope.intent?.classified_as).toBe("debug");
+        expect(envelope.sample_markers?.[0]?.kind).toBe("FIXME");
+      });
+    } finally {
+      revParse.mockRestore();
     }
   });
 
@@ -254,7 +326,11 @@ describe("buildContextEnvelope", () => {
         },
       ]);
 
-      const start = composeStartHere(db, defaultStartHereClassification());
+      const start = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        composeOpts(),
+      );
       const wide = start.hub_leaders[0]?.signatures.find(
         (s) => s.name === "wideFn",
       );

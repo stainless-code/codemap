@@ -634,6 +634,7 @@ describe("MCP server — audit / context / validate tools", () => {
         codemap: { schema_version: expect.any(Number) },
         project: { root: expect.any(String), file_count: expect.any(Number) },
         start_here: expect.objectContaining({
+          index_summary: expect.objectContaining({ files: expect.any(Number) }),
           recipes: expect.any(Array),
           hub_leaders: expect.any(Array),
         }),
@@ -642,6 +643,42 @@ describe("MCP server — audit / context / validate tools", () => {
           commit_drift: expect.any(Boolean),
         }),
       });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("context include_snippets adds snippet on hub leader signatures", async () => {
+    writeFileSync(
+      join(benchDir, "src", "snippet.ts"),
+      "export const SNIP = 1;\n",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        "INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at) VALUES ('src/snippet.ts', 'hs', 10, 1, 'typescript', 1, 1)",
+      );
+      db.run(
+        "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator) VALUES ('src/snippet.ts', 'SNIP', 'const', 1, 1, 'export const SNIP = 1', 1, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL, 0, 0)",
+      );
+      db.run(
+        "INSERT INTO dependencies (from_path, to_path) VALUES ('src/a.ts', 'src/snippet.ts')",
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "context",
+        arguments: { include_snippets: true },
+      });
+      const json = readJson(r);
+      const leader = json.start_here?.hub_leaders?.find(
+        (h: { file_path: string }) => h.file_path === "src/snippet.ts",
+      );
+      expect(leader?.signatures?.[0]?.snippet).toContain("export const SNIP");
     } finally {
       await server.close();
     }

@@ -2,4 +2,4 @@
 "@stainless-code/codemap": patch
 ---
 
-Add `start_here` to non-compact `context` responses — intent-ranked `query_recipe` cards and top hub files with exported-symbol signatures so session bootstrap replaces a common show → explore chain.
+Rich `context` bootstrap: `start_here` with intent-ranked recipe cards, inline index summary, hub leaders with export signatures (adaptive caps by repo size), debug-biased marker samples, and optional `include_snippets` on MCP/HTTP `context`.

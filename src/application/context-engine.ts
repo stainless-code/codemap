@@ -4,15 +4,47 @@ import { CODEMAP_VERSION } from "../version";
 import { computeIndexFreshness } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
 import { QUERY_RECIPES } from "./query-recipes";
+import { getIndexedContentHash, readSymbolSource } from "./show-engine";
 
 /** Max recipe cards in `start_here.recipes`. */
 const START_HERE_RECIPE_LIMIT = 4;
-/** Top dependency hubs surfaced with signatures. */
-const START_HERE_HUB_LIMIT = 5;
-/** Exported symbols sampled per hub leader. */
-const SIGNATURES_PER_HUB = 3;
-/** Truncate long `symbols.signature` strings in the envelope. */
-const SIGNATURE_MAX_CHARS = 120;
+const DEFAULT_MARKER_LIMIT = 20;
+
+export interface ContextBudget {
+  hub_limit: number;
+  signatures_per_hub: number;
+  signature_max_chars: number;
+  marker_limit: number;
+}
+
+/**
+ * Scale hub/signature payload from indexed file count — pairs with roadmap
+ * adaptive output budgets for large trees.
+ */
+export function resolveContextBudget(fileCount: number): ContextBudget {
+  if (fileCount <= 500) {
+    return {
+      hub_limit: 5,
+      signatures_per_hub: 3,
+      signature_max_chars: 120,
+      marker_limit: DEFAULT_MARKER_LIMIT,
+    };
+  }
+  if (fileCount <= 5000) {
+    return {
+      hub_limit: 3,
+      signatures_per_hub: 2,
+      signature_max_chars: 80,
+      marker_limit: 15,
+    };
+  }
+  return {
+    hub_limit: 2,
+    signatures_per_hub: 1,
+    signature_max_chars: 60,
+    marker_limit: 10,
+  };
+}
 
 /**
  * Snapshot envelope emitted by `codemap context`. Stable JSON shape any agent
@@ -34,7 +66,7 @@ export interface ContextEnvelope {
    * A flavor sample of TODO/FIXME/HACK/NOTE markers — the alphabetically-first
    * 20 across the repo, ordered by `(file_path, line_number)`. Not a recency
    * signal; for time-ordered output query `markers` directly, joining
-   * `files.last_modified`.
+   * `files.last_modified`. Debug intent biases toward FIXME/TODO kinds.
    */
   sample_markers?: {
     file_path: string;
@@ -63,17 +95,43 @@ export interface ContextRecipeStarter {
   tool: "query_recipe";
 }
 
+export interface ContextHubSignature {
+  name: string;
+  kind: string;
+  signature: string;
+  /** First source line at `line_start` when `include_snippets` is requested. */
+  snippet?: string;
+  stale?: boolean;
+  missing?: boolean;
+}
+
 export interface ContextHubLeader {
   file_path: string;
   fan_in: number;
-  signatures: { name: string; kind: string; signature: string }[];
+  signatures: ContextHubSignature[];
+}
+
+export interface ContextIndexSummary {
+  files: number;
+  symbols: number;
+  imports: number;
+  components: number;
+  dependencies: number;
 }
 
 export interface ContextStartHere {
   classified_as: string;
   hint: string;
+  index_summary: ContextIndexSummary;
   recipes: ContextRecipeStarter[];
   hub_leaders: ContextHubLeader[];
+}
+
+export interface BuildContextEnvelopeOpts {
+  compact: boolean;
+  intent: string | null;
+  /** MCP/HTTP only — one-line export previews on hub leader signatures. */
+  include_snippets?: boolean;
 }
 
 /**
@@ -152,7 +210,7 @@ export function defaultStartHereClassification(): ReturnType<
 export function buildContextEnvelope(
   db: CodemapDatabase,
   projectRoot: string,
-  opts: { compact: boolean; intent: string | null },
+  opts: BuildContextEnvelopeOpts,
 ): ContextEnvelope {
   const fileCount = readScalarInt(db, "SELECT COUNT(*) AS n FROM files");
   const lastCommit = getMeta(db, "last_indexed_commit") ?? null;
@@ -183,20 +241,28 @@ export function buildContextEnvelope(
   };
 
   if (!opts.compact) {
+    const budget = resolveContextBudget(fileCount);
+    const markerIntentClass =
+      opts.intent !== null ? classifyIntent(opts.intent).classified_as : null;
+
     envelope.hubs = db
       .query(QUERY_RECIPES["fan-in"]!.sql)
       .all() as ContextEnvelope["hubs"];
-    envelope.sample_markers = db
-      .query(
-        "SELECT file_path, line_number, kind, content FROM markers ORDER BY file_path ASC, line_number ASC LIMIT 20",
-      )
-      .all() as ContextEnvelope["sample_markers"];
+    envelope.sample_markers = readSampleMarkers(
+      db,
+      markerIntentClass,
+      budget.marker_limit,
+    );
 
     const classification =
       opts.intent !== null
         ? classifyIntent(opts.intent)
         : defaultStartHereClassification();
-    envelope.start_here = composeStartHere(db, classification);
+    envelope.start_here = composeStartHere(db, classification, {
+      fileCount,
+      projectRoot,
+      includeSnippets: opts.include_snippets === true,
+    });
   }
 
   if (opts.intent !== null) {
@@ -214,13 +280,73 @@ export function buildContextEnvelope(
 export function composeStartHere(
   db: CodemapDatabase,
   classification: ReturnType<typeof classifyIntent>,
+  opts: {
+    fileCount: number;
+    projectRoot: string;
+    includeSnippets?: boolean;
+  },
 ): ContextStartHere {
+  const budget = resolveContextBudget(opts.fileCount);
   return {
     classified_as: classification.classified_as,
     hint: classification.hint,
+    index_summary: readIndexSummary(db),
     recipes: composeRecipeStarters(classification.matched_recipes),
-    hub_leaders: composeHubLeaders(db),
+    hub_leaders: composeHubLeaders(db, {
+      budget,
+      projectRoot: opts.projectRoot,
+      includeSnippets: opts.includeSnippets === true,
+    }),
   };
+}
+
+function readIndexSummary(db: CodemapDatabase): ContextIndexSummary {
+  const row = db.query(QUERY_RECIPES["index-summary"]!.sql).get() as
+    | ContextIndexSummary
+    | undefined;
+  return {
+    files: row?.files ?? 0,
+    symbols: row?.symbols ?? 0,
+    imports: row?.imports ?? 0,
+    components: row?.components ?? 0,
+    dependencies: row?.dependencies ?? 0,
+  };
+}
+
+function readSampleMarkers(
+  db: CodemapDatabase,
+  intentClass: string | null,
+  limit: number,
+): ContextEnvelope["sample_markers"] {
+  if (intentClass === "debug") {
+    return db
+      .query(
+        `SELECT file_path, line_number, kind, content
+         FROM markers
+         WHERE kind IN ('FIXME', 'TODO', 'HACK', 'BUG')
+         ORDER BY
+           CASE kind
+             WHEN 'FIXME' THEN 0
+             WHEN 'BUG' THEN 1
+             WHEN 'TODO' THEN 2
+             WHEN 'HACK' THEN 3
+             ELSE 4
+           END,
+           file_path ASC,
+           line_number ASC
+         LIMIT ?`,
+      )
+      .all(limit) as ContextEnvelope["sample_markers"];
+  }
+
+  return db
+    .query(
+      `SELECT file_path, line_number, kind, content
+       FROM markers
+       ORDER BY file_path ASC, line_number ASC
+       LIMIT ?`,
+    )
+    .all(limit) as ContextEnvelope["sample_markers"];
 }
 
 function composeRecipeStarters(recipeIds: string[]): ContextRecipeStarter[] {
@@ -238,7 +364,14 @@ function composeRecipeStarters(recipeIds: string[]): ContextRecipeStarter[] {
   return starters;
 }
 
-function composeHubLeaders(db: CodemapDatabase): ContextHubLeader[] {
+function composeHubLeaders(
+  db: CodemapDatabase,
+  opts: {
+    budget: ContextBudget;
+    projectRoot: string;
+    includeSnippets: boolean;
+  },
+): ContextHubLeader[] {
   const hubs = db
     .query(
       `SELECT to_path AS file_path, COUNT(*) AS fan_in
@@ -247,22 +380,27 @@ function composeHubLeaders(db: CodemapDatabase): ContextHubLeader[] {
        ORDER BY fan_in DESC, to_path ASC
        LIMIT ?`,
     )
-    .all(START_HERE_HUB_LIMIT) as { file_path: string; fan_in: number }[];
+    .all(opts.budget.hub_limit) as { file_path: string; fan_in: number }[];
 
   return hubs.map((hub) => ({
     file_path: hub.file_path,
     fan_in: hub.fan_in,
-    signatures: readHubSignatures(db, hub.file_path),
+    signatures: readHubSignatures(db, hub.file_path, opts),
   }));
 }
 
 function readHubSignatures(
   db: CodemapDatabase,
   filePath: string,
+  opts: {
+    budget: ContextBudget;
+    projectRoot: string;
+    includeSnippets: boolean;
+  },
 ): ContextHubLeader["signatures"] {
   const rows = db
     .query(
-      `SELECT name, kind, signature
+      `SELECT name, kind, signature, line_start, line_end
        FROM symbols
        WHERE file_path = ? AND is_exported = 1
        ORDER BY
@@ -276,22 +414,53 @@ function readHubSignatures(
          line_start ASC
        LIMIT ?`,
     )
-    .all(filePath, SIGNATURES_PER_HUB) as {
+    .all(filePath, opts.budget.signatures_per_hub) as {
     name: string;
     kind: string;
     signature: string;
+    line_start: number;
+    line_end: number;
   }[];
 
-  return rows.map((row) => ({
-    name: row.name,
-    kind: row.kind,
-    signature: truncateSignature(row.signature),
-  }));
+  return rows.map((row) => {
+    const sig: ContextHubSignature = {
+      name: row.name,
+      kind: row.kind,
+      signature: truncateSignature(
+        row.signature,
+        opts.budget.signature_max_chars,
+      ),
+    };
+    if (opts.includeSnippets) {
+      const indexedHash = getIndexedContentHash(db, filePath);
+      const read = readSymbolSource({
+        projectRoot: opts.projectRoot,
+        match: {
+          file_path: filePath,
+          name: row.name,
+          kind: row.kind,
+          line_start: row.line_start,
+          line_end: row.line_start,
+          signature: row.signature,
+          is_exported: 1,
+          parent_name: null,
+          visibility: null,
+        },
+        indexedContentHash: indexedHash,
+      });
+      if (read.source !== undefined) {
+        sig.snippet = read.source.split("\n")[0] ?? read.source;
+      }
+      if (read.stale === true) sig.stale = true;
+      if (read.missing === true) sig.missing = true;
+    }
+    return sig;
+  });
 }
 
-function truncateSignature(signature: string): string {
-  if (signature.length <= SIGNATURE_MAX_CHARS) return signature;
-  return `${signature.slice(0, SIGNATURE_MAX_CHARS - 1)}…`;
+function truncateSignature(signature: string, maxChars: number): string {
+  if (signature.length <= maxChars) return signature;
+  return `${signature.slice(0, maxChars - 1)}…`;
 }
 
 function readScalarInt(db: CodemapDatabase, sql: string): number {
