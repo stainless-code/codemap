@@ -10,6 +10,14 @@ import {
 } from "./agents-init-mcp-registry";
 
 describe("AGENTS_INIT_MCP_REGISTRY", () => {
+  it("cursor and vscode inject workspace root via registry flag", () => {
+    expect(getAgentsInitMcpTargetDef("cursor").workspaceRootArg).toBe(true);
+    expect(getAgentsInitMcpTargetDef("vscode").workspaceRootArg).toBe(true);
+    expect(
+      getAgentsInitMcpTargetDef("claude-code").workspaceRootArg,
+    ).toBeUndefined();
+  });
+
   it("has unique ids", () => {
     const ids = AGENTS_INIT_MCP_REGISTRY.map((def) => def.id);
     expect(new Set(ids).size).toBe(ids.length);

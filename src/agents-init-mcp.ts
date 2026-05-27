@@ -52,7 +52,7 @@ export interface ClaudeSettingsFile {
   };
 }
 
-/** Host-specific codemap MCP entry (Cursor root arg, Amazon Q IDE transport fields, …). */
+/** Host-specific codemap MCP entry (workspace-root arg, Amazon Q IDE transport fields, …). */
 export function buildMcpServerEntryForDef(
   def: Pick<AgentsInitMcpTargetDef, "format" | "workspaceRootArg">,
   invocation: ResolvedCodemapInvocation,

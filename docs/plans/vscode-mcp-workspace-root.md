@@ -2,7 +2,7 @@
 
 > **Status:** implemented (pending release) · **Priority:** P2 · **Effort:** S (~half day) · **Trigger:** fact-check from consumer repo + internal dogfood mismatch
 >
-> **Motivator:** `codemap agents init --mcp` injects `--root ${workspaceFolder}` for Cursor only. VS Code / Copilot gets `mcp --watch` with no explicit project root. That contradicts codemap's own `.vscode/mcp.json` and leaves index resolution to spawn `cwd` — a guarantee VS Code does not document.
+> **Motivator:** `codemap agents init --mcp` previously injected `--root ${workspaceFolder}` for Cursor only. VS Code / Copilot now gets the same explicit root (PR #156). Original trigger: consumer repo fact-check + internal dogfood mismatch.
 >
 > **Origin:** [merchant-dashboard-v2 PR #1569](https://github.com/PaySpaceDevs/merchant-dashboard-v2/pull/1569) — codemap 0.9.2 upgrade + MCP wiring review.
 
@@ -10,45 +10,39 @@
 
 ## Summary for the next owner
 
-| Question                                               | Answer                                                                                                                                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Is this a VS Code `${workspaceFolder}` resolution bug? | **No.** Init never writes the variable for VS Code; it is not failing to substitute.                                                                                         |
-| Is codemap `init --mcp` accidentally broken?           | **No.** Intentional registry flag — only Cursor has `workspaceRootArg: true`.                                                                                                |
-| Is the VS Code scaffold **correct**?                   | **Weak / over-optimistic.** Official docs do not guarantee stdio spawn `cwd` = workspace root; codemap dogfoods `--root` on VS Code anyway.                                  |
-| Are consumer overrides wrong?                          | **No.** Keeping `--root ${workspaceFolder}` (and `--no-watch` where needed) on **both** `.cursor/mcp.json` and `.vscode/mcp.json` is the safer choice until upstream aligns. |
+| Question                                               | Answer                                                                                                                             |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Is this a VS Code `${workspaceFolder}` resolution bug? | **No.** Init never failed to substitute — it simply did not write the variable for VS Code before this fix.                        |
+| Is codemap `init --mcp` accidentally broken?           | **Was an intentional registry gap** — only Cursor had `workspaceRootArg: true`. **Fixed:** both Cursor and VS Code set the flag.   |
+| Is the VS Code scaffold **correct**?                   | **Yes after fix.** Init emits `mcp --watch --root ${workspaceFolder}` on `.vscode/mcp.json`.                                       |
+| Are consumer overrides wrong?                          | **No.** Overrides like `--no-watch` remain valid. Re-run `init --mcp` to pick up `--root` if `.vscode/mcp.json` predates this fix. |
 
 **Recommended fix:** add explicit workspace-root wiring for the `vscode` MCP target (prefer **`workspaceRootArg: true`** for parity with Cursor and with this repo's dogfood config).
 
 ---
 
-## Current behavior (source of truth)
+## Shipped behavior (post PR #156)
 
 ### Registry
 
-`src/agents-init-mcp-registry.ts` — only **`cursor`** sets `workspaceRootArg: true`. **`vscode`** omits it (defaults false).
+`src/agents-init-mcp-registry.ts` — **`cursor`** and **`vscode`** set `workspaceRootArg: true`.
 
 ### Spawn builder
 
-`src/codemap-invocation.ts` — `buildCodemapMcpSpawn(invocation, includeWorkspaceRoot)` appends `--root ${workspaceFolder}` only when the second arg is `true`.
+`src/codemap-invocation.ts` — `buildCodemapMcpSpawn(invocation, includeWorkspaceRoot)` appends `--root ${workspaceFolder}` when the registry flag is true.
 
-### Init comment + tests
+### Init + tests
 
-- `src/agents-init-mcp.ts` — _"Cursor uses `${workspaceFolder}` root injection; most other clients rely on workspace cwd."_
-- `src/agents-init-mcp.test.ts` — `"includes workspace root for Cursor"` vs `"omits --root for cwd-based clients"`.
+- `src/agents-init-mcp.ts` — Cursor and VS Code get `${workspaceFolder}` root injection; cwd-based clients omit `--root`.
+- `src/agents-init-mcp.test.ts` — vscode-only write/merge/idempotent/upgrade tests; integration test asserts full args array.
 
-### Docs table gap
+### Docs
 
-`docs/agents.md` § MCP wiring — Cursor row documents `--root ${workspaceFolder}`; VS Code row only mentions `type: stdio` (does not state that `--root` is omitted by design).
+`docs/agents.md` § MCP wiring — VS Code row documents `mcp --watch --root ${workspaceFolder}` (same spawn tail as Cursor, different JSON shape).
 
-### Internal inconsistency (dogfood)
+### Dogfood reference
 
-This repository's **`.vscode/mcp.json`** already uses:
-
-```json
-"args": ["src/index.ts", "mcp", "--watch", "--root", "${workspaceFolder}"]
-```
-
-So maintainers expect explicit `--root` on VS Code while `init --mcp` does not emit it for consumers.
+This repository's **`.vscode/mcp.json`** uses explicit `--root ${workspaceFolder}` — now aligned with consumer init output.
 
 ---
 
@@ -94,14 +88,14 @@ Optional follow-up: document **`--no-watch`** as a consumer override when file w
 
 ---
 
-## Implementation steps
+## Implementation steps (done)
 
-1. **`src/agents-init-mcp-registry.ts`** — add `workspaceRootArg: true` to the `vscode` entry (or rename flag to `injectWorkspaceRootArg` if the Cursor-only comment is retired).
-2. **`src/agents-init-mcp.test.ts`** — in `"writes all default project MCP files"`, assert `vscode.servers.codemap.args` contains `"--root"` and `"${workspaceFolder}"` (mirror Cursor assertions).
-3. **`src/agents-init-mcp.ts`** — update the file comment: both Cursor and VS Code get explicit root injection; other cwd-based clients remain unchanged.
-4. **`docs/agents.md`** — VS Code row: `servers.codemap` with `type: stdio` **and** `mcp --watch --root ${workspaceFolder}` (same spawn tail as Cursor, different JSON shape).
-5. **Re-run** `bun test src/agents-init-mcp.test.ts` (and full `check` if touching registry exports).
-6. **CHANGELOG** — patch note under `agents init --mcp` (VS Code workspace root parity).
+1. [x] **`src/agents-init-mcp-registry.ts`** — `workspaceRootArg: true` on the `vscode` entry.
+2. [x] **`src/agents-init-mcp.test.ts`** — assert VS Code args include `--root` and `${workspaceFolder}`.
+3. [x] **`src/agents-init-mcp.ts`** — comment: Cursor and VS Code get explicit root injection.
+4. [x] **`docs/agents.md`** — VS Code row updated.
+5. [x] **`bun test src/agents-init-mcp.test.ts`** (+ registry/cli coverage).
+6. [x] **Changeset** — patch note for npm release.
 
 ---
 
@@ -114,14 +108,16 @@ Optional follow-up: document **`--no-watch`** as a consumer override when file w
 
 ---
 
-## Consumer guidance (until shipped)
+## Consumer guidance
 
-Projects that already override MCP config (example: large-repo `--no-watch`, explicit `--root` on both IDEs) should **keep overrides**. Re-running `init --mcp` without re-applying:
+Projects with `.vscode/mcp.json` from **older** init output (no `--root`) should re-run **`codemap agents init --mcp`** (or target **`copilot`** only) to upsert the codemap server entry. Init merge is idempotent and preserves foreign `servers`.
 
-- **`--no-watch`** — still required when watch hangs.
-- **`--root ${workspaceFolder}`** on VS Code — still recommended until this plan ships.
+Custom overrides remain valid:
 
-Do **not** assume `init --mcp` output is authoritative for VS Code root pinning today.
+- **`--no-watch`** — still required when watch hangs on large repos.
+- **Hand-patched `--root ${workspaceFolder}`** — safe to keep; init will converge to the same args on re-run.
+
+Do **not** assume VS Code stdio spawn `cwd` equals workspace root — official docs do not guarantee it (see fact-check below).
 
 ---
 
