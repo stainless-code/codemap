@@ -590,6 +590,46 @@ describe("runAgentsInit", () => {
     }
   });
 
+  it("runAgentsInit with --force migrates legacy mirror via symlink refresh", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      await runAgentsInit({
+        projectRoot: dir,
+        force: true,
+        targets: ["cursor"],
+        linkMode: "copy",
+      });
+      writeFileSync(
+        join(dir, ".cursor", "rules", "codemap.mdc"),
+        `${readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8")
+          .replace(CODMAP_INIT_MANAGED, "")
+          .trim()}\nstale mirror line`,
+        "utf-8",
+      );
+      expect(
+        await runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "symlink",
+        }),
+      ).toBe(true);
+      expect(
+        lstatSync(
+          join(dir, ".cursor", "rules", "codemap.mdc"),
+        ).isSymbolicLink(),
+      ).toBe(true);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).toContain(CODMAP_INIT_MANAGED);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).not.toContain("stale mirror line");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("runAgentsInit with --force refuses symlink refresh when dest is a non-managed file", async () => {
     const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
     try {

@@ -119,7 +119,7 @@ describe("agents init on fixtures/minimal dummy corpus", () => {
       ).toContain(CODMAP_INIT_MANAGED);
       expect(
         readFileSync(join(dir, ".windsurf", "rules", "codemap.md"), "utf-8"),
-      ).toContain("codemap");
+      ).toContain(CODMAP_INIT_MANAGED);
       expect(readFileSync(join(dir, "CLAUDE.md"), "utf-8")).toContain(
         CODMAP_POINTER_BEGIN,
       );
@@ -275,6 +275,69 @@ describe("agents init on fixtures/minimal dummy corpus", () => {
       expect(existsSync(join(dir, ".cursor", "rules", "extra-team.mdc"))).toBe(
         false,
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("--force migrates legacy copy-mode mirror on dummy corpus", async () => {
+    const dir = copyDummyCorpus();
+    try {
+      await runAgentsInit({
+        projectRoot: dir,
+        force: true,
+        targets: ["cursor"],
+        linkMode: "copy",
+      });
+      writeFileSync(
+        join(dir, ".cursor", "rules", "codemap.mdc"),
+        `${readFileSync(join(dir, ".agents", "rules", "codemap.md"), "utf-8")
+          .replace(CODMAP_INIT_MANAGED, "")
+          .trim()}\nstale mirror line`,
+        "utf-8",
+      );
+      expect(
+        await runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "copy",
+        }),
+      ).toBe(true);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).toContain(CODMAP_INIT_MANAGED);
+      expect(
+        readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
+      ).not.toContain("stale mirror line");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("--force refuses symlink refresh for non-managed mirror on dummy corpus", async () => {
+    const dir = copyDummyCorpus();
+    try {
+      await runAgentsInit({
+        projectRoot: dir,
+        force: true,
+        targets: ["cursor"],
+        linkMode: "symlink",
+      });
+      rmSync(join(dir, ".cursor", "rules", "codemap.mdc"));
+      writeFileSync(
+        join(dir, ".cursor", "rules", "codemap.mdc"),
+        "# My team codemap override\n",
+        "utf-8",
+      );
+      await expect(
+        runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "symlink",
+        }),
+      ).rejects.toThrow(/not codemap-managed/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
