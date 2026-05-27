@@ -589,6 +589,34 @@ describe("runAgentsInit", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it("runAgentsInit with --force refuses symlink refresh when dest is a non-managed file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codemap-agents-"));
+    try {
+      await runAgentsInit({
+        projectRoot: dir,
+        force: true,
+        targets: ["cursor"],
+        linkMode: "symlink",
+      });
+      rmSync(join(dir, ".cursor", "rules", "codemap.mdc"));
+      writeFileSync(
+        join(dir, ".cursor", "rules", "codemap.mdc"),
+        "# My team codemap override\n",
+        "utf-8",
+      );
+      await expect(
+        runAgentsInit({
+          projectRoot: dir,
+          force: true,
+          targets: ["cursor"],
+          linkMode: "symlink",
+        }),
+      ).rejects.toThrow(/not codemap-managed/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 /** Minimal inner block for pointer tests (matches legacy migration heuristic). */
