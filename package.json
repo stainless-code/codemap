@@ -46,7 +46,7 @@
     "benchmark:query": "bun scripts/benchmark-query-output.ts",
     "build": "tsdown",
     "changeset": "changeset",
-    "check": "bun run build && bun run --parallel format:check lint:ci test typecheck && bun run test:golden && bun run test:agent-eval",
+    "check": "bun run build && bun run --parallel format:check lint:ci test test:scripts typecheck && bun run test:golden && bun run test:agent-eval",
     "check-updates": "bun update -i --latest",
     "check:perf-baseline": "bun scripts/check-perf-baseline.ts",
     "check:perf-baseline:update": "bun scripts/check-perf-baseline.ts --update",
@@ -70,6 +70,7 @@
     "test:coverage": "bun test --coverage ./src",
     "test:golden": "bun scripts/query-golden.ts",
     "test:golden:external": "bun scripts/query-golden.ts --corpus external",
+    "test:scripts": "bun test scripts/*.test.mjs",
     "typecheck": "tsgo --noEmit",
     "version": "changeset version && bun run format CHANGELOG.md"
   },

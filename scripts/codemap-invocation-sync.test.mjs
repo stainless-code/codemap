@@ -69,6 +69,17 @@ const CASES = [
     },
     opts: { projectRoot: "", packageManager: "bun" },
   },
+  {
+    label: "yarn berry exec local",
+    fixture: {
+      "package.json": JSON.stringify({
+        packageManager: "yarn@berry@4.0.0",
+        devDependencies: { "@stainless-code/codemap": "^1.0.0" },
+      }),
+      "yarn.lock": "",
+    },
+    opts: { projectRoot: "", packageManager: "yarn@berry" },
+  },
 ];
 
 describe("codemap-invocation TS ↔ mjs sync", () => {
