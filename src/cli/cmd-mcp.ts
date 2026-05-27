@@ -151,7 +151,7 @@ The server stays running until the MCP client disconnects (stdin EOF,
 stdout broken pipe, parent process exit, or SIGINT/SIGTERM). There is
 no idle timeout — silence without tool calls does not exit the process
 (the IDE host would not reliably respawn it mid-session). With --watch,
-the file watcher starts after connect and is drained before exit.
+the file watcher starts before connect and is drained before exit.
 `);
 }
 
