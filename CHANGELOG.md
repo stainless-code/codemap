@@ -1,5 +1,21 @@
 # @stainless-code/codemap
 
+## 0.9.2
+
+### Patch Changes
+
+- [#152](https://github.com/stainless-code/codemap/pull/152) [`150c6c6`](https://github.com/stainless-code/codemap/commit/150c6c62e9a304e72deac5dc1b5610174cf059bb) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Adaptive snippet budgets for `trace`, `explore`, and `node` scale with indexed file count when `budget_chars` is omitted (explicit override unchanged). `explore` also applies adaptive row limits internally (no transport override).
+
+- [#155](https://github.com/stainless-code/codemap/pull/155) [`450ca2e`](https://github.com/stainless-code/codemap/commit/450ca2ec29765f9ebb4f83463171591873958364) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap agents init` is safer on re-run: IDE mirrors sync bundled template paths only; `--force` overwrites IDE mirrors only when they carry `codemap-init:managed` or match the legacy mirror heuristic (pre-marker bundled copies); invalid MCP JSON shapes are rejected instead of reset (even with `--force`).
+
+- [#149](https://github.com/stainless-code/codemap/pull/149) [`41a4184`](https://github.com/stainless-code/codemap/commit/41a418405b182a3f98cce22cd4ce8153969d1e3f) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `index_freshness` metadata on `context`, MCP tool responses, HTTP headers, and boot stderr warnings so agents can detect commit drift, pending watcher sync, and disk-ahead-of-index states before trusting structural queries.
+
+- [#154](https://github.com/stainless-code/codemap/pull/154) [`1bcca3a`](https://github.com/stainless-code/codemap/commit/1bcca3a64ed4d1034358fc4f9c2505cf71bae45d) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap agents init --mcp` writes PM-aware MCP spawn commands (e.g. `npx codemap`, `pnpm exec codemap`, `yarn exec codemap`, `bunx codemap`, or dlx `@stainless-code/codemap@latest`) instead of assuming global `codemap` on PATH.
+
+- [#153](https://github.com/stainless-code/codemap/pull/153) [`048278b`](https://github.com/stainless-code/codemap/commit/048278bca5e13dbcf8f130e082a190ebcd574046) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - MCP session lifecycle hygiene: stdio disconnect detection (stdin EOF, stdout EPIPE, parent-PID poll) with graceful watcher shutdown on client exit; HTTP `serve --watch` refcount-gates the watcher per request (5s release grace, `/health` excluded). No MCP idle shutdown.
+
+- [#151](https://github.com/stainless-code/codemap/pull/151) [`e717652`](https://github.com/stainless-code/codemap/commit/e71765247b2227cb45442674932869078981a029) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Rich `context` bootstrap: `start_here` with intent-ranked recipe cards, inline index summary, budget-capped hub leaders with export signatures (adaptive caps by repo size), debug-biased marker samples, and optional `include_snippets` on MCP/HTTP `context` (no-op when `compact: true`). Legacy `hubs` keeps the bundled `fan-in` recipe default limit; prefer `start_here.hub_leaders` for signatures.
+
 ## 0.9.1
 
 ### Patch Changes
