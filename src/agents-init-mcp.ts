@@ -434,8 +434,8 @@ export interface ApplyAgentsInitMcpOptions {
 }
 
 /**
- * Write MCP config for selected integrations. Cursor uses
- * `${workspaceFolder}` root injection; most other clients rely on workspace cwd.
+ * Write MCP config for selected integrations. Cursor and VS Code get
+ * `${workspaceFolder}` root injection; other cwd-based clients omit `--root`.
  */
 export async function applyAgentsInitMcp(
   opts: ApplyAgentsInitMcpOptions,

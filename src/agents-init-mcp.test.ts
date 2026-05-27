@@ -301,6 +301,10 @@ describe("applyAgentsInitMcp", () => {
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.type).toBe("stdio");
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.command).toBe("npx");
       expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args?.[0]).toBe("codemap");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args).toContain("--root");
+      expect(vscode.servers[CODEMAP_MCP_SERVER_KEY]?.args).toContain(
+        "${workspaceFolder}",
+      );
 
       const amazonDefault = JSON.parse(
         readFileSync(join(dir, ".amazonq", "default.json"), "utf-8"),

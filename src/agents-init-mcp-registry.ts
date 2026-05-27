@@ -31,7 +31,7 @@ export interface AgentsInitMcpTargetDef {
   readonly docsUrl: string;
   /** Written by default when `--mcp` has no integration filter. */
   readonly defaultOnMcp: boolean;
-  /** Cursor: inject `--root ${workspaceFolder}`. */
+  /** Cursor / VS Code: inject `--root ${workspaceFolder}`. */
   readonly workspaceRootArg?: boolean | undefined;
   /** Matching `agents init --interactive` integration pick, when any. */
   readonly integrationTarget?: AgentsInitTarget | undefined;
@@ -77,6 +77,7 @@ export const AGENTS_INIT_MCP_REGISTRY: readonly AgentsInitMcpTargetDef[] =
       docsUrl:
         "https://code.visualstudio.com/docs/copilot/reference/mcp-configuration",
       defaultOnMcp: true,
+      workspaceRootArg: true,
       integrationTarget: "copilot",
     },
     {
