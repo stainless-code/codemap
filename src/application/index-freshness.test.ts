@@ -243,6 +243,50 @@ describe("warnIndexFreshnessToStderr", () => {
     }
   });
 
+  it("logs boot freshness warning when watch prime fails", async () => {
+    _resetWatchStateForTests();
+    const errLog = spyOn(console, "error").mockImplementation(() => {});
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue(
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    );
+    const backend = fakeBackend();
+
+    try {
+      withEmptyDb((db) => {
+        setMeta(
+          db,
+          "last_indexed_commit",
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        );
+      });
+      const handle = runWatchLoop({
+        root: benchDir,
+        excludeDirNames: new Set(["node_modules", ".git", "dist"]),
+        onChange: () => {},
+        debounceMs: 60_000,
+        backend,
+        onPrime: async () => {
+          try {
+            throw new Error("prime failed");
+          } finally {
+            warnIndexFreshnessToStderr("codemap mcp");
+          }
+        },
+      });
+      await handle.ready;
+      await handle.stop();
+      expect(errLog).toHaveBeenCalledWith(
+        expect.stringContaining("codemap mcp:"),
+      );
+      expect(errLog).toHaveBeenCalledWith(
+        expect.stringContaining("prime failed"),
+      );
+    } finally {
+      errLog.mockRestore();
+      revParse.mockRestore();
+    }
+  });
+
   it("stays silent when warning is null", () => {
     const head = "cccccccccccccccccccccccccccccccccccccccc";
     const errLog = spyOn(console, "error").mockImplementation(() => {});

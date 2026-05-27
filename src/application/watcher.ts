@@ -183,6 +183,8 @@ let watchActive = false;
 let watchDebouncer: Debouncer | undefined;
 let watchReindexInFlight = false;
 let watchPrimeInFlight = false;
+/** Batches chained on `inFlight` but not yet running or still running. */
+let watchReindexPendingBatches = 0;
 
 export function getWatchSyncState(): Readonly<{
   pending_paths: number;
@@ -190,7 +192,10 @@ export function getWatchSyncState(): Readonly<{
 }> {
   return {
     pending_paths: watchDebouncer?.pendingSize() ?? 0,
-    reindex_in_flight: watchReindexInFlight || watchPrimeInFlight,
+    reindex_in_flight:
+      watchReindexInFlight ||
+      watchPrimeInFlight ||
+      watchReindexPendingBatches > 0,
   };
 }
 
@@ -204,6 +209,7 @@ export function _resetWatchStateForTests(): void {
   watchDebouncer = undefined;
   watchReindexInFlight = false;
   watchPrimeInFlight = false;
+  watchReindexPendingBatches = 0;
 }
 
 /** Test-only escape hatch — flips the flag without booting a real watcher (for handleAudit prelude-skip tests). */
@@ -350,6 +356,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
   // re-indexing left the DB in a half-state).
   let inFlight: Promise<void> = Promise.resolve();
   const debouncer = createDebouncer((paths) => {
+    watchReindexPendingBatches++;
     inFlight = inFlight
       .then(async () => {
         watchReindexInFlight = true;
@@ -357,6 +364,7 @@ export function runWatchLoop(opts: WatchLoopOpts): {
           await Promise.resolve(opts.onChange(paths));
         } finally {
           watchReindexInFlight = false;
+          watchReindexPendingBatches--;
         }
       })
       .catch((err: unknown) => {

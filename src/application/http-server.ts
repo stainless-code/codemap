@@ -134,8 +134,11 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
       recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
       debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
       onPrime: async () => {
-        await prime();
-        warnIndexFreshnessToStderr("codemap serve");
+        try {
+          await prime();
+        } finally {
+          warnIndexFreshnessToStderr("codemap serve");
+        }
       },
       onChange: createReindexOnChange({
         quiet: false,

@@ -593,8 +593,11 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
       recipesWatchPrefix: resolveRecipesWatchPrefix(getProjectRoot()),
       debounceMs: opts.debounceMs ?? DEFAULT_DEBOUNCE_MS,
       onPrime: async () => {
-        await prime();
-        warnIndexFreshnessToStderr("codemap mcp");
+        try {
+          await prime();
+        } finally {
+          warnIndexFreshnessToStderr("codemap mcp");
+        }
       },
       onChange: createReindexOnChange({
         quiet: false,

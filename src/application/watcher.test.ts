@@ -415,6 +415,44 @@ describe("runWatchLoop — backend dispatch + path filter", () => {
     expect(onChangeFinished).toBe(true);
   });
 
+  it("reindex_in_flight stays true while chained batches wait on inFlight", async () => {
+    _resetWatchStateForTests();
+    const backend = fakeBackend();
+    let releaseBatch1: (() => void) | undefined;
+    const batch1Gate = new Promise<void>((resolve) => {
+      releaseBatch1 = resolve;
+    });
+    let batchCount = 0;
+
+    const handle = runWatchLoop({
+      root: "/tmp/proj",
+      excludeDirNames: exclude,
+      onChange: async () => {
+        batchCount++;
+        if (batchCount === 1) {
+          await batch1Gate;
+        }
+      },
+      debounceMs: 10,
+      backend,
+    });
+
+    backend.fire("change", "/tmp/proj/src/a.ts");
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
+
+    backend.fire("change", "/tmp/proj/src/b.ts");
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().pending_paths).toBe(0);
+    expect(getWatchSyncState().reindex_in_flight).toBe(true);
+
+    releaseBatch1!();
+    await new Promise((r) => setTimeout(r, 25));
+    expect(getWatchSyncState().reindex_in_flight).toBe(false);
+
+    await handle.stop();
+  });
+
   it("treats unlink as a path requiring reindex (caller handles deletes)", async () => {
     const backend = fakeBackend();
     const calls: ReadonlySet<string>[] = [];
