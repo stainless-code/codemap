@@ -209,6 +209,15 @@ export function defaultStartHereClassification(): ReturnType<
   return { ...explore, classified_as: "default" };
 }
 
+/** Trim MCP/CLI intent; whitespace-only matches no-intent (`null`). */
+export function normalizeContextIntent(
+  intent: string | null | undefined,
+): string | null {
+  if (intent === null || intent === undefined) return null;
+  const trimmed = intent.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 /**
  * Build the envelope from an open DB. Reads SQLite + optional git for
  * `index_freshness`; `include_snippets: true` adds bounded disk reads for hub
@@ -219,6 +228,9 @@ export function buildContextEnvelope(
   projectRoot: string,
   opts: BuildContextEnvelopeOpts,
 ): ContextEnvelope {
+  const userIntent = normalizeContextIntent(opts.intent);
+  const intentClassification =
+    userIntent !== null ? classifyIntent(userIntent) : null;
   const fileCount = readScalarInt(db, "SELECT COUNT(*) AS n FROM files");
   const lastCommit = getMeta(db, "last_indexed_commit") ?? null;
   const languages = (
@@ -249,8 +261,7 @@ export function buildContextEnvelope(
 
   if (!opts.compact) {
     const budget = resolveContextBudget(fileCount);
-    const markerIntentClass =
-      opts.intent !== null ? classifyIntent(opts.intent).classified_as : null;
+    const markerIntentClass = intentClassification?.classified_as ?? null;
 
     const legacyHubLimit = readRecipeSqlLimit("fan-in") ?? 15;
     const hubLeaderRows = readFanInHubs(db, budget.hub_limit);
@@ -264,21 +275,20 @@ export function buildContextEnvelope(
       budget.marker_limit,
     );
 
-    const classification =
-      opts.intent !== null
-        ? classifyIntent(opts.intent)
-        : defaultStartHereClassification();
-    envelope.start_here = composeStartHere(db, classification, {
-      fileCount,
-      projectRoot,
-      includeSnippets: opts.include_snippets === true,
-      fanInRows: hubLeaderRows,
-    });
+    envelope.start_here = composeStartHere(
+      db,
+      intentClassification ?? defaultStartHereClassification(),
+      {
+        fileCount,
+        projectRoot,
+        includeSnippets: opts.include_snippets === true,
+        fanInRows: hubLeaderRows,
+      },
+    );
   }
 
-  if (opts.intent !== null) {
-    const cls = classifyIntent(opts.intent);
-    envelope.intent = { input: opts.intent, ...cls };
+  if (intentClassification !== null && userIntent !== null) {
+    envelope.intent = { input: userIntent, ...intentClassification };
   }
 
   return envelope;
@@ -492,7 +502,12 @@ function readHubSignatures(
         lineStart: row.line_start,
         indexedContentHash: getIndexedContentHash(db, filePath),
       });
-      if (snippet.snippet !== undefined) sig.snippet = snippet.snippet;
+      if (snippet.snippet !== undefined) {
+        sig.snippet = truncateSignature(
+          snippet.snippet,
+          opts.signatureMaxChars,
+        );
+      }
       if (snippet.stale === true) sig.stale = true;
       if (snippet.missing === true) sig.missing = true;
     }

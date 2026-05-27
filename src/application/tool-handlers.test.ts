@@ -211,27 +211,16 @@ describe("handleContext", () => {
     }
   });
 
-  it("omits start_here when compact even with include_snippets", () => {
-    const result = handleContext({ compact: true, include_snippets: true });
+  it("treats whitespace-only intent as no intent", () => {
+    const result = handleContext({ intent: "   " });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      const payload = result.payload as Record<string, unknown>;
-      expect(payload.start_here).toBeUndefined();
-      expect(payload.hubs).toBeUndefined();
-    }
-  });
-});
-
-describe("handleContext", () => {
-  it("returns the bootstrap envelope with start_here", () => {
-    const result = handleContext({});
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      const payload = result.payload as Record<string, unknown>;
-      expect(payload.start_here).toBeDefined();
-      expect(payload.codemap).toMatchObject({
-        schema_version: expect.any(Number),
-      });
+      const payload = result.payload as {
+        start_here?: { classified_as: string };
+        intent?: unknown;
+      };
+      expect(payload.start_here?.classified_as).toBe("default");
+      expect(payload.intent).toBeUndefined();
     }
   });
 

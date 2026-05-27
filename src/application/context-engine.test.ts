@@ -27,6 +27,7 @@ import {
   classifyIntent,
   composeStartHere,
   defaultStartHereClassification,
+  normalizeContextIntent,
   readRecipeSqlLimit,
   resolveContextBudget,
 } from "./context-engine";
@@ -159,6 +160,19 @@ function composeOpts(): { fileCount: number; projectRoot: string } {
   return { fileCount: 3, projectRoot: benchDir };
 }
 
+describe("normalizeContextIntent", () => {
+  it("returns null for empty or whitespace-only strings", () => {
+    expect(normalizeContextIntent(null)).toBeNull();
+    expect(normalizeContextIntent(undefined)).toBeNull();
+    expect(normalizeContextIntent("")).toBeNull();
+    expect(normalizeContextIntent("   ")).toBeNull();
+  });
+
+  it("trims non-empty intent strings", () => {
+    expect(normalizeContextIntent("  refactor auth  ")).toBe("refactor auth");
+  });
+});
+
 describe("resolveContextBudget", () => {
   it("uses full caps on small repos", () => {
     expect(resolveContextBudget(100).hub_limit).toBe(5);
@@ -288,6 +302,118 @@ describe("composeStartHere", () => {
       );
       expect(missingSig?.missing).toBe(true);
       expect(missingSig?.snippet).toBeUndefined();
+    });
+  });
+
+  it("treats path-escape hub files as missing snippets", () => {
+    withSeededDb((db) => {
+      insertFile(db, {
+        path: "../../../escape.ts",
+        content_hash: "he",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      insertSymbols(db, [
+        {
+          file_path: "../../../escape.ts",
+          name: "escapeFn",
+          kind: "function",
+          line_start: 1,
+          line_end: 1,
+          signature: "export function escapeFn()",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+          complexity: null,
+          name_column_start: 0,
+          name_column_end: 0,
+          scope_local_id: 0,
+          body_line_count: null,
+          param_count: null,
+          nesting_depth: null,
+          return_type: null,
+          is_async: 0,
+          is_generator: 0,
+        },
+      ]);
+      insertDependencies(db, [
+        { from_path: "src/leaf.ts", to_path: "../../../escape.ts" },
+      ]);
+
+      const start = composeStartHere(db, defaultStartHereClassification(), {
+        ...composeOpts(),
+        includeSnippets: true,
+      });
+      const escapeHub = start.hub_leaders.find((h) =>
+        h.file_path.includes("escape.ts"),
+      );
+      expect(escapeHub?.signatures[0]?.missing).toBe(true);
+      expect(escapeHub?.signatures[0]?.snippet).toBeUndefined();
+    });
+  });
+
+  it("truncates long snippet lines to signature_max_chars", () => {
+    writeFileSync(
+      join(benchDir, "src", "long.ts"),
+      `export function longLine(${Array.from({ length: 40 }, (_, i) => `a${i}: number`).join(", ")}) {}\n`,
+    );
+    withSeededDb((db) => {
+      insertFile(db, {
+        path: "src/long.ts",
+        content_hash: "hl",
+        size: 200,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      insertSymbols(db, [
+        {
+          file_path: "src/long.ts",
+          name: "longLine",
+          kind: "function",
+          line_start: 1,
+          line_end: 1,
+          signature: "export function longLine(...)",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+          complexity: null,
+          name_column_start: 0,
+          name_column_end: 0,
+          scope_local_id: 0,
+          body_line_count: null,
+          param_count: null,
+          nesting_depth: null,
+          return_type: null,
+          is_async: 0,
+          is_generator: 0,
+        },
+      ]);
+      insertDependencies(db, [
+        { from_path: "src/other.ts", to_path: "src/long.ts" },
+      ]);
+
+      const start = composeStartHere(db, defaultStartHereClassification(), {
+        ...composeOpts(),
+        includeSnippets: true,
+      });
+      const longSig = start.hub_leaders
+        .flatMap((h) => h.signatures)
+        .find((s) => s.name === "longLine");
+      expect(longSig?.snippet?.endsWith("…")).toBe(true);
+      expect(longSig!.snippet!.length).toBeLessThanOrEqual(120);
     });
   });
 
@@ -424,6 +550,55 @@ describe("buildContextEnvelope", () => {
         expect(envelope.start_here).toBeUndefined();
         expect(envelope.hubs).toBeUndefined();
         expect(envelope.intent?.classified_as).toBe("debug");
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("caps sample_markers by adaptive marker_limit for large repos", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        for (let i = 0; i < 498; i++) {
+          insertFile(db, {
+            path: `src/extra/${i}.ts`,
+            content_hash: `hx${i}`,
+            size: 1,
+            line_count: 1,
+            language: "typescript",
+            last_modified: 1,
+            indexed_at: 1,
+          });
+        }
+        for (let i = 0; i < 25; i++) {
+          db.run(
+            "INSERT INTO markers (file_path, line_number, kind, content) VALUES (?, ?, 'NOTE', ?)",
+            [`src/extra/${i}.ts`, 1, `marker ${i}`],
+          );
+        }
+
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(envelope.sample_markers!.length).toBeLessThanOrEqual(15);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("treats whitespace-only intent as no intent", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: "   ",
+        });
+        expect(envelope.start_here?.classified_as).toBe("default");
+        expect(envelope.intent).toBeUndefined();
       });
     } finally {
       revParse.mockRestore();
