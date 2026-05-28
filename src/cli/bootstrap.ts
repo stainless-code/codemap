@@ -15,7 +15,7 @@ Index (default): update .codemap/index.db for the project root (\`--root\` or cw
 Query:
   codemap query [--json] "<SQL>"
   codemap query [--json] --recipe <id>
-  codemap query batch [--stdin | --file <path>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--compact]
+  codemap query batch [--stdin | --file <path>] [--summary | --no-summary] [--changed-since <ref>] [--group-by <mode>] [--compact]
 
 Outcome aliases (thin wrappers around \`query --recipe <id>\`; pass-through flags):
   codemap dead-code         # query --recipe untested-and-dead
@@ -42,7 +42,7 @@ PR comment renderer (audit/SARIF → markdown summary):
 
 MCP server (Model Context Protocol — for agent hosts):
   codemap mcp                                        # stdio JSON-RPC (17 tools; watcher default-ON)
-  # CLI parity: query batch, trace, explore, node, file, schema, context --include-snippets
+  # CLI parity: query batch, trace, explore, node, file, schema, symbols, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
   codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]   # watcher default-ON

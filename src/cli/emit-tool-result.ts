@@ -1,5 +1,7 @@
 import type { ToolResult } from "../application/tool-handlers";
 
+/** Tool-shaped MCP/HTTP handlers use {@link emitToolResult}; resource URIs use {@link emitJsonPayload}. */
+
 export interface EmitToolResultOpts {
   /** When true, errors go to stdout as `{"error":"…"}` (CLI --json convention). */
   json: boolean;

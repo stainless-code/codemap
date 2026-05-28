@@ -123,7 +123,7 @@ Resources:
                                  codemap symbols <name>.
 
 Output shape matches each tool's CLI JSON payload (always JSON for
-query batch, trace, explore, node, file, schema, context; optional
+query batch, trace, explore, node, file, schema, symbols, context; optional
 \`--json\` on query/show/snippet/impact/affected/validate). MCP wraps payloads
 in \`{content: [{type: "text", text: …}]}\`; HTTP returns raw JSON. See
 docs/architecture.md § MCP wiring for the engine seam and the agent rule
