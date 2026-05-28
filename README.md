@@ -225,7 +225,7 @@ codemap mcp                                                     # JSON-RPC on st
 # Tools (17): query, query_batch, query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
-# CLI twins: query batch, trace, explore, node, file, schema, context --include-snippets (same JSON as MCP/HTTP).
+# CLI twins: query batch, trace, explore, node, file, schema, symbols, context --include-snippets (same JSON as MCP/HTTP).
 # Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)

@@ -26,6 +26,20 @@ describe("parseQueryBatchRest", () => {
       compact: true,
     });
   });
+
+  it("parses --no-summary", () => {
+    expect(
+      parseQueryBatchRest(["query", "batch", "--stdin", "--no-summary"]),
+    ).toEqual({
+      kind: "run",
+      stdin: true,
+      filePath: undefined,
+      summary: false,
+      changedSince: undefined,
+      groupBy: undefined,
+      compact: false,
+    });
+  });
 });
 
 describe("parseQueryBatchInput", () => {
@@ -51,6 +65,14 @@ describe("parseQueryBatchInput", () => {
     if (!("error" in r)) {
       expect(r.statements).toEqual(["SELECT 1"]);
       expect(r.summary).toBe(true);
+    }
+  });
+
+  it("honors CLI --no-summary default", () => {
+    const r = parseQueryBatchInput(["SELECT 1"], { summary: false });
+    expect("error" in r).toBe(false);
+    if (!("error" in r)) {
+      expect(r.summary).toBe(false);
     }
   });
 });

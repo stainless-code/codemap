@@ -57,6 +57,7 @@ Targeted reads (precise lookup by symbol name):
   codemap snippet <name> [--kind <k>] [--in <path>] [--json]   # source text from disk + stale flag
   codemap file <path> [--compact]                              # per-file roll-up (MCP codemap://files twin)
   codemap schema [--compact]                                   # index DDL (MCP codemap://schema twin)
+  codemap symbols <name> [--in <path>] [--compact]             # symbol lookup (MCP codemap://symbols twin)
 
 Graph composers (MCP trace / explore / node twins):
   codemap trace --from <sym> --to <sym> [--max-depth N] [--via <b>] [--budget-chars N] [--compact]
@@ -149,6 +150,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "node") return;
   if (rest[0] === "file") return;
   if (rest[0] === "schema") return;
+  if (rest[0] === "symbols") return;
   if (rest[0] === "unlock") return;
 
   if (rest[0] === "agents") {

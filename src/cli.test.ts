@@ -117,6 +117,7 @@ describe("validateIndexModeArgs", () => {
       "node",
       "file",
       "schema",
+      "symbols",
       "unlock",
     ]) {
       expect(() => validateIndexModeArgs([verb])).not.toThrow();
@@ -183,6 +184,49 @@ describe("CLI parity verb dispatch", () => {
     expect(exitCode).toBe(1);
     expect(JSON.parse(out)).toEqual({
       error: expect.stringContaining("--from"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("query batch parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["query", "batch"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("--stdin"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("file parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["file"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("missing <path>"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("schema parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["schema", "--nope"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("unknown option"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("symbols --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["symbols", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap symbols");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("symbols parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["symbols"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("missing <name>"),
     });
     expect(err).toBe("");
   });

@@ -10,6 +10,7 @@ import {
   _resetResourceCachesForTests,
   buildFileRollup,
   buildSchemaCatalog,
+  buildSymbolLookup,
   listResources,
   readResource,
 } from "./resource-handlers";
@@ -244,6 +245,22 @@ describe("CLI builder parity with readResource", () => {
     const fromBuilder = buildFileRollup("src/foo.ts");
     const fromResource = JSON.parse(
       readResource("codemap://files/src/foo.ts")!.text,
+    );
+    expect(fromBuilder).toEqual(fromResource);
+  });
+
+  it("buildSymbolLookup matches codemap://symbols/{name}", () => {
+    const fromBuilder = buildSymbolLookup("foo");
+    const fromResource = JSON.parse(
+      readResource("codemap://symbols/foo")!.text,
+    );
+    expect(fromBuilder).toEqual(fromResource);
+  });
+
+  it("buildSymbolLookup matches codemap://symbols/{name}?in=", () => {
+    const fromBuilder = buildSymbolLookup("foo", "src/");
+    const fromResource = JSON.parse(
+      readResource("codemap://symbols/foo?in=src%2F")!.text,
     );
     expect(fromBuilder).toEqual(fromResource);
   });

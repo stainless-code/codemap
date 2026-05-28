@@ -116,9 +116,11 @@ Resources:
     codemap://recipes/{id}       Single recipe (id, description, sql).
     codemap://files/{path}       Per-file roll-up (symbols, imports,
                                  exports, coverage). URI-encode the path.
+                                 CLI: codemap file <path>.
     codemap://symbols/{name}     Symbol lookup; \`?in=<path-prefix>\`
                                  mirrors \`show --in <path>\`. Returns
-                                 {matches, disambiguation?}.
+                                 {matches, disambiguation?}. CLI:
+                                 codemap symbols <name>.
 
 Output shape matches each tool's CLI JSON payload (always JSON for
 query batch, trace, explore, node, file, schema, context; optional

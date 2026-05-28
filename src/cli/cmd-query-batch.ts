@@ -22,7 +22,7 @@ interface QueryBatchOpts {
 }
 
 export function printQueryBatchCmdHelp(): void {
-  console.log(`Usage: codemap query batch [--stdin | --file <path>] [--summary] [--changed-since <ref>] [--group-by owner|directory|package] [--compact]
+  console.log(`Usage: codemap query batch [--stdin | --file <path>] [--summary | --no-summary] [--changed-since <ref>] [--group-by owner|directory|package] [--compact]
 
 Run N read-only SQL statements in one bootstrap. Same payload as the MCP
 \`query_batch\` tool / HTTP \`POST /tool/query_batch\`.
@@ -38,6 +38,7 @@ JSON shapes (both accepted):
 
 Flags:
   --summary             Batch-wide summary default for bare string items.
+  --no-summary          Batch-wide summary off for bare string items.
   --changed-since <ref> Batch-wide changed_since default.
   --group-by <mode>     Batch-wide group_by (${GROUP_BY_MODES.join(" | ")}).
   --compact             Minify JSON output.
@@ -93,6 +94,10 @@ export function parseQueryBatchRest(rest: string[]):
     }
     if (a === "--summary") {
       summary = true;
+      continue;
+    }
+    if (a === "--no-summary") {
+      summary = false;
       continue;
     }
     if (a === "--changed-since") {

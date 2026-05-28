@@ -10,7 +10,11 @@ import {
 } from "./cmd-composers";
 import { parseContextRest } from "./cmd-context";
 import { parseQueryBatchRest } from "./cmd-query-batch";
-import { parseFileRest, parseSchemaRest } from "./cmd-resource";
+import {
+  parseFileRest,
+  parseSchemaRest,
+  parseSymbolsRest,
+} from "./cmd-resource";
 
 describe("parseContextRest — include-snippets", () => {
   it("parses --include-snippets", () => {
@@ -106,6 +110,19 @@ describe("parseSchemaRest", () => {
     expect(parseSchemaRest(["schema"])).toEqual({
       kind: "run",
       compact: false,
+    });
+  });
+});
+
+describe("parseSymbolsRest", () => {
+  it("parses name and --in", () => {
+    expect(
+      parseSymbolsRest(["symbols", "foo", "--in", "src/a.ts", "--compact"]),
+    ).toEqual({
+      kind: "run",
+      name: "foo",
+      inPath: "src/a.ts",
+      compact: true,
     });
   });
 });

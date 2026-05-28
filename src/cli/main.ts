@@ -552,6 +552,29 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "symbols") {
+    const { parseSymbolsRest, printSymbolsCmdHelp, runSymbolsCmd } =
+      await import("./cmd-resource.js");
+    const parsed = parseSymbolsRest(rest);
+    if (parsed.kind === "help") {
+      printSymbolsCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      emitJsonError(parsed.message);
+      return;
+    }
+    await runSymbolsCmd({
+      root,
+      configFile,
+      stateDir,
+      name: parsed.name,
+      inPath: parsed.inPath,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
   if (rest[0] === "query" && rest[1] === "batch") {
     const { parseQueryBatchRest, printQueryBatchCmdHelp, runQueryBatchCmd } =
       await import("./cmd-query-batch.js");

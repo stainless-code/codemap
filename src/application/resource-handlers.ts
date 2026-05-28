@@ -207,6 +207,31 @@ function readMcpInstructions(): ResourcePayload {
  * `undefined` when the path is not indexed. Shared by MCP/HTTP resources
  * and `codemap file`.
  */
+export function fileResourceUri(path: string): string {
+  return `codemap://files/${encodeURIComponent(path)}`;
+}
+
+/** Error text aligned with MCP `readTemplateResource` for missing file URIs. */
+export function unknownFileResourceError(path: string): string {
+  return `codemap: unknown file resource "${fileResourceUri(path)}".`;
+}
+
+export function symbolResourceUri(name: string, inPath?: string): string {
+  const base = `codemap://symbols/${encodeURIComponent(name)}`;
+  if (inPath !== undefined && inPath.length > 0) {
+    return `${base}?in=${encodeURIComponent(inPath)}`;
+  }
+  return base;
+}
+
+/** Error text aligned with MCP `readTemplateResource` for invalid symbol URIs. */
+export function unknownSymbolResourceError(
+  name: string,
+  inPath?: string,
+): string {
+  return `codemap: unknown symbol resource "${symbolResourceUri(name, inPath)}".`;
+}
+
 export function buildFileRollup(
   path: string,
 ): Record<string, unknown> | undefined {
@@ -350,6 +375,25 @@ function readFileResource(path: string): ResourcePayload | undefined {
 }
 
 /**
+ * Exact-name symbol lookup envelope (`{matches, disambiguation?}`). Returns
+ * `undefined` when `name` is empty. Shared by MCP/HTTP resources and
+ * `codemap symbols`.
+ */
+export function buildSymbolLookup(
+  name: string,
+  inPath?: string,
+): Record<string, unknown> | undefined {
+  if (name.length === 0) return undefined;
+  const db = openDb();
+  try {
+    const matches = findSymbolsByName(db, { name, inPath });
+    return buildShowResult(matches) as unknown as Record<string, unknown>;
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+}
+
+/**
  * Symbol lookup by exact name. Returns the same `{matches,
  * disambiguation?}` envelope as the `show` verb (per PR #39). Supports
  * `?in=<path-prefix>` query parameter mirroring `show --in <path>`.
@@ -370,18 +414,13 @@ function readSymbolsResource(uri: string): ResourcePayload | undefined {
   if (name.length === 0) return undefined;
 
   const inPath = parsed.searchParams.get("in") ?? undefined;
+  const payload = buildSymbolLookup(name, inPath);
+  if (payload === undefined) return undefined;
 
-  const db = openDb();
-  try {
-    const matches = findSymbolsByName(db, { name, inPath });
-    const result = buildShowResult(matches);
-    return {
-      mimeType: "application/json",
-      text: JSON.stringify(result),
-    };
-  } finally {
-    closeDb(db, { readonly: true });
-  }
+  return {
+    mimeType: "application/json",
+    text: JSON.stringify(payload),
+  };
 }
 
 /**
