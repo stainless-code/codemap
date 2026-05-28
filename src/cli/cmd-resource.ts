@@ -3,7 +3,7 @@ import {
   buildSchemaCatalog,
 } from "../application/resource-handlers";
 import { bootstrapCodemap } from "./bootstrap-codemap";
-import { emitJsonPayload } from "./emit-tool-result";
+import { emitJsonError, emitJsonPayload } from "./emit-tool-result";
 
 interface ResourceCmdOpts {
   root: string;
@@ -84,15 +84,13 @@ export async function runFileCmd(
     await bootstrapCodemap(opts);
     const payload = buildFileRollup(opts.path);
     if (payload === undefined) {
-      emitJsonPayload({ error: `file not indexed: ${opts.path}` });
-      process.exitCode = 1;
+      emitJsonError(`file not indexed: ${opts.path}`);
       return;
     }
     emitJsonPayload(payload, { pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitJsonPayload({ error: msg });
-    process.exitCode = 1;
+    emitJsonError(msg);
   }
 }
 
@@ -145,7 +143,6 @@ export async function runSchemaCmd(opts: ResourceCmdOpts): Promise<void> {
     emitJsonPayload(buildSchemaCatalog(), { pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitJsonPayload({ error: msg });
-    process.exitCode = 1;
+    emitJsonError(msg);
   }
 }

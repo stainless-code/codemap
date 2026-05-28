@@ -82,7 +82,7 @@ export function parseContextRest(rest: string[]):
     }
     return {
       kind: "error",
-      message: `codemap: unknown option "${a}". Run codemap context --help for usage.`,
+      message: `codemap context: unknown option "${a}". Run codemap context --help for usage.`,
     };
   }
   return { kind: "run", compact, intent, includeSnippets };
