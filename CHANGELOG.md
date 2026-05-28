@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.9.5
+
+### Patch Changes
+
+- [#160](https://github.com/stainless-code/codemap/pull/160) [`b1e3d58`](https://github.com/stainless-code/codemap/commit/b1e3d5841cccf90003105bb57984475549565557) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add CLI twins for MCP query composers and resources so shell-only consumers get the same JSON payloads: `codemap query batch`, `trace`, `explore`, `node`, `file`, `schema`, `symbols`, and `context --include-snippets`.
+
 ## 0.9.4
 
 ### Patch Changes
