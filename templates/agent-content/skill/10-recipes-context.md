@@ -66,7 +66,7 @@ codemap query --json --recipe affected-tests --params changed_files=src/foo.ts
 
 - **`codemap://recipes`** — full catalog (same as `--recipes-json`). Each row carries `source: "bundled" | "project"`, optional `shadows: true`, plus `last_run_at` / `run_count` recency fields.
 - **`codemap://recipes/{id}`** — one recipe `{id, description, body?, sql, actions?, source, shadows?, last_run_at, run_count}` (replaces `--print-sql <id>`).
-- **`codemap://schema`** — DDL of every table in `<state-dir>/index.db` (default `.codemap/index.db`; cached after first read per server process; also embedded inline below).
+- **`codemap://schema`** — DDL of every table in `<state-dir>/index.db` (default `.codemap/index.db`; cached after first read per server process; also embedded inline below). CLI twin: `codemap schema`.
 - **`codemap://skill`** / **`codemap://rule`** — full text of this skill / the codemap rule. Same content `codemap skill` / `codemap rule` print.
 - **`codemap://mcp-instructions`** — MCP initialize tool-selection playbook (also injected as `instructions` on handshake).
 - **`codemap://files/{path}`** — per-file roll-up `{path, language, line_count, symbols, imports, exports, coverage}`; URI-encode path segments (MCP template uses `{+path}`). CLI twin: `codemap file <path>`. Live.

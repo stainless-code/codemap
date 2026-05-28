@@ -1,10 +1,9 @@
-import { stdin as input } from "node:process";
-
 import {
   buildFileRollup,
   buildSchemaCatalog,
 } from "../application/resource-handlers";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { emitJsonPayload } from "./emit-tool-result";
 
 interface ResourceCmdOpts {
   root: string;
@@ -85,16 +84,14 @@ export async function runFileCmd(
     await bootstrapCodemap(opts);
     const payload = buildFileRollup(opts.path);
     if (payload === undefined) {
-      console.log(JSON.stringify({ error: `file not indexed: ${opts.path}` }));
+      emitJsonPayload({ error: `file not indexed: ${opts.path}` });
       process.exitCode = 1;
       return;
     }
-    console.log(
-      opts.compact ? JSON.stringify(payload) : JSON.stringify(payload, null, 2),
-    );
+    emitJsonPayload(payload, { pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(JSON.stringify({ error: msg }));
+    emitJsonPayload({ error: msg });
     process.exitCode = 1;
   }
 }
@@ -145,25 +142,10 @@ export function parseSchemaRest(
 export async function runSchemaCmd(opts: ResourceCmdOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-    const payload = buildSchemaCatalog();
-    console.log(
-      opts.compact ? JSON.stringify(payload) : JSON.stringify(payload, null, 2),
-    );
+    emitJsonPayload(buildSchemaCatalog(), { pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(JSON.stringify({ error: msg }));
+    emitJsonPayload({ error: msg });
     process.exitCode = 1;
   }
-}
-
-export async function readJsonFromStdin(): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of input) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  const text = Buffer.concat(chunks).toString("utf8").trim();
-  if (text.length === 0) {
-    throw new Error("codemap query batch: stdin was empty.");
-  }
-  return JSON.parse(text) as unknown;
 }

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
+import { z } from "zod";
+
+import { traceArgsSchema } from "../application/tool-handlers";
 import {
   parseExploreRest,
   parseNodeRest,
@@ -48,7 +51,6 @@ describe("parseTraceRest", () => {
       maxDepth: 2,
       via: "calls",
       budgetChars: 1000,
-      json: true,
       compact: true,
     });
   });
@@ -67,7 +69,6 @@ describe("parseExploreRest", () => {
         depth: 1,
         kindFilter: undefined,
         budgetChars: undefined,
-        json: true,
         compact: false,
       },
     );
@@ -85,7 +86,6 @@ describe("parseNodeRest", () => {
       inPath: "src/a.ts",
       includeSnippets: true,
       budgetChars: undefined,
-      json: true,
       compact: false,
     });
   });
@@ -120,5 +120,13 @@ describe("parseQueryBatchRest", () => {
       parseQueryBatchRest(["query", "batch", "--stdin", "--file", "x.json"])
         .kind,
     ).toBe("error");
+  });
+});
+
+describe("composer arg schemas", () => {
+  it("traceArgsSchema rejects empty from", () => {
+    expect(
+      z.object(traceArgsSchema).safeParse({ from: "", to: "bar" }).success,
+    ).toBe(false);
   });
 });

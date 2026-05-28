@@ -7,6 +7,27 @@ export interface EmitToolResultOpts {
   pretty?: boolean;
 }
 
+export interface EmitJsonPayloadOpts {
+  pretty?: boolean;
+}
+
+/** Print a JSON object/array to stdout (composer + resource CLI verbs). */
+export function emitJsonPayload(
+  payload: unknown,
+  opts: EmitJsonPayloadOpts = {},
+): void {
+  const pretty = opts.pretty !== false;
+  console.log(
+    pretty ? JSON.stringify(payload, null, 2) : JSON.stringify(payload),
+  );
+}
+
+/** Print `{"error":"…"}` to stdout and set exit code (JSON-only CLI verbs). */
+export function emitJsonError(message: string): void {
+  emitJsonPayload({ error: message }, { pretty: false });
+  process.exitCode = 1;
+}
+
 /**
  * Print a transport-agnostic {@link ToolResult} the way MCP/HTTP JSON tools
  * would — same payload shape, CLI error envelope on failure.
@@ -30,10 +51,7 @@ export function emitToolResult(
     return;
   }
 
-  const pretty = opts.pretty !== false && opts.json;
-  console.log(
-    pretty
-      ? JSON.stringify(result.payload, null, 2)
-      : JSON.stringify(result.payload),
-  );
+  emitJsonPayload(result.payload, {
+    pretty: opts.pretty !== false && opts.json,
+  });
 }

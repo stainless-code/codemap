@@ -9,6 +9,7 @@ import {
   printVersion,
   validateIndexModeArgs,
 } from "./bootstrap.js";
+import { emitJsonError } from "./emit-tool-result.js";
 
 /**
  * CLI entry — only `./bootstrap` is loaded eagerly. Command bodies are
@@ -124,8 +125,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runContextCmd({
       root,
@@ -440,8 +441,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runTraceCmd({
       root,
@@ -452,7 +453,6 @@ Copies bundled agent templates into .agents/ under the project root.
       maxDepth: parsed.maxDepth,
       via: parsed.via,
       budgetChars: parsed.budgetChars,
-      json: parsed.json,
       compact: parsed.compact,
     });
     return;
@@ -467,8 +467,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runExploreCmd({
       root,
@@ -478,7 +478,6 @@ Copies bundled agent templates into .agents/ under the project root.
       depth: parsed.depth,
       kindFilter: parsed.kindFilter,
       budgetChars: parsed.budgetChars,
-      json: parsed.json,
       compact: parsed.compact,
     });
     return;
@@ -493,8 +492,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runNodeCmd({
       root,
@@ -505,7 +504,6 @@ Copies bundled agent templates into .agents/ under the project root.
       inPath: parsed.inPath,
       includeSnippets: parsed.includeSnippets,
       budgetChars: parsed.budgetChars,
-      json: parsed.json,
       compact: parsed.compact,
     });
     return;
@@ -520,8 +518,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runFileCmd({
       root,
@@ -542,8 +540,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runSchemaCmd({
       root,
@@ -563,8 +561,8 @@ Copies bundled agent templates into .agents/ under the project root.
       return;
     }
     if (parsed.kind === "error") {
-      console.error(parsed.message);
-      process.exit(1);
+      emitJsonError(parsed.message);
+      return;
     }
     await runQueryBatchCmd({
       root,

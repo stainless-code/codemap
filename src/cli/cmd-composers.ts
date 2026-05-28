@@ -1,7 +1,12 @@
+import { z } from "zod";
+
 import {
+  exploreArgsSchema,
   handleExplore,
   handleNode,
   handleTrace,
+  nodeArgsSchema,
+  traceArgsSchema,
 } from "../application/tool-handlers";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
@@ -34,11 +39,15 @@ function parsePositiveIntFlag(
   return { ok: true, n };
 }
 
+function firstZodIssue(error: z.ZodError): string {
+  return error.issues[0]?.message ?? error.message;
+}
+
 export function printTraceCmdHelp(): void {
-  console.log(`Usage: codemap trace --from <symbol> --to <symbol> [--max-depth <N>] [--via calls|dependencies|all] [--budget-chars <N>] [--json]
+  console.log(`Usage: codemap trace --from <symbol> --to <symbol> [--max-depth <N>] [--via calls|dependencies|all] [--budget-chars <N>] [--compact]
 
 Shortest call path between two symbols plus budget-capped snippets. Same
-payload as the MCP \`trace\` tool / HTTP \`POST /tool/trace\`.
+payload as the MCP \`trace\` tool / HTTP \`POST /tool/trace\`. Always emits JSON.
 
 Flags:
   --from <symbol>       Start symbol (required).
@@ -46,12 +55,11 @@ Flags:
   --max-depth <N>       BFS cap (non-negative integer).
   --via <b>             calls | dependencies | all (default all).
   --budget-chars <N>    Snippet char budget (adaptive 15k/10k/6k when omitted).
-  --json                Emit JSON (default: pretty-printed JSON on stdout).
-  --compact             Minify JSON (implies --json).
+  --compact             Minify JSON (default: pretty-printed).
   --help, -h            Show this help.
 
 Examples:
-  codemap trace --from handleQuery --to executeQuery --json
+  codemap trace --from handleQuery --to executeQuery
   codemap trace --from foo --to bar --via calls --budget-chars 8000 --compact
 `);
 }
@@ -66,7 +74,6 @@ export function parseTraceRest(rest: string[]):
       maxDepth: number | undefined;
       via: "calls" | "dependencies" | "all" | undefined;
       budgetChars: number | undefined;
-      json: boolean;
       compact: boolean;
     } {
   if (rest[0] !== "trace") {
@@ -78,19 +85,13 @@ export function parseTraceRest(rest: string[]):
   let maxDepth: number | undefined;
   let via: "calls" | "dependencies" | "all" | undefined;
   let budgetChars: number | undefined;
-  let json = true;
   let compact = false;
 
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
     if (a === "--compact") {
       compact = true;
-      json = true;
       continue;
     }
     if (a === "--from") {
@@ -179,7 +180,6 @@ export function parseTraceRest(rest: string[]):
     maxDepth,
     via,
     budgetChars,
-    json,
     compact,
   };
 }
@@ -191,35 +191,39 @@ export async function runTraceCmd(
     maxDepth: number | undefined;
     via: "calls" | "dependencies" | "all" | undefined;
     budgetChars: number | undefined;
-    json: boolean;
     compact: boolean;
   },
 ): Promise<void> {
   try {
     await bootstrapCodemap(opts);
+    const validated = z.object(traceArgsSchema).safeParse({
+      from: opts.from,
+      to: opts.to,
+      max_depth: opts.maxDepth,
+      via: opts.via,
+      budget_chars: opts.budgetChars,
+    });
+    if (!validated.success) {
+      emitToolResult(
+        { ok: false, error: firstZodIssue(validated.error) },
+        { json: true },
+      );
+      return;
+    }
     const root = getProjectRoot();
-    const result = handleTrace(
-      {
-        from: opts.from,
-        to: opts.to,
-        max_depth: opts.maxDepth,
-        via: opts.via,
-        budget_chars: opts.budgetChars,
-      },
-      root,
-    );
-    emitToolResult(result, { json: opts.json, pretty: !opts.compact });
+    const result = handleTrace(validated.data, root);
+    emitToolResult(result, { json: true, pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitToolResult({ ok: false, error: msg }, { json: opts.json });
+    emitToolResult({ ok: false, error: msg }, { json: true });
   }
 }
 
 export function printExploreCmdHelp(): void {
-  console.log(`Usage: codemap explore <name>... [--depth <N>] [--kind <k>] [--budget-chars <N>] [--json]
+  console.log(`Usage: codemap explore <name>... [--depth <N>] [--kind <k>] [--budget-chars <N>] [--compact]
 
 Multi-symbol neighborhood survey with budget-capped snippets. Same payload
-as the MCP \`explore\` tool / HTTP \`POST /tool/explore\`.
+as the MCP \`explore\` tool / HTTP \`POST /tool/explore\`. Always emits JSON.
 
 Args:
   <name>...             One or more symbol names (required).
@@ -228,12 +232,11 @@ Flags:
   --depth <N>           Neighborhood depth (non-negative integer).
   --kind <k>            Filter neighborhood rows by symbol kind.
   --budget-chars <N>    Snippet char budget (adaptive when omitted).
-  --json                Emit JSON (default).
   --compact             Minify JSON.
   --help, -h            Show this help.
 
 Examples:
-  codemap explore handleQuery executeQuery --json
+  codemap explore handleQuery executeQuery
   codemap explore foo --depth 2 --kind function --compact
 `);
 }
@@ -247,7 +250,6 @@ export function parseExploreRest(rest: string[]):
       depth: number | undefined;
       kindFilter: string | undefined;
       budgetChars: number | undefined;
-      json: boolean;
       compact: boolean;
     } {
   if (rest[0] !== "explore") {
@@ -258,19 +260,13 @@ export function parseExploreRest(rest: string[]):
   let depth: number | undefined;
   let kindFilter: string | undefined;
   let budgetChars: number | undefined;
-  let json = true;
   let compact = false;
 
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
     if (a === "--compact") {
       compact = true;
-      json = true;
       continue;
     }
     if (a === "--depth") {
@@ -336,7 +332,6 @@ export function parseExploreRest(rest: string[]):
     depth,
     kindFilter,
     budgetChars,
-    json,
     compact,
   };
 }
@@ -347,34 +342,38 @@ export async function runExploreCmd(
     depth: number | undefined;
     kindFilter: string | undefined;
     budgetChars: number | undefined;
-    json: boolean;
     compact: boolean;
   },
 ): Promise<void> {
   try {
     await bootstrapCodemap(opts);
+    const validated = z.object(exploreArgsSchema).safeParse({
+      names: opts.names,
+      depth: opts.depth,
+      kind: opts.kindFilter,
+      budget_chars: opts.budgetChars,
+    });
+    if (!validated.success) {
+      emitToolResult(
+        { ok: false, error: firstZodIssue(validated.error) },
+        { json: true },
+      );
+      return;
+    }
     const root = getProjectRoot();
-    const result = handleExplore(
-      {
-        names: opts.names,
-        depth: opts.depth,
-        kind: opts.kindFilter,
-        budget_chars: opts.budgetChars,
-      },
-      root,
-    );
-    emitToolResult(result, { json: opts.json, pretty: !opts.compact });
+    const result = handleExplore(validated.data, root);
+    emitToolResult(result, { json: true, pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitToolResult({ ok: false, error: msg }, { json: opts.json });
+    emitToolResult({ ok: false, error: msg }, { json: true });
   }
 }
 
 export function printNodeCmdHelp(): void {
-  console.log(`Usage: codemap node <name> [--kind <k>] [--in <path>] [--include-snippets] [--budget-chars <N>] [--json]
+  console.log(`Usage: codemap node <name> [--kind <k>] [--in <path>] [--include-snippets] [--budget-chars <N>] [--compact]
 
 One-hop symbol survey: show center + scoped depth-1 neighborhood. Same
-payload as the MCP \`node\` tool / HTTP \`POST /tool/node\`.
+payload as the MCP \`node\` tool / HTTP \`POST /tool/node\`. Always emits JSON.
 
 Args:
   <name>                Symbol name (required).
@@ -384,12 +383,11 @@ Flags:
   --in <path>           Disambiguate by file path prefix.
   --include-snippets    Attach budget-capped source snippets.
   --budget-chars <N>    Snippet budget when --include-snippets (adaptive when omitted).
-  --json                Emit JSON (default).
   --compact             Minify JSON.
   --help, -h            Show this help.
 
 Examples:
-  codemap node handleQuery --json
+  codemap node handleQuery
   codemap node foo --in src/db.ts --include-snippets --compact
 `);
 }
@@ -404,7 +402,6 @@ export function parseNodeRest(rest: string[]):
       inPath: string | undefined;
       includeSnippets: boolean;
       budgetChars: number | undefined;
-      json: boolean;
       compact: boolean;
     } {
   if (rest[0] !== "node") {
@@ -416,19 +413,13 @@ export function parseNodeRest(rest: string[]):
   let inPath: string | undefined;
   let includeSnippets = false;
   let budgetChars: number | undefined;
-  let json = true;
   let compact = false;
 
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return { kind: "help" };
-    if (a === "--json") {
-      json = true;
-      continue;
-    }
     if (a === "--compact") {
       compact = true;
-      json = true;
       continue;
     }
     if (a === "--include-snippets") {
@@ -497,7 +488,6 @@ export function parseNodeRest(rest: string[]):
     inPath,
     includeSnippets,
     budgetChars,
-    json,
     compact,
   };
 }
@@ -509,26 +499,30 @@ export async function runNodeCmd(
     inPath: string | undefined;
     includeSnippets: boolean;
     budgetChars: number | undefined;
-    json: boolean;
     compact: boolean;
   },
 ): Promise<void> {
   try {
     await bootstrapCodemap(opts);
+    const validated = z.object(nodeArgsSchema).safeParse({
+      name: opts.name,
+      kind: opts.kindFilter,
+      in: opts.inPath,
+      include_snippets: opts.includeSnippets,
+      budget_chars: opts.budgetChars,
+    });
+    if (!validated.success) {
+      emitToolResult(
+        { ok: false, error: firstZodIssue(validated.error) },
+        { json: true },
+      );
+      return;
+    }
     const root = getProjectRoot();
-    const result = handleNode(
-      {
-        name: opts.name,
-        kind: opts.kindFilter,
-        in: opts.inPath,
-        include_snippets: opts.includeSnippets,
-        budget_chars: opts.budgetChars,
-      },
-      root,
-    );
-    emitToolResult(result, { json: opts.json, pretty: !opts.compact });
+    const result = handleNode(validated.data, root);
+    emitToolResult(result, { json: true, pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    emitToolResult({ ok: false, error: msg }, { json: opts.json });
+    emitToolResult({ ok: false, error: msg }, { json: true });
   }
 }

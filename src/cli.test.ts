@@ -169,6 +169,23 @@ describe("CLI parity verb dispatch", () => {
     expect(out).toContain("codemap query batch");
     expect(err).not.toContain("unexpected argument");
   });
+
+  test("mcp --help documents CLI twins for query batch", async () => {
+    const { exitCode, out, err } = await runCli(["mcp", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap query batch");
+    expect(out).not.toContain("no CLI verb");
+    expect(err).toBe("");
+  });
+
+  test("trace parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["trace"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("--from"),
+    });
+    expect(err).toBe("");
+  });
 });
 
 describe("CLI unknown / invalid args", () => {

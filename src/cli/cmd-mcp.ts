@@ -85,9 +85,9 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (17; snake_case — one per CLI verb plus no-CLI-verb helpers on MCP/HTTP):
+Tools (17; snake_case — mirrors CLI verbs where a shell twin exists):
   query                One read-only SQL statement.
-  query_batch          N statements in one round-trip (no CLI verb; MCP + HTTP).
+  query_batch          N statements in one round-trip (CLI: codemap query batch).
   query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
   audit                Structural-drift audit ({head, deltas} envelope).
   save_baseline        Snapshot rows under a name (sql or recipe).
@@ -120,8 +120,9 @@ Resources:
                                  mirrors \`show --in <path>\`. Returns
                                  {matches, disambiguation?}.
 
-Output shape matches each tool's CLI \`--json\` payload where a CLI verb
-exists (no CLI verb: query_batch, trace, explore, node). MCP wraps payloads
+Output shape matches each tool's CLI JSON payload (always JSON for
+query batch, trace, explore, node, file, schema, context; optional
+\`--json\` on query/show/snippet/impact/affected/validate). MCP wraps payloads
 in \`{content: [{type: "text", text: …}]}\`; HTTP returns raw JSON. See
 docs/architecture.md § MCP wiring for the engine seam and the agent rule
 + skill for query examples.

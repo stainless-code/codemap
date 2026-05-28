@@ -1,8 +1,6 @@
-import { buildContextEnvelope } from "../application/context-engine";
-import type { ContextEnvelope } from "../application/context-engine";
-import { closeDb, openDb } from "../db";
-import { getProjectRoot } from "../runtime";
+import { handleContext } from "../application/tool-handlers";
 import { bootstrapCodemap } from "./bootstrap-codemap";
+import { emitToolResult } from "./emit-tool-result";
 
 interface ContextOpts {
   root: string;
@@ -96,25 +94,14 @@ export function parseContextRest(rest: string[]):
 export async function runContextCmd(opts: ContextOpts): Promise<void> {
   try {
     await bootstrapCodemap(opts);
-    const db = openDb();
-    let envelope: ContextEnvelope;
-    try {
-      envelope = buildContextEnvelope(db, getProjectRoot(), {
-        compact: opts.compact,
-        intent: opts.intent,
-        include_snippets: opts.includeSnippets,
-      });
-    } finally {
-      closeDb(db, { readonly: true });
-    }
-    console.log(
-      opts.compact
-        ? JSON.stringify(envelope)
-        : JSON.stringify(envelope, null, 2),
-    );
+    const result = handleContext({
+      compact: opts.compact,
+      intent: opts.intent ?? undefined,
+      include_snippets: opts.includeSnippets,
+    });
+    emitToolResult(result, { json: true, pretty: !opts.compact });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.log(JSON.stringify({ error: msg }));
-    process.exitCode = 1;
+    emitToolResult({ ok: false, error: msg }, { json: true });
   }
 }

@@ -11,8 +11,8 @@ import type { GroupByMode } from "../group-by";
 import { GROUP_BY_MODES, isGroupByMode } from "../group-by";
 import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
-import { readJsonFromStdin } from "./cmd-resource";
 import { emitToolResult } from "./emit-tool-result";
+import { readJsonFromStdin } from "./read-json-stdin";
 
 interface QueryBatchOpts {
   root: string;
