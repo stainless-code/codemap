@@ -144,6 +144,12 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "apply") return;
   if (rest[0] === "ingest-coverage") return;
   if (rest[0] === "pr-comment") return;
+  if (rest[0] === "trace") return;
+  if (rest[0] === "explore") return;
+  if (rest[0] === "node") return;
+  if (rest[0] === "file") return;
+  if (rest[0] === "schema") return;
+  if (rest[0] === "unlock") return;
 
   if (rest[0] === "agents") {
     if (rest[1] === "init") return;

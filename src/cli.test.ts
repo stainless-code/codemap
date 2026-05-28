@@ -109,6 +109,45 @@ describe("validateIndexModeArgs", () => {
       validateIndexModeArgs(["--files", "a.ts", "b.tsx"]),
     ).not.toThrow();
   });
+
+  test("allows CLI parity verbs", () => {
+    for (const verb of [
+      "trace",
+      "explore",
+      "node",
+      "file",
+      "schema",
+      "unlock",
+    ]) {
+      expect(() => validateIndexModeArgs([verb])).not.toThrow();
+    }
+    expect(() =>
+      validateIndexModeArgs(["query", "batch", "--stdin"]),
+    ).not.toThrow();
+  });
+});
+
+describe("CLI parity verb dispatch", () => {
+  test("trace --help reaches command help (not index-mode guard)", async () => {
+    const { exitCode, out, err } = await runCli(["trace", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap trace");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("schema --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["schema", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap schema");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("file --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["file", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap file");
+    expect(err).not.toContain("unexpected argument");
+  });
 });
 
 describe("CLI unknown / invalid args", () => {

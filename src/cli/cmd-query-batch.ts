@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 import {
-  batchItemSchema,
   handleQueryBatch,
+  queryBatchArgsSchema,
 } from "../application/tool-handlers";
 import type { QueryBatchArgs } from "../application/tool-handlers";
 import type { GroupByMode } from "../group-by";
@@ -155,7 +155,7 @@ export function parseQueryBatchRest(rest: string[]):
   };
 }
 
-function parseBatchInput(
+export function parseQueryBatchInput(
   raw: unknown,
   cliDefaults: {
     summary?: boolean | undefined;
@@ -194,19 +194,14 @@ function parseBatchInput(
         : cliDefaults.groupBy,
   };
 
-  const parsed = z.array(batchItemSchema).min(1).safeParse(merged.statements);
+  const parsed = z.object(queryBatchArgsSchema).safeParse(merged);
   if (!parsed.success) {
     return {
-      error: `codemap query batch: invalid statements — ${parsed.error.message}`,
+      error: `codemap query batch: invalid input — ${parsed.error.message}`,
     };
   }
 
-  return {
-    statements: parsed.data,
-    summary: merged.summary === true ? true : undefined,
-    changed_since: merged.changed_since,
-    group_by: merged.group_by,
-  };
+  return parsed.data;
 }
 
 export async function runQueryBatchCmd(
@@ -226,7 +221,7 @@ export async function runQueryBatchCmd(
       raw = JSON.parse(readFileSync(opts.filePath!, "utf8")) as unknown;
     }
 
-    const parsed = parseBatchInput(raw, {
+    const parsed = parseQueryBatchInput(raw, {
       summary: opts.summary,
       changedSince: opts.changedSince,
       groupBy: opts.groupBy,
