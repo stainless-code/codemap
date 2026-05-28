@@ -13,6 +13,7 @@
  */
 
 import { closeDb, openDb } from "../db";
+import type { CodemapDatabase } from "../db";
 import { assembleAgentContent, assembleMcpInstructions } from "./agent-content";
 import {
   getQueryRecipeCatalogEntry,
@@ -32,6 +33,7 @@ export interface ResourcePayload {
 // freeze them at first-read. Schema / skill / rule stay cached — none
 // change mid-session.
 let schemaCache: ResourcePayload | undefined;
+let schemaCatalogCache: SchemaCatalogRow[] | undefined;
 let skillCache: ResourcePayload | undefined;
 let ruleCache: ResourcePayload | undefined;
 let mcpInstructionsCache: ResourcePayload | undefined;
@@ -42,6 +44,7 @@ let mcpInstructionsCache: ResourcePayload | undefined;
  */
 export function _resetResourceCachesForTests(): void {
   schemaCache = undefined;
+  schemaCatalogCache = undefined;
   skillCache = undefined;
   ruleCache = undefined;
   mcpInstructionsCache = undefined;
@@ -146,26 +149,29 @@ function readOneRecipe(id: string): ResourcePayload | undefined {
   };
 }
 
+export interface SchemaCatalogRow {
+  name: string;
+  ddl: string;
+}
+
+function loadSchemaCatalogRows(db: CodemapDatabase): SchemaCatalogRow[] {
+  const rows = db
+    .query(
+      "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    )
+    .all() as { name: string; sql: string | null }[];
+  return rows
+    .filter((r) => r.sql !== null)
+    .map((r) => ({ name: r.name, ddl: r.sql! }));
+}
+
 function readSchema(): ResourcePayload {
   if (schemaCache !== undefined) return schemaCache;
-  const db = openDb();
-  try {
-    const rows = db
-      .query(
-        "SELECT name, sql FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-      )
-      .all() as { name: string; sql: string | null }[];
-    schemaCache = {
-      mimeType: "application/json",
-      text: JSON.stringify(
-        rows
-          .filter((r) => r.sql !== null)
-          .map((r) => ({ name: r.name, ddl: r.sql })),
-      ),
-    };
-  } finally {
-    closeDb(db, { readonly: true });
-  }
+  const rows = buildSchemaCatalog();
+  schemaCache = {
+    mimeType: "application/json",
+    text: JSON.stringify(rows),
+  };
   return schemaCache;
 }
 
@@ -197,114 +203,191 @@ function readMcpInstructions(): ResourcePayload {
 }
 
 /**
- * Per-file roll-up: every shape codemap extracts about one file
- * (symbols, imports, exports, coverage). Returns `undefined` when the
- * file is not in the index. Reads live every call (no caching) since
- * the index can change between requests under `--watch`.
+ * Per-file roll-up JSON (symbols, imports, exports, coverage). Returns
+ * `undefined` when the path is not indexed. Shared by MCP/HTTP resources
+ * and `codemap file`.
  */
-function readFileResource(path: string): ResourcePayload | undefined {
+export function fileResourceUri(path: string): string {
+  return `codemap://files/${encodeURIComponent(path)}`;
+}
+
+/** Error text aligned with MCP `readTemplateResource` for missing file URIs. */
+export function unknownFileResourceError(path: string): string {
+  return `codemap: unknown file resource "${fileResourceUri(path)}".`;
+}
+
+export function symbolResourceUri(name: string, inPath?: string): string {
+  const base = `codemap://symbols/${encodeURIComponent(name)}`;
+  if (inPath !== undefined && inPath.length > 0) {
+    return `${base}?in=${encodeURIComponent(inPath)}`;
+  }
+  return base;
+}
+
+/** Error text aligned with MCP `readTemplateResource` for invalid symbol URIs. */
+export function unknownSymbolResourceError(
+  name: string,
+  inPath?: string,
+): string {
+  return `codemap: unknown symbol resource "${symbolResourceUri(name, inPath)}".`;
+}
+
+export function buildFileRollup(
+  path: string,
+): Record<string, unknown> | undefined {
   const db = openDb();
   try {
-    // Confirm the file exists in the index — fail-closed if not, so callers
-    // can distinguish "unknown URI" from "valid URI, empty roll-up".
-    const file = db
-      .query("SELECT path, language, line_count FROM files WHERE path = ?")
-      .get(path) as
-      | { path: string; language: string; line_count: number }
-      | null
-      | undefined;
-    if (file === undefined || file === null) return undefined;
+    return buildFileRollupPayload(db, path);
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+}
 
-    const symbols = db
-      .query(
-        `SELECT name, kind, line_start, line_end, signature, is_exported,
+/**
+ * DDL catalog for every user table in the index DB. Shared by MCP/HTTP
+ * resources and `codemap schema`.
+ */
+export function buildSchemaCatalog(): SchemaCatalogRow[] {
+  if (schemaCatalogCache !== undefined) return schemaCatalogCache;
+  const db = openDb();
+  try {
+    schemaCatalogCache = loadSchemaCatalogRows(db);
+    return schemaCatalogCache;
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+}
+
+function buildFileRollupPayload(
+  db: CodemapDatabase,
+  path: string,
+): Record<string, unknown> | undefined {
+  // Confirm the file exists in the index — fail-closed if not, so callers
+  // can distinguish "unknown URI" from "valid URI, empty roll-up".
+  const file = db
+    .query("SELECT path, language, line_count FROM files WHERE path = ?")
+    .get(path) as
+    | { path: string; language: string; line_count: number }
+    | null
+    | undefined;
+  if (file === undefined || file === null) return undefined;
+
+  const symbols = db
+    .query(
+      `SELECT name, kind, line_start, line_end, signature, is_exported,
                 is_default_export, parent_name, visibility, doc_comment
          FROM symbols
          WHERE file_path = ?
          ORDER BY line_start ASC`,
-      )
-      .all(path);
+    )
+    .all(path);
 
-    const imports = db
-      .query(
-        `SELECT source, resolved_path, specifiers, is_type_only, line_number
+  const imports = db
+    .query(
+      `SELECT source, resolved_path, specifiers, is_type_only, line_number
          FROM imports
          WHERE file_path = ?
          ORDER BY line_number ASC`,
-      )
-      .all(path) as {
-      source: string;
-      resolved_path: string | null;
-      specifiers: string;
-      is_type_only: number;
-      line_number: number;
-    }[];
+    )
+    .all(path) as {
+    source: string;
+    resolved_path: string | null;
+    specifiers: string;
+    is_type_only: number;
+    line_number: number;
+  }[];
 
-    const exports = db
-      .query(
-        `SELECT name, kind, is_default, re_export_source
+  const exports = db
+    .query(
+      `SELECT name, kind, is_default, re_export_source
          FROM exports
          WHERE file_path = ?
          ORDER BY name ASC`,
-      )
-      .all(path);
+    )
+    .all(path);
 
-    const coverage = db
-      .query(
-        `SELECT name, line_start, coverage_pct, hit_statements, total_statements
+  const coverage = db
+    .query(
+      `SELECT name, line_start, coverage_pct, hit_statements, total_statements
          FROM coverage
          WHERE file_path = ?
          ORDER BY line_start ASC`,
-      )
-      .all(path) as {
-      name: string;
-      line_start: number;
-      coverage_pct: number | null;
-      hit_statements: number;
-      total_statements: number;
-    }[];
+    )
+    .all(path) as {
+    name: string;
+    line_start: number;
+    coverage_pct: number | null;
+    hit_statements: number;
+    total_statements: number;
+  }[];
 
-    // Parse imports.specifiers JSON inline so consumers don't have to.
-    const importsParsed = imports.map((i) => ({
-      source: i.source,
-      resolved_path: i.resolved_path,
-      specifiers: safeParseSpecifiers(i.specifiers),
-      is_type_only: i.is_type_only === 1,
-      line_number: i.line_number,
-    }));
+  // Parse imports.specifiers JSON inline so consumers don't have to.
+  const importsParsed = imports.map((i) => ({
+    source: i.source,
+    resolved_path: i.resolved_path,
+    specifiers: safeParseSpecifiers(i.specifiers),
+    is_type_only: i.is_type_only === 1,
+    line_number: i.line_number,
+  }));
 
-    // Coverage roll-up summary (avg + count) plus per-symbol detail.
-    const measured = coverage.length;
-    const avg =
+  // Coverage roll-up summary (avg + count) plus per-symbol detail.
+  const measured = coverage.length;
+  const avg =
+    measured === 0
+      ? null
+      : Math.round(
+          (coverage.reduce((a, c) => a + (c.coverage_pct ?? 0), 0) / measured) *
+            10,
+        ) / 10;
+
+  const payload = {
+    path: file.path,
+    language: file.language,
+    line_count: file.line_count,
+    symbols,
+    imports: importsParsed,
+    exports,
+    coverage:
       measured === 0
         ? null
-        : Math.round(
-            (coverage.reduce((a, c) => a + (c.coverage_pct ?? 0), 0) /
-              measured) *
-              10,
-          ) / 10;
+        : {
+            measured_symbols: measured,
+            avg_coverage_pct: avg,
+            per_symbol: coverage,
+          },
+  };
 
-    const payload = {
-      path: file.path,
-      language: file.language,
-      line_count: file.line_count,
-      symbols,
-      imports: importsParsed,
-      exports,
-      coverage:
-        measured === 0
-          ? null
-          : {
-              measured_symbols: measured,
-              avg_coverage_pct: avg,
-              per_symbol: coverage,
-            },
-    };
+  return payload;
+}
 
+function readFileResource(path: string): ResourcePayload | undefined {
+  const db = openDb();
+  try {
+    const payload = buildFileRollupPayload(db, path);
+    if (payload === undefined) return undefined;
     return {
       mimeType: "application/json",
       text: JSON.stringify(payload),
     };
+  } finally {
+    closeDb(db, { readonly: true });
+  }
+}
+
+/**
+ * Exact-name symbol lookup envelope (`{matches, disambiguation?}`). Returns
+ * `undefined` when `name` is empty. Shared by MCP/HTTP resources and
+ * `codemap symbols`.
+ */
+export function buildSymbolLookup(
+  name: string,
+  inPath?: string,
+): Record<string, unknown> | undefined {
+  if (name.length === 0) return undefined;
+  const db = openDb();
+  try {
+    const matches = findSymbolsByName(db, { name, inPath });
+    return buildShowResult(matches) as unknown as Record<string, unknown>;
   } finally {
     closeDb(db, { readonly: true });
   }
@@ -331,18 +414,13 @@ function readSymbolsResource(uri: string): ResourcePayload | undefined {
   if (name.length === 0) return undefined;
 
   const inPath = parsed.searchParams.get("in") ?? undefined;
+  const payload = buildSymbolLookup(name, inPath);
+  if (payload === undefined) return undefined;
 
-  const db = openDb();
-  try {
-    const matches = findSymbolsByName(db, { name, inPath });
-    const result = buildShowResult(matches);
-    return {
-      mimeType: "application/json",
-      text: JSON.stringify(result),
-    };
-  } finally {
-    closeDb(db, { readonly: true });
-  }
+  return {
+    mimeType: "application/json",
+    text: JSON.stringify(payload),
+  };
 }
 
 /**

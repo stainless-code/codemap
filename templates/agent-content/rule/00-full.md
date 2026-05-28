@@ -64,7 +64,7 @@ If the question matches any of these, use the index instead of grepping:
 | ------------------------- | --------------------------------------------------------------------------------------------------- |
 | Find a symbol             | `SELECT name, kind, file_path, line_start, signature FROM symbols WHERE name = '...'`               |
 | Field-qualified search    | `codemap show --query 'kind:function name:Auth path:src/'` (MCP: `show` / `snippet` with `query`)   |
-| Call path / neighborhood  | MCP `trace` / `explore` / `node` (recipes: `call-path`, `symbol-neighborhood`)                      |
+| Call path / neighborhood  | `codemap trace` / `explore` / `node` (or MCP twins; recipes: `call-path`, `symbol-neighborhood`)    |
 | Affected tests            | `codemap affected --json` or MCP `affected` (recipe: `affected-tests`)                              |
 | Find a symbol (fuzzy)     | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                     |
 | Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...'`                               |

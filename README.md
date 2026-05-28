@@ -222,10 +222,10 @@ codemap rule                                                    # full codemap r
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
 codemap mcp                                                     # JSON-RPC on stdio (17 tools; watcher default-ON)
-# Tools (17): query, query_batch (no CLI verb), query_recipe, audit, save_baseline,
+# Tools (17): query, query_batch, query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply
-# No CLI verb (MCP + HTTP): query_batch, trace, explore, node. Other tools mirror a CLI --json envelope.
+# CLI twins: query batch, trace, explore, node, file, schema, symbols, context --include-snippets (same JSON as MCP/HTTP).
 # Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)

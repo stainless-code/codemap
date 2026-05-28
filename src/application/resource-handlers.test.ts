@@ -8,6 +8,9 @@ import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import {
   _resetResourceCachesForTests,
+  buildFileRollup,
+  buildSchemaCatalog,
+  buildSymbolLookup,
   listResources,
   readResource,
 } from "./resource-handlers";
@@ -227,5 +230,38 @@ describe("readResource — codemap://recipes/{id} (recency inline)", () => {
     expect(entry.id).toBe("fan-out");
     expect(entry.last_run_at).toBe(ts);
     expect(entry.run_count).toBe(4);
+  });
+});
+
+describe("CLI builder parity with readResource", () => {
+  it("buildSchemaCatalog matches codemap://schema", () => {
+    _resetResourceCachesForTests();
+    const fromBuilder = buildSchemaCatalog();
+    const fromResource = JSON.parse(readResource("codemap://schema")!.text);
+    expect(fromBuilder).toEqual(fromResource);
+  });
+
+  it("buildFileRollup matches codemap://files/{path}", () => {
+    const fromBuilder = buildFileRollup("src/foo.ts");
+    const fromResource = JSON.parse(
+      readResource("codemap://files/src/foo.ts")!.text,
+    );
+    expect(fromBuilder).toEqual(fromResource);
+  });
+
+  it("buildSymbolLookup matches codemap://symbols/{name}", () => {
+    const fromBuilder = buildSymbolLookup("foo");
+    const fromResource = JSON.parse(
+      readResource("codemap://symbols/foo")!.text,
+    );
+    expect(fromBuilder).toEqual(fromResource);
+  });
+
+  it("buildSymbolLookup matches codemap://symbols/{name}?in=", () => {
+    const fromBuilder = buildSymbolLookup("foo", "src/");
+    const fromResource = JSON.parse(
+      readResource("codemap://symbols/foo?in=src%2F")!.text,
+    );
+    expect(fromBuilder).toEqual(fromResource);
   });
 });

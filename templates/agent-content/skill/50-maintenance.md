@@ -13,7 +13,7 @@ codemap
 codemap --full
 
 # Check index freshness (index-level — HEAD drift, pending sync, disk-ahead)
-codemap context --compact --json | jq '.index_freshness'
+codemap context --compact | jq '.index_freshness'
 
 # Per-file staleness (content_hash drift)
 codemap validate --json

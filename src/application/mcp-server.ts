@@ -82,7 +82,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * 17 JSON-RPC tools (CLI mirrors plus no-CLI-verb helpers on MCP/HTTP) and MCP resources
+ * 17 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].

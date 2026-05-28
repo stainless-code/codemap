@@ -109,6 +109,127 @@ describe("validateIndexModeArgs", () => {
       validateIndexModeArgs(["--files", "a.ts", "b.tsx"]),
     ).not.toThrow();
   });
+
+  test("allows CLI parity verbs", () => {
+    for (const verb of [
+      "trace",
+      "explore",
+      "node",
+      "file",
+      "schema",
+      "symbols",
+      "unlock",
+    ]) {
+      expect(() => validateIndexModeArgs([verb])).not.toThrow();
+    }
+    expect(() =>
+      validateIndexModeArgs(["query", "batch", "--stdin"]),
+    ).not.toThrow();
+  });
+});
+
+describe("CLI parity verb dispatch", () => {
+  test("trace --help reaches command help (not index-mode guard)", async () => {
+    const { exitCode, out, err } = await runCli(["trace", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap trace");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("schema --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["schema", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap schema");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("file --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["file", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap file");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("explore --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["explore", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap explore");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("node --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["node", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap node");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("query batch --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["query", "batch", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap query batch");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("mcp --help documents CLI twins for query batch", async () => {
+    const { exitCode, out, err } = await runCli(["mcp", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap query batch");
+    expect(out).not.toContain("no CLI verb");
+    expect(err).toBe("");
+  });
+
+  test("trace parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["trace"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("--from"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("query batch parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["query", "batch"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("--stdin"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("file parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["file"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("missing <path>"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("schema parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["schema", "--nope"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("unknown option"),
+    });
+    expect(err).toBe("");
+  });
+
+  test("symbols --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["symbols", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap symbols");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("symbols parse error emits JSON envelope on stdout", async () => {
+    const { exitCode, out, err } = await runCli(["symbols"]);
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(out)).toEqual({
+      error: expect.stringContaining("missing <name>"),
+    });
+    expect(err).toBe("");
+  });
 });
 
 describe("CLI unknown / invalid args", () => {

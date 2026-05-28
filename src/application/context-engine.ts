@@ -135,7 +135,7 @@ export interface ContextStartHere {
 export interface BuildContextEnvelopeOpts {
   compact: boolean;
   intent: string | null;
-  /** MCP/HTTP only — one-line export previews on hub leader signatures. */
+  /** One-line export previews on hub leader signatures (CLI `--include-snippets`, MCP/HTTP `include_snippets`). */
   include_snippets?: boolean;
 }
 
@@ -221,7 +221,7 @@ export function normalizeContextIntent(
 /**
  * Build the envelope from an open DB. Reads SQLite + optional git for
  * `index_freshness`; `include_snippets: true` adds bounded disk reads for hub
- * leader one-liners (MCP/HTTP only — ignored when `compact: true`).
+ * leader one-liners (CLI `--include-snippets` / MCP `include_snippets` — ignored when `compact: true`).
  */
 export function buildContextEnvelope(
   db: CodemapDatabase,

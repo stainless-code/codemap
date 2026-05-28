@@ -1,0 +1,191 @@
+import { beforeAll, describe, expect, it } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  readResource,
+  unknownFileResourceError,
+} from "../application/resource-handlers";
+import { resolveCodemapConfig } from "../config";
+import { initCodemap } from "../runtime";
+
+const repoRoot = join(import.meta.dir, "..", "..");
+const indexTs = join(repoRoot, "src", "index.ts");
+const minimalRoot = join(repoRoot, "fixtures", "minimal");
+let bunBin: string | null = null;
+
+async function runCli(
+  args: string[],
+  opts: {
+    env?: Record<string, string>;
+    stdin?: string;
+  } = {},
+): Promise<{ exitCode: number; out: string; err: string }> {
+  if (bunBin === null) {
+    throw new Error(
+      "cmd-cli-parity-e2e.test: bunBin not initialised by beforeAll.",
+    );
+  }
+  const proc = Bun.spawn([bunBin, indexTs, ...args], {
+    cwd: repoRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: opts.stdin === undefined ? "ignore" : "pipe",
+    env: { ...process.env, ...opts.env },
+  });
+  if (opts.stdin !== undefined) {
+    const stdin = proc.stdin;
+    if (stdin === undefined) {
+      throw new Error(
+        "cmd-cli-parity-e2e.test: expected pipe stdin on spawned process.",
+      );
+    }
+    stdin.write(opts.stdin);
+    stdin.end();
+  }
+  const exitCode = await proc.exited;
+  const out = await new Response(proc.stdout).text();
+  const err = await new Response(proc.stderr).text();
+  return { exitCode, out, err };
+}
+
+beforeAll(async () => {
+  bunBin = Bun.which("bun");
+  if (!bunBin || !existsSync(indexTs)) {
+    throw new Error(
+      `cmd-cli-parity-e2e.test: cannot locate Bun (${bunBin}) or src entry (${indexTs}).`,
+    );
+  }
+  const idx = await runCli(["--full"], { env: { CODEMAP_ROOT: minimalRoot } });
+  expect(idx.exitCode).toBe(0);
+}, 120_000);
+
+describe("CLI parity e2e — fixtures/minimal", () => {
+  it("query batch --stdin returns statement results", async () => {
+    const r = await runCli(["query", "batch", "--stdin", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+      stdin: '{"statements":["SELECT COUNT(*) AS n FROM files"]}',
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const batch = JSON.parse(r.out) as Array<Array<{ n: number }>>;
+    expect(Array.isArray(batch)).toBe(true);
+    expect(batch[0]?.[0]?.n).toBeGreaterThan(0);
+  });
+
+  it("file returns the same JSON as codemap://files/{path}", async () => {
+    const path = "src/utils/format.ts";
+    const r = await runCli(["file", path, "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const fromCli = JSON.parse(r.out) as { path: string };
+    const fromResource = JSON.parse(
+      readResource(`codemap://files/${path}`)!.text,
+    ) as { path: string };
+    expect(fromCli).toEqual(fromResource);
+    expect(fromCli.path).toBe(path);
+  });
+
+  it("file not indexed uses MCP-aligned error text", async () => {
+    const path = "no/such.ts";
+    const r = await runCli(["file", path, "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(1);
+    expect(JSON.parse(r.out)).toEqual({
+      error: unknownFileResourceError(path),
+    });
+  });
+
+  it("symbols returns the same JSON as codemap://symbols/{name}", async () => {
+    const r = await runCli(["symbols", "usePermissions", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const fromCli = JSON.parse(r.out) as { matches: unknown[] };
+    const fromResource = JSON.parse(
+      readResource("codemap://symbols/usePermissions")!.text,
+    ) as { matches: unknown[] };
+    expect(fromCli).toEqual(fromResource);
+    expect(fromCli.matches.length).toBeGreaterThan(0);
+  });
+
+  it("schema returns the same JSON as codemap://schema", async () => {
+    const r = await runCli(["schema", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const fromCli = JSON.parse(r.out) as unknown[];
+    const fromResource = JSON.parse(readResource("codemap://schema")!.text);
+    expect(fromCli).toEqual(fromResource);
+    expect(fromCli.length).toBeGreaterThan(0);
+  });
+
+  it("trace returns a call-path envelope on success", async () => {
+    const r = await runCli(
+      [
+        "trace",
+        "--from",
+        "epochMs",
+        "--to",
+        "nowIso",
+        "--via",
+        "calls",
+        "--compact",
+      ],
+      { env: { CODEMAP_ROOT: minimalRoot } },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as {
+      from: string;
+      to: string;
+      path: unknown[];
+    };
+    expect(payload.from).toBe("epochMs");
+    expect(payload.to).toBe("nowIso");
+    expect(Array.isArray(payload.path)).toBe(true);
+  });
+
+  it("explore returns a neighborhood envelope on success", async () => {
+    const r = await runCli(["explore", "usePermissions", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as { names: string[]; rows: unknown[] };
+    expect(payload.names).toEqual(["usePermissions"]);
+    expect(Array.isArray(payload.rows)).toBe(true);
+  });
+
+  it("node returns center + neighborhood on success", async () => {
+    const r = await runCli(["node", "usePermissions", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as {
+      center: { matches: unknown[] };
+      neighborhood: unknown[];
+    };
+    expect(payload.center.matches.length).toBeGreaterThan(0);
+    expect(Array.isArray(payload.neighborhood)).toBe(true);
+  });
+
+  it("context --include-snippets returns start_here with hub leaders", async () => {
+    const r = await runCli(["context", "--include-snippets"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as {
+      start_here: { hub_leaders: unknown[] };
+    };
+    expect(Array.isArray(payload.start_here.hub_leaders)).toBe(true);
+    expect(payload.start_here.hub_leaders.length).toBeGreaterThan(0);
+  });
+});
