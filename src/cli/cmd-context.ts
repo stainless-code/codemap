@@ -10,13 +10,14 @@ interface ContextOpts {
   stateDir?: string | undefined;
   compact: boolean;
   intent: string | null;
+  includeSnippets: boolean;
 }
 
 /**
  * Print **`codemap context`** usage.
  */
 export function printContextCmdHelp(): void {
-  console.log(`Usage: codemap context [--compact] [--for "<intent>"]
+  console.log(`Usage: codemap context [--compact] [--for "<intent>"] [--include-snippets]
 
 Emit a JSON envelope describing the current index — project metadata, top
 hubs (fan-in), a sample of markers, session-start shortcuts (start_here),
@@ -28,34 +29,45 @@ Flags:
                      without pretty-print (smaller payload).
   --for "<intent>"   Pre-classify a free-text intent (refactor, debug, test,
                      feature, explore) and recommend recipes that match.
+  --include-snippets One-line export previews on hub leaders (ignored when
+                     --compact). Same as MCP \`context\` \`include_snippets\`.
   --help, -h         Show this help.
 
 Examples:
   codemap context
   codemap context --compact
   codemap context --for "refactor the auth module"
+  codemap context --include-snippets
 `);
 }
 
 /**
  * Parse `argv` after the bootstrap split: `rest[0]` must be `"context"`.
  */
-export function parseContextRest(
-  rest: string[],
-):
+export function parseContextRest(rest: string[]):
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; compact: boolean; intent: string | null } {
+  | {
+      kind: "run";
+      compact: boolean;
+      intent: string | null;
+      includeSnippets: boolean;
+    } {
   if (rest[0] !== "context") {
     throw new Error("parseContextRest: expected context");
   }
   let compact = false;
   let intent: string | null = null;
+  let includeSnippets = false;
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--compact") {
       compact = true;
+      continue;
+    }
+    if (a === "--include-snippets") {
+      includeSnippets = true;
       continue;
     }
     if (a === "--for") {
@@ -75,7 +87,7 @@ export function parseContextRest(
       message: `codemap: unknown option "${a}". Run codemap context --help for usage.`,
     };
   }
-  return { kind: "run", compact, intent };
+  return { kind: "run", compact, intent, includeSnippets };
 }
 
 /**
@@ -90,6 +102,7 @@ export async function runContextCmd(opts: ContextOpts): Promise<void> {
       envelope = buildContextEnvelope(db, getProjectRoot(), {
         compact: opts.compact,
         intent: opts.intent,
+        include_snippets: opts.includeSnippets,
       });
     } finally {
       closeDb(db, { readonly: true });

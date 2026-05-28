@@ -9,11 +9,12 @@ describe("parseContextRest", () => {
     expect(parseContextRest(["context", "-h"]).kind).toBe("help");
   });
 
-  it("parses no args as default run", () => {
+  it("parses default run", () => {
     expect(parseContextRest(["context"])).toEqual({
       kind: "run",
       compact: false,
       intent: null,
+      includeSnippets: false,
     });
   });
 
@@ -22,6 +23,7 @@ describe("parseContextRest", () => {
       kind: "run",
       compact: true,
       intent: null,
+      includeSnippets: false,
     });
   });
 
@@ -30,13 +32,19 @@ describe("parseContextRest", () => {
       kind: "run",
       compact: false,
       intent: "refactor auth",
+      includeSnippets: false,
     });
   });
 
   it("parses --compact + --for in any order", () => {
     expect(
       parseContextRest(["context", "--for", "fix bug", "--compact"]),
-    ).toEqual({ kind: "run", compact: true, intent: "fix bug" });
+    ).toEqual({
+      kind: "run",
+      compact: true,
+      intent: "fix bug",
+      includeSnippets: false,
+    });
   });
 
   it("errors when --for has no value", () => {
@@ -65,6 +73,7 @@ describe("parseContextRest", () => {
       kind: "run",
       compact: false,
       intent: "refactor auth",
+      includeSnippets: false,
     });
   });
 

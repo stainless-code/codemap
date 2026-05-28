@@ -133,6 +133,7 @@ Copies bundled agent templates into .agents/ under the project root.
       stateDir,
       compact: parsed.compact,
       intent: parsed.intent,
+      includeSnippets: parsed.includeSnippets,
     });
     return;
   }
@@ -426,6 +427,155 @@ Copies bundled agent templates into .agents/ under the project root.
       path: parsed.path,
       json: parsed.json,
       runtime: parsed.runtime,
+    });
+    return;
+  }
+
+  if (rest[0] === "trace") {
+    const { parseTraceRest, printTraceCmdHelp, runTraceCmd } =
+      await import("./cmd-composers.js");
+    const parsed = parseTraceRest(rest);
+    if (parsed.kind === "help") {
+      printTraceCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runTraceCmd({
+      root,
+      configFile,
+      stateDir,
+      from: parsed.from,
+      to: parsed.to,
+      maxDepth: parsed.maxDepth,
+      via: parsed.via,
+      budgetChars: parsed.budgetChars,
+      json: parsed.json,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
+  if (rest[0] === "explore") {
+    const { parseExploreRest, printExploreCmdHelp, runExploreCmd } =
+      await import("./cmd-composers.js");
+    const parsed = parseExploreRest(rest);
+    if (parsed.kind === "help") {
+      printExploreCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runExploreCmd({
+      root,
+      configFile,
+      stateDir,
+      names: parsed.names,
+      depth: parsed.depth,
+      kindFilter: parsed.kindFilter,
+      budgetChars: parsed.budgetChars,
+      json: parsed.json,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
+  if (rest[0] === "node") {
+    const { parseNodeRest, printNodeCmdHelp, runNodeCmd } =
+      await import("./cmd-composers.js");
+    const parsed = parseNodeRest(rest);
+    if (parsed.kind === "help") {
+      printNodeCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runNodeCmd({
+      root,
+      configFile,
+      stateDir,
+      name: parsed.name,
+      kindFilter: parsed.kindFilter,
+      inPath: parsed.inPath,
+      includeSnippets: parsed.includeSnippets,
+      budgetChars: parsed.budgetChars,
+      json: parsed.json,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
+  if (rest[0] === "file") {
+    const { parseFileRest, printFileCmdHelp, runFileCmd } =
+      await import("./cmd-resource.js");
+    const parsed = parseFileRest(rest);
+    if (parsed.kind === "help") {
+      printFileCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runFileCmd({
+      root,
+      configFile,
+      stateDir,
+      path: parsed.path,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
+  if (rest[0] === "schema") {
+    const { parseSchemaRest, printSchemaCmdHelp, runSchemaCmd } =
+      await import("./cmd-resource.js");
+    const parsed = parseSchemaRest(rest);
+    if (parsed.kind === "help") {
+      printSchemaCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runSchemaCmd({
+      root,
+      configFile,
+      stateDir,
+      compact: parsed.compact,
+    });
+    return;
+  }
+
+  if (rest[0] === "query" && rest[1] === "batch") {
+    const { parseQueryBatchRest, printQueryBatchCmdHelp, runQueryBatchCmd } =
+      await import("./cmd-query-batch.js");
+    const parsed = parseQueryBatchRest(rest);
+    if (parsed.kind === "help") {
+      printQueryBatchCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runQueryBatchCmd({
+      root,
+      configFile,
+      stateDir,
+      stdin: parsed.stdin,
+      filePath: parsed.filePath,
+      summary: parsed.summary,
+      changedSince: parsed.changedSince,
+      groupBy: parsed.groupBy,
+      compact: parsed.compact,
     });
     return;
   }

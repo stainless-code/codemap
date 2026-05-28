@@ -15,6 +15,7 @@ Index (default): update .codemap/index.db for the project root (\`--root\` or cw
 Query:
   codemap query [--json] "<SQL>"
   codemap query [--json] --recipe <id>
+  codemap query batch [--stdin | --file <path>] [--summary] [--changed-since <ref>] [--group-by <mode>] [--compact]
 
 Outcome aliases (thin wrappers around \`query --recipe <id>\`; pass-through flags):
   codemap dead-code         # query --recipe untested-and-dead
@@ -27,7 +28,7 @@ Validate (compare on-disk SHA-256 to indexed hash):
   codemap validate [--json] [paths...]
 
 Context (project snapshot envelope for any agent):
-  codemap context [--compact] [--for "<intent>"]
+  codemap context [--compact] [--for "<intent>"] [--include-snippets]
 
 Audit (structural drift — baseline snapshots or git ref):
   codemap audit [--baseline <prefix>] [--base <ref>] [--json] [--ci] ...
@@ -41,6 +42,7 @@ PR comment renderer (audit/SARIF → markdown summary):
 
 MCP server (Model Context Protocol — for agent hosts):
   codemap mcp                                        # stdio JSON-RPC (17 tools; watcher default-ON)
+  # CLI parity: query batch, trace, explore, node, file, schema, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
   codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]   # watcher default-ON
@@ -53,6 +55,13 @@ Watch mode (long-running; keeps .codemap/index.db fresh on file edits):
 Targeted reads (precise lookup by symbol name):
   codemap show <name> [--kind <k>] [--in <path>] [--json]      # metadata: file:line + signature
   codemap snippet <name> [--kind <k>] [--in <path>] [--json]   # source text from disk + stale flag
+  codemap file <path> [--compact]                              # per-file roll-up (MCP codemap://files twin)
+  codemap schema [--compact]                                   # index DDL (MCP codemap://schema twin)
+
+Graph composers (MCP trace / explore / node twins):
+  codemap trace --from <sym> --to <sym> [--max-depth N] [--via <b>] [--budget-chars N] [--compact]
+  codemap explore <name>... [--depth N] [--kind <k>] [--budget-chars N] [--compact]
+  codemap node <name> [--kind <k>] [--in <path>] [--include-snippets] [--budget-chars N] [--compact]
 
 Impact analysis (graph walk for refactor blast-radius):
   codemap impact <target> [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]

@@ -197,11 +197,26 @@ function readMcpInstructions(): ResourcePayload {
 }
 
 /**
- * Per-file roll-up: every shape codemap extracts about one file
- * (symbols, imports, exports, coverage). Returns `undefined` when the
- * file is not in the index. Reads live every call (no caching) since
- * the index can change between requests under `--watch`.
+ * Per-file roll-up JSON (symbols, imports, exports, coverage). Returns
+ * `undefined` when the path is not indexed. Shared by MCP/HTTP resources
+ * and `codemap file`.
  */
+export function buildFileRollup(
+  path: string,
+): Record<string, unknown> | undefined {
+  const payload = readFileResource(path);
+  if (payload === undefined) return undefined;
+  return JSON.parse(payload.text) as Record<string, unknown>;
+}
+
+/**
+ * DDL catalog for every user table in the index DB. Shared by MCP/HTTP
+ * resources and `codemap schema`.
+ */
+export function buildSchemaCatalog(): { name: string; ddl: string }[] {
+  return JSON.parse(readSchema().text) as { name: string; ddl: string }[];
+}
+
 function readFileResource(path: string): ResourcePayload | undefined {
   const db = openDb();
   try {
