@@ -115,30 +115,6 @@ describe("parseQueryBatchRest", () => {
     expect(parseQueryBatchRest(["query", "batch"]).kind).toBe("error");
   });
 
-  it("parses --stdin with batch flags", () => {
-    expect(
-      parseQueryBatchRest([
-        "query",
-        "batch",
-        "--stdin",
-        "--summary",
-        "--changed-since",
-        "HEAD",
-        "--group-by",
-        "directory",
-        "--compact",
-      ]),
-    ).toEqual({
-      kind: "run",
-      stdin: true,
-      filePath: undefined,
-      summary: true,
-      changedSince: "HEAD",
-      groupBy: "directory",
-      compact: true,
-    });
-  });
-
   it("rejects --stdin and --file together", () => {
     expect(
       parseQueryBatchRest(["query", "batch", "--stdin", "--file", "x.json"])

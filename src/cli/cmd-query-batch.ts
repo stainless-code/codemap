@@ -181,18 +181,20 @@ export function parseQueryBatchInput(
   }
 
   const obj = body as Record<string, unknown>;
-  const merged = {
-    statements: obj.statements,
-    summary: obj.summary !== undefined ? obj.summary : cliDefaults.summary,
-    changed_since:
-      typeof obj.changed_since === "string"
-        ? obj.changed_since
-        : cliDefaults.changedSince,
-    group_by:
-      typeof obj.group_by === "string" && isGroupByMode(obj.group_by)
-        ? obj.group_by
-        : cliDefaults.groupBy,
-  };
+  const merged: Record<string, unknown> = { statements: obj.statements };
+
+  if (obj.summary !== undefined) merged.summary = obj.summary;
+  else if (cliDefaults.summary !== undefined)
+    merged.summary = cliDefaults.summary;
+
+  if (obj.changed_since !== undefined) merged.changed_since = obj.changed_since;
+  else if (cliDefaults.changedSince !== undefined) {
+    merged.changed_since = cliDefaults.changedSince;
+  }
+
+  if (obj.group_by !== undefined) merged.group_by = obj.group_by;
+  else if (cliDefaults.groupBy !== undefined)
+    merged.group_by = cliDefaults.groupBy;
 
   const parsed = z.object(queryBatchArgsSchema).safeParse(merged);
   if (!parsed.success) {

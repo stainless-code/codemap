@@ -37,6 +37,14 @@ describe("parseQueryBatchInput", () => {
     expect("error" in r).toBe(true);
   });
 
+  it("rejects invalid group_by in JSON body", () => {
+    const r = parseQueryBatchInput(
+      { statements: ["SELECT 1"], group_by: "bogus" },
+      {},
+    );
+    expect("error" in r).toBe(true);
+  });
+
   it("accepts statements array shorthand", () => {
     const r = parseQueryBatchInput(["SELECT 1"], { summary: true });
     expect("error" in r).toBe(false);

@@ -142,10 +142,24 @@ describe("CLI parity verb dispatch", () => {
     expect(err).not.toContain("unexpected argument");
   });
 
-  test("file --help reaches command help", async () => {
-    const { exitCode, out, err } = await runCli(["file", "--help"]);
+  test("explore --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["explore", "--help"]);
     expect(exitCode).toBe(0);
-    expect(out).toContain("codemap file");
+    expect(out).toContain("codemap explore");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("node --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["node", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap node");
+    expect(err).not.toContain("unexpected argument");
+  });
+
+  test("query batch --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["query", "batch", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap query batch");
     expect(err).not.toContain("unexpected argument");
   });
 });
