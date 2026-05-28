@@ -150,4 +150,42 @@ describe("CLI parity e2e — fixtures/minimal", () => {
     expect(payload.to).toBe("nowIso");
     expect(Array.isArray(payload.path)).toBe(true);
   });
+
+  it("explore returns a neighborhood envelope on success", async () => {
+    const r = await runCli(["explore", "usePermissions", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as { names: string[]; rows: unknown[] };
+    expect(payload.names).toEqual(["usePermissions"]);
+    expect(Array.isArray(payload.rows)).toBe(true);
+  });
+
+  it("node returns center + neighborhood on success", async () => {
+    const r = await runCli(["node", "usePermissions", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as {
+      center: { matches: unknown[] };
+      neighborhood: unknown[];
+    };
+    expect(payload.center.matches.length).toBeGreaterThan(0);
+    expect(Array.isArray(payload.neighborhood)).toBe(true);
+  });
+
+  it("context --include-snippets returns start_here with hub leaders", async () => {
+    const r = await runCli(["context", "--include-snippets"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    expect(r.err).toBe("");
+    const payload = JSON.parse(r.out) as {
+      start_here: { hub_leaders: unknown[] };
+    };
+    expect(Array.isArray(payload.start_here.hub_leaders)).toBe(true);
+    expect(payload.start_here.hub_leaders.length).toBeGreaterThan(0);
+  });
 });
