@@ -142,6 +142,13 @@ describe("CLI parity verb dispatch", () => {
     expect(err).not.toContain("unexpected argument");
   });
 
+  test("file --help reaches command help", async () => {
+    const { exitCode, out, err } = await runCli(["file", "--help"]);
+    expect(exitCode).toBe(0);
+    expect(out).toContain("codemap file");
+    expect(err).not.toContain("unexpected argument");
+  });
+
   test("explore --help reaches command help", async () => {
     const { exitCode, out, err } = await runCli(["explore", "--help"]);
     expect(exitCode).toBe(0);
