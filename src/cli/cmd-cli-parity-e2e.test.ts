@@ -113,7 +113,19 @@ describe("CLI parity e2e — fixtures/minimal", () => {
     expect(fromCli.matches.length).toBeGreaterThan(0);
   });
 
-  it("trace wires handler and returns JSON envelope", async () => {
+  it("schema returns the same JSON as codemap://schema", async () => {
+    const r = await runCli(["schema", "--compact"], {
+      env: { CODEMAP_ROOT: minimalRoot },
+    });
+    expect(r.exitCode).toBe(0);
+    initCodemap(resolveCodemapConfig(minimalRoot, undefined));
+    const fromCli = JSON.parse(r.out) as unknown[];
+    const fromResource = JSON.parse(readResource("codemap://schema")!.text);
+    expect(fromCli).toEqual(fromResource);
+    expect(fromCli.length).toBeGreaterThan(0);
+  });
+
+  it("trace returns a call-path envelope on success", async () => {
     const r = await runCli(
       [
         "trace",
@@ -127,10 +139,15 @@ describe("CLI parity e2e — fixtures/minimal", () => {
       ],
       { env: { CODEMAP_ROOT: minimalRoot } },
     );
+    expect(r.exitCode).toBe(0);
     expect(r.err).toBe("");
-    const payload = JSON.parse(r.out) as Record<string, unknown>;
-    expect(payload.path !== undefined || payload.error !== undefined).toBe(
-      true,
-    );
+    const payload = JSON.parse(r.out) as {
+      from: string;
+      to: string;
+      path: unknown[];
+    };
+    expect(payload.from).toBe("epochMs");
+    expect(payload.to).toBe("nowIso");
+    expect(Array.isArray(payload.path)).toBe(true);
   });
 });
