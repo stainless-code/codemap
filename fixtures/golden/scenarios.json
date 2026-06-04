@@ -745,6 +745,11 @@
       }
     },
     {
+      "id": "stale-imports",
+      "prompt": "Unused sole-specifier import lines (import_specifiers vs references)",
+      "recipe": "stale-imports"
+    },
+    {
       "id": "migrate-import-source",
       "prompt": "Rewrite consumer import source path",
       "recipe": "migrate-import-source",

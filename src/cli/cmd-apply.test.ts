@@ -330,6 +330,42 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
     });
   });
 
+  describe("stale-imports", () => {
+    beforeEach(async () => {
+      writeFileSync(
+        join(projectRoot, "src", "widget.ts"),
+        'import { unusedBinding } from "./helper";\n\nexport const widget = 1;\n',
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("dry-run finds the sole-specifier import line", async () => {
+      const r = await runCli(
+        ["apply", "stale-imports", "--dry-run", "--json"],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.summary.rows).toBe(1);
+      expect(readFile("src/widget.ts")).toContain("unusedBinding");
+    });
+
+    it("removes the unused import line with --force --yes", async () => {
+      const r = await runCli(
+        ["apply", "stale-imports", "--force", "--yes", "--json"],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.applied).toBe(true);
+      const body = readFile("src/widget.ts");
+      expect(body).not.toContain("unusedBinding");
+      expect(body).toContain("export const widget");
+    });
+  });
+
   describe("migrate-import-source", () => {
     beforeEach(async () => {
       mkdirSync(join(projectRoot, "src", "api"), { recursive: true });

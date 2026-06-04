@@ -10,11 +10,11 @@
 | ------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Substrate (tiers 1–6)** | **Partially**          | Rich tables exist (`references`, `bindings`, `jsx_*`, `import_specifiers`, `jsdoc_tags`, …) but **only a thin slice** is JOIN'd by shipped diff-shape recipes. Tiers **7–13** are intentionally unshipped — not a utilization failure. |
 | **Apply executor**        | **Mostly yes**         | Phase-1/2 engine, three CLI input modes, MCP `apply` + `apply_rows`, policy gates, fixpoint loop — **shipped and engine-heavy in tests**.                                                                                              |
-| **Apply recipes**         | **No**                 | **4 of 62** bundled SQL recipes emit the diff row contract; **3** are `auto_fixable: true`. The product bottleneck is **recipe surface**, not executor plumbing.                                                                       |
+| **Apply recipes**         | **Partially**          | **5 of 62** bundled SQL recipes emit the diff row contract; **3** `auto_fixable: true`, **`stale-imports`** review-first. Bottleneck remains wave-2 **semantic** recipes (`migrate-deprecated`, …).                                    |
 | **Agent/consumer docs**   | **Mostly yes**         | Architecture + glossary + README apply subsection + skill/MCP apply workflow. Wave-2 recipe catalog still thin until Phase C.                                                                                                          |
 | **Verification**          | **Mostly yes**         | CLI E2E: three input modes (recipe, `--rows`, recipes on disk); `rename-preview-product-card` golden (barrel + re-export). **Open:** `--diff-input` CLI e2e.                                                                           |
 
-**Conclusion:** Rename substrate utilization improved on `rename-preview`. **Next:** wave-2 diff-shape recipes (C.2–C.4) — still the highest user-visible ROI.
+**Conclusion:** Five diff-shape recipes shipped (`rename-preview` extended, `stale-imports`). **Next:** `migrate-deprecated` (C.4) — pairs with `deprecated-symbols` audit → apply.
 
 ---
 
@@ -69,7 +69,7 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 | `markers`                                  | Yes                    | `replace-marker-kind`                                                     | `markers-by-kind`                                     |
 | `references` / `bindings` / `scopes`       | Yes                    | `rename-preview` (`reference_rows`; non-import/call/definition)           | `find-symbol-references`, `find-re-exported-bindings` |
 | `jsx_elements` / `jsx_attributes`          | Yes                    | **No**                                                                    | `find-jsx-usages`                                     |
-| `import_specifiers` (child table)          | Yes                    | **No** (stale-imports backlog)                                            | —                                                     |
+| `import_specifiers` (child table)          | Yes                    | **`stale-imports`** (sole-specifier lines)                                | —                                                     |
 | `jsdoc_tags`                               | Yes (partial tier 4/5) | **No** (`add-jsdoc` is text template, not tag-aware)                      | `find-throws-jsdoc`                                   |
 | Tiers **7–13**                             | Open                   | N/A                                                                       | Future recipes                                        |
 
@@ -98,12 +98,12 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 
 ## Open work (gap matrix)
 
-| Gap                                                                                      | Type           | Track here           |
-| ---------------------------------------------------------------------------------------- | -------------- | -------------------- |
-| Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, `migrate-deprecated`, …) | Implementation | § Phase C            |
-| `--diff-input` CLI e2e                                                                   | Testing        | § Phase B (optional) |
-| MCP `until_empty` / `--commit`                                                           | Deferred       | § Phase D            |
-| Substrate tiers 7–13                                                                     | Separate plan  | substrate-extraction |
+| Gap                                                                                | Type           | Track here           |
+| ---------------------------------------------------------------------------------- | -------------- | -------------------- |
+| Wave-2 diff-shape recipes (`migrate-deprecated`, multi-specifier stale-imports, …) | Implementation | § Phase C            |
+| `--diff-input` CLI e2e                                                             | Testing        | § Phase B (optional) |
+| MCP `until_empty` / `--commit`                                                     | Deferred       | § Phase D            |
+| Substrate tiers 7–13                                                               | Separate plan  | substrate-extraction |
 
 ---
 
@@ -125,13 +125,13 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 | Priority | Recipe                                           | Status                                                                      |
 | -------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
 | C.1      | Fix **`replace-marker-kind`**                    | **✓ Shipped**                                                               |
-| C.2      | **`organize-imports`**                           | **Open**                                                                    |
-| C.3      | **`stale-imports`**                              | **Open**                                                                    |
+| C.2      | **`organize-imports`**                           | **Rejected** — formatter/ESLint domain; see § Rejected                      |
+| C.3      | **`stale-imports`**                              | **✓ Shipped** — sole-specifier line delete (v1)                             |
 | C.4      | **`migrate-deprecated` / `deprecated-usages`**   | **Open**                                                                    |
 | C.5      | **`rename-app-wide` or barrel import rows**      | **✓ Shipped** — `barrel_import_rows` + `reference_rows` on `rename-preview` |
 | C.6      | `actions[].command` on audit recipes w/ diff SQL | **Open**                                                                    |
 
-**Phase C exit criteria:** ≥2 new diff-shape recipes beyond the original four; `re_export` golden or documented gap removed.
+**Phase C exit criteria (partial):** `stale-imports` + rename extensions shipped; **`migrate-deprecated`** still open for “≥2 beyond original four” if counting only new ids.
 
 ### Phase D — Optional transport parity (trigger-gated)
 
@@ -160,18 +160,19 @@ The "no fix engine" floor was about **product class** (no ESLint-style verdict e
 
 ## Rejected items (grep-able; revisit only on trigger)
 
-| Item                                              | Why rejected                                           | Revisit when                                                               |
-| ------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Curated CLI write verbs (`codemap rename`, …)     | Moat A — premature verb sprawl                         | ≥3 diff-shape recipes + clear agent-host demand beyond `actions[].command` |
-| Parallel AST apply engine (Path A)                | Competes with ts-morph/jscodeshift; maintenance burden | ≥2 external teams hit substring wall + concrete AST-shape demand           |
-| Trust tiers (`safe`/`review`/`risky`)             | Taxonomy debt; `auto_fixable` + allowlist suffice      | Allowlist insufficient + ≥2 consumers ship trust filters in CI             |
-| Per-row confidence scores                         | No consensus on computation                            | Recipe needs per-site ranking when `before_pattern` is ambiguous           |
-| Verifier as product surface (typecheck/lint gate) | Consumer CI owns orchestration                         | Consumer plan with concrete examples                                       |
-| Reliability loop telemetry                        | No upload floor                                        | Self-hosted observability request                                          |
-| `--branch` / `--output-patch` flags               | `--commit` priority                                    | `--commit` insufficient in practice                                        |
-| Multi-line kind-tagged row contract               | After single-line path stable                          | Multi-line edits required and workarounds fail                             |
-| Cross-file moves in one apply                     | Higher risk                                            | Alternative two-step ops insufficient                                      |
-| Cross-file atomic apply (50+ files)               | Per-file atomicity sufficient today                    | Real 50+ file apply + partial failure leak                                 |
+| Item                                              | Why rejected                                           | Revisit when                                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Curated CLI write verbs (`codemap rename`, …)     | Moat A — premature verb sprawl                         | ≥3 diff-shape recipes + clear agent-host demand beyond `actions[].command`                                   |
+| Parallel AST apply engine (Path A)                | Competes with ts-morph/jscodeshift; maintenance burden | ≥2 external teams hit substring wall + concrete AST-shape demand                                             |
+| Trust tiers (`safe`/`review`/`risky`)             | Taxonomy debt; `auto_fixable` + allowlist suffice      | Allowlist insufficient + ≥2 consumers ship trust filters in CI                                               |
+| Per-row confidence scores                         | No consensus on computation                            | Recipe needs per-site ranking when `before_pattern` is ambiguous                                             |
+| Verifier as product surface (typecheck/lint gate) | Consumer CI owns orchestration                         | Consumer plan with concrete examples                                                                         |
+| Reliability loop telemetry                        | No upload floor                                        | Self-hosted observability request                                                                            |
+| `--branch` / `--output-patch` flags               | `--commit` priority                                    | `--commit` insufficient in practice                                                                          |
+| Multi-line kind-tagged row contract               | After single-line path stable                          | Multi-line edits required and workarounds fail                                                               |
+| Cross-file moves in one apply                     | Higher risk                                            | Alternative two-step ops insufficient                                                                        |
+| Cross-file atomic apply (50+ files)               | Per-file atomicity sufficient today                    | Real 50+ file apply + partial failure leak                                                                   |
+| **`organize-imports`** (sort/group import lines)  | Prettier / Biome / ESLint `import/order` territory     | Index-driven import order + substring apply proves insufficient vs `actions[].command` pointing at formatter |
 
 Full trigger wording: [`research/codemap-richer-index-synthesis-2026-05.md` § 7](../research/codemap-richer-index-synthesis-2026-05.md#7-rejected-items-with-trigger-conditions).
 

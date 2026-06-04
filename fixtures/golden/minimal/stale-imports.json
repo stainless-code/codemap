@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 2,
+    "line_end": 2,
+    "before_pattern": "import { now } from \"../../utils/date\"",
+    "after_pattern": "",
+    "location_kind": "import_line",
+    "chain_depth": 0
+  }
+]
