@@ -1,6 +1,6 @@
 # In-repo test bench (no external corpus)
 
-**Status:** Shipped (Phases 1–3) on `feat/unresolved-calls-staging`; Phase 4 optional scale only.  
+**Status:** Shipped (Phases 1–3) in [#162](https://github.com/stainless-code/codemap/pull/162); Phase 4 optional scale only.  
 **Effort:** M (ongoing; expand incrementally).  
 **Supersedes for maintainers:** relying on Tier B `CODEMAP_ROOT` / private clones to validate Codemap itself.
 
