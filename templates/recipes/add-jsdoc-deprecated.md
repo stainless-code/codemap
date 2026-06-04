@@ -16,7 +16,7 @@ actions:
   - type: add-jsdoc-deprecated
     auto_fixable: false
     description: Insert a @deprecated JSDoc line above an export function definition.
-    command: codemap apply add-jsdoc-deprecated --params name={{name}},replacement={{replacement}} --yes --force
+    command: codemap apply add-jsdoc-deprecated --params name={{name}},replacement={{replacement}} --dry-run --force
 ---
 
 # add-jsdoc-deprecated

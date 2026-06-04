@@ -16,7 +16,7 @@ actions:
   - type: update-deprecated-jsdoc
     auto_fixable: false
     description: Rewrite the first @deprecated JSDoc line on the symbol definition.
-    command: codemap apply deprecated-usages --params symbol={{symbol}},replacement_message={{replacement_message}} --force --yes
+    command: codemap apply deprecated-usages --params symbol={{symbol}},replacement_message={{replacement_message}} --dry-run --force
 ---
 
 # deprecated-usages

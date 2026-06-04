@@ -21,7 +21,7 @@ actions:
   - type: migrate-deprecated
     auto_fixable: false
     description: Rewrite call sites and direct import specifiers away from a deprecated symbol.
-    command: codemap apply migrate-deprecated --params symbol={{symbol}},replacement={{replacement}} --force --yes
+    command: codemap apply migrate-deprecated --params symbol={{symbol}},replacement={{replacement}} --dry-run --force
 ---
 
 # migrate-deprecated
