@@ -16,7 +16,7 @@ actions:
   - type: replace-marker-kind
     auto_fixable: true
     description: Replace marker kind token in marker line content.
-    command: codemap apply replace-marker-kind --params from_kind={{from_kind}},to_kind={{to_kind}} --yes
+    command: codemap apply replace-marker-kind --params from_kind={{from_kind}},to_kind={{to_kind}},in_file={{in_file}} --yes
 ---
 
 # replace-marker-kind

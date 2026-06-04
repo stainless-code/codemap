@@ -49,13 +49,55 @@ doc_rows AS (
     d.file_path,
     (d.line_start - (2 + d.doc_line_count - d.deprecated_doc_line_index)) AS line_start,
     (d.line_start - (2 + d.doc_line_count - d.deprecated_doc_line_index)) AS line_end,
-    (' * ' || d.first_doc_line) AS before_pattern,
+    (
+      CASE
+        WHEN instr(d.doc_comment, ' * @deprecated') > 0 THEN
+          substr(
+            d.doc_comment,
+            instr(d.doc_comment, ' * @deprecated'),
+            CASE
+              WHEN instr(
+                substr(d.doc_comment, instr(d.doc_comment, ' * @deprecated')),
+                char(10)
+              ) > 0 THEN
+                instr(
+                  substr(d.doc_comment, instr(d.doc_comment, ' * @deprecated')),
+                  char(10)
+                ) - 1
+              ELSE
+                length(substr(d.doc_comment, instr(d.doc_comment, ' * @deprecated')))
+            END
+          )
+        WHEN instr(d.doc_comment, '@deprecated') > 0 THEN
+          ' * '
+          || trim(
+            substr(
+              d.doc_comment,
+              instr(d.doc_comment, '@deprecated'),
+              CASE
+                WHEN instr(
+                  substr(d.doc_comment, instr(d.doc_comment, '@deprecated')),
+                  char(10)
+                ) > 0 THEN
+                  instr(
+                    substr(d.doc_comment, instr(d.doc_comment, '@deprecated')),
+                    char(10)
+                  ) - 1
+                ELSE
+                  length(substr(d.doc_comment, instr(d.doc_comment, '@deprecated')))
+              END
+            )
+          )
+        ELSE
+          ' * ' || d.first_doc_line
+      END
+    ) AS before_pattern,
     (' * @deprecated ' || p.replacement_message) AS after_pattern,
     'deprecated_jsdoc' AS location_kind,
     0 AS chain_depth
   FROM deprecated_symbols d
   CROSS JOIN params p
-  WHERE d.first_doc_line LIKE '%@deprecated%'
+  WHERE instr(d.doc_comment, '@deprecated') > 0
 )
 SELECT *
 FROM doc_rows

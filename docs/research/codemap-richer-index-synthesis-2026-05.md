@@ -25,7 +25,7 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 
 **Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, …) and test gaps: [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md).
+- **§ 6 Steps 2–4, 6, 8–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, …; `organize-imports` **rejected** per [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md)) and test gaps there.
 - **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`, `--commit`, `--until-empty`, MCP `until_empty` / `commit_message` on `apply`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). Multi-line row contract remains backlog.
 - **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
 

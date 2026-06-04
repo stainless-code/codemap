@@ -157,6 +157,12 @@ export function parseApplyRest(rest: string[]):
         };
       }
       maxPasses = Number.parseInt(next, 10);
+      if (maxPasses < 1) {
+        return {
+          kind: "error",
+          message: `codemap apply: "--max-passes" requires a positive integer.`,
+        };
+      }
       i++;
       continue;
     }

@@ -6,7 +6,6 @@ deprecated_targets AS (
   FROM symbols s
   CROSS JOIN params p
   WHERE s.name = p.symbol
-    AND (p.in_file IS NULL OR s.file_path LIKE p.in_file || '%')
     AND (
       p.require_deprecated IS NULL
       OR p.require_deprecated = 0

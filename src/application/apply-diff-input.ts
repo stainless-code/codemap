@@ -8,36 +8,30 @@ export function parseUnifiedDiffToRows(diffText: string): ApplyInputRow[] {
   const rows: ApplyInputRow[] = [];
   let currentFile: string | undefined;
   let newLine = 0;
-  let pendingMinus: { file_path: string; before_pattern: string } | undefined;
+  const pendingMinus: { file_path: string; before_pattern: string }[] = [];
 
   const flushPair = (plus: {
     file_path: string;
     line_start: number;
     after_pattern: string;
   }): void => {
-    if (pendingMinus === undefined) return;
-    if (pendingMinus.file_path !== plus.file_path) {
-      pendingMinus = undefined;
-      return;
-    }
-    if (pendingMinus.before_pattern.length === 0) {
-      pendingMinus = undefined;
-      return;
-    }
+    const minus = pendingMinus.shift();
+    if (minus === undefined) return;
+    if (minus.file_path !== plus.file_path) return;
+    if (minus.before_pattern.length === 0) return;
     rows.push({
       file_path: plus.file_path,
       line_start: plus.line_start,
-      before_pattern: pendingMinus.before_pattern,
+      before_pattern: minus.before_pattern,
       after_pattern: plus.after_pattern,
     });
-    pendingMinus = undefined;
   };
 
   for (const rawLine of diffText.split(/\r?\n/)) {
     if (rawLine.startsWith("+++ ")) {
       const path = parseDiffPath(rawLine.slice(4).trim());
       if (path !== undefined) currentFile = path;
-      pendingMinus = undefined;
+      pendingMinus.length = 0;
       continue;
     }
     if (rawLine.startsWith("--- ") || rawLine.startsWith("diff ")) continue;
@@ -45,7 +39,7 @@ export function parseUnifiedDiffToRows(diffText: string): ApplyInputRow[] {
     const hunk = rawLine.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
     if (hunk !== null) {
       newLine = Number.parseInt(hunk[1]!, 10);
-      pendingMinus = undefined;
+      pendingMinus.length = 0;
       continue;
     }
 
@@ -53,15 +47,15 @@ export function parseUnifiedDiffToRows(diffText: string): ApplyInputRow[] {
     if (rawLine.startsWith("\\")) continue;
 
     if (rawLine.startsWith(" ")) {
-      pendingMinus = undefined;
+      pendingMinus.length = 0;
       newLine++;
       continue;
     }
     if (rawLine.startsWith("-")) {
-      pendingMinus = {
+      pendingMinus.push({
         file_path: currentFile,
         before_pattern: rawLine.slice(1),
-      };
+      });
       continue;
     }
     if (rawLine.startsWith("+")) {

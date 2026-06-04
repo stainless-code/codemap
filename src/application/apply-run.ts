@@ -137,14 +137,20 @@ function withMergedApplyFiles(
 function finalizeFixpointPayload(
   probe: ApplyJsonPayload,
   accumulated: Map<string, ApplyFile>,
-  extras: { passes: number; terminated_by: ApplyTerminatedBy },
+  extras: {
+    passes: number;
+    terminated_by: ApplyTerminatedBy;
+    invocationMode: "dry-run" | "apply";
+  },
 ): ApplyJsonPayload {
   const merged = withMergedApplyFiles({ ...probe, ...extras }, accumulated);
   const totalRowsApplied = [...accumulated.values()].reduce(
     (n, f) => n + f.rows_applied,
     0,
   );
-  if (totalRowsApplied === 0) return merged;
+  if (totalRowsApplied === 0) {
+    return { ...merged, mode: extras.invocationMode };
+  }
   return {
     ...merged,
     mode: "apply",
@@ -197,6 +203,7 @@ export async function runApplyUntilEmpty(opts: {
         payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
           passes: pass,
           terminated_by: "conflicts",
+          invocationMode: opts.dryRun ? "dry-run" : "apply",
         }),
         passes: pass,
         terminated_by: "conflicts",
@@ -207,6 +214,7 @@ export async function runApplyUntilEmpty(opts: {
         payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
           passes: pass,
           terminated_by: "empty",
+          invocationMode: opts.dryRun ? "dry-run" : "apply",
         }),
         passes: pass,
         terminated_by: "empty",
@@ -217,6 +225,7 @@ export async function runApplyUntilEmpty(opts: {
         payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
           passes: pass,
           terminated_by: "complete",
+          invocationMode: opts.dryRun ? "dry-run" : "apply",
         }),
         passes: pass,
         terminated_by: "complete",
@@ -236,6 +245,7 @@ export async function runApplyUntilEmpty(opts: {
         payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
           passes: pass,
           terminated_by: "conflicts",
+          invocationMode: opts.dryRun ? "dry-run" : "apply",
         }),
         passes: pass,
         terminated_by: "conflicts",
@@ -263,6 +273,7 @@ export async function runApplyUntilEmpty(opts: {
     payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
       passes: opts.maxPasses,
       terminated_by: "cap",
+      invocationMode: opts.dryRun ? "dry-run" : "apply",
     }),
     passes: opts.maxPasses,
     terminated_by: "cap",
