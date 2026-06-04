@@ -67,8 +67,8 @@ _(none — P1 agent-surface work complete)_
 
 - [ ] **Framework route extraction** — Express / React Router / NestJS `http_routes` substrate. Plan: [`plans/framework-route-extraction.md`](./plans/framework-route-extraction.md). Blocked on C.9 contract. Effort: L.
 - [ ] **Callback dispatch synthesis** — heuristic `calls` with `provenance`. Plan: [`plans/callback-dispatch-synthesis.md`](./plans/callback-dispatch-synthesis.md). Effort: L.
-- [ ] **In-repo test bench depth** — grow `fixtures/minimal` + `CAPABILITIES.json` so all capability groups (CLI/MCP e2e, method-call slices, shop-symbols recipe) are covered without external `CODEMAP_ROOT`. Plan: [`plans/in-repo-test-bench.md`](./plans/in-repo-test-bench.md). Effort: M.
-- [ ] **Unresolved calls staging** — two-phase call resolution queue. Plan: [`plans/unresolved-calls-staging.md`](./plans/unresolved-calls-staging.md). Effort: L.
+- [x] **In-repo test bench depth** — Phases 1–3: `fixtures/README.md`, `CAPABILITIES.json`, substrate goldens, method-call slice, shop-symbols recipe, CLI/MCP e2e + agent-eval probes — all without external `CODEMAP_ROOT`. Shipped [#162](https://github.com/stainless-code/codemap/pull/162). Optional Phase 4 scale: [`plans/in-repo-test-bench.md`](./plans/in-repo-test-bench.md).
+- [x] **Unresolved calls staging** — two-phase call resolution queue (`unresolved_calls`, scoped incremental `resolveCalls`). Shipped [#162](https://github.com/stainless-code/codemap/pull/162). Plan: [`plans/unresolved-calls-staging.md`](./plans/unresolved-calls-staging.md).
 - [ ] **Cross-project MCP root** — optional `root` on tools + DB cache. Plan: [`plans/cross-project-mcp-root.md`](./plans/cross-project-mcp-root.md). Effort: M.
 - [ ] **FTS default-on evaluation** — measure DB size tax; maybe flip default. Plan: [`plans/fts-default-on-evaluation.md`](./plans/fts-default-on-evaluation.md). Effort: S–M.
 
