@@ -509,6 +509,8 @@ export function loadBindingIndexContext(
     m.set(r.local_name, { source: r.source, imported_name: r.imported_name });
   }
 
+  // Read resolved_path from `imports`, not `dependencies` — the latter
+  // is (from_path, to_path)-only, no module specifier.
   const depsByFile = new Map<string, Map<string, string>>();
   const depRows = db
     .query<{ file_path: string; source: string; resolved_path: string | null }>(
@@ -526,6 +528,8 @@ export function loadBindingIndexContext(
   }
 
   const exportsByFile = new Map<string, Set<string>>();
+  // Re-export chain: (file, exported_name) → {source, imported_name}.
+  // Resolved in step 2 by walking the chain until we hit a non-re-export.
   const reExportsByFile = new Map<string, Map<string, ReExportEntry>>();
   const expRows = db
     .query<{
@@ -552,6 +556,7 @@ export function loadBindingIndexContext(
     }
   }
 
+  // Indexed-paths set for re-export resolution.
   const indexedPaths = new Set<string>(
     db
       .query<{ path: string }>("SELECT path FROM files")

@@ -2,6 +2,7 @@
   {
     "total_calls": 45,
     "resolved_calls": 24,
+    "method_calls_deferred": 20,
     "unresolved_queue": 1,
     "residual_meta": "1"
   }

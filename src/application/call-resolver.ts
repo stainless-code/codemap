@@ -53,8 +53,12 @@ function isCallResolved(
   result: Pick<BindingRow, "resolved_symbol_id" | "resolution_kind">,
 ): boolean {
   if (result.resolved_symbol_id != null) return true;
+  const kind = result.resolution_kind;
   return (
-    result.resolution_kind === "imported" || result.resolution_kind === "global"
+    kind === "imported" ||
+    kind === "global" ||
+    kind === "re-exported" ||
+    kind === "same-file"
   );
 }
 
@@ -85,7 +89,7 @@ function resolveOneCall(
       result.resolved_symbol_id,
       result.resolution_kind,
     );
-    return { resolved: true, queue: true };
+    return { resolved: true, queue: false };
   }
 
   updateCallResolution(db, call.id, null, "unresolved");
