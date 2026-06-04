@@ -42,6 +42,18 @@
     "line_count": 5
   },
   {
+    "path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "content_hash": "7990d39f36b4cfe4c478a020d56b822ec94ea3fcb1c3695b3e21af1584727d26",
+    "language": "tsx",
+    "line_count": 8
+  },
+  {
+    "path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "content_hash": "610257bc8108bf62603a37e8c7ef05635beda06cb81a8f8a9e53adff486e4c5e",
+    "language": "tsx",
+    "line_count": 10
+  },
+  {
     "path": "src/bench/method-call-sites.ts",
     "content_hash": "76a69f0d65b9b3b07547b93c73e15a81f5604234465d17f92b6e0bf487392d1a",
     "language": "ts",

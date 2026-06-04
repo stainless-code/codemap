@@ -20,6 +20,7 @@ WITH touched AS (
     'call'
   FROM components c
   JOIN calls ca ON ca.caller_name = c.name AND ca.file_path = c.file_path
+    AND (ca.provenance IS NULL OR ca.provenance = 'ast')
   JOIN symbols s ON s.name = ca.callee_name AND s.doc_comment LIKE '%@deprecated%'
 )
 SELECT * FROM touched

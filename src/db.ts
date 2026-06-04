@@ -3,7 +3,10 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
+
+/** Moat-A: default call-graph surfaces exclude callback-synthesis edges. */
+export const CALLS_AST_ONLY_SQL = "(provenance IS NULL OR provenance = 'ast')";
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -179,6 +182,9 @@ export function createTables(db: CodemapDatabase) {
         callee_resolution_kind IS NULL OR callee_resolution_kind IN (
           'same-file', 'imported', 're-exported', 'global', 'unresolved'
         )
+      ),
+      provenance TEXT CHECK (
+        provenance IS NULL OR provenance IN ('ast', 'heuristic')
       )
     ) STRICT;
 
@@ -1295,14 +1301,16 @@ export interface CallRow {
   is_method_call?: number;
   is_constructor_call?: number;
   is_optional_chain?: number;
+  /** `ast` from parse; `heuristic` from callback-synthesis pass; NULL = legacy ast-era rows. */
+  provenance?: "ast" | "heuristic" | null;
 }
 
 export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
   batchInsert(
     db,
     calls,
-    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end, args_count, is_method_call, is_constructor_call, is_optional_chain)",
-    "(?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end, args_count, is_method_call, is_constructor_call, is_optional_chain, provenance)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?)",
     (c, v) =>
       v.push(
         c.file_path,
@@ -1316,8 +1324,25 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
         c.is_method_call ?? 0,
         c.is_constructor_call ?? 0,
         c.is_optional_chain ?? 0,
+        c.provenance ?? null,
       ),
   );
+}
+
+/** Remove synthesized edges before a scoped re-run (incremental index). */
+export function deleteHeuristicCalls(
+  db: CodemapDatabase,
+  filePaths?: readonly string[],
+): void {
+  if (filePaths && filePaths.length > 0) {
+    const placeholders = filePaths.map(() => "?").join(",");
+    db.run(
+      `DELETE FROM calls WHERE provenance = 'heuristic' AND file_path IN (${placeholders})`,
+      [...filePaths],
+    );
+    return;
+  }
+  db.run("DELETE FROM calls WHERE provenance = 'heuristic'");
 }
 
 /** Staging row for call sites that did not resolve to a symbol in phase 2. */

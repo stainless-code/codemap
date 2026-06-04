@@ -100,6 +100,18 @@ export const codemapUserConfigSchema = z
       .describe(
         "Track per-recipe `last_run_at` + `run_count` in the `recipe_recency` table; surfaces inline on `--recipes-json` for agent-host ranking. Default `true` (opt-out). Set `false` to short-circuit every write — no rows ever land. Local-only — no upload primitive. See `docs/architecture.md` § `recipe_recency`.",
       ),
+    synthesis: z
+      .object({
+        heuristicCalls: z
+          .boolean()
+          .optional()
+          .describe(
+            "Post-index heuristic `calls` edges (v1: JSX parent→child). Default `false` — AST `calls` row counts unchanged until enabled.",
+          ),
+      })
+      .strict()
+      .optional()
+      .describe("Optional synthesis passes after bindings/call resolve."),
     boundaries: z
       .array(
         z
@@ -201,6 +213,10 @@ export interface ResolvedCodemapConfig {
     readonly to_glob: string;
     readonly action: "deny" | "allow";
   }>;
+  /** When `heuristicCalls` is true, runs callback-synthesis after `resolveCalls`. */
+  readonly synthesis: {
+    readonly heuristicCalls: boolean;
+  };
 }
 
 /**
@@ -304,6 +320,8 @@ export function resolveCodemapConfig(
   // Default ON (opt-out, not opt-in). Only `false` disables.
   const recipeRecency = parsed?.recipeRecency !== false;
 
+  const heuristicCalls = parsed?.synthesis?.heuristicCalls === true;
+
   return {
     root: absRoot,
     stateDir,
@@ -314,6 +332,7 @@ export function resolveCodemapConfig(
     fts5,
     boundaries,
     recipeRecency,
+    synthesis: { heuristicCalls },
   };
 }
 

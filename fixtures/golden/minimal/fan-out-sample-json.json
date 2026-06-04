@@ -20,6 +20,11 @@
     "sample_targets": "[\"src/lib/complexity-fixture.ts\"]"
   },
   {
+    "from_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/jsx-synthesis/ChildCard.tsx\"]"
+  },
+  {
     "from_path": "src/components/shop/ApiBridge.tsx",
     "deps": 1,
     "sample_targets": "[\"src/api/client.ts\"]"

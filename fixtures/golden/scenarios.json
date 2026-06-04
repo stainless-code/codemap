@@ -92,7 +92,7 @@
     {
       "id": "calls-consumer",
       "prompt": "What does the run function in consumer.ts call?",
-      "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
+      "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' AND (provenance IS NULL OR provenance = 'ast') ORDER BY callee_name"
     },
     {
       "id": "find-call-sites",
@@ -706,12 +706,18 @@
     {
       "id": "calls-createClient-resolved",
       "prompt": "createClient in consumer.ts resolves as imported after phase-2",
-      "sql": "SELECT callee_name, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
+      "sql": "SELECT callee_name, callee_resolution_kind, provenance FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
     },
     {
       "id": "calls-method-ping-unresolved",
       "prompt": "Method call ping() indexed but phase-2 leaves callee_symbol_id null",
       "sql": "SELECT callee_name, is_method_call, callee_symbol_id, callee_resolution_kind FROM calls WHERE file_path = 'src/bench/method-call-sites.ts' ORDER BY line_start"
+    },
+    {
+      "id": "calls-including-heuristic",
+      "prompt": "Heuristic call edges only (empty when synthesis.heuristicCalls off)",
+      "recipe": "calls-including-heuristic",
+      "match": { "kind": "exact" }
     },
     {
       "id": "try-catch-rethrow-heuristics",

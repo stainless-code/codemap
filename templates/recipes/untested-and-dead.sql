@@ -15,7 +15,11 @@ LEFT JOIN suppressions sup
   AND (sup.line_number = 0 OR sup.line_number = s.line_start)
 WHERE s.kind = 'function'
   AND s.is_exported = 1
-  AND NOT EXISTS (SELECT 1 FROM calls WHERE callee_name = s.name)
+  AND NOT EXISTS (
+    SELECT 1 FROM calls
+    WHERE callee_name = s.name
+      AND (provenance IS NULL OR provenance = 'ast')
+  )
   AND COALESCE(c.coverage_pct, 0) = 0
   AND sup.id IS NULL
 ORDER BY s.file_path ASC, s.line_start ASC

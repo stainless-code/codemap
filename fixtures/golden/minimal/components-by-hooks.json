@@ -8,5 +8,15 @@
     "name": "ShopButton",
     "file_path": "src/components/shop/ShopButton.tsx",
     "hook_count": 1
+  },
+  {
+    "name": "ChildCard",
+    "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "hook_count": 0
+  },
+  {
+    "name": "PageShell",
+    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "hook_count": 0
   }
 ]

@@ -258,7 +258,8 @@ function collectNeighborFilesForCenter(
   const calls = db
     .query<{ file_path: string; caller_name: string; callee_name: string }>(
       `SELECT file_path, caller_name, callee_name FROM calls
-       WHERE file_path = ? AND (caller_name = ? OR callee_name = ?)`,
+       WHERE (provenance IS NULL OR provenance = 'ast')
+         AND file_path = ? AND (caller_name = ? OR callee_name = ?)`,
     )
     .all(center.file_path, center.name, center.name) as {
     file_path: string;

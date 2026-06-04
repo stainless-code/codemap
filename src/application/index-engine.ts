@@ -34,6 +34,7 @@ import {
   insertCssKeyframes,
   insertTypeMembers,
   insertTypeHeritage,
+  deleteHeuristicCalls,
   insertCalls,
   insertDynamicImports,
   insertAsyncCalls,
@@ -52,6 +53,7 @@ import { resolveImports, resolveModuleSpecifier } from "../resolver";
 import {
   getExcludeDirNames,
   getFts5Enabled,
+  getHeuristicCallsEnabled,
   getIncludePatterns,
   getProjectRoot,
   getStateDir,
@@ -65,6 +67,7 @@ import {
   resolveBindings,
 } from "./bindings-engine";
 import { resolveCalls } from "./call-resolver";
+import { synthesizeCallbackCalls } from "./callback-synthesis";
 import { persistModuleCycles } from "./cycles-engine";
 import { appendIndexError } from "./error-log";
 import { persistFileBarrelFlags } from "./file-graph-flags";
@@ -614,10 +617,8 @@ export async function indexFiles(
       ? expandHeritageResolveScope(db, heritageScopePaths)
       : undefined;
   if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
-    resolveCalls(
-      db,
-      callResolveScope ? { filePaths: callResolveScope } : undefined,
-    );
+    const callScopePaths = callResolveScope ? callResolveScope : undefined;
+    runCallResolveAndSynthesis(db, callScopePaths);
   }
 
   const elapsed = Math.round(performance.now() - startTime);
@@ -715,6 +716,21 @@ export async function indexFiles(
     stats,
     performance: perf,
   };
+}
+
+/** Purge stale heuristics, resolve AST `calls`, optionally re-synthesize. */
+export function runCallResolveAndSynthesis(
+  db: CodemapDatabase,
+  filePaths?: string[],
+): void {
+  if (getHeuristicCallsEnabled()) {
+    deleteHeuristicCalls(db, filePaths);
+    resolveCalls(db, filePaths ? { filePaths } : undefined);
+    synthesizeCallbackCalls(db, filePaths ? { filePaths } : undefined);
+  } else {
+    deleteHeuristicCalls(db);
+    resolveCalls(db, filePaths ? { filePaths } : undefined);
+  }
 }
 
 export function deleteFilesFromIndex(

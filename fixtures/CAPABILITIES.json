@@ -63,12 +63,15 @@
       "fixtureFiles": [
         "src/consumer.ts",
         "src/lib/complexity-fixture.ts",
-        "src/bench/method-call-sites.ts"
+        "src/bench/method-call-sites.ts",
+        "src/bench/jsx-synthesis/PageShell.tsx",
+        "src/bench/jsx-synthesis/ChildCard.tsx"
       ],
       "goldenScenarios": [
         "call-resolution-stats",
         "unresolved-call-sites",
-        "calls-method-ping-unresolved"
+        "calls-method-ping-unresolved",
+        "calls-including-heuristic"
       ],
       "knownGaps": [
         "method-call callee_symbol_id deferred until namespace/member resolve"

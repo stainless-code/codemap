@@ -1,5 +1,11 @@
 [
   {
+    "name": "ChildCard"
+  },
+  {
+    "name": "PageShell"
+  },
+  {
     "name": "ProductCard"
   },
   {

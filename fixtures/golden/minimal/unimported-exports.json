@@ -35,6 +35,13 @@
     "re_export_source": null
   },
   {
+    "name": "PageShell",
+    "kind": "value",
+    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "PingService",
     "kind": "value",
     "file_path": "src/bench/method-call-sites.ts",

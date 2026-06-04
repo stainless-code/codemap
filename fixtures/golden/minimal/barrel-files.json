@@ -60,6 +60,14 @@
     "exports": 1
   },
   {
+    "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "exports": 1
+  },
+  {
+    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "exports": 1
+  },
+  {
     "file_path": "src/bench/method-call-sites.ts",
     "exports": 1
   },
@@ -69,14 +77,6 @@
   },
   {
     "file_path": "src/components/shop/ProductCard.tsx",
-    "exports": 1
-  },
-  {
-    "file_path": "src/components/shop/ShopButton.default.ts",
-    "exports": 1
-  },
-  {
-    "file_path": "src/types/homonym-mammal.ts",
     "exports": 1
   }
 ]
