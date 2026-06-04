@@ -1,5 +1,17 @@
 # @stainless-code/codemap
 
+## 0.10.0
+
+### Minor Changes
+
+- [#164](https://github.com/stainless-code/codemap/pull/164) [`8c7064a`](https://github.com/stainless-code/codemap/commit/8c7064a946df4108d940d74d182ac5f9430a8178) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add optional heuristic call edges (`calls.provenance`) for JSX parent→child composition. Schema rebuild to v37. Enable via `.codemap/config` `synthesis.heuristicCalls: true` (default off). Bundled recipe `calls-including-heuristic`; `call-path` excludes heuristics by default.
+
+- [#162](https://github.com/stainless-code/codemap/pull/162) [`6e50d77`](https://github.com/stainless-code/codemap/commit/6e50d77342938553e1d6d9c2800711950b92ab36) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add two-phase call resolution (`unresolved_calls` staging, `calls.callee_symbol_id` / `callee_resolution_kind`). Schema version 36 — existing indexes rebuild on next `codemap` run.
+
+### Patch Changes
+
+- [`7b0406a`](https://github.com/stainless-code/codemap/commit/7b0406a9eae183d4d3220206a2a6296dc7e9e938) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Ship the apply substrate: recipe-driven `codemap apply` for stale imports, deprecated migrations, import-source moves, JSX prop renames, and scoped `rename-preview` (`define_in` homonyms). Add `--rows`, `--diff-input`, fixpoint `--until-empty`, optional `--commit`, `auto_fixable`/`--force`, and `apply.autoApplyRecipes` allowlist. MCP/HTTP twins: `apply`, `apply_rows`, `apply_diff_input`.
+
 ## 0.9.5
 
 ### Patch Changes
