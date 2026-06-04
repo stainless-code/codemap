@@ -95,14 +95,17 @@ WHERE parent_name IS NULL AND file_path LIKE '%utils%';
 
 -- Who calls function X? (fan-in)
 SELECT DISTINCT caller_name, file_path FROM calls
-WHERE callee_name = 'fetchUser';
+WHERE callee_name = 'fetchUser'
+  AND (provenance IS NULL OR provenance = 'ast');
 
 -- What does function X call? (fan-out)
 SELECT DISTINCT callee_name FROM calls
-WHERE caller_name = 'processUser';
+WHERE caller_name = 'processUser'
+  AND (provenance IS NULL OR provenance = 'ast');
 
 -- Most-called functions (hotspots)
 SELECT callee_name, COUNT(*) as fan_in FROM calls
+WHERE (provenance IS NULL OR provenance = 'ast')
 GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10;
 
 -- File overview (imports + exports)

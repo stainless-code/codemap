@@ -618,17 +618,7 @@ export async function indexFiles(
       : undefined;
   if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
     const callScopePaths = callResolveScope ? callResolveScope : undefined;
-    deleteHeuristicCalls(db, callScopePaths);
-    resolveCalls(
-      db,
-      callScopePaths ? { filePaths: callScopePaths } : undefined,
-    );
-    if (getHeuristicCallsEnabled()) {
-      synthesizeCallbackCalls(
-        db,
-        callScopePaths ? { filePaths: callScopePaths } : undefined,
-      );
-    }
+    runCallResolveAndSynthesis(db, callScopePaths);
   }
 
   const elapsed = Math.round(performance.now() - startTime);
@@ -726,6 +716,18 @@ export async function indexFiles(
     stats,
     performance: perf,
   };
+}
+
+/** Purge stale heuristics, resolve AST `calls`, optionally re-synthesize. */
+export function runCallResolveAndSynthesis(
+  db: CodemapDatabase,
+  filePaths?: string[],
+): void {
+  deleteHeuristicCalls(db, filePaths);
+  resolveCalls(db, filePaths ? { filePaths } : undefined);
+  if (getHeuristicCallsEnabled()) {
+    synthesizeCallbackCalls(db, filePaths ? { filePaths } : undefined);
+  }
 }
 
 export function deleteFilesFromIndex(

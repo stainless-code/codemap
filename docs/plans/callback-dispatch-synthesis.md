@@ -2,7 +2,7 @@
 
 > **Status:** open · **Priority:** P2 · **Effort:** L (~2–3 weeks) · **Trigger-gated**
 >
-> **Motivator:** Static AST `calls` edges miss EventEmitter wiring, React `setState`→render, and JSX parent→child composition. Call-path and impact queries stop early on real TS/React codebases without heuristic edges — but heuristics must be tagged so agents don't treat them as type-checked facts.
+> **Motivator:** Static AST `calls` edges miss JSX parent→child composition (and later EventEmitter / `setState`→render). Call-path and impact queries stop early on real TS/React codebases without heuristic edges — but heuristics must be tagged so agents don't treat them as type-checked facts.
 >
 > **Roadmap:** [§ Agent & indexing ops — P2](../roadmap.md#agent--indexing-ops)
 
@@ -10,12 +10,12 @@
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                                                 | Source                                     |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| L.1 | Add **`calls.provenance`** column — values `NULL` (legacy ast), `'ast'`, `'heuristic'`. Default NULL = ast-era rows treated as ast.      | [Moat B](../roadmap.md#moats-load-bearing) |
-| L.2 | Synthesis runs **post-index pass** after bindings — additive only; failures ignored.                                                     | Optional enrichment                        |
-| L.3 | **Moat-A filters** — recipes default `WHERE provenance IS NULL OR provenance = 'ast'`; opt-in recipe `calls-including-heuristic`.        | Honesty                                    |
-| L.4 | **TS/React scope v1:** EventEmitter `on`/`emit`, JSX child component edges, `setState`→render heuristic. Skip Flutter/C++/Java patterns. | TS/JS focus                                |
+| #   | Decision                                                                                                                                     | Source                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| L.1 | Add **`calls.provenance`** column — values `NULL` (legacy ast), `'ast'`, `'heuristic'`. Default NULL = ast-era rows treated as ast.          | [Moat B](../roadmap.md#moats-load-bearing) |
+| L.2 | Synthesis runs **post-index pass** after bindings — additive only; failures ignored.                                                         | Optional enrichment                        |
+| L.3 | **Moat-A filters** — recipes default `WHERE provenance IS NULL OR provenance = 'ast'`; opt-in recipe `calls-including-heuristic`.            | Honesty                                    |
+| L.4 | **TS/React scope v1 (shipped in #164):** JSX child component edges only. EventEmitter / `setState` deferred. Skip Flutter/C++/Java patterns. | TS/JS focus                                |
 
 ---
 

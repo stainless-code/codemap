@@ -60,22 +60,22 @@ If the question matches any of these, use the index instead of grepping:
 
 ## Quick reference queries
 
-| I need to...              | Query                                                                                               |
-| ------------------------- | --------------------------------------------------------------------------------------------------- |
-| Find a symbol             | `SELECT name, kind, file_path, line_start, signature FROM symbols WHERE name = '...'`               |
-| Field-qualified search    | `codemap show --query 'kind:function name:Auth path:src/'` (MCP: `show` / `snippet` with `query`)   |
-| Call path / neighborhood  | `codemap trace` / `explore` / `node` (or MCP twins; recipes: `call-path`, `symbol-neighborhood`)    |
-| Affected tests            | `codemap affected --json` or MCP `affected` (recipe: `affected-tests`)                              |
-| Find a symbol (fuzzy)     | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                     |
-| Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...'`                               |
-| Who imports this file?    | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                             |
-| What does this depend on? | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                             |
-| Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...'`                       |
-| Component info            | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                            |
-| TODOs in a file           | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`            |
-| Deprecated symbols        | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                  |
-| Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'` |
-| Untested + dead exports   | `codemap query --json --recipe untested-and-dead`                                                   |
+| I need to...              | Query                                                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Find a symbol             | `SELECT name, kind, file_path, line_start, signature FROM symbols WHERE name = '...'`                                        |
+| Field-qualified search    | `codemap show --query 'kind:function name:Auth path:src/'` (MCP: `show` / `snippet` with `query`)                            |
+| Call path / neighborhood  | `codemap trace` / `explore` / `node` (or MCP twins; recipes: `call-path`, `symbol-neighborhood`)                             |
+| Affected tests            | `codemap affected --json` or MCP `affected` (recipe: `affected-tests`)                                                       |
+| Find a symbol (fuzzy)     | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                                              |
+| Symbol docs               | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...'`                                                        |
+| Who imports this file?    | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                                      |
+| What does this depend on? | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                                      |
+| Who calls X?              | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...' AND (provenance IS NULL OR provenance = 'ast')` |
+| Component info            | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                                     |
+| TODOs in a file           | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                                     |
+| Deprecated symbols        | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                           |
+| Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                          |
+| Untested + dead exports   | `codemap query --json --recipe untested-and-dead`                                                                            |
 
 ## When Grep / Read IS appropriate
 
