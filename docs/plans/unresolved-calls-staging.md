@@ -1,6 +1,6 @@
 # Unresolved calls staging — plan
 
-> **Status:** open · **Priority:** P2 · **Effort:** L (~2–3 weeks)
+> **Status:** shipped (2026-06) · **Priority:** P2 · **Effort:** L (~2–3 weeks)
 >
 > **Motivator:** Call sites are inserted during parse; cross-file resolution to callee symbols happens in bindings post-pass without a durable staging queue. Re-indexing a subset of files can leave stale call edges until full rebuild. A two-phase extract→resolve pipeline enables scoped re-resolution on incremental sync.
 >
@@ -50,9 +50,9 @@ CREATE TABLE unresolved_calls (
 
 ## Acceptance
 
-- [ ] Incremental `--files` re-resolves calls for touched files only
-- [ ] Recipe lists remaining unresolved sites
-- [ ] Full rebuild clears queue (or reports residual count)
+- [x] Incremental `--files` re-resolves calls for touched files only
+- [x] Recipe lists remaining unresolved sites
+- [x] Full rebuild clears queue (or reports residual count)
 
 ---
 

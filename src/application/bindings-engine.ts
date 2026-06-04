@@ -372,6 +372,17 @@ interface ReExportEntry {
   imported_name: string;
 }
 
+/** In-memory indexes shared by reference binding and call-site resolution. */
+export interface BindingIndexContext {
+  symbolsByFile: Map<string, Map<string, SymbolEntry[]>>;
+  scopeParents: Map<string, Map<number, number | null>>;
+  importsByFile: Map<string, Map<string, ImportSpec>>;
+  depsByFile: Map<string, Map<string, string>>;
+  exportsByFile: Map<string, Set<string>>;
+  reExportsByFile: Map<string, Map<string, ReExportEntry>>;
+  indexedPaths: Set<string>;
+}
+
 /**
  * Split parser output `'./Foo.default'` into `{ source: './Foo', imported_name:
  * 'default' }` — the `.default` suffix encodes `export { default as X } from
@@ -435,7 +446,9 @@ function resolveReExport(
   return null;
 }
 
-export function resolveBindings(db: CodemapDatabase): BindingRow[] {
+export function loadBindingIndexContext(
+  db: CodemapDatabase,
+): BindingIndexContext {
   const symbolsByFile = new Map<string, Map<string, SymbolEntry[]>>();
   const symbolRows = db
     .query<{
@@ -496,8 +509,6 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
     m.set(r.local_name, { source: r.source, imported_name: r.imported_name });
   }
 
-  // Read resolved_path from `imports`, not `dependencies` — the latter
-  // is (from_path, to_path)-only, no module specifier.
   const depsByFile = new Map<string, Map<string, string>>();
   const depRows = db
     .query<{ file_path: string; source: string; resolved_path: string | null }>(
@@ -515,8 +526,6 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
   }
 
   const exportsByFile = new Map<string, Set<string>>();
-  // Re-export chain: (file, exported_name) → {source, imported_name}.
-  // Resolved in step 2 by walking the chain until we hit a non-re-export.
   const reExportsByFile = new Map<string, Map<string, ReExportEntry>>();
   const expRows = db
     .query<{
@@ -543,13 +552,59 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
     }
   }
 
-  // Indexed-paths set for re-export resolution.
   const indexedPaths = new Set<string>(
     db
       .query<{ path: string }>("SELECT path FROM files")
       .all()
       .map((r) => r.path),
   );
+
+  return {
+    symbolsByFile,
+    scopeParents,
+    importsByFile,
+    depsByFile,
+    exportsByFile,
+    reExportsByFile,
+    indexedPaths,
+  };
+}
+
+/** Resolve a value reference at a scope — shared by bindings and call resolver. */
+export function resolveNameAtSite(
+  ctx: BindingIndexContext,
+  site: {
+    file_path: string;
+    name: string;
+    scope_local_id: number;
+    kind?: string;
+  },
+): Pick<BindingRow, "resolved_symbol_id" | "resolution_kind" | "is_external"> {
+  const binding = resolveOne(
+    {
+      id: 0,
+      file_path: site.file_path,
+      name: site.name,
+      scope_local_id: site.scope_local_id,
+      kind: site.kind ?? "value",
+    },
+    ctx.symbolsByFile,
+    ctx.scopeParents,
+    ctx.importsByFile,
+    ctx.depsByFile,
+    ctx.exportsByFile,
+    ctx.reExportsByFile,
+    ctx.indexedPaths,
+  );
+  return {
+    resolved_symbol_id: binding.resolved_symbol_id,
+    resolution_kind: binding.resolution_kind,
+    is_external: binding.is_external,
+  };
+}
+
+export function resolveBindings(db: CodemapDatabase): BindingRow[] {
+  const ctx = loadBindingIndexContext(db);
 
   // Skip kind='member' refs — property access RHS isn't a binding.
   // Consumers querying for member usage filter `kind='member'` directly.
@@ -570,13 +625,13 @@ export function resolveBindings(db: CodemapDatabase): BindingRow[] {
     out.push(
       resolveOne(
         r,
-        symbolsByFile,
-        scopeParents,
-        importsByFile,
-        depsByFile,
-        exportsByFile,
-        reExportsByFile,
-        indexedPaths,
+        ctx.symbolsByFile,
+        ctx.scopeParents,
+        ctx.importsByFile,
+        ctx.depsByFile,
+        ctx.exportsByFile,
+        ctx.reExportsByFile,
+        ctx.indexedPaths,
       ),
     );
   }

@@ -347,7 +347,7 @@ describe("SQLite layer (in-memory)", () => {
     }
   });
 
-  it("v27 on-disk schema rebuilds to 35 and preserves user-data tables", () => {
+  it("v27 on-disk schema rebuilds to 36 and preserves user-data tables", () => {
     const db = openCodemapDatabase(":memory:");
     try {
       const v27Sql = readFileSync(
