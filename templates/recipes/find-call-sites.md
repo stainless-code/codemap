@@ -11,7 +11,7 @@ actions:
 
 # find-call-sites
 
-List every call site of a named function with column-precise position. Foundation for app-wide rename and replace-deprecated-call recipes (Tier 6 extension of `rename-preview`).
+List every parse-resolved call site of a named function with column-precise position (excludes `provenance = 'heuristic'` — same Moat-A filter as `call-path`). Foundation for app-wide rename and replace-deprecated-call recipes (Tier 6 extension of `rename-preview`). For callback-synthesis edges, use `calls-including-heuristic`.
 
 ```bash
 codemap query --recipe find-call-sites --params callee=createClient

@@ -155,6 +155,17 @@ describe("resolveCodemapConfig", () => {
     expect(r.synthesis.heuristicCalls).toBe(true);
   });
 
+  it("rejects unknown keys under synthesis", () => {
+    expect(() =>
+      resolveCodemapConfig(dir, {
+        synthesis: { heuristicCalls: true, extra: true } as {
+          heuristicCalls: boolean;
+          extra: boolean;
+        },
+      }),
+    ).toThrow();
+  });
+
   it("rejects unknown action values", () => {
     expect(() =>
       resolveCodemapConfig(dir, {

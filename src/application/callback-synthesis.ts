@@ -69,6 +69,14 @@ function loadJsxComponentEdges(
       AND je.is_fragment = 0
       AND je.component_name != comp.name
     JOIN components child_comp ON child_comp.name = je.component_name
+      AND (
+        child_comp.file_path = comp.file_path
+        OR EXISTS (
+          SELECT 1 FROM imports imp
+          WHERE imp.file_path = comp.file_path
+            AND imp.resolved_path = child_comp.file_path
+        )
+      )
     WHERE 1=1
     ${fileClause}
     ORDER BY comp.file_path, je.line_start

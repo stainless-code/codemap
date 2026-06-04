@@ -63,7 +63,9 @@
       "fixtureFiles": [
         "src/consumer.ts",
         "src/lib/complexity-fixture.ts",
-        "src/bench/method-call-sites.ts"
+        "src/bench/method-call-sites.ts",
+        "src/bench/jsx-synthesis/PageShell.tsx",
+        "src/bench/jsx-synthesis/ChildCard.tsx"
       ],
       "goldenScenarios": [
         "call-resolution-stats",

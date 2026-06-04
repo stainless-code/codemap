@@ -723,10 +723,13 @@ export function runCallResolveAndSynthesis(
   db: CodemapDatabase,
   filePaths?: string[],
 ): void {
-  deleteHeuristicCalls(db, filePaths);
-  resolveCalls(db, filePaths ? { filePaths } : undefined);
   if (getHeuristicCallsEnabled()) {
+    deleteHeuristicCalls(db, filePaths);
+    resolveCalls(db, filePaths ? { filePaths } : undefined);
     synthesizeCallbackCalls(db, filePaths ? { filePaths } : undefined);
+  } else {
+    deleteHeuristicCalls(db);
+    resolveCalls(db, filePaths ? { filePaths } : undefined);
   }
 }
 

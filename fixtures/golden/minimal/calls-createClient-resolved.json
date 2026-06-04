@@ -1,6 +1,7 @@
 [
   {
     "callee_name": "createClient",
-    "callee_resolution_kind": "imported"
+    "callee_resolution_kind": "imported",
+    "provenance": null
   }
 ]

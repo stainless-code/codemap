@@ -24,7 +24,7 @@ The output columns `exported_count`, `fan_in`, `avg_coverage_pct`, `measured_sym
 Suggested tuning axes for project-local overrides:
 
 - **Log-scale `fan_in`** for hub-heavy codebases — diminishing returns above ~20 callers: `LOG(fan_in + 1) * 30`.
-- **Per-symbol fan_in via `calls`** if you'd rather rank symbols than files: replace the `fan_in_per_file` CTE with `SELECT callee_name, COUNT(DISTINCT caller_name || '|' || file_path) AS fan_in FROM calls GROUP BY callee_name`. Caveat: name-collision false positives across files.
+- **Per-symbol fan_in via `calls`** if you'd rather rank symbols than files: replace the `fan_in_per_file` CTE with `SELECT callee_name, COUNT(DISTINCT caller_name || '|' || file_path) AS fan_in FROM calls WHERE (provenance IS NULL OR provenance = 'ast') GROUP BY callee_name`. Caveat: name-collision false positives across files.
 - **Visibility weight** if `@public` / `@internal` / `@beta` JSDoc tags are used consistently: `+ CASE visibility WHEN 'public' THEN 20 WHEN 'beta' THEN 10 ELSE 0 END`.
 - **LOC weight** scale by file `line_count` (already on the `files` table).
 

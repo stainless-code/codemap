@@ -37,8 +37,8 @@ Cap fan-out per file to limit false positives.
 2. **`src/application/callback-synthesis.ts`** — scan files (or use jsx_elements table); insert synthetic `calls` rows
 3. Run from `index-engine.ts` after `deleteHeuristicCalls` + `resolveCalls` (when `synthesis.heuristicCalls` is true)
 4. Recipe: `calls-including-heuristic`, update `call-path` docs
-5. Tests — fixture with EventEmitter + JSX; assert provenance tags
-6. Document limits in skill + MCP instructions
+5. Tests — JSX parent→child fixture + provenance tags (`callback-synthesis.test.ts`; minimal bench `src/bench/jsx-synthesis/`)
+6. Document limits in skill + MCP instructions (Moat-A filter + `calls-including-heuristic`)
 
 ---
 
@@ -47,7 +47,9 @@ Cap fan-out per file to limit false positives.
 - [x] `calls.provenance` + SCHEMA 37; heuristic edges tagged when synthesis enabled
 - [x] Moat-A surfaces exclude heuristics; opt-in `calls-including-heuristic` recipe
 - [x] Synthesis off by default; stale heuristic rows purged on each resolve scope
-- [ ] EventEmitter / setState heuristics; minimal golden with synthesis on; skill/MCP notes
+- [ ] EventEmitter / setState heuristics
+- [x] JSX fixture + integration test with `synthesis.heuristicCalls: true` (`callback-synthesis-integration.test.ts`)
+- [x] Agent-content Moat-A + `calls-including-heuristic` notes
 
 ---
 

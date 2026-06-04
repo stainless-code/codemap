@@ -706,7 +706,7 @@
     {
       "id": "calls-createClient-resolved",
       "prompt": "createClient in consumer.ts resolves as imported after phase-2",
-      "sql": "SELECT callee_name, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
+      "sql": "SELECT callee_name, callee_resolution_kind, provenance FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
     },
     {
       "id": "calls-method-ping-unresolved",

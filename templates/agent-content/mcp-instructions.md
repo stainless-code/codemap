@@ -66,6 +66,6 @@ Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commi
 
 ## Recipe ids cited here
 
-`find-symbol-definitions`, `find-symbol-by-kind`, `find-symbol-references`, `fan-in`, `call-path`, `symbol-neighborhood`, `type-ancestors`, `type-descendants`, `affected-tests`, `deprecated-symbols`, `boundary-violations`, `refactor-risk-ranking`. Others: list via **`codemap://recipes`** before **`query_recipe`**.
+`find-symbol-definitions`, `find-symbol-by-kind`, `find-symbol-references`, `fan-in`, `call-path`, `symbol-neighborhood`, `type-ancestors`, `type-descendants`, `affected-tests`, `deprecated-symbols`, `boundary-violations`, `refactor-risk-ranking`, `calls-including-heuristic` (opt-in; requires `synthesis.heuristicCalls: true` in config). Default call-graph recipes exclude `provenance = 'heuristic'`. Others: list via **`codemap://recipes`** before **`query_recipe`**.
 
 <!-- codemap-mcp-recipe-refs: find-symbol-definitions, find-symbol-by-kind, find-symbol-references, fan-in, call-path, symbol-neighborhood, type-ancestors, type-descendants, affected-tests, deprecated-symbols, boundary-violations, refactor-risk-ranking -->

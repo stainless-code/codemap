@@ -6,6 +6,18 @@
     "coverage_pct": 0
   },
   {
+    "name": "ChildCard",
+    "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "line_start": 5,
+    "coverage_pct": 0
+  },
+  {
+    "name": "PageShell",
+    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
     "name": "ApiBridge",
     "file_path": "src/components/shop/ApiBridge.tsx",
     "line_start": 4,

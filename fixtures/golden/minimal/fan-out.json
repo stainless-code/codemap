@@ -16,6 +16,10 @@
     "deps": 1
   },
   {
+    "from_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "deps": 1
+  },
+  {
     "from_path": "src/components/shop/ApiBridge.tsx",
     "deps": 1
   },

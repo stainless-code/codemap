@@ -81,11 +81,11 @@ Synchronous Node.js SQLite binding. The Node-side counterpart to `bun:sqlite`. A
 
 ### `calls` (table)
 
-Function-scoped call edges, deduped per `(caller_scope, callee_name, call_kind)` per file (`call` vs `new`). **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. Columns include `args_count` (NULL when a spread argument is present), `is_method_call`, `is_constructor_call`, `is_optional_chain`, and **`provenance`** (`NULL` / `ast` = parse-resolved; `heuristic` = callback-synthesis). After bindings, **`resolveCalls`** (`src/application/call-resolver.ts`) fills **`callee_symbol_id`** and **`callee_resolution_kind`** on ast-only rows; method calls (`is_method_call = 1`) stay NULL and are not queued. Moat-A recipes and walks filter `NULL`/`ast`; **`calls-including-heuristic`** lists heuristic rows only. Optional **`synthesis.heuristicCalls`** in config (default `false`) runs **`callback-synthesis`** after resolve. See `CallRow`, `unresolved_calls`.
+Function-scoped call edges, deduped per `(caller_scope, callee_name, call_kind)` per file (`call` vs `new`). **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. Columns include `args_count` (NULL when a spread argument is present), `is_method_call`, `is_constructor_call`, `is_optional_chain`, and **`provenance`** (`NULL` = parse-resolved; `heuristic` = callback-synthesis). After bindings, **`resolveCalls`** (`src/application/call-resolver.ts`) fills **`callee_symbol_id`** and **`callee_resolution_kind`** on ast-only rows; method calls (`is_method_call = 1`) stay NULL and are not queued. Moat-A recipes and walks filter `NULL`/`ast`; **`calls-including-heuristic`** lists heuristic rows only. Optional **`synthesis.heuristicCalls`** in config (default `false`) runs **`callback-synthesis`** after resolve. See [`architecture.md` § `calls`](./architecture.md#calls--function-scoped-call-edges-deduped-per-file-strict), `CallRow`, `unresolved_calls`.
 
 ### `CallRow`
 
-TS shape for one row of the `calls` table. Maps 1:1 to the SQLite columns.
+TS shape for one row of the `calls` table. Maps 1:1 to the SQLite columns, including optional **`provenance`** (`null` | `'heuristic'`).
 
 ### category
 

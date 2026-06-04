@@ -108,6 +108,11 @@ SELECT callee_name, COUNT(*) as fan_in FROM calls
 WHERE (provenance IS NULL OR provenance = 'ast')
 GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10;
 
+-- Callback-synthesis edges (opt-in; not type-checked — enable synthesis.heuristicCalls in config first)
+-- codemap query --recipe calls-including-heuristic
+SELECT file_path, caller_name, callee_name, line_start, provenance
+FROM calls WHERE provenance = 'heuristic' ORDER BY file_path, line_start;
+
 -- File overview (imports + exports)
 SELECT 'import' as dir, source as name, specifiers as detail
 FROM imports WHERE file_path LIKE '%OrderRow%'

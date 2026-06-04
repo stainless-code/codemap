@@ -114,9 +114,9 @@
     "language": "md"
   },
   {
-    "path": "src/orphan.ts",
+    "path": "src/bench/jsx-synthesis/PageShell.tsx",
     "line_count": 10,
-    "size": 239,
-    "language": "ts"
+    "size": 153,
+    "language": "tsx"
   }
 ]

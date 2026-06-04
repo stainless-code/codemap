@@ -6,6 +6,7 @@ import {
   insertCalls,
   insertComponents,
   insertFile,
+  insertImports,
   insertSymbols,
 } from "../db";
 import type { CodemapDatabase } from "../db";
@@ -88,6 +89,16 @@ function seedMinimalReactFile(db: CodemapDatabase) {
     },
   ];
   persistJsxElementsAndAttributes(db, elements, []);
+  insertImports(db, [
+    {
+      file_path: "src/Parent.tsx",
+      source: "./Child",
+      resolved_path: "src/Child.tsx",
+      specifiers: '["Child"]',
+      is_type_only: 0,
+      line_number: 1,
+    },
+  ]);
 }
 
 describe("synthesizeCallbackCalls", () => {
@@ -152,6 +163,53 @@ describe("synthesizeCallbackCalls", () => {
           }
         ).n,
       ).toBe(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("matches child component via import resolved_path, not homonyms elsewhere", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      seedMinimalReactFile(db);
+      insertFile(db, {
+        path: "src/OtherButton.tsx",
+        content_hash: "o",
+        size: 1,
+        line_count: 5,
+        language: "tsx",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      insertComponents(db, [
+        {
+          file_path: "src/OtherButton.tsx",
+          name: "Child",
+          props_type: null,
+          hooks_used: "[]",
+          is_default_export: 0,
+        },
+      ]);
+      insertImports(db, [
+        {
+          file_path: "src/Parent.tsx",
+          source: "./Child",
+          resolved_path: "src/Child.tsx",
+          specifiers: '["Child"]',
+          is_type_only: 0,
+          line_number: 1,
+        },
+      ]);
+
+      const result = synthesizeCallbackCalls(db);
+      expect(result.jsxEdges).toBe(1);
+      const row = db
+        .query<{ callee_name: string }>(
+          "SELECT callee_name FROM calls WHERE provenance = 'heuristic'",
+        )
+        .get() as { callee_name: string };
+      expect(row.callee_name).toBe("Child");
     } finally {
       closeDb(db);
     }
