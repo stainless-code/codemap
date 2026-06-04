@@ -1,6 +1,6 @@
 # In-repo test bench (no external corpus)
 
-**Status:** Open — Phase 1–3 in progress on `feat/unresolved-calls-staging`; Phase 4 backlog.  
+**Status:** Shipped (Phases 1–3) on `feat/unresolved-calls-staging`; Phase 4 optional scale only.  
 **Effort:** M (ongoing; expand incrementally).  
 **Supersedes for maintainers:** relying on Tier B `CODEMAP_ROOT` / private clones to validate Codemap itself.
 
