@@ -52,11 +52,11 @@ We **do not** commit another product’s source tree, paths, business strings, o
 
 ## Tier model
 
-| Tier                       | Corpus                                   | When                       | Purpose                                                                                 |
-| -------------------------- | ---------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
-| **A (in-repo test bench)** | `fixtures/minimal` + `fixtures/golden/`  | Every PR / `bun run check` | **Canonical** for Codemap development — see [fixtures/README.md](../fixtures/README.md) |
-| **B (consumer-only)**      | Local path via `CODEMAP_*`               | Private app validation     | Goldens **gitignored** — not required to develop Codemap                                |
-| **Bench growth**           | `fixtures/minimal` + `CAPABILITIES.json` | Ongoing                    | Plan: [plans/in-repo-test-bench.md](./plans/in-repo-test-bench.md)                      |
+| Tier                       | Corpus                                   | When                       | Purpose                                                                                                                                                                         |
+| -------------------------- | ---------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A (in-repo test bench)** | `fixtures/minimal` + `fixtures/golden/`  | Every PR / `bun run check` | **Canonical** for Codemap development — see [fixtures/README.md](../fixtures/README.md)                                                                                         |
+| **B (consumer-only)**      | Local path via `CODEMAP_*`               | Private app validation     | Goldens **gitignored** — not required to develop Codemap                                                                                                                        |
+| **Bench growth**           | `fixtures/minimal` + `CAPABILITIES.json` | Shipped (Phases 1–3)       | [testing-coverage.md](./testing-coverage.md), [fixtures/README.md](../fixtures/README.md); optional scale: [plans/in-repo-test-bench.md](./plans/in-repo-test-bench.md) Phase 4 |
 
 ---
 

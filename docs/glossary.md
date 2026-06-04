@@ -81,7 +81,7 @@ Synchronous Node.js SQLite binding. The Node-side counterpart to `bun:sqlite`. A
 
 ### `calls` (table)
 
-Function-scoped call edges, deduped per `(caller_scope, callee_name, call_kind)` per file (`call` vs `new`). **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. Columns include `args_count` (NULL when a spread argument is present), `is_method_call`, `is_constructor_call`, and `is_optional_chain`. See `CallRow`.
+Function-scoped call edges, deduped per `(caller_scope, callee_name, call_kind)` per file (`call` vs `new`). **`caller_scope`** is dot-joined enclosing scope (e.g. `UserService.run`). Module-level calls are excluded. Columns include `args_count` (NULL when a spread argument is present), `is_method_call`, `is_constructor_call`, and `is_optional_chain`. After bindings, **`resolveCalls`** (`src/application/call-resolver.ts`) fills **`callee_symbol_id`** and **`callee_resolution_kind`** (`same-file`, `imported`, `re-exported`, `global`, `unresolved`); method calls (`is_method_call = 1`) stay NULL and are not queued. See `CallRow`, `unresolved_calls`.
 
 ### `CallRow`
 
@@ -597,6 +597,18 @@ Properties and method signatures on interfaces and object-literal types. `symbol
 ### `TypeMemberRow`
 
 TS shape for one row of the `type_members` table.
+
+---
+
+## U
+
+### `unresolved_calls` (table)
+
+Staging queue for call sites that **`resolveCalls`** could not bind after the bindings pass. Rows carry `file_path`, `caller_scope`, `callee_name`, and call-site position; deleted when resolved or when the call row is removed. Bundled recipes: `unresolved-call-sites`, `call-resolution-stats`. See [architecture § Call resolution](./architecture.md#schema).
+
+### `unresolved_calls_residual`
+
+`meta` key (`meta.unresolved_calls_residual`) — global `COUNT(*)` on `unresolved_calls` after each resolve pass; surfaced by the `call-resolution-stats` recipe.
 
 ---
 

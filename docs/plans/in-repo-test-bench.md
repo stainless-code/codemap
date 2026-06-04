@@ -53,7 +53,7 @@ fixtures/
 
 ### Phase 4 — Scale (optional, replaces Tier B′)
 
-- [ ] If `minimal/` exceeds ~50 files, add `fixtures/bench/` as a **second committed corpus** with its own `scenarios.bench.json` — still in-repo, still CI
+- [ ] If `minimal/` outgrows a single corpus, add `fixtures/bench/` as a **second committed corpus** with its own `scenarios.bench.json` — still in-repo, still CI
 - [ ] Or: rename `minimal` → `bench` in a breaking release with path alias `fixtures/minimal` → symlink
 
 ## Non-goals
