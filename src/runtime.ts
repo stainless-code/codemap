@@ -55,6 +55,10 @@ export function getBoundaryRules(): ResolvedCodemapConfig["boundaries"] {
   return getCodemapConfig().boundaries;
 }
 
+export function getHeuristicCallsEnabled(): boolean {
+  return getCodemapConfig().synthesis.heuristicCalls;
+}
+
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
   const set = getExcludeDirNames();

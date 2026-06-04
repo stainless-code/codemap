@@ -52,6 +52,7 @@ import { resolveImports, resolveModuleSpecifier } from "../resolver";
 import {
   getExcludeDirNames,
   getFts5Enabled,
+  getHeuristicCallsEnabled,
   getIncludePatterns,
   getProjectRoot,
   getStateDir,
@@ -65,6 +66,7 @@ import {
   resolveBindings,
 } from "./bindings-engine";
 import { resolveCalls } from "./call-resolver";
+import { synthesizeCallbackCalls } from "./callback-synthesis";
 import { persistModuleCycles } from "./cycles-engine";
 import { appendIndexError } from "./error-log";
 import { persistFileBarrelFlags } from "./file-graph-flags";
@@ -615,6 +617,13 @@ export async function indexFiles(
       : undefined;
   if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
     resolveCalls(
+      db,
+      callResolveScope ? { filePaths: callResolveScope } : undefined,
+    );
+  }
+
+  if (getHeuristicCallsEnabled()) {
+    synthesizeCallbackCalls(
       db,
       callResolveScope ? { filePaths: callResolveScope } : undefined,
     );

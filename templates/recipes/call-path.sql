@@ -26,6 +26,7 @@ call_paths(hop, current, visited, edges) AS (
   FROM calls c
   CROSS JOIN params p
   WHERE c.caller_name = p."from"
+    AND (c.provenance IS NULL OR c.provenance = 'ast')
     AND (p.via_mode = 'calls' OR p.via_mode = 'all')
   UNION ALL
   SELECT
@@ -53,7 +54,8 @@ call_paths(hop, current, visited, edges) AS (
   FROM calls c
   JOIN call_paths cp ON c.caller_name = cp.current
   CROSS JOIN params p
-  WHERE cp.hop < p.max_depth
+  WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+    AND cp.hop < p.max_depth
     AND cp.current != p."to"
     AND (p.via_mode = 'calls' OR p.via_mode = 'all')
     AND instr(cp.visited, char(30) || c.callee_name || char(30)) = 0

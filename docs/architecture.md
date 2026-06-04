@@ -261,6 +261,7 @@ All base tables use `STRICT` mode; **`source_fts`** is an FTS5 virtual table (no
 | is_optional_chain      | INTEGER    | 1 when the call uses optional chaining (`?.`)                                                                                                                   |
 | callee_symbol_id       | INTEGER FK | Resolved callee in `symbols` (NULL when unresolved / external global)                                                                                           |
 | callee_resolution_kind | TEXT       | `same-file`, `imported`, `re-exported`, `global`, or `unresolved` — set by `resolveCalls` after bindings; NULL on method calls (`is_method_call = 1`, deferred) |
+| provenance             | TEXT       | `ast` (parse), `heuristic` (callback-synthesis), or NULL (legacy ast-era rows). Default recipes filter `NULL`/`ast` only                                        |
 
 Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `foo` calls `bar` three times in the same file, only one row is stored. `foo()` and `new Foo()` with the same callee name remain distinct rows. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 

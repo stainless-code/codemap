@@ -25,7 +25,7 @@ actions:
 
 # call-path
 
-Shortest path between two symbols via a cycle-safe recursive walk on `calls`, with optional file-import fallback.
+Shortest path between two symbols via a cycle-safe recursive walk on `calls`, with optional file-import fallback. Excludes `provenance = 'heuristic'` rows (use `calls-including-heuristic` to inspect synthesized edges).
 
 **`via` modes:**
 
