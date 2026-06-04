@@ -143,6 +143,18 @@ describe("resolveCodemapConfig", () => {
     ]);
   });
 
+  it("defaults synthesis.heuristicCalls to false", () => {
+    const r = resolveCodemapConfig(dir, undefined);
+    expect(r.synthesis.heuristicCalls).toBe(false);
+  });
+
+  it("enables synthesis.heuristicCalls when config sets true", () => {
+    const r = resolveCodemapConfig(dir, {
+      synthesis: { heuristicCalls: true },
+    });
+    expect(r.synthesis.heuristicCalls).toBe(true);
+  });
+
   it("rejects unknown action values", () => {
     expect(() =>
       resolveCodemapConfig(dir, {

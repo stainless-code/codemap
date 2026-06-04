@@ -68,7 +68,8 @@
       "goldenScenarios": [
         "call-resolution-stats",
         "unresolved-call-sites",
-        "calls-method-ping-unresolved"
+        "calls-method-ping-unresolved",
+        "calls-including-heuristic"
       ],
       "knownGaps": [
         "method-call callee_symbol_id deferred until namespace/member resolve"

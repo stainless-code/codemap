@@ -296,7 +296,8 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
              walk.path || c.${joinToCol} || char(30), c.file_path
       FROM calls c
       JOIN walk ON c.${joinFromCol} = walk.node
-      WHERE walk.depth < ?
+      WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+        AND walk.depth < ?
         AND instr(walk.path, char(30) || c.${joinToCol} || char(30)) = 0
     )
     SELECT node, depth, file_path

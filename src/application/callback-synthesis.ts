@@ -1,14 +1,12 @@
 /**
- * Post-index heuristic call edges (EventEmitter, JSX composition, setState→render).
- * Tagged `provenance = 'heuristic'` so Moat-A recipes exclude them by default.
+ * Post-index heuristic call edges (v1: JSX parent→child composition).
+ * Tagged `provenance = 'heuristic'` so Moat-A surfaces exclude them by default.
  */
-import { deleteHeuristicCalls, insertCalls } from "../db";
+import { CALLS_AST_ONLY_SQL, deleteHeuristicCalls, insertCalls } from "../db";
 import type { CallRow, CodemapDatabase } from "../db";
 
 /** Cap synthetic edges per file to limit false-positive fan-out. */
 const MAX_HEURISTIC_EDGES_PER_FILE = 32;
-
-const AST_CALL_FILTER = "(provenance IS NULL OR provenance = 'ast')";
 
 interface JsxEdgeRow {
   file_path: string;
@@ -83,6 +81,7 @@ function dedupeJsxEdges(
   db: CodemapDatabase,
 ): { insert: CallRow[]; skippedDuplicate: number } {
   const perFile = new Map<string, number>();
+  const seen = new Set<string>();
   const insert: CallRow[] = [];
   let skippedDuplicate = 0;
 
@@ -91,20 +90,14 @@ function dedupeJsxEdges(
     if (count >= MAX_HEURISTIC_EDGES_PER_FILE) continue;
 
     const edgeKey = `${row.file_path}\0${row.caller_scope}\0${row.callee_name}`;
-    if (
-      insert.some(
-        (c) =>
-          `${c.file_path}\0${c.caller_scope}\0${c.callee_name}` === edgeKey,
-      )
-    ) {
-      continue;
-    }
+    if (seen.has(edgeKey)) continue;
 
     if (astCallExists(db, row)) {
       skippedDuplicate++;
       continue;
     }
 
+    seen.add(edgeKey);
     insert.push({
       file_path: row.file_path,
       caller_name: row.caller_name,
@@ -129,7 +122,7 @@ function astCallExists(db: CodemapDatabase, row: JsxEdgeRow): boolean {
     .query<{ n: number }>(
       `SELECT 1 AS n FROM calls
        WHERE file_path = ? AND caller_scope = ? AND callee_name = ?
-         AND ${AST_CALL_FILTER}
+         AND ${CALLS_AST_ONLY_SQL}
        LIMIT 1`,
     )
     .get(row.file_path, row.caller_scope, row.callee_name);

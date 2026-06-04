@@ -106,7 +106,7 @@ export const codemapUserConfigSchema = z
           .boolean()
           .optional()
           .describe(
-            "Post-index heuristic `calls` edges (JSX composition, EventEmitter, setState→render). Default `false` — AST `calls` row counts unchanged until enabled.",
+            "Post-index heuristic `calls` edges (v1: JSX parent→child). Default `false` — AST `calls` row counts unchanged until enabled.",
           ),
       })
       .strict()

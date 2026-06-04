@@ -34,6 +34,7 @@ import {
   insertCssKeyframes,
   insertTypeMembers,
   insertTypeHeritage,
+  deleteHeuristicCalls,
   insertCalls,
   insertDynamicImports,
   insertAsyncCalls,
@@ -616,17 +617,18 @@ export async function indexFiles(
       ? expandHeritageResolveScope(db, heritageScopePaths)
       : undefined;
   if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
+    const callScopePaths = callResolveScope ? callResolveScope : undefined;
+    deleteHeuristicCalls(db, callScopePaths);
     resolveCalls(
       db,
-      callResolveScope ? { filePaths: callResolveScope } : undefined,
+      callScopePaths ? { filePaths: callScopePaths } : undefined,
     );
-  }
-
-  if (getHeuristicCallsEnabled()) {
-    synthesizeCallbackCalls(
-      db,
-      callResolveScope ? { filePaths: callResolveScope } : undefined,
-    );
+    if (getHeuristicCallsEnabled()) {
+      synthesizeCallbackCalls(
+        db,
+        callScopePaths ? { filePaths: callScopePaths } : undefined,
+      );
+    }
   }
 
   const elapsed = Math.round(performance.now() - startTime);

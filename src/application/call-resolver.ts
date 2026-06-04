@@ -4,6 +4,7 @@
  */
 
 import type { BindingRow, CodemapDatabase, UnresolvedCallRow } from "../db";
+import { CALLS_AST_ONLY_SQL } from "../db";
 import {
   clearAllCallResolutions,
   clearCallResolutionsForFiles,
@@ -121,12 +122,11 @@ export function resolveCalls(
   const ctx = loadBindingIndexContext(db);
   const createdAt = new Date().toISOString();
 
-  let sql =
-    "SELECT id, file_path, caller_scope, callee_name, line_start, column_start, is_method_call FROM calls";
+  let sql = `SELECT id, file_path, caller_scope, callee_name, line_start, column_start, is_method_call FROM calls WHERE ${CALLS_AST_ONLY_SQL}`;
   const params: string[] = [];
   if (filePaths?.length) {
     const placeholders = filePaths.map(() => "?").join(",");
-    sql += ` WHERE file_path IN (${placeholders})`;
+    sql += ` AND file_path IN (${placeholders})`;
     params.push(...filePaths);
   }
   const calls = db.query<CallRowDb>(sql).all(...params);

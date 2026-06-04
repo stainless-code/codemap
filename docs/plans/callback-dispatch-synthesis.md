@@ -35,18 +35,19 @@ Cap fan-out per file to limit false positives.
 
 1. SCHEMA_VERSION bump — `ALTER`/rebuild adds `calls.provenance`
 2. **`src/application/callback-synthesis.ts`** — scan files (or use jsx_elements table); insert synthetic `calls` rows
-3. Run from `run-index.ts` finally block (after bindings)
+3. Run from `index-engine.ts` after `deleteHeuristicCalls` + `resolveCalls` (when `synthesis.heuristicCalls` is true)
 4. Recipe: `calls-including-heuristic`, update `call-path` docs
 5. Tests — fixture with EventEmitter + JSX; assert provenance tags
 6. Document limits in skill + MCP instructions
 
 ---
 
-## Acceptance
+## Acceptance (tracer in #164)
 
-- [ ] Heuristic edges visible with `provenance='heuristic'`
-- [ ] Default call-path recipe excludes heuristics unless param set
-- [ ] No change to existing ast call row counts when synthesis disabled via config flag
+- [x] `calls.provenance` + SCHEMA 37; heuristic edges tagged when synthesis enabled
+- [x] Moat-A surfaces exclude heuristics; opt-in `calls-including-heuristic` recipe
+- [x] Synthesis off by default; stale heuristic rows purged on each resolve scope
+- [ ] EventEmitter / setState heuristics; minimal golden with synthesis on; skill/MCP notes
 
 ---
 

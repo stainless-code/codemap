@@ -10,14 +10,16 @@ call_walk(sym, depth, path) AS (
   FROM calls c
   JOIN call_walk cw ON c.caller_name = cw.sym
   CROSS JOIN params p
-  WHERE cw.depth < p.max_depth
+  WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+    AND cw.depth < p.max_depth
     AND instr(cw.path, char(30) || c.callee_name || char(30)) = 0
   UNION ALL
   SELECT c.caller_name, cw.depth + 1, cw.path || c.caller_name || char(30)
   FROM calls c
   JOIN call_walk cw ON c.callee_name = cw.sym
   CROSS JOIN params p
-  WHERE cw.depth < p.max_depth
+  WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+    AND cw.depth < p.max_depth
     AND instr(cw.path, char(30) || c.caller_name || char(30)) = 0
 ),
 call_neighbors AS (
@@ -29,7 +31,8 @@ call_neighbors AS (
         SELECT 1
         FROM calls c
         CROSS JOIN params p
-        WHERE c.caller_name = p.name
+        WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+          AND c.caller_name = p.name
           AND c.callee_name = cw.sym
           AND cw.depth = 1
       ) THEN 'callee'
@@ -37,7 +40,8 @@ call_neighbors AS (
         SELECT 1
         FROM calls c
         CROSS JOIN params p
-        WHERE c.callee_name = p.name
+        WHERE (c.provenance IS NULL OR c.provenance = 'ast')
+          AND c.callee_name = p.name
           AND c.caller_name = cw.sym
           AND cw.depth = 1
       ) THEN 'caller'

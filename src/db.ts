@@ -5,6 +5,9 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
  *  See `docs/architecture.md` § Schema Versioning. */
 export const SCHEMA_VERSION = 37;
 
+/** Moat-A: default call-graph surfaces exclude callback-synthesis edges. */
+export const CALLS_AST_ONLY_SQL = "(provenance IS NULL OR provenance = 'ast')";
+
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
  * current resolved config triggers a forced `--full` rebuild

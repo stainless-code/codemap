@@ -2,4 +2,5 @@ SELECT file_path, caller_name, caller_scope, line_start, column_start, column_en
        args_count, is_method_call, is_constructor_call, is_optional_chain
 FROM calls
 WHERE callee_name = ?
+  AND (provenance IS NULL OR provenance = 'ast')
 ORDER BY file_path, line_start, column_start;
