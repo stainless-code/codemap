@@ -931,7 +931,7 @@ describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
     });
     const apply = actions?.find((a) => a.type === "apply-rename-preview");
     expect(apply?.command).toBe(
-      "codemap apply rename-preview --params old=Foo,new=NEW --dry-run",
+      "codemap apply rename-preview --params old=Foo,new=NEW,define_in=src/a.ts --dry-run",
     );
   });
 
