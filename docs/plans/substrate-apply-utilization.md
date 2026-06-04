@@ -1,8 +1,6 @@
 # Substrate & apply utilization — gap diagnosis + doc/execution plan
 
-> **Status:** open — **Hygiene slice shipped** (`8d00ba8` on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165)): marker recipe fix, partial Phase A/B, utilization plan added. **Open:** full Phase A (architecture + glossary), Phase B remainder, Phase C wave-2 recipes. Synthesizes 2026-06 apply/substrate exploration (14 parallel codebase audits). **Does not** replace [`apply-engine-direction.md`](./apply-engine-direction.md) (executor shipped) or [`substrate-extraction.md`](./substrate-extraction.md) (tiers 7–13 open).
->
-> **Motivator:** Steps 2–12 of the apply-engine landed, but agents and humans still experience codemap as “query + one rename recipe.” This plan answers whether we are using **indexed substrate** and **apply** to their designed capacity, and sequences remaining **documentation** + **recipe/test** work without violating [Moat A](../roadmap.md#moats-load-bearing) / [Moat B](../roadmap.md#moats-load-bearing).
+> **Status:** open — **Phase A (docs) shipped** on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165): `architecture.md` apply section, `glossary.md`, README apply examples, agent discover→apply workflow, `apply-engine-direction.md` closed (lifted here). **Hygiene slice** (`8d00ba8`): marker recipe fix, partial Phase B, MCP 18-tool sync. **Open:** Phase B remainder (testing map, `--rows` tests), Phase C wave-2 recipes, Phase D (MCP fixpoint). Synthesizes 2026-06 apply/substrate exploration. Substrate tiers 7–13: [`substrate-extraction.md`](./substrate-extraction.md).
 
 ---
 
@@ -10,13 +8,13 @@
 
 | Layer                     | Using full capability? | One-line why                                                                                                                                                                                                                           |
 | ------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Substrate (tiers 1–6)** | **Partially**          | Rich tables exist (`references`, `bindings`, `jsx_*`, `import_specifiers`, `jsdoc_tags`, …) but **only a thin slice** is JOIN’d by shipped diff-shape recipes. Tiers **7–13** are intentionally unshipped — not a utilization failure. |
+| **Substrate (tiers 1–6)** | **Partially**          | Rich tables exist (`references`, `bindings`, `jsx_*`, `import_specifiers`, `jsdoc_tags`, …) but **only a thin slice** is JOIN'd by shipped diff-shape recipes. Tiers **7–13** are intentionally unshipped — not a utilization failure. |
 | **Apply executor**        | **Mostly yes**         | Phase-1/2 engine, three CLI input modes, MCP `apply` + `apply_rows`, policy gates, fixpoint loop — **shipped and engine-heavy in tests**.                                                                                              |
 | **Apply recipes**         | **No**                 | **4 of 62** bundled SQL recipes emit the diff row contract; **3** are `auto_fixable: true`. The product bottleneck is **recipe surface**, not executor plumbing.                                                                       |
-| **Agent/consumer docs**   | **Partially**          | Hygiene: 18-tool count, `apply_rows` in skill/MCP instructions, synthesis shipped blurb, config example. **Still thin:** README lacks dedicated apply subsection; `architecture.md` / `glossary.md` apply sections incomplete.         |
+| **Agent/consumer docs**   | **Mostly yes**         | Architecture + glossary + README apply subsection + skill/MCP apply workflow. Wave-2 recipe catalog still thin until Phase C.                                                                                                          |
 | **Verification**          | **Partially**          | Goldens still query-only (by design). CLI E2E: `rename-preview` + `migrate-import-source` dry-run; allowlist unit tests. **Open:** `--rows`, `--diff-input`, disk apply for non-rename recipes.                                        |
 
-**Conclusion:** We built a **general substrate-shaped apply platform** and indexed a **broad AST→SQLite graph**, but we **under-utilize both** on the user-visible path: recipes don’t read most substrate; maintainer docs still lag code in places. **Next:** wave-2 recipes (Phase C) + finish Phase A.1–A.2 + Phase B — not another apply-engine step.
+**Conclusion:** Executor + maintainer docs are aligned. **Next:** wave-2 recipes (Phase C) + Phase B tests — not another apply-engine step.
 
 ---
 
@@ -34,6 +32,23 @@
 | 8   | `assertApplyAllowlist` unit tests                                                            |
 | 9   | `mcp-instructions.md` + `10-recipes-context.md` — `apply_rows`, `force`, `command`, 18 tools |
 | 10  | `roadmap.md` — link to this plan                                                             |
+
+---
+
+## Phase A docs shipped (2026-06)
+
+| Step | Action                                                                                             | Status |
+| ---- | -------------------------------------------------------------------------------------------------- | ------ |
+| A.1  | **`architecture.md` § Apply** — input modes, transport matrix, policy, fixpoint, non-goals anchor. | **✓**  |
+| A.2  | **`glossary.md`** — `codemap apply`, `apply_rows`, flags, allowlist, `passes` / `terminated_by`.   | **✓**  |
+| A.3  | **README § CLI** — apply subsection (three modes + bundled recipe ids + MCP tools).                | **✓**  |
+| A.4  | **`templates/agent-content`** — discover→dry_run→apply workflow in skill + MCP chains.             | **✓**  |
+| A.5  | **`rename-preview.md`** coverage vs SQL.                                                           | **✓**  |
+| A.6  | **Synthesis** — Steps 2–12 shipped; §4.4/4.5 tables.                                               | **✓**  |
+| A.7  | **`codemap.config.example.json`** — `apply.autoApplyRecipes`.                                      | **✓**  |
+| A.8  | **Close `apply-engine-direction.md`** — rejected table + moats lifted below; plan deleted.         | **✓**  |
+
+Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy), [`glossary.md § codemap apply`](../glossary.md#codemap-apply--apply-tool).
 
 ---
 
@@ -58,61 +73,43 @@
 | `jsdoc_tags`                               | Yes (partial tier 4/5) | **No** (`add-jsdoc` is text template, not tag-aware)         | `find-throws-jsdoc`                                   |
 | Tiers **7–13**                             | Open                   | N/A                                                          | Future recipes                                        |
 
-**Verdict:** Substrate is **over-built relative to apply recipes** (good for Moat B) but **under-exposed** on the write path. Read path uses more tables; write path uses **four narrow JOIN patterns**.
+**Verdict:** Substrate is **over-built relative to apply recipes** (good for Moat B) but **under-exposed** on the write path.
 
 ### Apply
 
-**Designed capacity** ([`apply-engine-direction.md`](./apply-engine-direction.md), [`glossary.md`](../glossary.md)): recipe / rows / diff-input → validate → write; optional fixpoint + commit; `actions[].command`; `auto_fixable` + allowlist; MCP subset.
+**Designed capacity** ([`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy), [`glossary.md`](../glossary.md)): recipe / rows / diff-input → validate → write; optional fixpoint + commit; `actions[].command`; `auto_fixable` + allowlist; MCP subset.
 
 **Actual utilization:**
 
-| Capability                          | Code     | Docs                                                    | Recipes          | Tests                                                        |
-| ----------------------------------- | -------- | ------------------------------------------------------- | ---------------- | ------------------------------------------------------------ |
-| `applyDiffPayload`                  | Shipped  | Partial (`glossary` strong; `architecture` recipe-only) | 4 diff ids       | **Strong** (`apply-engine.test.ts`)                          |
-| Recipe apply                        | Shipped  | README rename examples only                             | 4 ids            | **Partial** (`rename-preview` + `migrate-import-source` CLI) |
-| `--rows` / `apply_rows`             | Shipped  | Skill/MCP instructions ✓; README apply subsection ✗     | Agent loop       | **None**                                                     |
-| `--diff-input`                      | Shipped  | CLI help + skill mention ✓; architecture ✗              | External diffs   | Parser unit only                                             |
-| `--until-empty`                     | CLI only | Plan/roadmap                                            | Fixpoint         | **None**                                                     |
-| `--commit`                          | CLI only | Plan/roadmap                                            | One-shot git     | **None**                                                     |
-| `actions[].command`                 | Shipped  | Skill ✓ (4 recipes); rendered on `--json` query rows    | 4 templates      | Template unit only                                           |
-| Policy (allowlist + `auto_fixable`) | Shipped  | Example config ✓; glossary apply expansion ✗            | 3 auto + 1 force | auto_fixable + allowlist unit tests                          |
+| Capability                          | Code     | Docs                        | Recipes          | Tests                                                        |
+| ----------------------------------- | -------- | --------------------------- | ---------------- | ------------------------------------------------------------ |
+| `applyDiffPayload`                  | Shipped  | Architecture + glossary ✓   | 4 diff ids       | **Strong** (`apply-engine.test.ts`)                          |
+| Recipe apply                        | Shipped  | README + skill ✓            | 4 ids            | **Partial** (`rename-preview` + `migrate-import-source` CLI) |
+| `--rows` / `apply_rows`             | Shipped  | Glossary + skill ✓          | Agent loop       | **None**                                                     |
+| `--diff-input`                      | Shipped  | Architecture + glossary ✓   | External diffs   | Parser unit only                                             |
+| `--until-empty`                     | CLI only | Architecture + glossary ✓   | Fixpoint         | **None**                                                     |
+| `--commit`                          | CLI only | Architecture + glossary ✓   | One-shot git     | **None**                                                     |
+| `actions[].command`                 | Shipped  | Skill ✓                     | 4 templates      | Template unit only                                           |
+| Policy (allowlist + `auto_fixable`) | Shipped  | Example config + glossary ✓ | 3 auto + 1 force | auto_fixable + allowlist unit tests                          |
 
-**Verdict:** Apply **executor ≈ 85% utilized**; **recipe catalog ≈ 6% of SQL files apply-shaped**; **agent docs ≈ 55–60%** after hygiene (was ~40%).
+**Verdict:** Apply **executor ≈ 85% utilized**; **recipe catalog ≈ 6% of SQL files apply-shaped**; **agent docs ≈ 75%** after Phase A.
 
 ---
 
 ## Open work (gap matrix)
 
-| Gap                                                                                      | Type           | Track here            |
-| ---------------------------------------------------------------------------------------- | -------------- | --------------------- |
-| Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, `migrate-deprecated`, …) | Implementation | § Phase C             |
-| `rename-app-wide` (JOIN `references`/`bindings`)                                         | Implementation | Phase C.5             |
-| Barrel-consumer import rename                                                            | Recipe design  | Phase C.5             |
-| **`architecture.md` + `glossary.md` apply depth**                                        | Documentation  | § Phase A.1–A.2       |
-| README dedicated apply subsection                                                        | Documentation  | § Phase A.3 (partial) |
-| Close `apply-engine-direction.md`                                                        | Lifecycle      | § Phase A.8           |
-| `testing-coverage.md` apply map; `--rows` / disk apply tests                             | Testing        | § Phase B             |
-| MCP `until_empty`                                                                        | Deferred       | § Phase D             |
-| Substrate tiers 7–13                                                                     | Separate plan  | substrate-extraction  |
+| Gap                                                                                      | Type           | Track here           |
+| ---------------------------------------------------------------------------------------- | -------------- | -------------------- |
+| Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, `migrate-deprecated`, …) | Implementation | § Phase C            |
+| `rename-app-wide` (JOIN `references`/`bindings`)                                         | Implementation | Phase C.5            |
+| Barrel-consumer import rename                                                            | Recipe design  | Phase C.5            |
+| `testing-coverage.md` apply map; `--rows` / disk apply tests                             | Testing        | § Phase B            |
+| MCP `until_empty` / `--diff-input` / `--commit`                                          | Deferred       | § Phase D            |
+| Substrate tiers 7–13                                                                     | Separate plan  | substrate-extraction |
 
 ---
 
 ## Execution phases
-
-### Phase A — Truth sync (maintainer + consumer)
-
-| Step | Action                                                                                                                            | Status                                                       |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| A.1  | **Expand `architecture.md` § Apply wiring** — three input modes, transport matrix, policy, fixpoint envelope, non-goals.          | **Open**                                                     |
-| A.2  | **Expand `glossary.md` § `codemap apply`** — rows, diff-input, until-empty, commit, force, allowlist, `passes` / `terminated_by`. | **Open**                                                     |
-| A.3  | **README § CLI** — dedicated apply subsection (three modes + recipe catalog); 18 tools ✓ already.                                 | **Partial** — tool count only                                |
-| A.4  | **`templates/agent-content`** — apply + apply_rows, command, auto_fixable, force.                                                 | **Partial** — no full discover→dry_run→apply narrative block |
-| A.5  | **`rename-preview.md`** coverage vs SQL.                                                                                          | **✓ Shipped**                                                |
-| A.6  | **Synthesis** — Steps 2–12 shipped; §4.4/4.5 tables.                                                                              | **✓ Shipped** (delete vs stub: grill Q4 still open)          |
-| A.7  | **`codemap.config.example.json`** — `apply.autoApplyRecipes`.                                                                     | **✓ Shipped**                                                |
-| A.8  | **Close `apply-engine-direction.md`** — lift rejected + moats here; delete plan file.                                             | **Open**                                                     |
-
-**Phase A exit criteria (remaining):** `architecture.md` + `glossary.md` describe all CLI/MCP apply paths; A.8 complete; README apply subsection optional but recommended.
 
 ### Phase B — Verification (maintainer)
 
@@ -123,7 +120,7 @@
 | B.3  | **`replace-marker-kind` golden**                                                           | **✓ Shipped**                               |
 | B.4  | **`rename-preview` golden with `re_export`**                                               | **Open**                                    |
 
-**Phase B exit criteria (remaining):** all three CLI input modes tested at least once; B.1 doc map exists.
+**Phase B exit criteria:** all three CLI input modes tested at least once; B.1 doc map exists.
 
 ### Phase C — Recipe utilization (post-doc)
 
@@ -148,7 +145,7 @@
 
 ---
 
-## Preserved constraints (lifted from apply-engine-direction)
+## Preserved constraints (apply path)
 
 Do not erode during utilization work:
 
@@ -159,13 +156,32 @@ Do not erode during utilization work:
 - **No telemetry upload** for reliability loops.
 - **Recipe-only policy** does not apply to `--rows` / `apply_rows` (separate trust boundary).
 
-Rejected alternatives with revisit triggers: see [`apply-engine-direction.md` § Rejected](./apply-engine-direction.md#rejected-items-grep-able-revisit-only-on-trigger) until A.8 deletes that file — then grep this heading anchor.
+The "no fix engine" floor was about **product class** (no ESLint-style verdict engine), not forbidding a **substrate-shaped** apply executor.
+
+---
+
+## Rejected items (grep-able; revisit only on trigger)
+
+| Item                                              | Why rejected                                           | Revisit when                                                               |
+| ------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Curated CLI write verbs (`codemap rename`, …)     | Moat A — premature verb sprawl                         | ≥3 diff-shape recipes + clear agent-host demand beyond `actions[].command` |
+| Parallel AST apply engine (Path A)                | Competes with ts-morph/jscodeshift; maintenance burden | ≥2 external teams hit substring wall + concrete AST-shape demand           |
+| Trust tiers (`safe`/`review`/`risky`)             | Taxonomy debt; `auto_fixable` + allowlist suffice      | Allowlist insufficient + ≥2 consumers ship trust filters in CI             |
+| Per-row confidence scores                         | No consensus on computation                            | Recipe needs per-site ranking when `before_pattern` is ambiguous           |
+| Verifier as product surface (typecheck/lint gate) | Consumer CI owns orchestration                         | Consumer plan with concrete examples                                       |
+| Reliability loop telemetry                        | No upload floor                                        | Self-hosted observability request                                          |
+| `--branch` / `--output-patch` flags               | `--commit` priority                                    | `--commit` insufficient in practice                                        |
+| Multi-line kind-tagged row contract               | After single-line path stable                          | Multi-line edits required and workarounds fail                             |
+| Cross-file moves in one apply                     | Higher risk                                            | Alternative two-step ops insufficient                                      |
+| Cross-file atomic apply (50+ files)               | Per-file atomicity sufficient today                    | Real 50+ file apply + partial failure leak                                 |
+
+Full trigger wording: [`research/codemap-richer-index-synthesis-2026-05.md` § 7](../research/codemap-richer-index-synthesis-2026-05.md#7-rejected-items-with-trigger-conditions).
 
 ---
 
 ## Roadmap linkage
 
-**Shipped:** [`roadmap.md`](../roadmap.md) apply-engine [x] links here for follow-on work. Do not duplicate wave-2 items in roadmap until this plan closes or slim to recipe queue only.
+**Shipped:** [`roadmap.md`](../roadmap.md) apply-engine [x] links here for wave-2 + tests. Do not duplicate Phase C items in roadmap until this plan closes or slim to recipe queue only.
 
 ---
 
@@ -177,21 +193,21 @@ Rejected alternatives with revisit triggers: see [`apply-engine-direction.md` §
 | 2   | `replace-marker-kind`: SQL vs indexer?                    | **✓ SQL fix** (drop `content LIKE`)       |
 | 3   | `add-jsdoc-deprecated`: flip `auto_fixable`?              | **Open** — still `false` + `--force`      |
 | 4   | Synthesis: delete vs superseded stub?                     | **Open**                                  |
-| 5   | Phase A before C mandatory?                               | **Open** — hygiene did partial A parallel |
+| 5   | Phase A before C mandatory?                               | **✓** — Phase A closed                    |
 | 6   | `rename-app-wide`: new id vs `rename-preview` params?     | **Open**                                  |
 | 7   | MCP fixpoint: ship vs shell loop docs?                    | **Open** — defer Phase D unless demand    |
-| 8   | Capability map: research doc vs architecture § Apply?     | **Open**                                  |
+| 8   | Capability map: research doc vs architecture § Apply?     | **✓** — architecture § Apply is canonical |
 
 ---
 
 ## Success metrics (qualitative)
 
-| Metric                                                          | Status                                      |
-| --------------------------------------------------------------- | ------------------------------------------- |
-| Contributor answers “how do I apply hunks?” from README + skill | **Partial** — skill OK; README thin         |
-| Every diff-shape recipe non-empty golden or documented          | **✓** — all four have rows                  |
-| Audit → apply pair documented end-to-end                        | **Open**                                    |
-| No stale “not shipped” / “17 tools” on consumer surfaces        | **✓** for those greps; architecture pending |
+| Metric                                                          | Status                          |
+| --------------------------------------------------------------- | ------------------------------- |
+| Contributor answers “how do I apply hunks?” from README + skill | **✓**                           |
+| Every diff-shape recipe non-empty golden or documented          | **✓** — all four have rows      |
+| Audit → apply pair documented end-to-end                        | **✓** — skill + MCP apply chain |
+| No stale “not shipped” / “17 tools” on consumer surfaces        | **✓**                           |
 
 ---
 
@@ -199,16 +215,15 @@ Rejected alternatives with revisit triggers: see [`apply-engine-direction.md` §
 
 | Doc                                                                                                  | Role                                       |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| [`apply-engine-direction.md`](./apply-engine-direction.md)                                           | Executor checklist — close via A.8         |
+| [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)              | Transport matrix + policy (canonical)      |
 | [`substrate-extraction.md`](./substrate-extraction.md)                                               | Tiers 1–6 shipped, 7–13 open               |
 | [`codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) | Wave-2 inventory — hygiene synced §4.4/4.5 |
 | [`golden-queries.md`](../golden-queries.md)                                                          | Golden policy for apply row scenarios      |
-| [`consumer-surfaces`](../../.agents/rules/consumer-surfaces.md)                                      | Phase A.3–A.4 discipline                   |
+| [`consumer-surfaces`](../../.agents/rules/consumer-surfaces.md)                                      | Agent-content discipline                   |
 
 ---
 
 ## Lifecycle
 
-- **While open:** Queue for Phase A remainder, B remainder, C wave-2.
-- **When Phases A+B complete:** Lift transport matrix + moats into `architecture.md`; slim or delete this file if C still open.
-- **When Phases A–C complete:** Delete plan; wave-2 remainder in `roadmap.md` Backlog only.
+- **While open:** Queue for Phase B remainder + Phase C wave-2.
+- **When Phases B+C complete:** Delete plan; wave-2 remainder in `roadmap.md` Backlog only.

@@ -54,6 +54,15 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 - **`apply`** — `{recipe, params?, dry_run?, yes?, force?}`. Executes diff hunks from recipe SQL (`{file_path, line_start, before_pattern, after_pattern}`). Writes require `yes: true`; recipes without `auto_fixable: true` need `force: true` unless config allowlist covers them. **All-or-nothing** on conflicts. `dry_run` and `yes` are mutually exclusive.
 - **`apply_rows`** — `{rows, dry_run?, yes?}`. Same executor with caller-supplied rows (no recipe policy gates). CLI twin: `codemap apply --rows -|<file.json>`. Unified diffs: CLI `codemap apply --diff-input <file>` only.
 
+**Apply workflow (discover → preview → apply):**
+
+1. **Discover** — `query_recipe` / `query --recipe <id> --format diff-json` (or audit `added` rows from a baseline diff). Bundled diff-shape ids: `rename-preview`, `migrate-import-source`, `replace-marker-kind`, `add-jsdoc-deprecated`. Inspect `actions[].command` on `--json` rows for a rendered shell one-liner.
+2. **Preview** — `apply` with `dry_run: true` (or CLI `--dry-run`) — same conflict envelope as writes; zero disk mutation.
+3. **Apply** — `apply` with `yes: true` (+ `force: true` when frontmatter has `auto_fixable: false` and allowlist does not cover the id). Re-index (`codemap` / watcher) before a second pass if hunks may have shifted.
+4. **Agent rows** — when you already have hunks (codemod output), skip recipe policy: `apply_rows` or `codemap apply --rows - --yes`.
+
+CLI-only extras: `--until-empty` (fixpoint: apply → reindex touched files → repeat; envelope `passes` / `terminated_by`), `--commit "<msg>"` after clean apply.
+
 **Affected tests:** **`codemap affected`** (CLI) for CI/shell (`stdin`, `--changed-since`). **`affected`** MCP/HTTP tool or **`query_recipe`** with `recipe: "affected-tests"` for agents. Path sources on CLI: positional → `--stdin` → `--changed-since` → default `HEAD`. On MCP/HTTP: `paths` array → else `changed_since` / `HEAD`. Example:
 
 ```bash

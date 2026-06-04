@@ -1,6 +1,6 @@
 # Codemap richer-index — consolidated triangulation across 5 model perspectives — 2026-05
 
-> **Status:** Open research archive — **canonical open work** for apply-engine steps lives in [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md); substrate tiers in [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). This note retains consensus / disagreement matrices and per-source argumentation until all synthesis steps close.
+> **Status:** Open research archive — **canonical open work** for apply follow-on (wave-2 recipes, tests) lives in [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md); apply executor in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); substrate tiers in [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). This note retains consensus / disagreement matrices and per-source argumentation until synthesis fully closes.
 >
 > **Purpose:** Triangulation record (five model perspectives, May 2026). Do not treat this file as the implementation checklist — use the plans above.
 >
@@ -10,7 +10,7 @@
 
 ## What shipped (fact-checked 2026-05-19) — appendix per § 9 lifecycle
 
-The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half lifted to [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md). **Live status = those plan headings**, not this note.
+The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half shipped — executor in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); wave-2 queue in [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md). **Live status = those homes**, not this note.
 
 **Shipped via the substrate plan:**
 
@@ -25,7 +25,7 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 
 **Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — shipped per [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md). Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, …) and doc/test gaps: [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md).
+- **§ 6 Steps 2–4, 6, 8–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, …) and test gaps: [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md).
 - **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `--commit`, `--until-empty`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). MCP fixpoint loop and multi-line row contract remain backlog.
 - **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
 
@@ -701,7 +701,7 @@ The "no fix engine" line was right about the **product class**; it was wrong abo
 
 Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance/SKILL.md#closing-research):
 
-- **Open implementation** → [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
+- **Open implementation** → [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
 - **When all 12 steps ship or close:** retire this note per [`docs/README.md` Rule 8](../README.md). Lift any remaining durable strategic claim into [`why-codemap.md`](../why-codemap.md) before deletion.
 - **When a deferred / rejected item triggers** (per § 7 trigger conditions): open a plan PR with this note as the rationale anchor; this synthesis is the disagreement record that justifies the trigger.
 - **Annual re-evaluation** — re-run the triangulation against the substrate / recipe count of the day; update verdicts with current data.
