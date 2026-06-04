@@ -8,15 +8,15 @@
 
 ## Harness layers
 
-| Layer                 | Command                             | What it proves                                                                                           |
-| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Unit**              | `bun test ./src`                    | Parsers, DB DDL, engines, CLI/MCP handlers in isolation (`:memory:` or mocks).                           |
-| **Golden (Tier A)**   | `bun run test:golden`               | Full index of `fixtures/minimal/` → SQL/recipe output vs `fixtures/golden/minimal/*.json`.               |
-| **Golden guard**      | `bun run test:scripts`              | `scripts/query-golden-coverage-matrix.test.mjs` — every bundled recipe + substrate table has a scenario. |
-| **Agent eval**        | `bun run test:agent-eval`           | Probe arms vs golden ids (MCP-on vs glob/read).                                                          |
-| **Integration (git)** | `src/application/run-index.test.ts` | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                     |
-| **CLI e2e**           | `cmd-cli-parity-e2e.test.ts`        | Spawned CLI against `fixtures/minimal`.                                                                  |
-| **Check**             | `bun run check`                     | build + lint + unit + scripts + golden + agent-eval.                                                     |
+| Layer                  | Command                             | What it proves                                                                                                          |
+| ---------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Unit**               | `bun test ./src`                    | Parsers, DB DDL, engines, CLI/MCP handlers in isolation (`:memory:` or mocks).                                          |
+| **In-repo test bench** | `bun run test:golden`               | Index `fixtures/minimal/` (bench corpus) → compare `fixtures/golden/minimal/*.json`. Map: `fixtures/CAPABILITIES.json`. |
+| **Golden guard**       | `bun run test:scripts`              | `scripts/query-golden-coverage-matrix.test.mjs` — every bundled recipe + substrate table has a scenario.                |
+| **Agent eval**         | `bun run test:agent-eval`           | Probe arms vs golden ids (MCP-on vs glob/read).                                                                         |
+| **Integration (git)**  | `src/application/run-index.test.ts` | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                                    |
+| **CLI e2e**            | `cmd-cli-parity-e2e.test.ts`        | Spawned CLI against `fixtures/minimal`.                                                                                 |
+| **Check**              | `bun run check`                     | build + lint + unit + scripts + golden + agent-eval.                                                                    |
 
 Refresh Tier A goldens after intentional fixture or schema changes:
 
@@ -65,7 +65,11 @@ Core graph tables (`files`, `symbols`, `imports`, …) are covered by many exist
 
 ---
 
-## Intentionally not in Tier A goldens
+## In-repo bench vs external trees
+
+Codemap development uses **only** the committed bench ([fixtures/README.md](../fixtures/README.md)). `bun run test:golden:external` is for consumers testing against private apps — not a maintainer requirement.
+
+## Intentionally not in bench goldens
 
 | Surface           | Why                  | Where tested                                                |
 | ----------------- | -------------------- | ----------------------------------------------------------- |

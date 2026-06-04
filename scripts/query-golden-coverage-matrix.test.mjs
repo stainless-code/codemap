@@ -7,6 +7,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const REPO_ROOT = join(import.meta.dir, "..");
+const CAPABILITIES_PATH = join(REPO_ROOT, "fixtures/CAPABILITIES.json");
 const SCENARIOS_PATH = join(REPO_ROOT, "fixtures/golden/scenarios.json");
 const RECIPES_DIR = join(REPO_ROOT, "templates/recipes");
 const GOLDEN_DIR = join(REPO_ROOT, "fixtures/golden/minimal");
@@ -77,5 +78,28 @@ describe("golden coverage matrix", () => {
     expect(scenario?.sql).toContain("FROM file_metrics");
     expect(scenario?.sql).toContain("FROM unresolved_calls");
     expect(scenario?.sql).toContain('FROM "references"');
+  });
+
+  it("fixtures/CAPABILITIES.json goldenScenarios exist in scenarios.json", () => {
+    const manifest = JSON.parse(readFileSync(CAPABILITIES_PATH, "utf-8"));
+    const missing = [];
+    for (const cap of manifest.capabilities ?? []) {
+      for (const id of cap.goldenScenarios ?? []) {
+        if (!scenarioIds.has(id)) missing.push(`${cap.id}:${id}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it("fixtures/CAPABILITIES.json fixtureFiles exist under corpus", () => {
+    const manifest = JSON.parse(readFileSync(CAPABILITIES_PATH, "utf-8"));
+    const root = join(REPO_ROOT, manifest.corpusRoot ?? "fixtures/minimal");
+    const missing = [];
+    for (const cap of manifest.capabilities ?? []) {
+      for (const rel of cap.fixtureFiles ?? []) {
+        if (!existsSync(join(root, rel))) missing.push(`${cap.id}:${rel}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });

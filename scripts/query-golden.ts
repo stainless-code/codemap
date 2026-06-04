@@ -16,7 +16,7 @@ function parseArgs(argv: string[]) {
   let update = false;
   let help = false;
   let strictBudget = false;
-  let corpus: "minimal" | "external" = "minimal";
+  let corpus: "minimal" | "bench" | "external" = "minimal";
   let root: string | undefined;
   let scenariosPath: string | undefined;
   let goldenDir: string | undefined;
@@ -27,10 +27,12 @@ function parseArgs(argv: string[]) {
     else if (a === "--strict-budget") strictBudget = true;
     else if (a === "--corpus" && argv[i + 1]) {
       const v = argv[++i];
-      if (v !== "minimal" && v !== "external") {
-        throw new Error(`--corpus must be minimal or external, got "${v}"`);
+      if (v !== "minimal" && v !== "bench" && v !== "external") {
+        throw new Error(
+          `--corpus must be minimal, bench, or external, got "${v}"`,
+        );
       }
-      corpus = v;
+      corpus = v === "bench" ? "minimal" : v;
     } else if (a === "--root" && argv[i + 1]) root = resolve(argv[++i]);
     else if (a === "--scenarios" && argv[i + 1]) {
       scenariosPath = resolve(argv[++i]);
@@ -50,8 +52,9 @@ if (HELP) {
   console.log(`Usage: bun scripts/query-golden.ts [options]
 
 Corpus:
-  --corpus minimal     (default) fixtures/minimal + fixtures/golden/scenarios.json
-  --corpus external    Index CODEMAP_ROOT or --root; scenarios from scenarios.external.json
+  --corpus minimal     (default) in-repo test bench: fixtures/minimal + scenarios.json
+  --corpus bench       Alias for minimal (same in-repo test bench)
+  --corpus external    Optional: index CODEMAP_ROOT / --root (consumer private trees only)
                        if present, else scenarios.external.example.json; goldens in
                        fixtures/golden/external/ (gitignored — for local / private trees)
 

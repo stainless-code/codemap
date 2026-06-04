@@ -1,6 +1,6 @@
-# Minimal codemap fixture
+# Codemap in-repo test bench (corpus)
 
-Stable tree exercising every codemap surface — used by `src/benchmark.ts`, golden tests, and CI.
+Stable tree exercising every codemap surface — used by `test:golden`, `test:agent-eval`, `src/benchmark.ts`, and CI. Hub: [fixtures/README.md](../README.md). Capability map: [CAPABILITIES.json](../CAPABILITIES.json).
 
 ## What's exercised
 

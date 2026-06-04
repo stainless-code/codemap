@@ -704,6 +704,11 @@
       "sql": "SELECT callee_name, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
     },
     {
+      "id": "calls-method-ping-unresolved",
+      "prompt": "Method call ping() indexed but phase-2 leaves callee_symbol_id null",
+      "sql": "SELECT callee_name, is_method_call, callee_symbol_id, callee_resolution_kind FROM calls WHERE file_path = 'src/bench/method-call-sites.ts' ORDER BY line_start"
+    },
+    {
       "id": "try-catch-rethrow-heuristics",
       "prompt": "catch_rethrows: nested arrow throw vs direct rethrow (complexity-fixture)",
       "sql": "SELECT s.name, t.catch_rethrows FROM try_catch t JOIN symbols s ON s.file_path = t.file_path AND s.kind = 'function' AND t.try_line_start >= s.line_start AND t.try_line_start <= s.line_end WHERE t.file_path = 'src/lib/complexity-fixture.ts' AND s.name IN ('catchInnerArrowRethrow', 'catchDirectRethrow') ORDER BY s.name"
