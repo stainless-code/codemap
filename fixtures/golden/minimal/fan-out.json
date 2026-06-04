@@ -16,6 +16,10 @@
     "deps": 1
   },
   {
+    "from_path": "src/bench/homonym-consumer-a.ts",
+    "deps": 1
+  },
+  {
     "from_path": "src/bench/jsx-member-gap.tsx",
     "deps": 1
   },
@@ -33,10 +37,6 @@
   },
   {
     "from_path": "src/components/shop/ShopButton.default.ts",
-    "deps": 1
-  },
-  {
-    "from_path": "src/lib/cache.ts",
     "deps": 1
   }
 ]

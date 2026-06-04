@@ -30,6 +30,24 @@
     "coverage_pct": 0
   },
   {
+    "name": "useHelperA",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "helper",
+    "file_path": "src/bench/homonym-helper-a.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "helper",
+    "file_path": "src/bench/homonym-helper-b.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
     "name": "MemberHost",
     "file_path": "src/bench/jsx-member-gap.tsx",
     "line_start": 3,
@@ -99,24 +117,6 @@
     "name": "get",
     "file_path": "src/lib/cache.ts",
     "line_start": 8,
-    "coverage_pct": 0
-  },
-  {
-    "name": "invalidate",
-    "file_path": "src/lib/cache.ts",
-    "line_start": 16,
-    "coverage_pct": 0
-  },
-  {
-    "name": "deeplyNested",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 6,
-    "coverage_pct": 0
-  },
-  {
-    "name": "labyrinth",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 22,
     "coverage_pct": 0
   }
 ]

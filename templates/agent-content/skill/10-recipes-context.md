@@ -63,6 +63,8 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 4. **Commit (optional)** — CLI `--commit "<msg>"` or MCP `commit_message` on recipe `apply` / `apply_diff_input` after a clean apply; with `until_empty`, only when `terminated_by` is `empty`.
 5. **Agent rows / diffs** — when you already have hunks (codemod output), skip recipe policy: `apply_rows` / `apply_diff_input` or CLI `codemap apply --rows -` / `--diff-input` (both need `--yes` / `yes: true`).
 
+**Homonym renames:** `rename-preview` unions every `symbols.name` match unless you pass `define_in=<definition file_path>` (same anchor as `find-symbol-references`). `in_file` only narrows output row paths — it does not scope the target symbol.
+
 **diff-json preview:** each hunk includes `ambiguity_count` (extra `before_pattern` matches on the line); apply rewrites the first match only.
 
 **Affected tests:** **`codemap affected`** (CLI) for CI/shell (`stdin`, `--changed-since`). **`affected`** MCP/HTTP tool or **`query_recipe`** with `recipe: "affected-tests"` for agents. Path sources on CLI: positional → `--stdin` → `--changed-since` → default `HEAD`. On MCP/HTTP: `paths` array → else `changed_since` / `HEAD`. Example:

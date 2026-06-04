@@ -35,6 +35,20 @@
     "re_export_source": null
   },
   {
+    "name": "useHelperA",
+    "kind": "value",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "helper",
+    "kind": "value",
+    "file_path": "src/bench/homonym-helper-b.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "MemberHost",
     "kind": "value",
     "file_path": "src/bench/jsx-member-gap.tsx",

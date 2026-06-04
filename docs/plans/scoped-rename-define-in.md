@@ -1,6 +1,6 @@
 # Scoped rename (`define_in` on `rename-preview`)
 
-**Status:** Open — tracer-bullet implementation.  
+**Status:** Shipped — `define_in` on `rename-preview` (PR #165+). Delete on merge after lifting to architecture/glossary.  
 **Effort:** S (recipe + goldens + CLI e2e); +S optional `codemap rename` write alias.  
 **Motivation:** Agents need homonym-safe renames; `find-symbol-references` already anchors on definition `file_path`, but `rename-preview` keys on **name only** and `call_rows` match **every** `callee_name`.
 
@@ -156,10 +156,10 @@ Pair with [`find-symbol-references`](../../templates/recipes/find-symbol-referen
 
 ## Success criteria
 
-- [ ] With `define_in` set, golden + e2e show **zero** edits to the sibling homonym file.
-- [ ] With `define_in` unset, existing rename-preview goldens pass.
-- [ ] Skill/MCP text states homonym policy in one place.
-- [ ] Optional: `codemap rename --define-in` documented and tested.
+- [x] With `define_in` set, golden + e2e show **zero** edits to the sibling homonym file.
+- [x] With `define_in` unset, existing rename-preview goldens pass.
+- [x] Skill/MCP text states homonym policy in one place.
+- [ ] Optional: `codemap rename --define-in` documented and tested (deferred).
 
 ---
 

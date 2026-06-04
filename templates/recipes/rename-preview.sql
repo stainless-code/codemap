@@ -1,5 +1,5 @@
-WITH params(old_name, new_name, kind_filter, in_file, include_tests, include_re_exports) AS (
-  SELECT ?, ?, ?, ?, ?, ?
+WITH params(old_name, new_name, kind_filter, in_file, include_tests, include_re_exports, define_in) AS (
+  SELECT ?, ?, ?, ?, ?, ?, ?
 ),
 -- target_symbols intentionally does NOT filter by `in_file`. `in_file` narrows
 -- the OUTPUT rows (definition / import call sites whose own `file_path` is
@@ -9,6 +9,7 @@ target_symbols AS (
   SELECT s.*
   FROM symbols s, params p
   WHERE s.name = p.old_name
+    AND (p.define_in IS NULL OR s.file_path = p.define_in)
     AND (p.kind_filter IS NULL OR s.kind = p.kind_filter)
     AND (
       p.include_tests
@@ -63,6 +64,18 @@ call_rows AS (
     AND (
       p.include_tests
       OR (c.file_path NOT LIKE '%test.%' AND c.file_path NOT LIKE '%spec.%')
+    )
+    AND (
+      p.define_in IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM "references" r
+        JOIN bindings b ON b.reference_id = r.id
+        WHERE r.file_path = c.file_path
+          AND r.line_start = c.line_start
+          AND r.name = p.old_name
+          AND b.resolved_symbol_id IN (SELECT id FROM target_symbols)
+      )
     )
 ),
 re_export_rows AS (

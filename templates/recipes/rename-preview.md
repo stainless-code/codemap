@@ -26,11 +26,15 @@ params:
     required: false
     default: true
     description: When false, omit single-hop re_export_chains rows from the preview.
+  - name: define_in
+    type: string
+    required: false
+    description: When set, anchor `target_symbols` to the definition file (exact `symbols.file_path`). `call_rows` require binding resolution to that symbol — homonym-safe. Distinct from `in_file` (output row prefix only).
 actions:
   - type: apply-rename
     auto_fixable: true
     description: Apply rename hunks via codemap apply after reviewing the diff preview.
-    command: codemap apply rename-preview --params old={{old}},new={{new}} --yes
+    command: codemap apply rename-preview --params old={{old}},new={{new}},define_in={{define_in}} --yes
 ---
 
 # Rename preview
@@ -63,3 +67,5 @@ codemap query --recipe rename-preview \
 - Same-line ambiguity when `before_pattern` appears twice on one line (first match only).
 
 Use `rg oldName` for literals/comments. Pair with `find-symbol-references` for audit-only views of binding sites.
+
+**Homonyms:** pass `define_in=src/path/to/definition.ts` (same anchor as `find-symbol-references` definition `file_path`) so only that symbol's definitions, imports, and binding-resolved call sites appear — bare `old`/`new` still unions every homonym in the index.

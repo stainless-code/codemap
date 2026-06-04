@@ -6,6 +6,12 @@
     "coverage_pct": 0
   },
   {
+    "name": "useHelperA",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
     "name": "MemberHost",
     "file_path": "src/bench/jsx-member-gap.tsx",
     "line_start": 3,

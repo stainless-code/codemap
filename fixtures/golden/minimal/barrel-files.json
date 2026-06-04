@@ -64,19 +64,19 @@
     "exports": 1
   },
   {
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "exports": 1
+  },
+  {
+    "file_path": "src/bench/homonym-helper-a.ts",
+    "exports": 1
+  },
+  {
+    "file_path": "src/bench/homonym-helper-b.ts",
+    "exports": 1
+  },
+  {
     "file_path": "src/bench/jsx-member-gap.tsx",
-    "exports": 1
-  },
-  {
-    "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
-    "exports": 1
-  },
-  {
-    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
-    "exports": 1
-  },
-  {
-    "file_path": "src/bench/jsx-ui-namespace.ts",
     "exports": 1
   }
 ]

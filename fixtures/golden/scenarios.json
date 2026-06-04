@@ -808,6 +808,16 @@
       }
     },
     {
+      "id": "rename-preview-homonym-scoped",
+      "prompt": "Rename helper→worker scoped to homonym-helper-a only",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "helper",
+        "new": "worker",
+        "define_in": "src/bench/homonym-helper-a.ts"
+      }
+    },
+    {
       "id": "migrate-jsx-prop-product-card",
       "prompt": "Rename data-id JSX attribute on ProductCard article",
       "recipe": "migrate-jsx-prop",
