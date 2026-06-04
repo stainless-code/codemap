@@ -239,6 +239,118 @@ describe("resolveCalls", () => {
     }
   });
 
+  it("sets meta residual from global queue count after scoped pass", () => {
+    const db = freshDb();
+    try {
+      seedFile(db, "src/a.ts");
+      seedFile(db, "src/b.ts");
+      insertScopes(db, [
+        {
+          file_path: "src/a.ts",
+          local_id: 0,
+          kind: "module",
+          parent_local_id: null,
+          line_start: 1,
+          line_end: 10,
+          owner_symbol_name: null,
+        },
+        {
+          file_path: "src/b.ts",
+          local_id: 0,
+          kind: "module",
+          parent_local_id: null,
+          line_start: 1,
+          line_end: 10,
+          owner_symbol_name: null,
+        },
+      ]);
+      insertCalls(db, [
+        {
+          file_path: "src/a.ts",
+          caller_name: "fn",
+          caller_scope: "fn",
+          callee_name: "missingA",
+          line_start: 3,
+          column_start: 0,
+          column_end: 8,
+        },
+        {
+          file_path: "src/b.ts",
+          caller_name: "fn",
+          caller_scope: "fn",
+          callee_name: "missingB",
+          line_start: 3,
+          column_start: 0,
+          column_end: 8,
+        },
+      ]);
+      resolveCalls(db);
+      expect(getMeta(db, META_KEY)).toBe("2");
+      resolveCalls(db, { filePaths: ["src/a.ts"] });
+      expect(getMeta(db, META_KEY)).toBe("2");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("skips method calls without queuing false import matches", () => {
+    const db = freshDb();
+    try {
+      seedFile(db, "src/a.ts");
+      insertScopes(db, [
+        {
+          file_path: "src/a.ts",
+          local_id: 0,
+          kind: "module",
+          parent_local_id: null,
+          line_start: 1,
+          line_end: 10,
+          owner_symbol_name: null,
+        },
+        {
+          file_path: "src/a.ts",
+          local_id: 1,
+          kind: "function",
+          parent_local_id: 0,
+          line_start: 2,
+          line_end: 8,
+          owner_symbol_name: "run",
+        },
+      ]);
+      insertCalls(db, [
+        {
+          file_path: "src/a.ts",
+          caller_name: "run",
+          caller_scope: "run",
+          callee_name: "target.ping",
+          line_start: 5,
+          column_start: 0,
+          column_end: 4,
+          is_method_call: 1,
+        },
+      ]);
+      resolveCalls(db);
+      expect(
+        (
+          db
+            .query<{ kind: string | null }>(
+              "SELECT callee_resolution_kind AS kind FROM calls",
+            )
+            .get() as { kind: string | null }
+        ).kind,
+      ).toBeNull();
+      expect(
+        (
+          db.query("SELECT COUNT(*) AS n FROM unresolved_calls").get() as {
+            n: number;
+          }
+        ).n,
+      ).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
   it("scoped resolve only touches listed files", () => {
     const db = freshDb();
     try {

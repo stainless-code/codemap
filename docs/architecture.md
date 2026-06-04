@@ -264,7 +264,7 @@ All base tables use `STRICT` mode; **`source_fts`** is an FTS5 virtual table (no
 
 Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `foo` calls `bar` three times in the same file, only one row is stored. `foo()` and `new Foo()` with the same callee name remain distinct rows. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
-**Call resolution:** `src/application/call-resolver.ts` runs after bindings on full rebuild and after incremental file updates (scoped to changed paths). Unresolved sites are staged in `unresolved_calls`; residual count is stored in `meta.unresolved_calls_residual`.
+**Call resolution:** `src/application/call-resolver.ts` runs after bindings on full rebuild and after incremental file updates. Incremental scope is `expandHeritageResolveScope` over all requested/changed paths (includes importers). Method calls (`is_method_call = 1`) are not name-bound yet. Unresolved sites are staged in `unresolved_calls`; `meta.unresolved_calls_residual` is the global queue `COUNT(*)`.
 
 ### `unresolved_calls` — Staging queue for unresolved call sites (`STRICT`)
 

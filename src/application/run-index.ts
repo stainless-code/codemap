@@ -8,6 +8,8 @@ import {
 import type { CodemapDatabase } from "../db";
 import { getBoundaryRules, getFts5Enabled } from "../runtime";
 import { getStateDir } from "../runtime";
+import { resolveCalls } from "./call-resolver";
+import { expandHeritageResolveScope } from "./heritage-resolver";
 import {
   collectFiles,
   deleteFilesFromIndex,
@@ -231,6 +233,10 @@ async function runCodemapIndexBody(
       }
       if (diff.deleted.length > 0) {
         deleteFilesFromIndex(db, diff.deleted, quiet);
+        const callScope = expandHeritageResolveScope(db, diff.deleted);
+        if (callScope.length > 0) {
+          resolveCalls(db, { filePaths: callScope });
+        }
         setMeta(db, "last_indexed_commit", getCurrentCommit());
         if (!quiet) console.log("  Index updated (deletions only)");
         return {

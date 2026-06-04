@@ -547,8 +547,11 @@ export async function indexFiles(
 
     transaction();
     heritageScopePaths = [
-      ...parsedResults.map((p) => p.relPath),
-      ...(options?.deletedPaths ?? []),
+      ...new Set([
+        ...filePaths,
+        ...parsedResults.map((p) => p.relPath),
+        ...(options?.deletedPaths ?? []),
+      ]),
     ];
   }
 
@@ -608,7 +611,7 @@ export async function indexFiles(
   const callResolveScope = fullRebuild
     ? undefined
     : heritageScopePaths && heritageScopePaths.length > 0
-      ? heritageScopePaths
+      ? expandHeritageResolveScope(db, heritageScopePaths)
       : undefined;
   if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
     resolveCalls(

@@ -23,6 +23,7 @@ interface CallRowDb {
   callee_name: string;
   line_start: number;
   column_start: number;
+  is_method_call: number;
 }
 
 /** Member / `this` chains: resolve the terminal identifier name. */
@@ -61,7 +62,13 @@ function resolveOneCall(
   ctx: BindingIndexContext,
   db: CodemapDatabase,
   call: CallRowDb,
-): { resolved: boolean } {
+): { resolved: boolean; queue: boolean } {
+  // Receiver-aware member resolution is deferred — binding the terminal
+  // identifier alone mis-resolves `obj.method()` as a module import of `method`.
+  if (call.is_method_call) {
+    return { resolved: false, queue: false };
+  }
+
   const bindingName = calleeBindingName(call.callee_name);
   const scopeLocalId = scopeLocalIdForLine(db, call.file_path, call.line_start);
   const result = resolveNameAtSite(ctx, {
@@ -78,11 +85,11 @@ function resolveOneCall(
       result.resolved_symbol_id,
       result.resolution_kind,
     );
-    return { resolved: true };
+    return { resolved: true, queue: true };
   }
 
   updateCallResolution(db, call.id, null, "unresolved");
-  return { resolved: false };
+  return { resolved: false, queue: true };
 }
 
 export interface ResolveCallsResult {
@@ -111,7 +118,7 @@ export function resolveCalls(
   const createdAt = new Date().toISOString();
 
   let sql =
-    "SELECT id, file_path, caller_scope, callee_name, line_start, column_start FROM calls";
+    "SELECT id, file_path, caller_scope, callee_name, line_start, column_start, is_method_call FROM calls";
   const params: string[] = [];
   if (filePaths?.length) {
     const placeholders = filePaths.map(() => "?").join(",");
@@ -124,10 +131,10 @@ export function resolveCalls(
   let resolved = 0;
 
   for (const call of calls) {
-    const { resolved: ok } = resolveOneCall(ctx, db, call);
+    const { resolved: ok, queue } = resolveOneCall(ctx, db, call);
     if (ok) {
       resolved++;
-    } else {
+    } else if (queue) {
       unresolvedRows.push({
         file_path: call.file_path,
         caller_scope: call.caller_scope,
@@ -144,7 +151,10 @@ export function resolveCalls(
     insertUnresolvedCalls(db, unresolvedRows);
   }
 
-  setMeta(db, META_UNRESOLVED_CALLS_RESIDUAL, String(unresolvedRows.length));
+  const residual = db
+    .query<{ n: number }>("SELECT COUNT(*) AS n FROM unresolved_calls")
+    .get()!.n;
+  setMeta(db, META_UNRESOLVED_CALLS_RESIDUAL, String(residual));
 
   return {
     total: calls.length,
