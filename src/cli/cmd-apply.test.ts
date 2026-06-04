@@ -702,6 +702,41 @@ export function staleOne(): number { return 2; }
       expect(log.trim().split("\n").length).toBe(1);
     });
 
+    it("creates a git commit after until-empty fixpoint reaches empty", async () => {
+      writeFileSync(
+        join(projectRoot, "src", "marked.ts"),
+        "// FIXME: todo item\nexport const MARKED = 1;\n",
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+
+      const r = await runCli(
+        [
+          "apply",
+          "replace-marker-kind",
+          "--params",
+          "from_kind=FIXME,to_kind=XXX",
+          "--until-empty",
+          "--yes",
+          "--commit",
+          "codemap: migrate FIXME markers",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.terminated_by).toBe("empty");
+      expect(env.applied).toBe(true);
+      const log = execSync("git log -1 --format=%s", {
+        cwd: projectRoot,
+        encoding: "utf8",
+      });
+      expect(log.trim()).toBe("codemap: migrate FIXME markers");
+      expect(readFile("src/marked.ts")).toContain("// XXX:");
+    });
+
     it("creates a git commit for touched files after a clean apply", async () => {
       const r = await runCli(
         [

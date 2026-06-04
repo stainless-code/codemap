@@ -133,6 +133,29 @@ function withMergedApplyFiles(
   };
 }
 
+/** Terminal fixpoint probe is dry-run; reflect prior apply passes in `applied` / `files`. */
+function finalizeFixpointPayload(
+  probe: ApplyJsonPayload,
+  accumulated: Map<string, ApplyFile>,
+  extras: { passes: number; terminated_by: ApplyTerminatedBy },
+): ApplyJsonPayload {
+  const merged = withMergedApplyFiles({ ...probe, ...extras }, accumulated);
+  const totalRowsApplied = [...accumulated.values()].reduce(
+    (n, f) => n + f.rows_applied,
+    0,
+  );
+  if (totalRowsApplied === 0) return merged;
+  return {
+    ...merged,
+    mode: "apply",
+    applied: true,
+    summary: {
+      ...merged.summary,
+      rows_applied: totalRowsApplied,
+    },
+  };
+}
+
 export async function runApplyUntilEmpty(opts: {
   projectRoot: string;
   recipeId: string;
@@ -171,42 +194,30 @@ export async function runApplyUntilEmpty(opts: {
     });
     if (last.payload.conflicts.length > 0) {
       return {
-        payload: withMergedApplyFiles(
-          {
-            ...last.payload,
-            passes: pass,
-            terminated_by: "conflicts",
-          },
-          touchedAcrossPasses,
-        ),
+        payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
+          passes: pass,
+          terminated_by: "conflicts",
+        }),
         passes: pass,
         terminated_by: "conflicts",
       };
     }
     if (last.payload.summary.rows === 0) {
       return {
-        payload: withMergedApplyFiles(
-          {
-            ...last.payload,
-            passes: pass,
-            terminated_by: "empty",
-          },
-          touchedAcrossPasses,
-        ),
+        payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
+          passes: pass,
+          terminated_by: "empty",
+        }),
         passes: pass,
         terminated_by: "empty",
       };
     }
     if (opts.dryRun) {
       return {
-        payload: withMergedApplyFiles(
-          {
-            ...last.payload,
-            passes: pass,
-            terminated_by: "complete",
-          },
-          touchedAcrossPasses,
-        ),
+        payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
+          passes: pass,
+          terminated_by: "complete",
+        }),
         passes: pass,
         terminated_by: "complete",
       };
@@ -222,14 +233,10 @@ export async function runApplyUntilEmpty(opts: {
     });
     if (last.payload.conflicts.length > 0) {
       return {
-        payload: withMergedApplyFiles(
-          {
-            ...last.payload,
-            passes: pass,
-            terminated_by: "conflicts",
-          },
-          touchedAcrossPasses,
-        ),
+        payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
+          passes: pass,
+          terminated_by: "conflicts",
+        }),
         passes: pass,
         terminated_by: "conflicts",
       };
@@ -253,14 +260,10 @@ export async function runApplyUntilEmpty(opts: {
   }
 
   return {
-    payload: withMergedApplyFiles(
-      {
-        ...last.payload,
-        passes: opts.maxPasses,
-        terminated_by: "cap",
-      },
-      touchedAcrossPasses,
-    ),
+    payload: finalizeFixpointPayload(last.payload, touchedAcrossPasses, {
+      passes: opts.maxPasses,
+      terminated_by: "cap",
+    }),
     passes: opts.maxPasses,
     terminated_by: "cap",
   };

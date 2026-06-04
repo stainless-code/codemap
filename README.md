@@ -216,11 +216,11 @@ codemap affected --changed-since origin/main --json               # committed de
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
 codemap apply migrate-import-source --params old=legacy,new=@app/core --dry-run
-codemap apply stale-imports --params in_file=src/widget --dry-run --force  # preview force-gated recipe
+codemap apply stale-imports --params in_file=src/widget --dry-run  # preview force-gated recipe (--force only for writes)
 # Agent/codemod rows (no recipe policy gates): echo '[{...}]' | codemap apply --rows - --yes
 # External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
 # Fixpoint (recipe mode): codemap apply rename-preview --params old=a,new=b --until-empty --yes
-# Optional git commit after clean apply: codemap apply ... --yes --commit "chore: rename a→b"
+# Optional git commit after clean apply: codemap apply ... --yes --commit "chore: rename a→b" (--until-empty requires fixpoint to reach empty rows)
 # Bundled diff-shape recipes: rename-preview, migrate-import-source, replace-marker-kind, stale-imports, migrate-deprecated, deprecated-usages, migrate-jsx-prop, add-jsdoc-deprecated
 # All-or-nothing: any conflict aborts before any file is written. MCP: apply, apply_rows, apply_diff_input (yes: true for writes).
 
