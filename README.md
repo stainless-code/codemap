@@ -217,6 +217,7 @@ codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=func
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
 codemap apply migrate-import-source --params old_source=legacy,new_source=@app/core --dry-run
 codemap apply stale-imports --params in_file=src/widget --dry-run  # preview; writes need --force --yes
+codemap apply migrate-jsx-prop --params old_name=data-id,new_name=data-testid,component_name=ProductCard --dry-run --force
 # Agent/codemod rows (no recipe policy gates): echo '[{...}]' | codemap apply --rows - --yes
 # External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
 # Fixpoint (recipe mode): codemap apply rename-preview --params old=a,new=b --until-empty --yes

@@ -13,7 +13,7 @@ actions:
   - type: remove-stale-import
     auto_fixable: false
     description: Remove unused import specifiers (whole line or one name from a multi-specifier line).
-    command: codemap apply stale-imports --force --yes
+    command: codemap apply stale-imports --params in_file={{in_file}},include_type_only={{include_type_only}} --dry-run --force
 ---
 
 # stale-imports

@@ -20,7 +20,7 @@ actions:
   - type: migrate-jsx-prop
     auto_fixable: false
     description: Rename JSX attribute names on indexed opening tags (review before apply).
-    command: codemap apply migrate-jsx-prop --params old_name={{old_name}},new_name={{new_name}} --force --yes
+    command: codemap apply migrate-jsx-prop --params old_name={{old_name}},new_name={{new_name}},component_name={{component_name}},in_file={{in_file}} --dry-run --force
 ---
 
 # migrate-jsx-prop

@@ -28,11 +28,26 @@ function renderCommandTemplate(
   template: string,
   valueByName: Map<string, string>,
 ): string {
-  return template.replace(
+  const substituted = template.replace(
     /\{\{([A-Za-z_][A-Za-z0-9_]*)\}\}/g,
     (_m, name: string) => {
       const value = valueByName.get(name);
       return value ?? "";
     },
   );
+  return scrubEmptyApplyParamPairs(substituted);
+}
+
+/** Drop `key=` pairs with empty values after optional `{{param}}` substitution. */
+function scrubEmptyApplyParamPairs(command: string): string {
+  const match = command.match(/(--params\s+)(.+?)(?=\s+--|$)/);
+  if (match === null) return command;
+  const pairs = match[2]!.split(",").filter((pair) => {
+    const eq = pair.indexOf("=");
+    return eq !== -1 && pair.slice(eq + 1).length > 0;
+  });
+  if (pairs.length === 0) {
+    return command.replace(match[0], "").replace(/\s{2,}/g, " ");
+  }
+  return command.replace(match[0], `${match[1]}${pairs.join(",")}`);
 }

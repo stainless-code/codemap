@@ -962,6 +962,27 @@ describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
     );
   });
 
+  it("migrate-jsx-prop action includes scoped optional params when bound", () => {
+    const actions = getQueryRecipeActionsRendered("migrate-jsx-prop", {
+      old_name: "data-id",
+      new_name: "data-testid",
+      component_name: "ProductCard",
+      in_file: "src/ui",
+    });
+    expect(actions?.[0]?.command).toBe(
+      "codemap apply migrate-jsx-prop --params old_name=data-id,new_name=data-testid,component_name=ProductCard,in_file=src/ui --dry-run --force",
+    );
+  });
+
+  it("stale-imports action renders in_file and include_type_only default", () => {
+    const actions = getQueryRecipeActionsRendered("stale-imports", {
+      in_file: "src/widget",
+    });
+    expect(actions?.[0]?.command).toBe(
+      "codemap apply stale-imports --params in_file=src/widget,include_type_only=false --dry-run --force",
+    );
+  });
+
   it("markers-by-kind uses FROM_KIND/TO_KIND sentinels", () => {
     const actions = getQueryRecipeActions("markers-by-kind");
     expect(
