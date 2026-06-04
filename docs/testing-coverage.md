@@ -1,0 +1,94 @@
+# Testing coverage map
+
+**Purpose:** Maintainer reference for how Codemap capabilities are regression-tested. Consumers do not need this file.
+
+**Operational entry points:** [CONTRIBUTING § Golden queries](../.github/CONTRIBUTING.md) · [golden-queries.md](./golden-queries.md) · [benchmark.md § Fixtures](./benchmark.md#fixtures)
+
+---
+
+## Harness layers
+
+| Layer                 | Command                             | What it proves                                                                                           |
+| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Unit**              | `bun test ./src`                    | Parsers, DB DDL, engines, CLI/MCP handlers in isolation (`:memory:` or mocks).                           |
+| **Golden (Tier A)**   | `bun run test:golden`               | Full index of `fixtures/minimal/` → SQL/recipe output vs `fixtures/golden/minimal/*.json`.               |
+| **Golden guard**      | `bun run test:scripts`              | `scripts/query-golden-coverage-matrix.test.mjs` — every bundled recipe + substrate table has a scenario. |
+| **Agent eval**        | `bun run test:agent-eval`           | Probe arms vs golden ids (MCP-on vs glob/read).                                                          |
+| **Integration (git)** | `src/application/run-index.test.ts` | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                     |
+| **CLI e2e**           | `cmd-cli-parity-e2e.test.ts`        | Spawned CLI against `fixtures/minimal`.                                                                  |
+| **Check**             | `bun run check`                     | build + lint + unit + scripts + golden + agent-eval.                                                     |
+
+Refresh Tier A goldens after intentional fixture or schema changes:
+
+```bash
+bun scripts/query-golden.ts --update
+```
+
+---
+
+## Bundled recipes (58)
+
+Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/scenarios.json` with `"recipe": "<id>"`. Enforced by `query-golden-coverage-matrix.test.mjs`.
+
+---
+
+## Substrate tables — SQL pin-down scenarios
+
+Recipe goldens prove query _behavior_; these scenarios pin **persisted rows** on the minimal corpus:
+
+| Table                                 | Scenario id                                             |
+| ------------------------------------- | ------------------------------------------------------- |
+| Aggregate counts (all indexed tables) | `index-table-stats`                                     |
+| `meta`                                | `meta-fts5-enabled`, `call-resolution-stats` (residual) |
+| `source_fts`                          | `source-fts-row-count`                                  |
+| `file_metrics`                        | `file-metrics-complexity-fixture`                       |
+| `scopes`                              | `scopes-product-card`                                   |
+| `references`                          | `references-product-card-perms`                         |
+| `bindings`                            | `bindings-createClient`                                 |
+| `import_specifiers`                   | `import-specifiers-consumer`                            |
+| `async_calls`                         | `async-calls-prefetch`                                  |
+| `decorators`                          | `decorators-sealed`                                     |
+| `dynamic_imports`                     | `dynamic-imports-prefetch`                              |
+| `module_cycles`                       | `module-cycles-cache-store`                             |
+| `re_export_chains`                    | `re-export-chains-product-card`                         |
+| `runtime_markers`                     | `runtime-markers-env`                                   |
+| `function_params`                     | `function-params-createClient`                          |
+| `boundary_rules`                      | `boundary-rules-ui-no-api`                              |
+| `unresolved_calls`                    | `unresolved-call-sites`                                 |
+| `calls` (resolution)                  | `calls-createClient-resolved`                           |
+| `try_catch`                           | `try-catch-rethrow-heuristics`                          |
+| `jsdoc_tags`                          | `jsdoc-tags-createClient`                               |
+| `suppressions`                        | `suppressions-orphan`                                   |
+| `coverage`                            | `coverage-rows-after-ingest` (+ killer recipes)         |
+
+Core graph tables (`files`, `symbols`, `imports`, …) are covered by many existing SQL/recipe scenarios — see `fixtures/golden/scenarios.json`.
+
+---
+
+## Intentionally not in Tier A goldens
+
+| Surface           | Why                  | Where tested                                                |
+| ----------------- | -------------------- | ----------------------------------------------------------- |
+| `query_baselines` | User/session data    | `db.test.ts`, `audit-worktree.test.ts`, `cmd-audit.test.ts` |
+| `recipe_recency`  | Side effect of query | `recipe-recency.test.ts`, MCP/HTTP query tests              |
+| Proprietary trees | Policy               | Tier B: `test:golden:external` (gitignored goldens)         |
+
+---
+
+## Agent eval probes
+
+`scripts/agent-eval/scenarios.json` maps probes → golden ids:
+
+| Probe                 | Golden id                    |
+| --------------------- | ---------------------------- |
+| Symbol definition     | `symbol-usePermissions`      |
+| Dependency edges      | `dependencies-from-consumer` |
+| Call sites            | `find-call-sites`            |
+| Call resolution stats | `call-resolution-stats`      |
+| Import specifiers     | `import-specifiers-consumer` |
+
+---
+
+## Fixture corpus
+
+[`fixtures/minimal/README.md`](../fixtures/minimal/README.md) documents which source files exercise each parser tier. When adding a new indexed column or table, extend the fixture **and** add a golden scenario (or extend `index-table-stats`), then run `--update`.

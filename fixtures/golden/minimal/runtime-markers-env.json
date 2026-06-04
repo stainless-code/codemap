@@ -1,0 +1,10 @@
+[
+  {
+    "kind": "process-env",
+    "detail": "CODEMAP_FIXTURE_API_KEY"
+  },
+  {
+    "kind": "process-env",
+    "detail": "NODE_ENV"
+  }
+]

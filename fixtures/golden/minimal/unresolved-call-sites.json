@@ -1,0 +1,10 @@
+[
+  {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "caller_scope": "catchInnerArrowRethrow.$anon_4",
+    "callee_name": "relay",
+    "line_start": 93,
+    "column_start": 4,
+    "reference_kind": "call"
+  }
+]

@@ -609,6 +609,101 @@
       "sql": "SELECT a.name, a.value_kind FROM jsx_attributes a JOIN jsx_elements e ON e.id = a.element_id WHERE e.file_path = 'src/components/shop/ProductCard.tsx' ORDER BY a.name"
     },
     {
+      "id": "index-table-stats",
+      "prompt": "Row counts for all indexed substrate tables (mirrors fetchTableStats + post-pass tables)",
+      "sql": "SELECT (SELECT COUNT(*) FROM files) AS files, (SELECT COUNT(*) FROM symbols) AS symbols, (SELECT COUNT(*) FROM imports) AS imports, (SELECT COUNT(*) FROM exports) AS exports, (SELECT COUNT(*) FROM components) AS components, (SELECT COUNT(*) FROM dependencies) AS dependencies, (SELECT COUNT(*) FROM markers) AS markers, (SELECT COUNT(*) FROM type_members) AS type_members, (SELECT COUNT(*) FROM type_heritage) AS type_heritage, (SELECT COUNT(*) FROM calls) AS calls, (SELECT COUNT(*) FROM css_variables) AS css_vars, (SELECT COUNT(*) FROM css_classes) AS css_classes, (SELECT COUNT(*) FROM css_keyframes) AS css_keyframes, (SELECT COUNT(*) FROM scopes) AS scopes, (SELECT COUNT(*) FROM \"references\") AS ref_count, (SELECT COUNT(*) FROM bindings) AS bindings, (SELECT COUNT(*) FROM import_specifiers) AS import_specifiers, (SELECT COUNT(*) FROM function_params) AS function_params, (SELECT COUNT(*) FROM runtime_markers) AS runtime_markers, (SELECT COUNT(*) FROM test_suites) AS test_suites, (SELECT COUNT(*) FROM re_export_chains) AS re_export_chains, (SELECT COUNT(*) FROM module_cycles) AS module_cycles, (SELECT COUNT(*) FROM dynamic_imports) AS dynamic_imports, (SELECT COUNT(*) FROM file_metrics) AS file_metrics, (SELECT COUNT(*) FROM unresolved_calls) AS unresolved_calls, (SELECT COUNT(*) FROM jsx_elements) AS jsx_elements, (SELECT COUNT(*) FROM async_calls) AS async_calls, (SELECT COUNT(*) FROM decorators) AS decorators, (SELECT COUNT(*) FROM try_catch) AS try_catch, (SELECT COUNT(*) FROM jsdoc_tags) AS jsdoc_tags, (SELECT COUNT(*) FROM jsx_attributes) AS jsx_attributes, (SELECT COUNT(*) FROM boundary_rules) AS boundary_rules, (SELECT COUNT(*) FROM suppressions) AS suppressions"
+    },
+    {
+      "id": "meta-fts5-enabled",
+      "prompt": "meta.fts5_enabled after indexing minimal with fts5: true",
+      "sql": "SELECT key, value FROM meta WHERE key = 'fts5_enabled'"
+    },
+    {
+      "id": "source-fts-row-count",
+      "prompt": "source_fts rows populated when fts5 is enabled",
+      "sql": "SELECT COUNT(*) AS n FROM source_fts"
+    },
+    {
+      "id": "file-metrics-complexity-fixture",
+      "prompt": "file_metrics aggregates for complexity-fixture.ts",
+      "sql": "SELECT file_path, total_lines, function_count, export_count FROM file_metrics WHERE file_path = 'src/lib/complexity-fixture.ts'"
+    },
+    {
+      "id": "scopes-product-card",
+      "prompt": "Lexical scopes on ProductCard.tsx (module / interface / function)",
+      "sql": "SELECT kind, owner_symbol_name FROM scopes WHERE file_path = 'src/components/shop/ProductCard.tsx' ORDER BY local_id"
+    },
+    {
+      "id": "references-product-card-perms",
+      "prompt": "Identifier references to perms in ProductCard (read + write sites)",
+      "sql": "SELECT name, kind, is_write FROM \"references\" WHERE file_path = 'src/components/shop/ProductCard.tsx' AND name = 'perms' ORDER BY line_start, is_write"
+    },
+    {
+      "id": "bindings-createClient",
+      "prompt": "Binding resolution kinds for createClient symbol uses",
+      "sql": "SELECT b.resolution_kind, COUNT(*) AS n FROM bindings b JOIN symbols s ON s.id = b.resolved_symbol_id WHERE s.name = 'createClient' GROUP BY b.resolution_kind ORDER BY b.resolution_kind"
+    },
+    {
+      "id": "import-specifiers-consumer",
+      "prompt": "Per-binding import_specifiers rows in consumer.ts",
+      "sql": "SELECT imported_name, local_name, kind FROM import_specifiers WHERE file_path = 'src/consumer.ts' ORDER BY line"
+    },
+    {
+      "id": "async-calls-prefetch",
+      "prompt": "await in loop inside prefetch (consumer.ts)",
+      "sql": "SELECT awaited_callee_name, in_loop FROM async_calls WHERE file_path = 'src/consumer.ts' AND caller_scope = 'prefetch'"
+    },
+    {
+      "id": "decorators-sealed",
+      "prompt": "@sealed decorator on Transport class",
+      "sql": "SELECT name, target_kind FROM decorators WHERE file_path = 'src/api/decorated.ts'"
+    },
+    {
+      "id": "dynamic-imports-prefetch",
+      "prompt": "Dynamic import() in prefetch",
+      "sql": "SELECT file_path, source_kind, source_text, in_async_fn FROM dynamic_imports WHERE file_path = 'src/consumer.ts'"
+    },
+    {
+      "id": "module-cycles-cache-store",
+      "prompt": "Two-node import cycle between cache.ts and store.ts",
+      "sql": "SELECT file_path, cycle_id, cycle_size FROM module_cycles ORDER BY file_path"
+    },
+    {
+      "id": "re-export-chains-product-card",
+      "prompt": "Materialised re-export chain for shop barrel ProductCard",
+      "sql": "SELECT from_file, from_name, to_file, to_name, hops FROM re_export_chains WHERE from_name = 'ProductCard' ORDER BY hops"
+    },
+    {
+      "id": "runtime-markers-env",
+      "prompt": "process.env reads in env.ts",
+      "sql": "SELECT kind, detail FROM runtime_markers WHERE file_path = 'src/env.ts' ORDER BY detail"
+    },
+    {
+      "id": "function-params-createClient",
+      "prompt": "Typed parameters on createClient",
+      "sql": "SELECT name, type_text, is_optional, position FROM function_params WHERE owner_name = 'createClient' AND file_path = 'src/api/client.ts' ORDER BY position"
+    },
+    {
+      "id": "boundary-rules-ui-no-api",
+      "prompt": "boundary_rules reconciled from minimal .codemap/config.json",
+      "sql": "SELECT name, action, from_glob, to_glob FROM boundary_rules ORDER BY name"
+    },
+    {
+      "id": "call-resolution-stats",
+      "prompt": "Call-resolution phase counts on minimal fixture (total, resolved, queue, meta residual)",
+      "recipe": "call-resolution-stats"
+    },
+    {
+      "id": "unresolved-call-sites",
+      "prompt": "Call sites still in unresolved_calls after phase-2 (relay in complexity-fixture)",
+      "recipe": "unresolved-call-sites"
+    },
+    {
+      "id": "calls-createClient-resolved",
+      "prompt": "createClient in consumer.ts resolves as imported after phase-2",
+      "sql": "SELECT callee_name, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'createClient'"
+    },
+    {
       "id": "try-catch-rethrow-heuristics",
       "prompt": "catch_rethrows: nested arrow throw vs direct rethrow (complexity-fixture)",
       "sql": "SELECT s.name, t.catch_rethrows FROM try_catch t JOIN symbols s ON s.file_path = t.file_path AND s.kind = 'function' AND t.try_line_start >= s.line_start AND t.try_line_start <= s.line_end WHERE t.file_path = 'src/lib/complexity-fixture.ts' AND s.name IN ('catchInnerArrowRethrow', 'catchDirectRethrow') ORDER BY s.name"

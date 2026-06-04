@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ui-no-api",
+    "action": "deny",
+    "from_glob": "src/components/**",
+    "to_glob": "src/api/**"
+  }
+]

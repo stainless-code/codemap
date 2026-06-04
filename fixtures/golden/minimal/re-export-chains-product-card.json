@@ -1,0 +1,9 @@
+[
+  {
+    "from_file": "src/components/shop/index.ts",
+    "from_name": "ProductCard",
+    "to_file": "src/components/shop/ProductCard.tsx",
+    "to_name": "ProductCard",
+    "hops": 1
+  }
+]

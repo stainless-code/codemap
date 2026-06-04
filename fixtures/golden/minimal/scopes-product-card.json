@@ -1,0 +1,14 @@
+[
+  {
+    "kind": "module",
+    "owner_symbol_name": null
+  },
+  {
+    "kind": "interface",
+    "owner_symbol_name": "ProductCardProps"
+  },
+  {
+    "kind": "function",
+    "owner_symbol_name": "ProductCard"
+  }
+]

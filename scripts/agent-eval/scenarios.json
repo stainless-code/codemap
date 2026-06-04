@@ -27,6 +27,24 @@
         "regex": "createClient\\s*\\(",
         "mode": "matches"
       }
+    },
+    {
+      "id": "call-resolution-stats",
+      "goldenId": "call-resolution-stats",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "createClient\\s*\\(",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "import-specifiers-consumer",
+      "goldenId": "import-specifiers-consumer",
+      "traditional": {
+        "globs": ["src/consumer.ts"],
+        "regex": "import\\s+\\{[^}]+\\}\\s+from",
+        "mode": "matches"
+      }
     }
   ]
 }
