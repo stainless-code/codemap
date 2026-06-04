@@ -33,7 +33,11 @@ import {
   executeAffectedTests,
   resolveAffectedChangedPaths,
 } from "./affected-engine";
-import { applyDiffPayload } from "./apply-engine";
+import {
+  ApplyRunError,
+  runApplyFromRecipe,
+  runApplyFromRows,
+} from "./apply-run";
 import {
   makeWorktreeReindex,
   resolveAuditBaselines,
@@ -43,7 +47,7 @@ import {
 import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
-import { getCurrentCommit, queryRows } from "./index-engine";
+import { getCurrentCommit } from "./index-engine";
 import {
   formatAnnotations,
   formatDiff,
@@ -53,7 +57,7 @@ import {
 } from "./output-formatters";
 import { executeQuery } from "./query-engine";
 import {
-  getQueryRecipeActions,
+  getQueryRecipeActionsRendered,
   getQueryRecipeParams,
   getQueryRecipeCatalogEntry,
   getQueryRecipeSql,
@@ -275,7 +279,10 @@ export function handleQueryRecipe(
       provided: args.params,
     });
     if (!resolvedParams.ok) return err(resolvedParams.error);
-    const recipeActions = getQueryRecipeActions(args.recipe);
+    const recipeActions = getQueryRecipeActionsRendered(
+      args.recipe,
+      args.params,
+    );
     const resolveChanged = makeChangedFilesResolver(root);
     const changed = resolveChanged(args.changed_since);
     if (changed && typeof changed === "object" && "error" in changed) {
@@ -972,6 +979,13 @@ export function handleNode(args: NodeArgs, root: string): ToolResult {
 
 // === apply ==================================================================
 
+export const applyRowSchema = z.object({
+  file_path: z.string().min(1),
+  line_start: z.number().int().positive(),
+  before_pattern: z.string().min(1),
+  after_pattern: z.string(),
+});
+
 export const applyArgsSchema = {
   recipe: z.string().min(1, "recipe must be a non-empty string"),
   params: z
@@ -980,6 +994,7 @@ export const applyArgsSchema = {
   dry_run: z.boolean().optional(),
   /** Q6 (a) — required for the write path; non-TTY transports have no prompt to fall back on. */
   yes: z.boolean().optional(),
+  force: z.boolean().optional(),
 };
 
 export interface ApplyArgs {
@@ -987,60 +1002,86 @@ export interface ApplyArgs {
   params?: RecipeParamValues;
   dry_run?: boolean;
   yes?: boolean;
+  force?: boolean;
+}
+
+export const applyRowsArgsSchema = {
+  rows: z.array(applyRowSchema).min(1),
+  dry_run: z.boolean().optional(),
+  yes: z.boolean().optional(),
+};
+
+export interface ApplyRowsArgs {
+  rows: Array<{
+    file_path: string;
+    line_start: number;
+    before_pattern: string;
+    after_pattern: string;
+  }>;
+  dry_run?: boolean;
+  yes?: boolean;
+}
+
+function assertApplyTransportConsent(
+  dryRun: boolean,
+  yes: boolean | undefined,
+): string | undefined {
+  if (dryRun && yes === true) {
+    return `codemap apply: dry_run and yes are mutually exclusive (dry_run never writes).`;
+  }
+  if (!dryRun && yes !== true) {
+    return `codemap apply: this tool writes files. Pass {yes: true} for non-interactive runs, or {dry_run: true} for preview.`;
+  }
+  return undefined;
 }
 
 /**
- * Substrate-shaped fix executor — reuses {@link applyDiffPayload} so the
- * envelope is identical across CLI / MCP / HTTP (Q5). Non-`dry_run`
- * invocations require `yes: true`; this is the agent-shaped equivalent
- * of the CLI's non-TTY rejection.
+ * Substrate-shaped fix executor — recipe SQL → row contract →
+ * {@link runApplyFromRecipe} (Q5 envelope). Non-`dry_run` requires `yes: true`.
  */
 export function handleApply(args: ApplyArgs, root: string): ToolResult {
   try {
-    const sql = getQueryRecipeSql(args.recipe);
-    if (sql === undefined) {
+    const dryRun = args.dry_run === true;
+    const consentErr = assertApplyTransportConsent(dryRun, args.yes);
+    if (consentErr !== undefined) return err(consentErr);
+
+    if (getQueryRecipeSql(args.recipe) === undefined) {
       return err(
         `codemap: unknown recipe "${args.recipe}". List available recipes via the codemap://recipes resource.`,
         404,
       );
     }
 
-    const dryRun = args.dry_run === true;
-    if (!dryRun && args.yes !== true) {
-      return err(
-        `codemap apply: this tool writes files. Pass {yes: true} for non-interactive runs, or {dry_run: true} for preview.`,
-      );
-    }
-    if (dryRun && args.yes === true) {
-      return err(
-        `codemap apply: dry_run and yes are mutually exclusive (dry_run never writes).`,
-      );
-    }
-
-    const resolvedParams = resolveRecipeParams({
-      recipeId: args.recipe,
-      declared: getQueryRecipeParams(args.recipe),
-      provided: args.params,
-    });
-    if (!resolvedParams.ok) return err(resolvedParams.error);
-
-    let rows: unknown[];
-    try {
-      rows = queryRows(sql, resolvedParams.values);
-    } catch (e) {
-      return err(
-        `codemap apply: recipe SQL execution failed — ${e instanceof Error ? e.message : String(e)}`,
-        500,
-      );
-    }
-
-    const payload = applyDiffPayload({
-      rows: rows as Record<string, unknown>[],
+    const { payload } = runApplyFromRecipe({
       projectRoot: root,
+      recipeId: args.recipe,
+      params: args.params,
+      dryRun,
+      force: args.force === true,
+      yes: args.yes === true,
+    });
+    return ok(payload);
+  } catch (e) {
+    if (e instanceof ApplyRunError) return err(e.message, 400);
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+/** Agent-in-the-loop apply — explicit row contract (Step 8). */
+export function handleApplyRows(args: ApplyRowsArgs, root: string): ToolResult {
+  try {
+    const dryRun = args.dry_run === true;
+    const consentErr = assertApplyTransportConsent(dryRun, args.yes);
+    if (consentErr !== undefined) return err(consentErr);
+
+    const { payload } = runApplyFromRows({
+      projectRoot: root,
+      rows: args.rows,
       dryRun,
     });
     return ok(payload);
   } catch (e) {
+    if (e instanceof ApplyRunError) return err(e.message, 400);
     return err(e instanceof Error ? e.message : String(e), 500);
   }
 }

@@ -1,0 +1,20 @@
+[
+  {
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 1,
+    "line_end": 1,
+    "before_pattern": "~/api/client",
+    "after_pattern": "~/api/client-v2",
+    "location_kind": "import_source",
+    "chain_depth": 0
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 1,
+    "line_end": 1,
+    "before_pattern": "~/api/client",
+    "after_pattern": "~/api/client-v2",
+    "location_kind": "import_source",
+    "chain_depth": 0
+  }
+]

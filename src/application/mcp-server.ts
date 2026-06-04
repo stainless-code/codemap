@@ -37,10 +37,12 @@ import type { ManagedWatchSession } from "./session-lifecycle";
 import {
   affectedArgsSchema,
   applyArgsSchema,
+  applyRowsArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
   handleApply,
+  handleApplyRows,
   handleAudit,
   handleAffected,
   handleContext,
@@ -179,6 +181,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("explore", () => registerExploreTool(server, opts));
   maybeRegister("node", () => registerNodeTool(server, opts));
   maybeRegister("apply", () => registerApplyTool(server, opts));
+  maybeRegister("apply_rows", () => registerApplyRowsTool(server, opts));
   registerResources(server);
   logMcpToolAllowlist(allowlistResolved, registered);
 
@@ -382,10 +385,22 @@ function registerApplyTool(server: McpServer, opts: ServerOpts): void {
     "apply",
     {
       description:
-        "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
+        "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run), force (bypass auto_fixable / apply.autoApplyRecipes gates). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
       inputSchema: applyArgsSchema,
     },
     (args) => wrapToolResult(handleApply(args, opts.root)),
+  );
+}
+
+function registerApplyRowsTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "apply_rows",
+    {
+      description:
+        "Apply explicit diff rows (agent-in-the-loop) — same phase-1/2 engine as `apply` but rows are supplied directly instead of from recipe SQL. Args: rows (array of {file_path, line_start, before_pattern, after_pattern}), dry_run, yes (required for writes).",
+      inputSchema: applyRowsArgsSchema,
+    },
+    (args) => wrapToolResult(handleApplyRows(args, opts.root)),
   );
 }
 

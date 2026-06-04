@@ -92,6 +92,9 @@ export interface ApplyJsonPayload {
   applied: boolean;
   files: ApplyFile[];
   conflicts: ConflictRow[];
+  /** Set when `--until-empty` runs the fixpoint loop. */
+  passes?: number;
+  terminated_by?: "empty" | "cap" | "conflicts" | "complete";
   summary: {
     /** Distinct `file_path`s in the input row set. */
     files: number;

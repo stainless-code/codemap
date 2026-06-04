@@ -14,7 +14,7 @@ import {
   hasLocatableRows,
 } from "../application/output-formatters";
 import {
-  getQueryRecipeActions,
+  getQueryRecipeActionsRendered,
   getQueryRecipeCatalogEntry,
   getQueryRecipeParams,
   getQueryRecipeSql,
@@ -852,7 +852,7 @@ export async function runQueryCmd(opts: {
 
     const recipeActions =
       opts.recipeId !== undefined
-        ? getQueryRecipeActions(opts.recipeId)
+        ? getQueryRecipeActionsRendered(opts.recipeId, opts.recipeParams)
         : undefined;
     const bindValues = resolveRecipeBindValues({
       recipeId: opts.recipeId,

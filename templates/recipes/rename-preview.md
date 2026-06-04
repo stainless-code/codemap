@@ -27,8 +27,10 @@ params:
     default: true
     description: Reserved for alias-chain support once export locations are indexed.
 actions:
-  - type: review-rename
-    description: "Read-only preview. Run `git apply --check` before applying; codemap never writes files."
+  - type: apply-rename
+    auto_fixable: true
+    description: Apply rename hunks via codemap apply after reviewing the diff preview.
+    command: codemap apply rename-preview --params old={{old}},new={{new}} --yes
 ---
 
 # Rename preview
@@ -48,8 +50,9 @@ codemap query --recipe rename-preview \
 
 ## What v1 does not cover
 
-- Call sites inside function bodies — the current `calls` table records caller/callee names but not callee source line/column.
-- Re-export alias chains — the current `exports` table records names but not export source locations.
 - String literals, comments, dynamic dispatch (`obj[name]`), template-literal property access.
+- JSX component tag renames (use dedicated JSX recipes).
+- Default-import binding shapes beyond direct named specifiers.
+- Same-line ambiguity when `before_pattern` appears twice on one line (first match only).
 
-Use `rg oldName` separately before applying the diff. This recipe is intentionally conservative; future slices can widen coverage after the substrate records precise source locations for calls and exports.
+Use `rg oldName` for literals/comments. `include_re_exports` controls single-hop `re_export_chains` rows.

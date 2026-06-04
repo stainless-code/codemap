@@ -351,7 +351,13 @@ Copies bundled agent templates into .agents/ under the project root.
       params: parsed.params,
       dryRun: parsed.dryRun,
       yes: parsed.yes,
+      force: parsed.force,
       json: parsed.json,
+      rowsPath: parsed.rowsPath,
+      diffInputPath: parsed.diffInputPath,
+      untilEmpty: parsed.untilEmpty,
+      maxPasses: parsed.maxPasses,
+      commitMessage: parsed.commitMessage,
     });
     return;
   }

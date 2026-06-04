@@ -28,11 +28,13 @@ import type { ManagedWatchSession } from "./session-lifecycle";
 import {
   affectedArgsSchema,
   applyArgsSchema,
+  applyRowsArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
   exploreArgsSchema,
   handleApply,
+  handleApplyRows,
   handleAudit,
   handleAffected,
   handleContext,
@@ -117,6 +119,7 @@ const TOOL_NAMES = [
   "explore",
   "node",
   "apply",
+  "apply_rows",
   "save_baseline",
   "list_baselines",
   "drop_baseline",
@@ -571,6 +574,12 @@ async function dispatchTool(
       const r = validate(applyArgsSchema, args, "apply");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleApply(r.value, opts.root);
+      break;
+    }
+    case "apply_rows": {
+      const r = validate(applyRowsArgsSchema, args, "apply_rows");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleApplyRows(r.value, opts.root);
       break;
     }
     case "save_baseline": {

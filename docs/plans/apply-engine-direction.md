@@ -1,6 +1,6 @@
 # Apply-engine direction — diff-shape recipes + agent-in-the-loop substrate
 
-> **Status:** open · substrate growth (Steps 5–7 partial) lives in [`substrate-extraction.md`](./substrate-extraction.md) (tiers 1–6 shipped). This plan owns the **apply-engine / diff-shape recipe** half of the richer-index synthesis.
+> **Status:** closing — Steps 2–4, 6–12 shipped (`feat/apply-engine-slices`). Substrate Steps 5–7 live in [`substrate-extraction.md`](./substrate-extraction.md) (tiers 1–6 shipped). This plan owns the **apply-engine / diff-shape recipe** half of the richer-index synthesis.
 >
 > **Motivator:** extend `codemap apply` from recipe-driven single-file hunks toward agent-in-the-loop row contracts (`apply --rows -`, diff-input, fixpoint loops) without crossing [Moat A](../roadmap.md#moats-load-bearing) (SQL/recipe API) or [Moat B](../roadmap.md#moats-load-bearing) (no re-extraction in apply).
 >
@@ -20,47 +20,47 @@
 
 ## Open steps (implementation sequence)
 
-### Step 2 — Three diff-shape recipes (S × 3)
+_All steps below shipped on branch `feat/apply-engine-slices` (single PR). Wave-2 recipes (`organize-imports`, `missing-exports`, …) remain backlog per synthesis § 4.3._
 
-Ship `replace-marker-kind`, `migrate-import-source`, `add-jsdoc-deprecated` — pure SQL + frontmatter; no engine/schema change.
+### Step 2 — Three diff-shape recipes (S × 3) — ✓ Shipped
 
-Open: sequential PRs per [tracer-bullets](../../.agents/rules/tracer-bullets.md); hold `organize-imports` / `missing-exports` for wave 2.
+`replace-marker-kind`, `migrate-import-source`, `add-jsdoc-deprecated` — bundled SQL + frontmatter + golden scenarios.
 
-### Step 3 — Per-row `actions[].command` template (S)
+### Step 3 — Per-row `actions[].command` template (S) — ✓ Shipped
 
-Extend `recipes-loader.ts` / `query-recipes.ts` so `actions[]` carries a rendered `command` template (reuse `recipe-params.ts`; block-list shape only).
+`RecipeAction.command` + `renderRecipeActionCommands` / `getQueryRecipeActionsRendered`.
 
-### Step 4 — `auto_fixable` gating (S)
+### Step 4 — `auto_fixable` gating (S) — ✓ Shipped
 
-Enforce `actions[].auto_fixable: true` (or `--force`) before write. `--force` bypasses gate only, not phase-1 conflict detection.
+`assertApplyAutoFixable` + CLI/MCP `--force`.
 
-### Step 6 — App-wide rename recipe (S; depends Step 5 substrate ✓)
+### Step 6 — App-wide rename recipe (S) — ✓ Shipped
 
-Extend `rename-preview.sql` with `call_rows` CTE. Bias: extend existing recipe id, not a second rename recipe. Preserve honest v1 gap list (re-exports, JSX, default-import binds).
+`rename-preview.sql` `call_rows` CTE; golden updated with `call_site` rows.
 
-### Step 7 (recipe) — `rename-preview` `re_export_rows` CTE (S)
+### Step 7 (recipe) — `rename-preview` `re_export_rows` CTE (S) — ✓ Shipped
 
-Substrate shipped; **recipe extension open**. Single-hop alias chains in v1; recursive CTE if gap appears.
+Single-hop `re_export_rows` CTE; gated by `include_re_exports`.
 
-### Step 8 — `apply --rows -` + `apply_rows` MCP/HTTP tool (M)
+### Step 8 — `apply --rows -` + `apply_rows` MCP/HTTP tool (M) — ✓ Shipped
 
-JSON array of `{file_path, line_start, before_pattern, after_pattern}` from stdin/args; existing phase-1/2 validation. Separate MCP tool (not polymorphic with recipe id).
+CLI `--rows`; MCP/HTTP `apply_rows` tool.
 
-### Step 9 — `apply --diff-input <file>` (S)
+### Step 9 — `apply --diff-input <file>` (S) — ✓ Shipped
 
-Unified diff → row contract → same engine. Hand-roll parser; per-file atomicity; cross-file rollback deferred.
+`parseUnifiedDiffToRows` + CLI `--diff-input`.
 
-### Step 10 — `apply --commit "<msg>"` (S)
+### Step 10 — `apply --commit "<msg>"` (S) — ✓ Shipped
 
-`git add` only files apply touched, then commit. Message templating deferred.
+`gitCommitAppliedFiles` + CLI `--commit`.
 
-### Step 11 — `--until-empty` + `--max-passes N` (S)
+### Step 11 — `--until-empty` + `--max-passes N` (S) — ✓ Shipped
 
-Apply → reindex → re-run recipe loop. Abort whole loop on phase-1 conflicts. Extend result envelope with `passes` + `terminated_by`.
+`runApplyUntilEmpty` + envelope `passes` / `terminated_by` (CLI only).
 
-### Step 12 — `apply.autoApplyRecipes` allowlist (S)
+### Step 12 — `apply.autoApplyRecipes` allowlist (S) — ✓ Shipped
 
-Config list of recipe ids allowed with `--yes` without interactive confirm. `--force` bypasses allowlist.
+`codemapUserConfigSchema.apply.autoApplyRecipes` + `assertApplyAllowlist`.
 
 ---
 

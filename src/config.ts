@@ -112,6 +112,18 @@ export const codemapUserConfigSchema = z
       .strict()
       .optional()
       .describe("Optional synthesis passes after bindings/call resolve."),
+    apply: z
+      .object({
+        autoApplyRecipes: z
+          .array(z.string().min(1))
+          .optional()
+          .describe(
+            "Recipe ids allowed with `--yes` without interactive confirm. Empty/omitted = no allowlist gate. `--force` bypasses.",
+          ),
+      })
+      .strict()
+      .optional()
+      .describe("Apply-engine policy (substrate-shaped fix executor)."),
     boundaries: z
       .array(
         z
@@ -217,6 +229,11 @@ export interface ResolvedCodemapConfig {
   readonly synthesis: {
     readonly heuristicCalls: boolean;
   };
+  /**
+   * When non-empty, `codemap apply --yes <recipe>` requires the recipe id to
+   * appear here unless `--force` is passed.
+   */
+  readonly applyAutoApplyRecipes: readonly string[] | undefined;
 }
 
 /**
@@ -322,6 +339,12 @@ export function resolveCodemapConfig(
 
   const heuristicCalls = parsed?.synthesis?.heuristicCalls === true;
 
+  const autoApply = parsed?.apply?.autoApplyRecipes;
+  const applyAutoApplyRecipes =
+    autoApply !== undefined && autoApply.length > 0
+      ? [...autoApply]
+      : undefined;
+
   return {
     root: absRoot,
     stateDir,
@@ -333,6 +356,7 @@ export function resolveCodemapConfig(
     boundaries,
     recipeRecency,
     synthesis: { heuristicCalls },
+    applyAutoApplyRecipes,
   };
 }
 

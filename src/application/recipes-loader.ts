@@ -14,6 +14,8 @@ export interface RecipeAction {
   type: string;
   auto_fixable?: boolean;
   description?: string;
+  /** Rendered with `{{param}}` placeholders via {@link renderRecipeActionCommands}. */
+  command?: string;
 }
 
 /**
@@ -440,6 +442,7 @@ function applyKey(
     next.auto_fixable = value;
   else if (key === "description" && typeof value === "string")
     next.description = value;
+  else if (key === "command" && typeof value === "string") next.command = value;
   // Unknown keys silently ignored (forward-compat).
   return next;
 }

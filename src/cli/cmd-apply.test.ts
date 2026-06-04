@@ -250,7 +250,7 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
         CODEMAP_ROOT: projectRoot,
       });
       expect(r.exitCode).toBe(1);
-      expect(r.err).toContain("missing <recipe-id>");
+      expect(r.err).toMatch(/recipe-id|--rows|--diff-input/);
     });
 
     it("rejects unknown options", async () => {
@@ -266,7 +266,8 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
     it("prints usage without bootstrapping", async () => {
       const r = await runCli(["apply", "--help"]);
       expect(r.exitCode).toBe(0);
-      expect(r.out).toContain("Usage: codemap apply <recipe-id>");
+      expect(r.out).toContain("codemap apply");
+      expect(r.out).toContain("--rows");
       expect(r.out).toContain("--dry-run");
       expect(r.out).toContain("--yes");
     });

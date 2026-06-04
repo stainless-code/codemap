@@ -360,6 +360,22 @@ body
     ]);
   });
 
+  it("parses action with command template", () => {
+    const md = `---
+actions:
+  - type: apply-x
+    command: codemap apply foo --params old={{old}} --yes
+---
+`;
+    const r = extractFrontmatterAndBody(md);
+    expect(r.actions).toEqual([
+      {
+        type: "apply-x",
+        command: "codemap apply foo --params old={{old}} --yes",
+      },
+    ]);
+  });
+
   it("parses action with auto_fixable: true (boolean scalar)", () => {
     const md = `---
 actions:
