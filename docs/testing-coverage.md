@@ -40,6 +40,8 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 | `replace-marker-kind`   | `replace-marker-kind`                                                            | `--yes` disk apply (temp project)            |
 | `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                           | — (query golden only; writes need `--force`) |
 | `stale-imports`         | `stale-imports`                                                                  | dry-run + `--force --yes` disk apply         |
+| `migrate-deprecated`    | `migrate-deprecated`                                                             | dry-run + `--force --yes` disk apply         |
+| `deprecated-usages`     | `deprecated-usages`                                                              | `--force --yes` disk apply (JSDoc line)      |
 
 **Input modes:** recipe id (above); `--rows` JSON file (e2e); `--diff-input` (`apply-diff-input.test.ts` unit). MCP `apply_rows` shares the rows path — no separate e2e yet.
 

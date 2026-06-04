@@ -1,6 +1,6 @@
 # Substrate & apply utilization — gap diagnosis + doc/execution plan
 
-> **Status:** open — **Phase A + B + C.5 shipped** on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165). **Open:** Phase C wave-2 recipes (C.2–C.4, C.6); Phase D (MCP fixpoint). Substrate tiers 7–13: [`substrate-extraction.md`](./substrate-extraction.md).
+> **Status:** open — **Phase A–B + C.3–C.5 shipped** on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165). **Open:** C.6, multi-specifier stale-imports, Phase D. `organize-imports` rejected (formatter domain). Substrate tiers 7–13: [`substrate-extraction.md`](./substrate-extraction.md).
 
 ---
 
@@ -10,11 +10,11 @@
 | ------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Substrate (tiers 1–6)** | **Partially**          | Rich tables exist (`references`, `bindings`, `jsx_*`, `import_specifiers`, `jsdoc_tags`, …) but **only a thin slice** is JOIN'd by shipped diff-shape recipes. Tiers **7–13** are intentionally unshipped — not a utilization failure. |
 | **Apply executor**        | **Mostly yes**         | Phase-1/2 engine, three CLI input modes, MCP `apply` + `apply_rows`, policy gates, fixpoint loop — **shipped and engine-heavy in tests**.                                                                                              |
-| **Apply recipes**         | **Partially**          | **5 of 62** bundled SQL recipes emit the diff row contract; **3** `auto_fixable: true`, **`stale-imports`** review-first. Bottleneck remains wave-2 **semantic** recipes (`migrate-deprecated`, …).                                    |
+| **Apply recipes**         | **Mostly yes**         | **7 of 62** diff-shape recipes; `deprecated-symbols` → `migrate-deprecated` / `deprecated-usages`. Remaining: multi-specifier import edits, C.6.                                                                                       |
 | **Agent/consumer docs**   | **Mostly yes**         | Architecture + glossary + README apply subsection + skill/MCP apply workflow. Wave-2 recipe catalog still thin until Phase C.                                                                                                          |
 | **Verification**          | **Mostly yes**         | CLI E2E: three input modes (recipe, `--rows`, recipes on disk); `rename-preview-product-card` golden (barrel + re-export). **Open:** `--diff-input` CLI e2e.                                                                           |
 
-**Conclusion:** Five diff-shape recipes shipped (`rename-preview` extended, `stale-imports`). **Next:** `migrate-deprecated` (C.4) — pairs with `deprecated-symbols` audit → apply.
+**Conclusion:** Seven diff-shape recipes shipped including deprecated audit→apply pair. **Next:** C.6 / multi-specifier stale-imports; close plan when exit criteria met.
 
 ---
 
@@ -98,12 +98,12 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 
 ## Open work (gap matrix)
 
-| Gap                                                                                | Type           | Track here           |
-| ---------------------------------------------------------------------------------- | -------------- | -------------------- |
-| Wave-2 diff-shape recipes (`migrate-deprecated`, multi-specifier stale-imports, …) | Implementation | § Phase C            |
-| `--diff-input` CLI e2e                                                             | Testing        | § Phase B (optional) |
-| MCP `until_empty` / `--commit`                                                     | Deferred       | § Phase D            |
-| Substrate tiers 7–13                                                               | Separate plan  | substrate-extraction |
+| Gap                                                                   | Type           | Track here           |
+| --------------------------------------------------------------------- | -------------- | -------------------- |
+| Multi-specifier `stale-imports`; `actions[].command` on audit recipes | Implementation | § Phase C            |
+| `--diff-input` CLI e2e                                                | Testing        | § Phase B (optional) |
+| MCP `until_empty` / `--commit`                                        | Deferred       | § Phase D            |
+| Substrate tiers 7–13                                                  | Separate plan  | substrate-extraction |
 
 ---
 
@@ -127,11 +127,11 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 | C.1      | Fix **`replace-marker-kind`**                    | **✓ Shipped**                                                               |
 | C.2      | **`organize-imports`**                           | **Rejected** — formatter/ESLint domain; see § Rejected                      |
 | C.3      | **`stale-imports`**                              | **✓ Shipped** — sole-specifier line delete (v1)                             |
-| C.4      | **`migrate-deprecated` / `deprecated-usages`**   | **Open**                                                                    |
+| C.4      | **`migrate-deprecated` / `deprecated-usages`**   | **✓ Shipped**                                                               |
 | C.5      | **`rename-app-wide` or barrel import rows**      | **✓ Shipped** — `barrel_import_rows` + `reference_rows` on `rename-preview` |
 | C.6      | `actions[].command` on audit recipes w/ diff SQL | **Open**                                                                    |
 
-**Phase C exit criteria (partial):** `stale-imports` + rename extensions shipped; **`migrate-deprecated`** still open for “≥2 beyond original four” if counting only new ids.
+**Phase C exit criteria (partial):** ≥2 new ids beyond original four (`stale-imports`, `migrate-deprecated`, `deprecated-usages`) ✓; C.6 open.
 
 ### Phase D — Optional transport parity (trigger-gated)
 

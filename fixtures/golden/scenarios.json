@@ -745,6 +745,24 @@
       }
     },
     {
+      "id": "migrate-deprecated",
+      "prompt": "Migrate call/import sites from deprecated symbol now to Date.now",
+      "recipe": "migrate-deprecated",
+      "params": {
+        "symbol": "now",
+        "replacement": "Date.now"
+      }
+    },
+    {
+      "id": "deprecated-usages",
+      "prompt": "Rewrite @deprecated JSDoc line on now()",
+      "recipe": "deprecated-usages",
+      "params": {
+        "symbol": "now",
+        "replacement_message": "Use Date.now() only."
+      }
+    },
+    {
       "id": "stale-imports",
       "prompt": "Unused sole-specifier import lines (import_specifiers vs references)",
       "recipe": "stale-imports"

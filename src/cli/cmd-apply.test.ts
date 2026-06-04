@@ -330,6 +330,92 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
     });
   });
 
+  describe("migrate-deprecated", () => {
+    beforeEach(async () => {
+      writeFileSync(
+        join(projectRoot, "src", "legacy.ts"),
+        "/**\n * @deprecated Use newHelper instead.\n */\nexport function oldHelper(): void {}\n",
+        "utf8",
+      );
+      writeFileSync(
+        join(projectRoot, "src", "use.ts"),
+        'import { oldHelper } from "./legacy";\n\nexport function run() {\n  return oldHelper();\n}\n',
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("dry-run emits call-site rows for a deprecated symbol", async () => {
+      const r = await runCli(
+        [
+          "apply",
+          "migrate-deprecated",
+          "--params",
+          "symbol=oldHelper,replacement=newHelper",
+          "--dry-run",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.summary.rows).toBeGreaterThan(0);
+      expect(readFile("src/use.ts")).toContain("oldHelper");
+    });
+
+    it("rewrites call sites with --force --yes", async () => {
+      const r = await runCli(
+        [
+          "apply",
+          "migrate-deprecated",
+          "--params",
+          "symbol=oldHelper,replacement=newHelper",
+          "--force",
+          "--yes",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const body = readFile("src/use.ts");
+      expect(body).toContain("import { newHelper }");
+      expect(body).toContain("return newHelper()");
+      expect(body).not.toMatch(/\boldHelper\b/);
+    });
+  });
+
+  describe("deprecated-usages", () => {
+    beforeEach(async () => {
+      writeFileSync(
+        join(projectRoot, "src", "legacy.ts"),
+        "/**\n * @deprecated Use newHelper instead.\n */\nexport function oldHelper(): void {}\n",
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("rewrites the @deprecated JSDoc line on disk", async () => {
+      const r = await runCli(
+        [
+          "apply",
+          "deprecated-usages",
+          "--params",
+          "symbol=oldHelper,replacement_message=Prefer newHelper.",
+          "--force",
+          "--yes",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const body = readFile("src/legacy.ts");
+      expect(body).toContain("@deprecated Prefer newHelper.");
+      expect(body).not.toContain("Use newHelper instead");
+    });
+  });
+
   describe("stale-imports", () => {
     beforeEach(async () => {
       writeFileSync(
