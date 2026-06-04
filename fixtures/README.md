@@ -2,14 +2,14 @@
 
 **Single committed corpus** for regression-testing Codemap — no `CODEMAP_ROOT` pointing at external apps required for maintainers or CI.
 
-| Piece                   | Path                                                                                    | Role                                                     |
-| ----------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| **Corpus**              | [`minimal/`](./minimal/)                                                                | Source tree indexed by goldens, benchmark, agent-eval    |
-| **Golden scenarios**    | [`golden/scenarios.json`](./golden/scenarios.json)                                      | 124+ SQL/recipe scenarios                                |
-| **Golden snapshots**    | [`golden/minimal/`](./golden/minimal/)                                                  | Expected query JSON (committed)                          |
-| **Capability map**      | [`CAPABILITIES.json`](./CAPABILITIES.json)                                              | Machine-readable: capability → fixture files → scenarios |
-| **Agent eval**          | [`agent-eval/`](../scripts/agent-eval/) + probes in `scripts/agent-eval/scenarios.json` | MCP-on vs traditional arms                               |
-| **Benchmark scenarios** | [`benchmark/scenarios.example.json`](./benchmark/scenarios.example.json)                | Speed comparisons (optional override)                    |
+| Piece                   | Path                                                                                    | Role                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Corpus**              | [`minimal/`](./minimal/)                                                                | Source tree indexed by goldens, benchmark, agent-eval     |
+| **Golden scenarios**    | [`golden/scenarios.json`](./golden/scenarios.json)                                      | 125 SQL/recipe scenarios                                  |
+| **Golden snapshots**    | [`golden/minimal/`](./golden/minimal/)                                                  | Expected query JSON (committed)                           |
+| **Capability map**      | [`CAPABILITIES.json`](./CAPABILITIES.json)                                              | Capability groups → fixture files → `goldenScenarios` ids |
+| **Agent eval**          | [`agent-eval/`](../scripts/agent-eval/) + probes in `scripts/agent-eval/scenarios.json` | MCP-on vs traditional arms                                |
+| **Benchmark scenarios** | [`benchmark/scenarios.example.json`](./benchmark/scenarios.example.json)                | Speed comparisons (optional override)                     |
 
 ## Commands (from repo root)
 

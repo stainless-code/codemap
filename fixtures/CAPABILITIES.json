@@ -8,7 +8,11 @@
       "id": "index.schema",
       "description": "All indexed tables populated on full rebuild",
       "fixtureFiles": ["src/consumer.ts", "src/api/client.ts"],
-      "goldenScenarios": ["index-table-stats", "index-summary"]
+      "goldenScenarios": [
+        "index-table-stats",
+        "index-summary",
+        "file-metrics-complexity-fixture"
+      ]
     },
     {
       "id": "symbols.imports.exports",
@@ -36,6 +40,8 @@
       "goldenScenarios": [
         "references-product-card-perms",
         "bindings-createClient",
+        "import-specifiers-consumer",
+        "function-params-createClient",
         "find-symbol-references",
         "find-re-exported-bindings"
       ]
@@ -79,6 +85,7 @@
       "goldenScenarios": [
         "type-members-client-config",
         "type-ancestors-dog",
+        "type-ancestors-qualified-child",
         "type-descendants-animal"
       ]
     },
@@ -119,6 +126,7 @@
       "goldenScenarios": [
         "find-barrel-files",
         "circular-imports",
+        "module-cycles-cache-store",
         "dynamic-imports-prefetch",
         "re-export-chains-product-card",
         "barrel-chains"
@@ -140,7 +148,8 @@
         "try-catch-rethrow-heuristics",
         "decorators-sealed",
         "runtime-markers-env",
-        "find-leftover-console"
+        "find-leftover-console",
+        "jsdoc-tags-createClient"
       ]
     },
     {

@@ -245,26 +245,26 @@ All base tables use `STRICT` mode; **`source_fts`** is an FTS5 virtual table (no
 
 ### `calls` — Function-scoped call edges, deduped per file (`STRICT`)
 
-| Column                 | Type       | Description                                                                                                                       |
-| ---------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| id                     | INTEGER PK | Auto-increment row id                                                                                                             |
-| file_path              | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                        |
-| caller_name            | TEXT       | Name of the calling function/method                                                                                               |
-| caller_scope           | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions |
-| callee_name            | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self           |
-| line_start             | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                           |
-| column_start           | INTEGER    | 0-based byte column of the callee token                                                                                           |
-| column_end             | INTEGER    | One-past-last column                                                                                                              |
-| args_count             | INTEGER    | Argument count; NULL when a spread argument is present                                                                            |
-| is_method_call         | INTEGER    | 1 when callee is a member expression (`obj.method()`)                                                                             |
-| is_constructor_call    | INTEGER    | 1 for `new Foo()` (`NewExpression`)                                                                                               |
-| is_optional_chain      | INTEGER    | 1 when the call uses optional chaining (`?.`)                                                                                     |
-| callee_symbol_id       | INTEGER FK | Resolved callee in `symbols` (NULL when unresolved / external global)                                                             |
-| callee_resolution_kind | TEXT       | `same-file`, `imported`, `re-exported`, `global`, or `unresolved` — filled by `resolveCalls` after bindings                       |
+| Column                 | Type       | Description                                                                                                                                                     |
+| ---------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                     | INTEGER PK | Auto-increment row id                                                                                                                                           |
+| file_path              | TEXT FK    | References `files(path)` ON DELETE CASCADE                                                                                                                      |
+| caller_name            | TEXT       | Name of the calling function/method                                                                                                                             |
+| caller_scope           | TEXT       | Dot-joined scope path (e.g. `UserService.run`). Anonymous scopes encode as `$anon_<localId>` to avoid sibling-callback collisions                               |
+| callee_name            | TEXT       | Name of the called function, `obj.method` / `obj.foo.bar` for member chains (recursive flatten), `this.method` for self                                         |
+| line_start             | INTEGER    | 1-based line of the callee identifier token (per [R.6])                                                                                                         |
+| column_start           | INTEGER    | 0-based byte column of the callee token                                                                                                                         |
+| column_end             | INTEGER    | One-past-last column                                                                                                                                            |
+| args_count             | INTEGER    | Argument count; NULL when a spread argument is present                                                                                                          |
+| is_method_call         | INTEGER    | 1 when callee is a member expression (`obj.method()`)                                                                                                           |
+| is_constructor_call    | INTEGER    | 1 for `new Foo()` (`NewExpression`)                                                                                                                             |
+| is_optional_chain      | INTEGER    | 1 when the call uses optional chaining (`?.`)                                                                                                                   |
+| callee_symbol_id       | INTEGER FK | Resolved callee in `symbols` (NULL when unresolved / external global)                                                                                           |
+| callee_resolution_kind | TEXT       | `same-file`, `imported`, `re-exported`, `global`, or `unresolved` — set by `resolveCalls` after bindings; NULL on method calls (`is_method_call = 1`, deferred) |
 
 Edges are deduped per (caller_scope, callee, call vs constructor) per file: if `foo` calls `bar` three times in the same file, only one row is stored. `foo()` and `new Foo()` with the same callee name remain distinct rows. Same-named methods in different classes get distinct `caller_scope` values. Module-level calls (outside any function) are excluded — only function-scoped calls are tracked.
 
-**Call resolution:** `src/application/call-resolver.ts` runs after bindings on full rebuild and after incremental file updates. Incremental scope is `expandHeritageResolveScope` over all requested/changed paths (includes importers). Method calls (`is_method_call = 1`) are not name-bound yet. Unresolved sites are staged in `unresolved_calls`; `meta.unresolved_calls_residual` is the global queue `COUNT(*)`.
+**Call resolution:** `src/application/call-resolver.ts` runs after bindings on full rebuild and after incremental file updates. Incremental scope is `expandHeritageResolveScope` over changed/requested paths **and** deletion-only paths (includes importers). Method calls (`is_method_call = 1`) are not name-bound yet (`callee_*` stay NULL; not queued). Unresolved sites are staged in `unresolved_calls`; `meta.unresolved_calls_residual` is the global queue `COUNT(*)`.
 
 ### `unresolved_calls` — Staging queue for unresolved call sites (`STRICT`)
 
