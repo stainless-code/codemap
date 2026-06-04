@@ -49,7 +49,7 @@ fixtures/
 
 - [x] `src/cli/cmd-test-bench-e2e.test.ts` — show, snippet, impact, validate, `shop-symbols`, SARIF (`boundary-violations`)
 - [x] `cmd-cli-parity-e2e.test.ts` — trace, explore, node, context, batch, resources
-- [ ] Expand `test:agent-eval` to one probe per `CAPABILITIES.json` group (6/16 today)
+- [x] Expand `test:agent-eval` to one probe per `CAPABILITIES.json` group (18 probes; guarded by `capability-probes.test.mjs`)
 
 ### Phase 4 — Scale (optional, replaces Tier B′)
 

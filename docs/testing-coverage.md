@@ -81,16 +81,7 @@ Codemap development uses **only** the committed bench ([fixtures/README.md](../f
 
 ## Agent eval probes
 
-`scripts/agent-eval/scenarios.json` maps probes → golden ids:
-
-| Probe                 | Golden id                    |
-| --------------------- | ---------------------------- |
-| Symbol definition     | `symbol-usePermissions`      |
-| Dependency edges      | `dependencies-from-consumer` |
-| Call sites            | `find-call-sites`            |
-| Call resolution stats | `call-resolution-stats`      |
-| Import specifiers     | `import-specifiers-consumer` |
-| Project-local recipe  | `shop-symbols-recipe`        |
+`scripts/agent-eval/scenarios.json` — **18 probes**, one golden id per `CAPABILITIES.json` group (except bundled-recipe guard + CLI-only groups). Enforced by `scripts/agent-eval/capability-probes.test.mjs` in `test:scripts`.
 
 ---
 

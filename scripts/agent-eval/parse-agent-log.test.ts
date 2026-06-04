@@ -588,7 +588,10 @@ describe("run-probes smoke", () => {
       ).probes.length;
       expect(parsed.scenarios).toHaveLength(probeCount);
       expect(parsed.summary.successCount).toBe(probeCount);
-      expect(parsed.scenarios[2]!.mcpOn.toolSequence).toEqual(["query_recipe"]);
+      const findCallSites = parsed.scenarios.find(
+        (s) => s.id === "find-call-sites",
+      );
+      expect(findCallSites?.mcpOn.toolSequence).toEqual(["query_recipe"]);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
