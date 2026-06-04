@@ -25,4 +25,5 @@ Exact-match import `source` path migration (one row per `imports` line).
 
 ```bash
 codemap apply migrate-import-source --params old_source=~/api/client,new_source=~/api/client-v2 --dry-run
+codemap apply migrate-import-source --params old_source=~/api/client,new_source=~/api/client-v2,in_file=src/components --dry-run
 ```

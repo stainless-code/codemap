@@ -221,6 +221,12 @@ export function parseApplyRest(rest: string[]):
       message: `codemap apply: choose one of <recipe-id>, --rows, or --diff-input.`,
     };
   }
+  if (params !== undefined && recipeId === undefined) {
+    return {
+      kind: "error",
+      message: `codemap apply: --params can only be used with <recipe-id>.`,
+    };
+  }
   if (untilEmpty && recipeId === undefined) {
     return {
       kind: "error",

@@ -86,7 +86,7 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors `lsp-diagn
 
 - **Q14 — In-place schema migration.** **RESOLVED 2026-05-14 — promoted to [R.16](#pre-locked-decisions).** Every tier bumps `SCHEMA_VERSION`; full rebuild on mismatch; reject in-place migrations. Empirical rebuild cost (~2s worst case) makes optimisation unjustified.
 
-- **Q16 — Extractor-registration architecture.** **RESOLVED 2026-05-14 — promoted to [R.17](#pre-locked-decisions).** Per-tier extractor modules under `src/extractors/<tier>.ts` exporting `TierExtractor { tierId, register(visitor, ctx) }`; `parser.ts` becomes a thin orchestrator; migration PR ships before Tier 1. (Question added during the grill — not in the original Q1-Q15 numbering.)
+- **Q16 — Extractor-registration architecture.** **RESOLVED 2026-05-14 — decision locked in [R.17](#pre-locked-decisions).** Target shape is per-tier modules under `src/extractors/<tier>.ts`; **not implemented** as the `TierExtractor { register(visitor, ctx) }` registry — extend today's extractor layout per R.17. (Question added during the grill — not in the original Q1-Q15 numbering.)
 
 - **Q15 — Indexing strategy on new tables.** SQLite indexes for the new tables — which columns get B-tree indexes? `references(file_path, name)`, `references(resolved_symbol_id)`, `jsx_elements(component_name)`, `bindings(resolved_symbol_id)` are the obvious ones. Plan PR for each tier settles its indexing strategy.
 

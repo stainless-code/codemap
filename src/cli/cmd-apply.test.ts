@@ -261,6 +261,15 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
       expect(r.exitCode).toBe(1);
       expect(r.err).toContain("unknown option");
     });
+
+    it("rejects --params with --rows", async () => {
+      const r = await runCli(
+        ["apply", "--rows", "-", "--params", "old=a,new=b", "--yes"],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(1);
+      expect(r.err).toContain("--params can only be used with <recipe-id>");
+    });
   });
 
   describe("--help", () => {

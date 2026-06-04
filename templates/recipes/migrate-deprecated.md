@@ -31,7 +31,9 @@ Diff-shape rows to **migrate usages** of a deprecated symbol to a replacement id
 ```bash
 codemap query --recipe deprecated-symbols --format diff-json
 codemap query --recipe migrate-deprecated --params symbol=now,replacement=Date.now --format diff-json
+codemap query --recipe migrate-deprecated --params symbol=now,replacement=Date.now,in_file=src/utils --format diff-json
 codemap apply migrate-deprecated --params symbol=now,replacement=Date.now --dry-run
+codemap apply migrate-deprecated --params symbol=now,replacement=Date.now,require_deprecated=false --dry-run --force
 ```
 
 ## v1 scope

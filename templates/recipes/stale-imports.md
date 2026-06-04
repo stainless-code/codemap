@@ -22,8 +22,10 @@ Diff-shape rows for **unused import specifiers** — structural dead-import cand
 
 ```bash
 codemap query --recipe stale-imports --format diff-json
+codemap query --recipe stale-imports --params in_file=src/bench --format diff-json
 codemap apply stale-imports --dry-run
-codemap apply stale-imports --params in_file=src/ --dry-run --force
+codemap apply stale-imports --params in_file=src/bench --dry-run --force
+codemap apply stale-imports --params in_file=src/bench,include_type_only=true --dry-run --force
 ```
 
 ## Apply scope
