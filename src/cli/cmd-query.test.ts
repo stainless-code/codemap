@@ -897,14 +897,17 @@ describe("getQueryRecipeActions", () => {
 });
 
 describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
-  it("deprecated-symbols exposes apply command hints", () => {
+  it("deprecated-symbols exposes copy-paste apply hints without angle-bracket drift", () => {
     const actions = getQueryRecipeActions("deprecated-symbols");
-    expect(actions?.some((a) => a.type === "apply-migrate-deprecated")).toBe(
-      true,
+    const migrate = actions?.find((a) => a.type === "apply-migrate-deprecated");
+    expect(migrate?.command).toBe(
+      "codemap apply migrate-deprecated --params symbol=SYMBOL,replacement=REPLACEMENT --dry-run",
     );
     expect(
-      actions?.find((a) => a.type === "apply-migrate-deprecated")?.command,
-    ).toContain("migrate-deprecated");
+      actions?.find((a) => a.type === "apply-add-jsdoc-deprecated")?.command,
+    ).toBe(
+      "codemap apply add-jsdoc-deprecated --params name=SYMBOL,replacement=REPLACEMENT --dry-run --force",
+    );
   });
 
   it("find-symbol-references renders rename-preview command from name param", () => {
@@ -918,19 +921,39 @@ describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
     );
   });
 
-  it("find-jsx-usages renders component_name into rename-preview command", () => {
+  it("find-jsx-usages renders {{component_name}} and jsx-prop sentinels", () => {
     const actions = getQueryRecipeActionsRendered("find-jsx-usages", {
       component_name: "ProductCard",
     });
     expect(
       actions?.find((a) => a.type === "apply-rename-preview")?.command,
-    ).toContain("old=ProductCard");
+    ).toBe(
+      "codemap apply rename-preview --params old=ProductCard,new=NEW --dry-run",
+    );
+    expect(
+      actions?.find((a) => a.type === "apply-migrate-jsx-prop")?.command,
+    ).toBe(
+      "codemap apply migrate-jsx-prop --params old_name=OLD_ATTR,new_name=NEW_ATTR,component_name=ProductCard --dry-run --force",
+    );
   });
 
-  it("markers-by-kind exposes replace-marker-kind apply hint", () => {
+  it("find-import-sites uses sentinel module path placeholders", () => {
+    const actions = getQueryRecipeActionsRendered("find-import-sites", {
+      imported_name: "usePermissions",
+    });
+    expect(
+      actions?.find((a) => a.type === "apply-migrate-import-source")?.command,
+    ).toBe(
+      "codemap apply migrate-import-source --params old_source=OLD_SOURCE,new_source=NEW_SOURCE --dry-run",
+    );
+  });
+
+  it("markers-by-kind uses FROM_KIND/TO_KIND sentinels", () => {
     const actions = getQueryRecipeActions("markers-by-kind");
     expect(
       actions?.find((a) => a.type === "apply-replace-marker-kind")?.command,
-    ).toContain("replace-marker-kind");
+    ).toBe(
+      "codemap apply replace-marker-kind --params from_kind=FROM_KIND,to_kind=TO_KIND --dry-run",
+    );
   });
 });

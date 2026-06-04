@@ -3,7 +3,7 @@ actions:
   - type: audit-markers
     description: "Counts by marker kind — pair with per-file queries or [`markers-by-kind`](./markers-by-kind.sql) filters."
   - type: apply-replace-marker-kind
-    description: "Bulk rewrite one marker kind to another (e.g. TODO → FIXME) on indexed lines."
+    description: "Bulk rewrite one marker kind to another — replace FROM_KIND and TO_KIND (e.g. TODO → FIXME) before apply."
     command: codemap apply replace-marker-kind --params from_kind=FROM_KIND,to_kind=TO_KIND --dry-run
 ---
 

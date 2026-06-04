@@ -11,8 +11,8 @@ actions:
     description: "Component tag rename — uses `component_name` as `old`; replace NEW before apply (includes member/namespaced JSX)."
     command: codemap apply rename-preview --params old={{component_name}},new=NEW --dry-run
   - type: apply-migrate-jsx-prop
-    description: "Attribute rename on matching elements — set old_name/new_name (optional component_name filter on apply)."
-    command: codemap apply migrate-jsx-prop --params old_name=OLD_ATTR,new_name=NEW_ATTR --dry-run --force
+    description: "Attribute rename on matching elements — replace OLD_ATTR/NEW_ATTR; `component_name` binds from query param."
+    command: codemap apply migrate-jsx-prop --params old_name=OLD_ATTR,new_name=NEW_ATTR,component_name={{component_name}} --dry-run --force
 ---
 
 # find-jsx-usages

@@ -267,5 +267,5 @@ Full trigger wording: [`research/codemap-richer-index-synthesis-2026-05.md` § 7
 | `find-symbol-references`  | `rename-preview` (`old={{name}}`)                                 |
 | `find-symbol-definitions` | `rename-preview` (`old={{name}}`)                                 |
 | `find-jsx-usages`         | `rename-preview`, `migrate-jsx-prop`                              |
-| `find-import-sites`       | `migrate-import-source` (`<source>` placeholder)                  |
+| `find-import-sites`       | `migrate-import-source` (`OLD_SOURCE` / `NEW_SOURCE` sentinels)   |
 | `markers-by-kind`         | `replace-marker-kind`                                             |
