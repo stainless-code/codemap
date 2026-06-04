@@ -1,6 +1,6 @@
 # Substrate & apply utilization — gap diagnosis + doc/execution plan
 
-> **Status:** open — **Phase A (docs) shipped** on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165): `architecture.md` apply section, `glossary.md`, README apply examples, agent discover→apply workflow, `apply-engine-direction.md` closed (lifted here). **Hygiene slice** (`8d00ba8`): marker recipe fix, partial Phase B, MCP 18-tool sync. **Open:** Phase B remainder (testing map, `--rows` tests), Phase C wave-2 recipes, Phase D (MCP fixpoint). Synthesizes 2026-06 apply/substrate exploration. Substrate tiers 7–13: [`substrate-extraction.md`](./substrate-extraction.md).
+> **Status:** open — **Phase A + B + C.5 shipped** on `feat/apply-engine-slices` / [#165](https://github.com/stainless-code/codemap/pull/165). **Open:** Phase C wave-2 recipes (C.2–C.4, C.6); Phase D (MCP fixpoint). Substrate tiers 7–13: [`substrate-extraction.md`](./substrate-extraction.md).
 
 ---
 
@@ -12,9 +12,9 @@
 | **Apply executor**        | **Mostly yes**         | Phase-1/2 engine, three CLI input modes, MCP `apply` + `apply_rows`, policy gates, fixpoint loop — **shipped and engine-heavy in tests**.                                                                                              |
 | **Apply recipes**         | **No**                 | **4 of 62** bundled SQL recipes emit the diff row contract; **3** are `auto_fixable: true`. The product bottleneck is **recipe surface**, not executor plumbing.                                                                       |
 | **Agent/consumer docs**   | **Mostly yes**         | Architecture + glossary + README apply subsection + skill/MCP apply workflow. Wave-2 recipe catalog still thin until Phase C.                                                                                                          |
-| **Verification**          | **Partially**          | Goldens still query-only (by design). CLI E2E: `rename-preview` + `migrate-import-source` dry-run; allowlist unit tests. **Open:** `--rows`, `--diff-input`, disk apply for non-rename recipes.                                        |
+| **Verification**          | **Mostly yes**         | CLI E2E: three input modes (recipe, `--rows`, recipes on disk); `rename-preview-product-card` golden (barrel + re-export). **Open:** `--diff-input` CLI e2e.                                                                           |
 
-**Conclusion:** Executor + maintainer docs are aligned. **Next:** wave-2 recipes (Phase C) + Phase B tests — not another apply-engine step.
+**Conclusion:** Rename substrate utilization improved on `rename-preview`. **Next:** wave-2 diff-shape recipes (C.2–C.4) — still the highest user-visible ROI.
 
 ---
 
@@ -60,18 +60,18 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 
 **Actual utilization today (apply-relevant):**
 
-| Substrate cluster                          | Shipped in index?      | Used by shipped apply SQL?                                   | Used by read recipes (feeds apply)?                   |
-| ------------------------------------------ | ---------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| `symbols` positions + `doc_comment`        | Yes                    | `rename-preview`, `add-jsdoc-deprecated` (positions only)    | `deprecated-symbols`, many audits                     |
-| `imports` + `specifiers` + `resolved_path` | Yes                    | `rename-preview` (direct importers), `migrate-import-source` | `find-import-sites`, barrel audits                    |
-| `calls` + `provenance`                     | Yes                    | `rename-preview` (`call_rows`, AST only)                     | `find-call-sites`, `call-path`                        |
-| `exports` + `re_export_chains`             | Yes                    | `rename-preview` (single-hop `re_export_rows`)               | `barrel-chains`, `find-re-exported-bindings`          |
-| `markers`                                  | Yes                    | `replace-marker-kind`                                        | `markers-by-kind`                                     |
-| `references` / `bindings` / `scopes`       | Yes                    | **No** apply recipe                                          | `find-symbol-references`, `find-re-exported-bindings` |
-| `jsx_elements` / `jsx_attributes`          | Yes                    | **No**                                                       | `find-jsx-usages`                                     |
-| `import_specifiers` (child table)          | Yes                    | **No** (stale-imports backlog)                               | —                                                     |
-| `jsdoc_tags`                               | Yes (partial tier 4/5) | **No** (`add-jsdoc` is text template, not tag-aware)         | `find-throws-jsdoc`                                   |
-| Tiers **7–13**                             | Open                   | N/A                                                          | Future recipes                                        |
+| Substrate cluster                          | Shipped in index?      | Used by shipped apply SQL?                                                | Used by read recipes (feeds apply)?                   |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `symbols` positions + `doc_comment`        | Yes                    | `rename-preview`, `add-jsdoc-deprecated` (positions only)                 | `deprecated-symbols`, many audits                     |
+| `imports` + `specifiers` + `resolved_path` | Yes                    | `rename-preview` (direct + `barrel_import_rows`), `migrate-import-source` | `find-import-sites`, barrel audits                    |
+| `calls` + `provenance`                     | Yes                    | `rename-preview` (`call_rows`, AST only)                                  | `find-call-sites`, `call-path`                        |
+| `exports` + `re_export_chains`             | Yes                    | `rename-preview` (single-hop `re_export_rows`)                            | `barrel-chains`, `find-re-exported-bindings`          |
+| `markers`                                  | Yes                    | `replace-marker-kind`                                                     | `markers-by-kind`                                     |
+| `references` / `bindings` / `scopes`       | Yes                    | `rename-preview` (`reference_rows`; non-import/call/definition)           | `find-symbol-references`, `find-re-exported-bindings` |
+| `jsx_elements` / `jsx_attributes`          | Yes                    | **No**                                                                    | `find-jsx-usages`                                     |
+| `import_specifiers` (child table)          | Yes                    | **No** (stale-imports backlog)                                            | —                                                     |
+| `jsdoc_tags`                               | Yes (partial tier 4/5) | **No** (`add-jsdoc` is text template, not tag-aware)                      | `find-throws-jsdoc`                                   |
+| Tiers **7–13**                             | Open                   | N/A                                                                       | Future recipes                                        |
 
 **Verdict:** Substrate is **over-built relative to apply recipes** (good for Moat B) but **under-exposed** on the write path.
 
@@ -81,16 +81,16 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 
 **Actual utilization:**
 
-| Capability                          | Code     | Docs                        | Recipes          | Tests                                                        |
-| ----------------------------------- | -------- | --------------------------- | ---------------- | ------------------------------------------------------------ |
-| `applyDiffPayload`                  | Shipped  | Architecture + glossary ✓   | 4 diff ids       | **Strong** (`apply-engine.test.ts`)                          |
-| Recipe apply                        | Shipped  | README + skill ✓            | 4 ids            | **Partial** (`rename-preview` + `migrate-import-source` CLI) |
-| `--rows` / `apply_rows`             | Shipped  | Glossary + skill ✓          | Agent loop       | **None**                                                     |
-| `--diff-input`                      | Shipped  | Architecture + glossary ✓   | External diffs   | Parser unit only                                             |
-| `--until-empty`                     | CLI only | Architecture + glossary ✓   | Fixpoint         | **None**                                                     |
-| `--commit`                          | CLI only | Architecture + glossary ✓   | One-shot git     | **None**                                                     |
-| `actions[].command`                 | Shipped  | Skill ✓                     | 4 templates      | Template unit only                                           |
-| Policy (allowlist + `auto_fixable`) | Shipped  | Example config + glossary ✓ | 3 auto + 1 force | auto_fixable + allowlist unit tests                          |
+| Capability                          | Code     | Docs                        | Recipes          | Tests                                                             |
+| ----------------------------------- | -------- | --------------------------- | ---------------- | ----------------------------------------------------------------- |
+| `applyDiffPayload`                  | Shipped  | Architecture + glossary ✓   | 4 diff ids       | **Strong** (`apply-engine.test.ts`)                               |
+| Recipe apply                        | Shipped  | README + skill ✓            | 4 ids            | **Strong** (rename + migrate dry-run; `replace-marker-kind` disk) |
+| `--rows` / `apply_rows`             | Shipped  | Glossary + skill ✓          | Agent loop       | **`cmd-apply.test.ts` `--rows` file**                             |
+| `--diff-input`                      | Shipped  | Architecture + glossary ✓   | External diffs   | Parser unit only                                                  |
+| `--until-empty`                     | CLI only | Architecture + glossary ✓   | Fixpoint         | **None**                                                          |
+| `--commit`                          | CLI only | Architecture + glossary ✓   | One-shot git     | **None**                                                          |
+| `actions[].command`                 | Shipped  | Skill ✓                     | 4 templates      | Template unit only                                                |
+| Policy (allowlist + `auto_fixable`) | Shipped  | Example config + glossary ✓ | 3 auto + 1 force | auto_fixable + allowlist unit tests                               |
 
 **Verdict:** Apply **executor ≈ 85% utilized**; **recipe catalog ≈ 6% of SQL files apply-shaped**; **agent docs ≈ 75%** after Phase A.
 
@@ -101,10 +101,8 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 | Gap                                                                                      | Type           | Track here           |
 | ---------------------------------------------------------------------------------------- | -------------- | -------------------- |
 | Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, `migrate-deprecated`, …) | Implementation | § Phase C            |
-| `rename-app-wide` (JOIN `references`/`bindings`)                                         | Implementation | Phase C.5            |
-| Barrel-consumer import rename                                                            | Recipe design  | Phase C.5            |
-| `testing-coverage.md` apply map; `--rows` / disk apply tests                             | Testing        | § Phase B            |
-| MCP `until_empty` / `--diff-input` / `--commit`                                          | Deferred       | § Phase D            |
+| `--diff-input` CLI e2e                                                                   | Testing        | § Phase B (optional) |
+| MCP `until_empty` / `--commit`                                                           | Deferred       | § Phase D            |
 | Substrate tiers 7–13                                                                     | Separate plan  | substrate-extraction |
 
 ---
@@ -113,25 +111,25 @@ Canonical apply homes: [`architecture.md § Apply`](../architecture.md#apply--in
 
 ### Phase B — Verification (maintainer)
 
-| Step | Action                                                                                     | Status                                      |
-| ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------- |
-| B.1  | **`testing-coverage.md`** — apply harness map.                                             | **Open**                                    |
-| B.2  | Tracer tests: `--rows` round-trip; disk apply for second recipe; `apply-run` if warranted. | **Partial** — allowlist + migrate dry-run ✓ |
-| B.3  | **`replace-marker-kind` golden**                                                           | **✓ Shipped**                               |
-| B.4  | **`rename-preview` golden with `re_export`**                                               | **Open**                                    |
+| Step | Action                                                                                     | Status                                                           |
+| ---- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| B.1  | **`testing-coverage.md`** — apply harness map.                                             | **✓ Shipped**                                                    |
+| B.2  | Tracer tests: `--rows` round-trip; disk apply for second recipe; `apply-run` if warranted. | **✓ Shipped** — `--rows` file + `replace-marker-kind` disk apply |
+| B.3  | **`replace-marker-kind` golden**                                                           | **✓ Shipped**                                                    |
+| B.4  | **`rename-preview` golden with `re_export`**                                               | **✓ Shipped** — `rename-preview-product-card` scenario           |
 
-**Phase B exit criteria:** all three CLI input modes tested at least once; B.1 doc map exists.
+**Phase B exit criteria:** **✓** — recipe + `--rows` + doc map; `--diff-input` covered by unit tests only.
 
 ### Phase C — Recipe utilization (post-doc)
 
-| Priority | Recipe                                           | Status        |
-| -------- | ------------------------------------------------ | ------------- |
-| C.1      | Fix **`replace-marker-kind`**                    | **✓ Shipped** |
-| C.2      | **`organize-imports`**                           | **Open**      |
-| C.3      | **`stale-imports`**                              | **Open**      |
-| C.4      | **`migrate-deprecated` / `deprecated-usages`**   | **Open**      |
-| C.5      | **`rename-app-wide` or barrel import rows**      | **Open**      |
-| C.6      | `actions[].command` on audit recipes w/ diff SQL | **Open**      |
+| Priority | Recipe                                           | Status                                                                      |
+| -------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
+| C.1      | Fix **`replace-marker-kind`**                    | **✓ Shipped**                                                               |
+| C.2      | **`organize-imports`**                           | **Open**                                                                    |
+| C.3      | **`stale-imports`**                              | **Open**                                                                    |
+| C.4      | **`migrate-deprecated` / `deprecated-usages`**   | **Open**                                                                    |
+| C.5      | **`rename-app-wide` or barrel import rows**      | **✓ Shipped** — `barrel_import_rows` + `reference_rows` on `rename-preview` |
+| C.6      | `actions[].command` on audit recipes w/ diff SQL | **Open**                                                                    |
 
 **Phase C exit criteria:** ≥2 new diff-shape recipes beyond the original four; `re_export` golden or documented gap removed.
 

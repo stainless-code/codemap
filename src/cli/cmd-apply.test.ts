@@ -273,6 +273,63 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
     });
   });
 
+  describe("--rows", () => {
+    it("applies caller-supplied rows from a JSON file", async () => {
+      const rowsPath = join(projectRoot, "apply-rows.json");
+      writeFileSync(
+        rowsPath,
+        JSON.stringify([
+          {
+            file_path: "src/helper.ts",
+            line_start: 1,
+            before_pattern: "helper",
+            after_pattern: "worker",
+          },
+        ]),
+        "utf8",
+      );
+      const r = await runCli(["apply", "--rows", rowsPath, "--yes", "--json"], {
+        CODEMAP_ROOT: projectRoot,
+      });
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.mode).toBe("apply");
+      expect(env.applied).toBe(true);
+      expect(readFile("src/helper.ts")).toContain("function worker(");
+    });
+  });
+
+  describe("replace-marker-kind", () => {
+    beforeEach(async () => {
+      writeFileSync(
+        join(projectRoot, "src", "notes.md"),
+        "# Notes\n\nTODO: fix later\n",
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("writes FIXME on disk when applied with --yes", async () => {
+      const r = await runCli(
+        [
+          "apply",
+          "replace-marker-kind",
+          "--params",
+          "from_kind=TODO,to_kind=FIXME",
+          "--yes",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.applied).toBe(true);
+      expect(readFile("src/notes.md")).toContain("FIXME:");
+      expect(readFile("src/notes.md")).not.toMatch(/\bTODO:/);
+    });
+  });
+
   describe("migrate-import-source", () => {
     beforeEach(async () => {
       mkdirSync(join(projectRoot, "src", "api"), { recursive: true });

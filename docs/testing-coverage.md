@@ -16,6 +16,7 @@
 | **Agent eval**         | `bun run test:agent-eval`                                                  | Probe arms vs golden ids (MCP-on vs glob/read).                                                                         |
 | **Integration (git)**  | `src/application/run-index.test.ts`                                        | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                                    |
 | **CLI e2e**            | `src/cli/cmd-test-bench-e2e.test.ts`, `src/cli/cmd-cli-parity-e2e.test.ts` | Spawned CLI on `fixtures/minimal` (bench smoke + resource parity).                                                      |
+| **Apply CLI e2e**      | `src/cli/cmd-apply.test.ts`                                                | Temp project + full index: recipe dry-run/apply, `--rows`, second recipe disk apply.                                    |
 | **Check**              | `bun run check`                                                            | build + lint + unit + scripts + golden + agent-eval.                                                                    |
 
 Refresh Tier A goldens after intentional fixture or schema changes:
@@ -29,6 +30,17 @@ bun scripts/query-golden.ts --update
 ## Bundled recipes
 
 Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/scenarios.json` with `"recipe": "<id>"`. Enforced by `query-golden-coverage-matrix.test.mjs`. List ids: `codemap query --recipes-json` or `ls templates/recipes/*.sql`.
+
+### Apply-shaped recipes (diff row contract)
+
+| Recipe id               | Golden scenario(s)                                                               | CLI e2e (`cmd-apply.test.ts`)                |
+| ----------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
+| `rename-preview`        | `rename-preview`, `rename-preview-product-card` (barrel + re-export + reference) | dry-run, `--yes` disk apply, Q6/Q7           |
+| `migrate-import-source` | `migrate-import-source`                                                          | dry-run                                      |
+| `replace-marker-kind`   | `replace-marker-kind`                                                            | `--yes` disk apply (temp project)            |
+| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                           | — (query golden only; writes need `--force`) |
+
+**Input modes:** recipe id (above); `--rows` JSON file (e2e); `--diff-input` (`apply-diff-input.test.ts` unit). MCP `apply_rows` shares the rows path — no separate e2e yet.
 
 ---
 

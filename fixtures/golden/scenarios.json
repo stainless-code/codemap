@@ -30,6 +30,16 @@
       }
     },
     {
+      "id": "rename-preview-product-card",
+      "prompt": "Rename ProductCard: barrel consumer import, re-export, and reference sites.",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "ProductCard",
+        "new": "ProductCardNext",
+        "kind": "function"
+      }
+    },
+    {
       "id": "index-summary",
       "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
       "recipe": "index-summary"
