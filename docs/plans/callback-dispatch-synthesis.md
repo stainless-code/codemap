@@ -62,4 +62,4 @@ Cap fan-out per file to limit false positives.
 
 ## Config (optional)
 
-`config.synthesis.heuristicCalls: boolean` default `true` after bake-in period.
+`config.synthesis.heuristicCalls: boolean` — default `false` in v1 (#164); may flip to `true` after bake-in.

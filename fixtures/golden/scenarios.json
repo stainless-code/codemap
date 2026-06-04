@@ -92,7 +92,7 @@
     {
       "id": "calls-consumer",
       "prompt": "What does the run function in consumer.ts call?",
-      "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' ORDER BY callee_name"
+      "sql": "SELECT DISTINCT callee_name FROM calls WHERE caller_name = 'run' AND file_path = 'src/consumer.ts' AND (provenance IS NULL OR provenance = 'ast') ORDER BY callee_name"
     },
     {
       "id": "find-call-sites",
