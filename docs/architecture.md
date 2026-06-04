@@ -196,7 +196,7 @@ Optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; def
 
 **Fresh database:** the default CLI **`codemap`** (incremental) calls **`createSchema()`** in **`runCodemapIndex`** before **`getChangedFiles()`**, so the **`meta`** table exists before **`getMeta(..., "last_indexed_commit")`** runs on an empty **`.codemap/index.db`**.
 
-Current schema version: **36** — see [Schema Versioning](#schema-versioning) for details.
+Live schema version: `SCHEMA_VERSION` in [`src/db.ts`](../src/db.ts) — see [Schema Versioning](#schema-versioning) for bump policy.
 
 All base tables use `STRICT` mode; **`source_fts`** is an FTS5 virtual table (no `STRICT`). Tables marked with `WITHOUT ROWID` store data directly in the primary key B-tree. PRAGMAs and index design: [SQLite Performance Configuration](#sqlite-performance-configuration).
 

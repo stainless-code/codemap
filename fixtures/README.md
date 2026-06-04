@@ -5,7 +5,7 @@
 | Piece                   | Path                                                                                    | Role                                                      |
 | ----------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | **Corpus**              | [`minimal/`](./minimal/)                                                                | Source tree indexed by goldens, benchmark, agent-eval     |
-| **Golden scenarios**    | [`golden/scenarios.json`](./golden/scenarios.json)                                      | 125 SQL/recipe scenarios                                  |
+| **Golden scenarios**    | [`golden/scenarios.json`](./golden/scenarios.json)                                      | Tier A scenario inventory (SQL + recipe ids)              |
 | **Golden snapshots**    | [`golden/minimal/`](./golden/minimal/)                                                  | Expected query JSON (committed)                           |
 | **Capability map**      | [`CAPABILITIES.json`](./CAPABILITIES.json)                                              | Capability groups → fixture files → `goldenScenarios` ids |
 | **Agent eval**          | [`agent-eval/`](../scripts/agent-eval/) + probes in `scripts/agent-eval/scenarios.json` | MCP-on vs traditional arms                                |

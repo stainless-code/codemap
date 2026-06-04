@@ -26,9 +26,9 @@ bun scripts/query-golden.ts --update
 
 ---
 
-## Bundled recipes (58)
+## Bundled recipes
 
-Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/scenarios.json` with `"recipe": "<id>"`. Enforced by `query-golden-coverage-matrix.test.mjs`.
+Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/scenarios.json` with `"recipe": "<id>"`. Enforced by `query-golden-coverage-matrix.test.mjs`. List ids: `codemap query --recipes-json` or `ls templates/recipes/*.sql`.
 
 ---
 
@@ -81,7 +81,7 @@ Codemap development uses **only** the committed bench ([fixtures/README.md](../f
 
 ## Agent eval probes
 
-`scripts/agent-eval/scenarios.json` — **18 probes** (one per `CAPABILITIES.json` capability id). Each probe’s `goldenId` must appear in that group’s `goldenScenarios` (or the group uses `unitTests` / `enforcedBy` instead — `recipes.bundled`, `cli.bench-smoke`, `cli.mcp.http`). Some groups list multiple substrate scenarios; probes need only cover one id per group. Enforced by `scripts/agent-eval/capability-probes.test.mjs` in `test:scripts`.
+`scripts/agent-eval/scenarios.json` — one probe per `CAPABILITIES.json` capability id (groups with `unitTests` or `enforcedBy` instead: `recipes.bundled`, `cli.bench-smoke`, `cli.mcp.http`). Each probe’s `goldenId` must appear in that group’s `goldenScenarios`; multiple substrate ids per group are fine — one matching probe is enough. Enforced by `scripts/agent-eval/capability-probes.test.mjs` in `test:scripts`.
 
 ---
 

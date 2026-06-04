@@ -6,7 +6,7 @@
 
 ## Problem
 
-`fixtures/minimal` + `test:golden` already cover **all 58 bundled recipes** and most indexed tables, but the name “minimal” and Tier B docs imply a **second, external tree** is needed for realism. Contributors should have **one committed bench** inside this repo.
+`fixtures/minimal` + `test:golden` already cover every bundled recipe (`templates/recipes/*.sql`) and most indexed tables, but the name “minimal” and Tier B docs imply a **second, external tree** is needed for realism. Contributors should have **one committed bench** inside this repo.
 
 ## Goal
 
@@ -42,14 +42,14 @@ fixtures/
 
 - [x] Method-call slice — `src/bench/method-call-sites.ts` + `calls-method-ping-unresolved`
 - [x] Qualified heritage — `type-ancestors-qualified-child` on `heritage-qualified.ts`
-- [x] `affected-tests` — six param scenarios in `scenarios.json`
+- [x] `affected-tests` — param scenarios in `scenarios.json`
 - [x] Project-local recipe — `shop-symbols-recipe` golden
 
 ### Phase 3 — CLI / MCP bench pack
 
 - [x] `src/cli/cmd-test-bench-e2e.test.ts` — show, snippet, impact, validate, `shop-symbols`, SARIF (`boundary-violations`)
 - [x] `cmd-cli-parity-e2e.test.ts` — trace, explore, node, context, batch, resources
-- [x] Expand `test:agent-eval` to one probe per `CAPABILITIES.json` capability id (18 probes; 15 golden-backed + 3 `unitTests`/`enforcedBy` groups; `capability-probes.test.mjs`)
+- [x] Expand `test:agent-eval` — one probe per `CAPABILITIES.json` capability id (`capability-probes.test.mjs`)
 
 ### Phase 4 — Scale (optional, replaces Tier B′)
 

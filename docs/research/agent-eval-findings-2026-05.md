@@ -31,7 +31,7 @@ AGENT_EVAL_MODE=live AGENT_EVAL_PRINT_SUMMARY=1 bash scripts/agent-eval/run-arms
 
 Corpus: [`fixtures/minimal`](../../fixtures/minimal/) · Probes: [`scripts/agent-eval/scenarios.json`](../../scripts/agent-eval/scenarios.json) · Output: `.agent-eval/comparison.json` (gitignored).
 
-Captured **2026-05-26** (live MCP handlers, `runs=1`, all three probes succeeded):
+Captured **2026-05-26** (live MCP handlers, `runs=1`, 3-probe subset — all succeeded):
 
 | Scenario                     | MCP-on tools | MCP-off tools | MCP-on est. tokens | MCP-off est. tokens |
 | ---------------------------- | ------------ | ------------- | ------------------ | ------------------- |
