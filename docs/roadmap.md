@@ -67,7 +67,6 @@ _(none — P1 agent-surface work complete)_
 
 - [ ] **Framework route extraction** — Express / React Router / NestJS `http_routes` substrate. Plan: [`plans/framework-route-extraction.md`](./plans/framework-route-extraction.md). Blocked on C.9 contract. Effort: L.
 - [ ] **Callback dispatch synthesis** — heuristic `calls` with `provenance`. Plan: [`plans/callback-dispatch-synthesis.md`](./plans/callback-dispatch-synthesis.md). Effort: L.
-- [ ] **Unresolved calls staging** — two-phase call resolution queue. Plan: [`plans/unresolved-calls-staging.md`](./plans/unresolved-calls-staging.md). Effort: L.
 - [ ] **Cross-project MCP root** — optional `root` on tools + DB cache. Plan: [`plans/cross-project-mcp-root.md`](./plans/cross-project-mcp-root.md). Effort: M.
 - [ ] **FTS default-on evaluation** — measure DB size tax; maybe flip default. Plan: [`plans/fts-default-on-evaluation.md`](./plans/fts-default-on-evaluation.md). Effort: S–M.
 

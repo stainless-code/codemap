@@ -13,9 +13,9 @@
   },
   {
     "path": "README.md",
-    "content_hash": "60f28d758b1d2a65a751cb17c2aa0d00c65d953d94836e4d7d5b3f60011bfd3f",
+    "content_hash": "83dd2274fa918728c812bf27eef86da7dd1cb24fa09c70e5bbad9173750121b5",
     "language": "md",
-    "line_count": 52
+    "line_count": 58
   },
   {
     "path": "package.json",
@@ -40,6 +40,12 @@
     "content_hash": "96bd631cc642f270589cba89e4fbfea8555b375aba66be53fed657f4b2de8d9c",
     "language": "ts",
     "line_count": 5
+  },
+  {
+    "path": "src/bench/method-call-sites.ts",
+    "content_hash": "76a69f0d65b9b3b07547b93c73e15a81f5604234465d17f92b6e0bf487392d1a",
+    "language": "ts",
+    "line_count": 11
   },
   {
     "path": "src/components/shop/ApiBridge.tsx",

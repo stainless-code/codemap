@@ -1,0 +1,8 @@
+[
+  {
+    "name": "config",
+    "type_text": "ClientConfig",
+    "is_optional": 1,
+    "position": 0
+  }
+]

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 /**
  * `meta` key tracking the FTS5 state at the last reindex; mismatch with the
@@ -173,7 +173,25 @@ export function createTables(db: CodemapDatabase) {
       args_count INTEGER,
       is_method_call INTEGER NOT NULL DEFAULT 0,
       is_constructor_call INTEGER NOT NULL DEFAULT 0,
-      is_optional_chain INTEGER NOT NULL DEFAULT 0
+      is_optional_chain INTEGER NOT NULL DEFAULT 0,
+      callee_symbol_id INTEGER REFERENCES symbols(id) ON DELETE SET NULL,
+      callee_resolution_kind TEXT CHECK (
+        callee_resolution_kind IS NULL OR callee_resolution_kind IN (
+          'same-file', 'imported', 're-exported', 'global', 'unresolved'
+        )
+      )
+    ) STRICT;
+
+    -- Phase-1 staging queue for call sites pending cross-file callee resolution.
+    CREATE TABLE IF NOT EXISTS unresolved_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+      caller_scope TEXT,
+      callee_name TEXT NOT NULL,
+      line_start INTEGER NOT NULL,
+      column_start INTEGER,
+      reference_kind TEXT NOT NULL DEFAULT 'call',
+      created_at TEXT NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS type_members (
@@ -677,6 +695,13 @@ export function createIndexes(db: CodemapDatabase) {
     CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_name, file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_file ON calls(file_path);
     CREATE INDEX IF NOT EXISTS idx_calls_position ON calls(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_calls_callee_symbol ON calls(callee_symbol_id)
+      WHERE callee_symbol_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_calls_resolution ON calls(callee_resolution_kind, file_path)
+      WHERE callee_resolution_kind IS NOT NULL;
+
+    CREATE INDEX IF NOT EXISTS idx_unresolved_calls_file ON unresolved_calls(file_path, line_start);
+    CREATE INDEX IF NOT EXISTS idx_unresolved_calls_callee ON unresolved_calls(callee_name, file_path);
 
     -- Mirrors the typical join shape symbols.(file_path, name, line_start).
     -- The (file_path, name) prefix also covers GROUP BY file_path scans
@@ -728,6 +753,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS runtime_markers;
     DROP TABLE IF EXISTS test_suites;
     DROP TABLE IF EXISTS file_metrics;
+    DROP TABLE IF EXISTS unresolved_calls;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
     DROP TABLE IF EXISTS calls;
@@ -1291,6 +1317,73 @@ export function insertCalls(db: CodemapDatabase, calls: CallRow[]) {
         c.is_constructor_call ?? 0,
         c.is_optional_chain ?? 0,
       ),
+  );
+}
+
+/** Staging row for call sites that did not resolve to a symbol in phase 2. */
+export interface UnresolvedCallRow {
+  file_path: string;
+  caller_scope: string | null;
+  callee_name: string;
+  line_start: number;
+  column_start: number | null;
+  reference_kind: string;
+  created_at: string;
+}
+
+export function insertUnresolvedCalls(
+  db: CodemapDatabase,
+  rows: UnresolvedCallRow[],
+) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO unresolved_calls (file_path, caller_scope, callee_name, line_start, column_start, reference_kind, created_at)",
+    "(?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.caller_scope,
+        r.callee_name,
+        r.line_start,
+        r.column_start,
+        r.reference_kind,
+        r.created_at,
+      ),
+  );
+}
+
+export function clearCallResolutionsForFiles(
+  db: CodemapDatabase,
+  filePaths: readonly string[],
+) {
+  if (filePaths.length === 0) return;
+  const placeholders = filePaths.map(() => "?").join(",");
+  db.run(
+    `UPDATE calls SET callee_symbol_id = NULL, callee_resolution_kind = NULL WHERE file_path IN (${placeholders})`,
+    [...filePaths],
+  );
+  db.run(`DELETE FROM unresolved_calls WHERE file_path IN (${placeholders})`, [
+    ...filePaths,
+  ]);
+}
+
+export function clearAllCallResolutions(db: CodemapDatabase) {
+  db.run(
+    "UPDATE calls SET callee_symbol_id = NULL, callee_resolution_kind = NULL",
+  );
+  db.run("DELETE FROM unresolved_calls");
+}
+
+export function updateCallResolution(
+  db: CodemapDatabase,
+  callId: number,
+  calleeSymbolId: number | null,
+  calleeResolutionKind: string,
+) {
+  db.run(
+    "UPDATE calls SET callee_symbol_id = ?, callee_resolution_kind = ? WHERE id = ?",
+    [calleeSymbolId, calleeResolutionKind, callId],
   );
 }
 

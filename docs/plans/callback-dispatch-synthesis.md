@@ -52,7 +52,7 @@ Cap fan-out per file to limit false positives.
 
 ## Dependencies
 
-- [unresolved-calls-staging](./unresolved-calls-staging.md) may run before synthesis
+- Base call resolution shipped [#162](https://github.com/stainless-code/codemap/pull/162) (`resolveCalls`, `unresolved_calls`) — see [architecture.md](../architecture.md)
 - Improves MCP `trace` / `explore` / `node` usefulness (shipped #134)
 
 ---

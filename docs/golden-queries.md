@@ -52,11 +52,11 @@ We **do not** commit another product’s source tree, paths, business strings, o
 
 ## Tier model
 
-| Tier            | Corpus                       | When                       | Purpose                                  |
-| --------------- | ---------------------------- | -------------------------- | ---------------------------------------- |
-| **A**           | `fixtures/minimal` (in-repo) | Every PR / `bun run check` | Fast, **committed** goldens              |
-| **B**           | Local path via `CODEMAP_*`   | Maintainer machine         | Scale; goldens **optional / gitignored** |
-| **B′** (future) | Public OSS fixture only      | CI optional                | Larger committed corpus if license OK    |
+| Tier                       | Corpus                                   | When                       | Purpose                                                                                                                                                                         |
+| -------------------------- | ---------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A (in-repo test bench)** | `fixtures/minimal` + `fixtures/golden/`  | Every PR / `bun run check` | **Canonical** for Codemap development — see [fixtures/README.md](../fixtures/README.md)                                                                                         |
+| **B (consumer-only)**      | Local path via `CODEMAP_*`               | Private app validation     | Goldens **gitignored** — not required to develop Codemap                                                                                                                        |
+| **Bench growth**           | `fixtures/minimal` + `CAPABILITIES.json` | Shipped (Phases 1–3)       | [testing-coverage.md](./testing-coverage.md), [fixtures/README.md](../fixtures/README.md); optional scale: [plans/in-repo-test-bench.md](./plans/in-repo-test-bench.md) Phase 4 |
 
 ---
 
@@ -70,13 +70,13 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 ## Status
 
-| Area                          | State                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tier A runner + CI            | **`bun run test:golden`** + **`bun run test:agent-eval`** in `check` (CI Test job runs both; agent-eval reuses golden index when present)                                                                                                                                                                                                   |
-| Tier A scenario coverage      | Scenarios cover the core parser / schema surfaces plus bundled-recipe smoke tests; some user-data and opt-in tables are intentionally exercised by unit tests or specific recipes instead of a one-row-per-table golden. Current scenario inventory is derived from [scenarios.json](../fixtures/golden/scenarios.json), not repeated here. |
-| Tier B external + schema      | **`test:golden:external`**, Zod in **`scripts/query-golden/schema.ts`**                                                                                                                                                                                                                                                                     |
-| Subset matchers + budgets     | **`match`**, **`budgetMs`**, **`--strict-budget`**                                                                                                                                                                                                                                                                                          |
-| Optional CI for public corpus | Deferred — [roadmap § Backlog](./roadmap.md#backlog)                                                                                                                                                                                                                                                                                        |
+| Area                          | State                                                                                                                                                                                                                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tier A runner + CI            | **`bun run test:golden`** + **`bun run test:agent-eval`** in `check` (CI Test job runs both; agent-eval reuses golden index when present)                                                                                                                                                                        |
+| Tier A scenario coverage      | Scenarios cover core parser/schema surfaces, every bundled recipe (`templates/recipes/*.sql`), and SQL pin-down for substrate tables — see [testing-coverage.md](./testing-coverage.md). Guard: `scripts/query-golden-coverage-matrix.test.mjs`. Inventory: [scenarios.json](../fixtures/golden/scenarios.json). |
+| Tier B external + schema      | **`test:golden:external`**, Zod in **`scripts/query-golden/schema.ts`**                                                                                                                                                                                                                                          |
+| Subset matchers + budgets     | **`match`**, **`budgetMs`**, **`--strict-budget`**                                                                                                                                                                                                                                                               |
+| Optional CI for public corpus | Deferred — [roadmap § Backlog](./roadmap.md#backlog)                                                                                                                                                                                                                                                             |
 
 ---
 

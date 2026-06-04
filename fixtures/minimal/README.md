@@ -1,6 +1,6 @@
-# Minimal codemap fixture
+# Codemap in-repo test bench (corpus)
 
-Stable tree exercising every codemap surface — used by `src/benchmark.ts`, golden tests, and CI.
+Stable tree exercising every codemap surface — used by `test:golden`, `test:agent-eval`, `src/benchmark.ts`, and CI. Hub: [fixtures/README.md](../README.md). Capability map: [CAPABILITIES.json](../CAPABILITIES.json).
 
 ## What's exercised
 
@@ -30,6 +30,12 @@ Stable tree exercising every codemap surface — used by `src/benchmark.ts`, gol
 | **`orphan` exports**                    | `orphan.ts` — `unimported-exports`                                                                                                                                                                                                                      |
 | **Project-local recipes**               | `.codemap/recipes/shop-symbols.{sql,md}`                                                                                                                                                                                                                |
 | **`CODEOWNERS`**                        | `--group-by owner`                                                                                                                                                                                                                                      |
+
+## Golden scenarios
+
+Tier A regression: `fixtures/golden/scenarios.json` → `fixtures/golden/minimal/<id>.json`. Coverage map: [docs/testing-coverage.md](../../docs/testing-coverage.md). Guard: `scripts/query-golden-coverage-matrix.test.mjs` (via `bun run test:scripts`).
+
+Substrate pin-down scenarios added for tables not fully locked by recipes alone: `index-table-stats`, `meta-fts5-enabled`, `source-fts-row-count`, `file-metrics-complexity-fixture`, `scopes-product-card`, `references-product-card-perms`, `bindings-createClient`, `import-specifiers-consumer`, `async-calls-prefetch`, `decorators-sealed`, `dynamic-imports-prefetch`, `module-cycles-cache-store`, `re-export-chains-product-card`, `runtime-markers-env`, `function-params-createClient`, `boundary-rules-ui-no-api`, plus call-resolution (`call-resolution-stats`, `unresolved-call-sites`, `calls-createClient-resolved`).
 
 ## Use
 

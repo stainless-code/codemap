@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "corpusRoot": "fixtures/minimal",
+  "goldenScenariosFile": "fixtures/golden/scenarios.json",
+  "goldenDir": "fixtures/golden/minimal",
+  "capabilities": [
+    {
+      "id": "index.schema",
+      "description": "All indexed tables populated on full rebuild",
+      "fixtureFiles": ["src/consumer.ts", "src/api/client.ts"],
+      "goldenScenarios": [
+        "index-table-stats",
+        "index-summary",
+        "file-metrics-complexity-fixture"
+      ]
+    },
+    {
+      "id": "symbols.imports.exports",
+      "description": "Tier 1 symbols, imports, exports, dependencies",
+      "fixtureFiles": [
+        "src/consumer.ts",
+        "src/api/client.ts",
+        "src/utils/date.ts"
+      ],
+      "goldenScenarios": [
+        "symbol-usePermissions",
+        "imports-consumer-alias",
+        "dependencies-from-consumer",
+        "exports-client"
+      ]
+    },
+    {
+      "id": "substrate.references.bindings",
+      "description": "Tier 2 references and bindings resolution",
+      "fixtureFiles": [
+        "src/components/shop/ProductCard.tsx",
+        "src/consumer.ts",
+        "src/components/shop/index.ts"
+      ],
+      "goldenScenarios": [
+        "references-product-card-perms",
+        "bindings-createClient",
+        "import-specifiers-consumer",
+        "function-params-createClient",
+        "find-symbol-references",
+        "find-re-exported-bindings"
+      ]
+    },
+    {
+      "id": "calls.graph",
+      "description": "Call edges, paths, optional chains, constructors",
+      "fixtureFiles": ["src/consumer.ts", "src/api/client.ts"],
+      "goldenScenarios": [
+        "calls-consumer",
+        "find-call-sites",
+        "call-path",
+        "calls-createClient-resolved"
+      ]
+    },
+    {
+      "id": "calls.phase2",
+      "description": "Two-phase call resolution and unresolved_calls queue",
+      "fixtureFiles": [
+        "src/consumer.ts",
+        "src/lib/complexity-fixture.ts",
+        "src/bench/method-call-sites.ts"
+      ],
+      "goldenScenarios": [
+        "call-resolution-stats",
+        "unresolved-call-sites",
+        "calls-method-ping-unresolved"
+      ],
+      "knownGaps": [
+        "method-call callee_symbol_id deferred until namespace/member resolve"
+      ]
+    },
+    {
+      "id": "types.heritage",
+      "description": "type_members, type_heritage, ancestor/descendant recipes",
+      "fixtureFiles": [
+        "src/types/hierarchy.ts",
+        "src/types/heritage-qualified.ts",
+        "src/types/homonym-mammal.ts"
+      ],
+      "goldenScenarios": [
+        "type-members-client-config",
+        "type-ancestors-dog",
+        "type-ancestors-qualified-child",
+        "type-descendants-animal"
+      ]
+    },
+    {
+      "id": "react.jsx",
+      "description": "components, jsx_elements, jsx_attributes",
+      "fixtureFiles": [
+        "src/components/shop/ProductCard.tsx",
+        "src/components/shop/ShopButton.tsx"
+      ],
+      "goldenScenarios": [
+        "components-no-false-positives",
+        "find-jsx-usages",
+        "jsx-attributes-product-card",
+        "scopes-product-card"
+      ]
+    },
+    {
+      "id": "css",
+      "description": "css_variables, css_classes, css_keyframes, css imports",
+      "fixtureFiles": ["src/theme.css", "src/styles/button.module.css"],
+      "goldenScenarios": [
+        "css-variables",
+        "css-classes-module",
+        "css-keyframes",
+        "css-imports"
+      ]
+    },
+    {
+      "id": "module.graph",
+      "description": "barrels, cycles, dynamic imports, re_export_chains",
+      "fixtureFiles": [
+        "src/components/shop/index.ts",
+        "src/lib/cache.ts",
+        "src/lib/store.ts",
+        "src/consumer.ts"
+      ],
+      "goldenScenarios": [
+        "find-barrel-files",
+        "circular-imports",
+        "module-cycles-cache-store",
+        "dynamic-imports-prefetch",
+        "re-export-chains-product-card",
+        "barrel-chains"
+      ]
+    },
+    {
+      "id": "behavioral",
+      "description": "async_calls, try_catch, decorators, runtime_markers",
+      "fixtureFiles": [
+        "src/consumer.ts",
+        "src/lib/cache.ts",
+        "src/lib/complexity-fixture.ts",
+        "src/api/decorated.ts",
+        "src/env.ts"
+      ],
+      "goldenScenarios": [
+        "async-calls-prefetch",
+        "find-swallowed-errors",
+        "try-catch-rethrow-heuristics",
+        "decorators-sealed",
+        "runtime-markers-env",
+        "find-leftover-console",
+        "jsdoc-tags-createClient"
+      ]
+    },
+    {
+      "id": "coverage.recipes",
+      "description": "coverage ingest and killer / risk recipes",
+      "fixtureFiles": ["coverage/coverage-final.json", "src/orphan.ts"],
+      "goldenScenarios": [
+        "coverage-rows-after-ingest",
+        "untested-and-dead",
+        "refactor-risk-ranking",
+        "files-by-coverage"
+      ],
+      "setup": ["ingest-coverage"]
+    },
+    {
+      "id": "boundaries.suppressions",
+      "description": "boundary_rules, suppressions, config-driven violations",
+      "fixtureFiles": [
+        ".codemap/config.json",
+        "src/components/shop/ApiBridge.tsx",
+        "src/orphan.ts"
+      ],
+      "goldenScenarios": [
+        "boundary-rules-ui-no-api",
+        "boundary-violations",
+        "suppressions-orphan"
+      ]
+    },
+    {
+      "id": "fts5",
+      "description": "source_fts when fts5 enabled in config",
+      "fixtureFiles": [".codemap/config.json"],
+      "goldenScenarios": [
+        "source-fts-row-count",
+        "meta-fts5-enabled",
+        "text-in-deprecated-functions"
+      ]
+    },
+    {
+      "id": "tests.affected",
+      "description": "test_suites and affected-tests recipe",
+      "fixtureFiles": ["src/__tests__/smoke.test.ts"],
+      "goldenScenarios": [
+        "find-skipped-tests",
+        "tests-by-file",
+        "affected-tests-direct"
+      ]
+    },
+    {
+      "id": "recipes.project-local",
+      "description": "State-dir recipes under .codemap/recipes/",
+      "fixtureFiles": [
+        ".codemap/recipes/shop-symbols.sql",
+        ".codemap/recipes/shop-symbols.md"
+      ],
+      "goldenScenarios": ["shop-symbols-recipe"]
+    },
+    {
+      "id": "recipes.bundled",
+      "description": "Every templates/recipes/*.sql id has a golden scenario",
+      "fixtureFiles": [],
+      "goldenScenarios": [],
+      "enforcedBy": "scripts/query-golden-coverage-matrix.test.mjs"
+    },
+    {
+      "id": "cli.bench-smoke",
+      "description": "Spawned CLI smoke on fixtures/minimal (show, snippet, impact, validate, SARIF)",
+      "fixtureFiles": [],
+      "goldenScenarios": [],
+      "unitTests": [
+        "src/cli/cmd-test-bench-e2e.test.ts",
+        "src/cli/cmd-cli-parity-e2e.test.ts"
+      ]
+    },
+    {
+      "id": "cli.mcp.http",
+      "description": "MCP/HTTP handlers and audit baselines — unit-tested",
+      "fixtureFiles": [],
+      "goldenScenarios": [],
+      "unitTests": [
+        "src/application/mcp-server.test.ts",
+        "src/application/tool-handlers.test.ts"
+      ]
+    }
+  ]
+}

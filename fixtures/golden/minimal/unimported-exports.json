@@ -35,6 +35,13 @@
     "re_export_source": null
   },
   {
+    "name": "PingService",
+    "kind": "value",
+    "file_path": "src/bench/method-call-sites.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "ApiBridge",
     "kind": "value",
     "file_path": "src/components/shop/ApiBridge.tsx",

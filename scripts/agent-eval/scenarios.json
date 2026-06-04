@@ -2,6 +2,15 @@
   "version": 1,
   "probes": [
     {
+      "id": "index-table-stats",
+      "goldenId": "index-table-stats",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx,md,css}"],
+        "regex": ".",
+        "mode": "files"
+      }
+    },
+    {
       "id": "symbol-usePermissions",
       "goldenId": "symbol-usePermissions",
       "traditional": {
@@ -20,11 +29,137 @@
       }
     },
     {
+      "id": "import-specifiers-consumer",
+      "goldenId": "import-specifiers-consumer",
+      "traditional": {
+        "globs": ["src/consumer.ts"],
+        "regex": "import\\s+\\{[^}]+\\}\\s+from",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "bindings-createClient",
+      "goldenId": "bindings-createClient",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "createClient",
+        "mode": "matches"
+      }
+    },
+    {
       "id": "find-call-sites",
       "goldenId": "find-call-sites",
       "traditional": {
         "globs": ["**/*.{ts,tsx}"],
         "regex": "createClient\\s*\\(",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "call-resolution-stats",
+      "goldenId": "call-resolution-stats",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "createClient\\s*\\(",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "unresolved-call-sites",
+      "goldenId": "unresolved-call-sites",
+      "traditional": {
+        "globs": ["src/lib/complexity-fixture.ts"],
+        "regex": "relay\\s*\\(",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "type-ancestors-dog",
+      "goldenId": "type-ancestors-dog",
+      "traditional": {
+        "globs": ["src/types/hierarchy.ts"],
+        "regex": "extends\\s+\\w+",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "find-jsx-usages",
+      "goldenId": "find-jsx-usages",
+      "traditional": {
+        "globs": ["**/*.{tsx,jsx}"],
+        "regex": "<[A-Za-z]",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "css-variables",
+      "goldenId": "css-variables",
+      "traditional": {
+        "globs": ["**/*.css"],
+        "regex": "--[\\w-]+",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "circular-imports",
+      "goldenId": "circular-imports",
+      "traditional": {
+        "globs": ["src/lib/*.ts"],
+        "regex": "from\\s+['\"]\\./",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "find-swallowed-errors",
+      "goldenId": "find-swallowed-errors",
+      "traditional": {
+        "globs": ["src/lib/cache.ts"],
+        "regex": "catch\\s*\\(",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "untested-and-dead",
+      "goldenId": "untested-and-dead",
+      "traditional": {
+        "globs": ["src/**/*.ts"],
+        "regex": "export\\s+function",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "boundary-violations",
+      "goldenId": "boundary-violations",
+      "traditional": {
+        "globs": ["src/components/**/*.tsx"],
+        "regex": "from\\s+['\"]~?/api/",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "source-fts-row-count",
+      "goldenId": "source-fts-row-count",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx,md,css}"],
+        "regex": ".",
+        "mode": "files"
+      }
+    },
+    {
+      "id": "find-skipped-tests",
+      "goldenId": "find-skipped-tests",
+      "traditional": {
+        "globs": ["src/__tests__/**/*.ts"],
+        "regex": "\\.(skip|only)\\s*\\(",
+        "mode": "matches"
+      }
+    },
+    {
+      "id": "shop-symbols-recipe",
+      "goldenId": "shop-symbols-recipe",
+      "traditional": {
+        "globs": ["src/components/shop/**/*.tsx"],
+        "regex": "export\\s+function\\s+\\w+",
         "mode": "matches"
       }
     }

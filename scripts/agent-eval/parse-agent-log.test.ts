@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -506,7 +512,7 @@ describe("run-probes smoke", () => {
     }
   });
 
-  it("indexes fixtures/minimal and compares three probes", async () => {
+  it("indexes fixtures/minimal and compares default probes", async () => {
     const { spawnSync } = await import("node:child_process");
     const fixtureRoot = join(import.meta.dir, "../../fixtures/minimal");
     const tmp = mkdtempSync(join(tmpdir(), "agent-eval-smoke-"));
@@ -530,8 +536,11 @@ describe("run-probes smoke", () => {
         scenarios: ScenarioComparison[];
         summary: { successCount: number; mcpOffTotalToolCalls: number };
       };
-      expect(parsed.scenarios).toHaveLength(3);
-      expect(parsed.summary.successCount).toBe(3);
+      const probeCount = JSON.parse(
+        readFileSync(join(import.meta.dir, "scenarios.json"), "utf-8"),
+      ).probes.length;
+      expect(parsed.scenarios).toHaveLength(probeCount);
+      expect(parsed.summary.successCount).toBe(probeCount);
       expect(parsed.summary.mcpOffTotalToolCalls).toBeGreaterThan(
         parsed.scenarios.reduce((n, s) => n + s.mcpOn.toolCallCount, 0),
       );
@@ -574,9 +583,15 @@ describe("run-probes smoke", () => {
       };
       expect(parsed.mode).toBe("live");
       expect(parsed.mcpTools).toEqual(["query", "query_recipe"]);
-      expect(parsed.scenarios).toHaveLength(3);
-      expect(parsed.summary.successCount).toBe(3);
-      expect(parsed.scenarios[2]!.mcpOn.toolSequence).toEqual(["query_recipe"]);
+      const probeCount = JSON.parse(
+        readFileSync(join(import.meta.dir, "scenarios.json"), "utf-8"),
+      ).probes.length;
+      expect(parsed.scenarios).toHaveLength(probeCount);
+      expect(parsed.summary.successCount).toBe(probeCount);
+      const findCallSites = parsed.scenarios.find(
+        (s) => s.id === "find-call-sites",
+      );
+      expect(findCallSites?.mcpOn.toolSequence).toEqual(["query_recipe"]);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

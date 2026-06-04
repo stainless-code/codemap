@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb, setMeta } from "../db";
+import { closeDb, createTables, getMeta, openDb, setMeta } from "../db";
 import { hashContent } from "../hash";
 import { configureResolver } from "../resolver";
 import { initCodemap } from "../runtime";
@@ -158,6 +158,109 @@ describe("runCodemapIndex", () => {
         expect(row?.resolution_kind).toBe("same-file");
         expect(row?.base_file_path).toBe("src/types.ts");
         expect(row?.base_symbol_id).not.toBeNull();
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    test("incremental re-index re-resolves calls when the defining file changes", async () => {
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src/consumer.ts"),
+        "function helper() { return 1; }\nexport function run() { helper(); }\n",
+      );
+      writeFileSync(join(projectRoot, "package.json"), "{}");
+      const indexedAt = commitAll("add consumer");
+
+      const db = openDb();
+      try {
+        await runCodemapIndex(db, { mode: "full", quiet: true });
+
+        const beforeStale = db
+          .query<{
+            callee_symbol_id: number | null;
+            callee_resolution_kind: string | null;
+          }>(
+            "SELECT callee_symbol_id, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'helper'",
+          )
+          .get();
+        expect(beforeStale?.callee_resolution_kind).toBe("same-file");
+        expect(beforeStale?.callee_symbol_id).not.toBeNull();
+
+        db.run(
+          "UPDATE calls SET callee_symbol_id = NULL, callee_resolution_kind = 'unresolved' WHERE file_path = 'src/consumer.ts' AND callee_name = 'helper'",
+        );
+
+        writeFileSync(
+          join(projectRoot, "src/consumer.ts"),
+          "function helper() { return 2; }\nexport function run() { helper(); }\n",
+        );
+        commitAll("change helper body");
+
+        setMeta(db, "last_indexed_commit", indexedAt);
+
+        await runCodemapIndex(db, { mode: "incremental", quiet: true });
+
+        const row = db
+          .query<{
+            callee_symbol_id: number | null;
+            callee_resolution_kind: string | null;
+          }>(
+            "SELECT callee_symbol_id, callee_resolution_kind FROM calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'helper'",
+          )
+          .get();
+        expect(row?.callee_resolution_kind).toBe("same-file");
+        expect(row?.callee_symbol_id).not.toBeNull();
+        expect(
+          (
+            db
+              .query<{ n: number }>(
+                "SELECT COUNT(*) AS n FROM unresolved_calls WHERE file_path = 'src/consumer.ts' AND callee_name = 'helper'",
+              )
+              .get() as { n: number }
+          ).n,
+        ).toBe(0);
+      } finally {
+        closeDb(db);
+      }
+    });
+
+    test("incremental deletion-only run clears deleted file and runs call resolve", async () => {
+      mkdirSync(join(projectRoot, "src"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src/util.ts"),
+        "export function helper() { return 1; }\n",
+      );
+      writeFileSync(join(projectRoot, "package.json"), "{}");
+      const indexedAt = commitAll("add util");
+
+      const db = openDb();
+      try {
+        await runCodemapIndex(db, { mode: "full", quiet: true });
+        expect(
+          db
+            .query<{ name: string }>(
+              "SELECT name FROM symbols WHERE file_path = 'src/util.ts' AND name = 'helper'",
+            )
+            .get()?.name,
+        ).toBe("helper");
+
+        git(["rm", "src/util.ts"]);
+        commitAll("delete util");
+
+        setMeta(db, "last_indexed_commit", indexedAt);
+
+        const result = await runCodemapIndex(db, {
+          mode: "incremental",
+          quiet: true,
+        });
+        expect(result.idle).toBe(true);
+        expect(
+          db
+            .query<{ path: string }>("SELECT path FROM files WHERE path = ?")
+            .get("src/util.ts"),
+        ).toBeFalsy();
+        expect(getMeta(db, "last_indexed_commit")).not.toBe(indexedAt);
       } finally {
         closeDb(db);
       }

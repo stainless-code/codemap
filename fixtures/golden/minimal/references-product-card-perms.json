@@ -1,0 +1,12 @@
+[
+  {
+    "name": "perms",
+    "kind": "value",
+    "is_write": 1
+  },
+  {
+    "name": "perms",
+    "kind": "value",
+    "is_write": 0
+  }
+]

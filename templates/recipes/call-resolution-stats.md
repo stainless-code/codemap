@@ -1,0 +1,1 @@
+Counts for call-resolution phase: total `calls` rows, resolved (non-unresolved kind), method calls deferred (receiver resolution not run yet), staging queue size, and `meta.unresolved_calls_residual`. `resolved_calls + method_calls_deferred + unresolved_queue` may be less than `total_calls` when some rows are still null before the pass.

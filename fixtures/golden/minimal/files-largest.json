@@ -7,8 +7,8 @@
   },
   {
     "path": "README.md",
-    "line_count": 52,
-    "size": 8499,
+    "line_count": 58,
+    "size": 9521,
     "language": "md"
   },
   {
@@ -102,6 +102,12 @@
     "language": "json"
   },
   {
+    "path": "src/bench/method-call-sites.ts",
+    "line_count": 11,
+    "size": 204,
+    "language": "ts"
+  },
+  {
     "path": "src/notes.md",
     "line_count": 11,
     "size": 418,
@@ -112,11 +118,5 @@
     "line_count": 10,
     "size": 239,
     "language": "ts"
-  },
-  {
-    "path": ".codemap/recipes/shop-symbols.md",
-    "line_count": 9,
-    "size": 310,
-    "language": "md"
   }
 ]

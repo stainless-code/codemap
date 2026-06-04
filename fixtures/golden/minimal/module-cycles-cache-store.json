@@ -1,0 +1,12 @@
+[
+  {
+    "file_path": "src/lib/cache.ts",
+    "cycle_id": 1,
+    "cycle_size": 2
+  },
+  {
+    "file_path": "src/lib/store.ts",
+    "cycle_id": 1,
+    "cycle_size": 2
+  }
+]

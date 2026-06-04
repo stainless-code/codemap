@@ -22,6 +22,17 @@
     "via": "calls"
   },
   {
+    "name": "run",
+    "kind": "method",
+    "file_path": "src/bench/method-call-sites.ts",
+    "line_start": 7,
+    "line_end": 9,
+    "signature": "run(): number",
+    "edge": "caller",
+    "depth": 1,
+    "via": "calls"
+  },
+  {
     "name": "ApiBridge",
     "kind": "function",
     "file_path": "src/components/shop/ApiBridge.tsx",
@@ -42,6 +53,17 @@
     "edge": "caller",
     "depth": 1,
     "via": "calls"
+  },
+  {
+    "name": "run",
+    "kind": "method",
+    "file_path": "src/bench/method-call-sites.ts",
+    "line_start": 7,
+    "line_end": 9,
+    "signature": "run(): number",
+    "edge": "depended_on_by",
+    "depth": 1,
+    "via": "dependencies"
   },
   {
     "name": "ApiBridge",

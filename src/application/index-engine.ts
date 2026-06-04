@@ -64,6 +64,7 @@ import {
   persistReExportChains,
   resolveBindings,
 } from "./bindings-engine";
+import { resolveCalls } from "./call-resolver";
 import { persistModuleCycles } from "./cycles-engine";
 import { appendIndexError } from "./error-log";
 import { persistFileBarrelFlags } from "./file-graph-flags";
@@ -546,8 +547,11 @@ export async function indexFiles(
 
     transaction();
     heritageScopePaths = [
-      ...parsedResults.map((p) => p.relPath),
-      ...(options?.deletedPaths ?? []),
+      ...new Set([
+        ...filePaths,
+        ...parsedResults.map((p) => p.relPath),
+        ...(options?.deletedPaths ?? []),
+      ]),
     ];
   }
 
@@ -602,6 +606,18 @@ export async function indexFiles(
     const heritageRows = resolveTypeHeritage(db, scope);
     persistTypeHeritageResolution(db, heritageRows);
     heritageMs = performance.now() - heritageStart;
+  }
+
+  const callResolveScope = fullRebuild
+    ? undefined
+    : heritageScopePaths && heritageScopePaths.length > 0
+      ? expandHeritageResolveScope(db, heritageScopePaths)
+      : undefined;
+  if (fullRebuild || (callResolveScope && callResolveScope.length > 0)) {
+    resolveCalls(
+      db,
+      callResolveScope ? { filePaths: callResolveScope } : undefined,
+    );
   }
 
   const elapsed = Math.round(performance.now() - startTime);
