@@ -23,10 +23,10 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 - **Substrate plan Tiers 1–6 (2026-05-19)** — remainder shipped: JSX (`jsx_elements` / `jsx_attributes`), behavioral (`async_calls`, `try_catch`, `decorators`, `jsdoc_tags`), `symbols.{return_type,is_async,is_generator}`, `dynamic_imports`, `files.{is_barrel,has_side_effects}`. **`files.is_entry`** deferred to [`plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md).
 - **Partial ship** of substrate plan Tiers 9 / 10 / 11 / 12 — foundation tables landed (`test_suites` / `runtime_markers` / `file_metrics` / `module_cycles`); deferred bits stay tracked under each tier's heading. Tier 4 partial: `function_params` shipped; `generic_params` / `type_predicates` deferred.
 
-**Still open (the apply-engine half of this synthesis):**
+**Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — not shipped. **Step 1 (doc reframe) shipped** — [`roadmap.md`](../roadmap.md) Floors split + [`why-codemap.md`](../why-codemap.md) verdict/autofix wording. The remaining steps still drive the apply-engine direction (new diff-shape recipes, write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
-- **§ 4.4 engine extensions** (`apply --rows -`, `apply --diff-input`, `--until-empty`, etc.) — none shipped; still tracked as the agent-in-the-loop unlock per [§ 5.4 agent-angle gap analysis](#54-agent-angle-gap-analysis-from-a4).
+- **§ 6 Steps 2–4, 6, 8–12** — shipped per [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md). Wave-2 diff-shape recipes (`organize-imports`, `stale-imports`, …) and doc/test gaps: [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md).
+- **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `--commit`, `--until-empty`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). MCP fixpoint loop and multi-line row contract remain backlog.
 - **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
 
 The disagreement maps (§ 3), reference views (§ 5), rejected items (§ 7), and preserved moats (§ 8) stay verbatim — they're the strategic record that justifies the 12-step path's open steps and any future trigger-firing on rejected items.
@@ -361,9 +361,9 @@ Every recipe candidate proposed across all five positions. **Diff-shape** = emit
 
 | Extension                                                                                                      | Sources                                           | Effort | Verdict                                                                                         |
 | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| `apply --rows -` (CLI stdin) + `apply_rows` MCP/HTTP tool                                                      | A1, A3 (via WorkspaceEdit), A4 (highest-leverage) | M      | **Synthesis Step 8**                                                                            |
-| `apply --diff-input <file>` (unified diff source)                                                              | A4                                                | S      | **Synthesis Step 9**                                                                            |
-| `--until-empty` apply-loop with `--max-passes N`                                                               | A1                                                | S      | **Synthesis Step 11**                                                                           |
+| `apply --rows -` (CLI stdin) + `apply_rows` MCP/HTTP tool                                                      | A1, A3 (via WorkspaceEdit), A4 (highest-leverage) | M      | **Shipped** (Step 8)                                                                            |
+| `apply --diff-input <file>` (unified diff source)                                                              | A4                                                | S      | **Shipped** (Step 9; CLI only)                                                                  |
+| `--until-empty` apply-loop with `--max-passes N`                                                               | A1                                                | S      | **Shipped** (Step 11; CLI + recipe-id only)                                                     |
 | Multi-line + kind-tagged row contract (`before_lines`, `kind: replace/insert-before/insert-after/delete-line`) | A1                                                | M × 2  | **Backlog** — ships after Step 11                                                               |
 | Cross-file moves (`move_to: { file_path, line_start }`)                                                        | A1 mentions                                       | L      | **Deferred** — higher risk, less immediate value                                                |
 | Cross-file atomic apply (pre-write backups + restore-on-throw)                                                 | A1 mentions                                       | M      | **Deferred** — current per-file atomicity (temp + rename) is fine for ≤10 files; revisit at 50+ |
@@ -373,11 +373,11 @@ Every recipe candidate proposed across all five positions. **Diff-shape** = emit
 
 | Extension                                                                 | Sources                                                        | Effort | Verdict                                                                                    |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
-| `apply --commit "<msg>"`                                                  | A1                                                             | S      | **Synthesis Step 10**                                                                      |
+| `apply --commit "<msg>"`                                                  | A1                                                             | S      | **Shipped** (Step 10; CLI only)                                                            |
 | `apply --branch <name>`                                                   | A1                                                             | S      | **Backlog**                                                                                |
 | `apply --output-patch <file>` (unified diff without write)                | A1                                                             | S      | **Backlog**                                                                                |
-| `apply.autoApplyRecipes` allowlist config                                 | A6, A1 (Step 12)                                               | S      | **Synthesis Step 12**                                                                      |
-| `auto_fixable` gating (flip from advisory to enforcing)                   | A2 (trust tiers extension), A5 (default false), A6 (allowlist) | S      | **Synthesis Step 4**                                                                       |
+| `apply.autoApplyRecipes` allowlist config                                 | A6, A1 (Step 12)                                               | S      | **Shipped** (Step 12)                                                                      |
+| `auto_fixable` gating (flip from advisory to enforcing)                   | A2 (trust tiers extension), A5 (default false), A6 (allowlist) | S      | **Shipped** (Step 4)                                                                       |
 | Trust tiers (`safe` / `review` / `risky`)                                 | A2                                                             | M      | **Rejected** — covered by `auto_fixable` + allowlist                                       |
 | Per-row confidence scores                                                 | A2                                                             | M      | **Deferred** — speculative; no consensus on computation                                    |
 | Verifier as product surface (typecheck / lint / tests + structural delta) | A3                                                             | L      | **Deferred** — scope creep; consumer-side CI owns this                                     |
@@ -464,14 +464,14 @@ Items 1–10 are all pre-floor; the floor is doing zero blocking until item 11.
 
 A4's audit of where codemap stands on supporting LLM-driven edits. The under-tapped market is **substrate FOR LLM-driven edits**, not codemap-as-codemod-tool.
 
-| Capability                                | Already there?                 | Gap                                                                                                                                             |
-| ----------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent queries codemap                     | ✓ MCP `query` / `query_recipe` | None                                                                                                                                            |
-| Agent gets blast-radius before editing    | ✓ `impact`                     | None                                                                                                                                            |
-| Agent dry-runs an edit                    | ✓ `apply --dry-run`            | None                                                                                                                                            |
-| Agent emits arbitrary diff (not a recipe) | ✗                              | `apply --diff-input` / `apply --rows -` — turns codemap into the safe-write substrate for any fix source (**Synthesis Steps 8, 9**)             |
-| Agent gets feedback after edit            | ✓ partial via `watch`          | Real-time reindex covers it; LSP-style diagnostics still missing (tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)) |
-| Agent reasons about API safety            | ✗                              | "This rename touches the public API surface" needs a notion of external consumers — beyond v1 substrate                                         |
+| Capability                                | Already there?                                  | Gap                                                                                                                                             |
+| ----------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent queries codemap                     | ✓ MCP `query` / `query_recipe`                  | None                                                                                                                                            |
+| Agent gets blast-radius before editing    | ✓ `impact`                                      | None                                                                                                                                            |
+| Agent dry-runs an edit                    | ✓ `apply --dry-run`                             | None                                                                                                                                            |
+| Agent emits arbitrary diff (not a recipe) | ✓ (`apply_rows`; CLI `--rows` / `--diff-input`) | MCP/HTTP: `apply_rows`; CLI also accepts `--diff-input`. Recipe policy gates do not apply to row/diff paths.                                    |
+| Agent gets feedback after edit            | ✓ partial via `watch`                           | Real-time reindex covers it; LSP-style diagnostics still missing (tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)) |
+| Agent reasons about API safety            | ✗                                               | "This rename touches the public API surface" needs a notion of external consumers — beyond v1 substrate                                         |
 
 Concretely, the codemap-enabled agent flow:
 

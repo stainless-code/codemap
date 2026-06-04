@@ -13,7 +13,6 @@ marker_rows AS (
   FROM markers m
   CROSS JOIN params p
   WHERE m.kind = p.from_kind
-    AND m.content LIKE '%' || p.from_kind || '%'
     AND (p.in_file IS NULL OR m.file_path LIKE p.in_file || '%')
 )
 SELECT *

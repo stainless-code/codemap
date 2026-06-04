@@ -41,7 +41,7 @@ PR comment renderer (audit/SARIF → markdown summary):
   codemap pr-comment <file> [--shape audit|sarif] [--json]   # - for stdin
 
 MCP server (Model Context Protocol — for agent hosts):
-  codemap mcp                                        # stdio JSON-RPC (17 tools; watcher default-ON)
+  codemap mcp                                        # stdio JSON-RPC (18 tools; watcher default-ON)
   # CLI parity: query batch, trace, explore, node, file, schema, symbols, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):

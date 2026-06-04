@@ -25,7 +25,7 @@ params:
     type: boolean
     required: false
     default: true
-    description: Reserved for alias-chain support once export locations are indexed.
+    description: When false, omit single-hop re_export_chains rows from the preview.
 actions:
   - type: apply-rename
     auto_fixable: true
@@ -35,7 +35,7 @@ actions:
 
 # Rename preview
 
-Read-only diff preview for direct symbol definitions and direct import specifiers.
+Read-only diff preview for symbol renames (definitions, imports, call sites, optional re-exports).
 
 ```bash
 codemap query --recipe rename-preview \
@@ -47,12 +47,15 @@ codemap query --recipe rename-preview \
 
 - Definition lines from `symbols`.
 - Direct named import specifiers from `imports.specifiers` when `imports.resolved_path` points at the target symbol file.
+- AST call sites from `calls` where `callee_name` matches (`provenance` ast-only).
+- Single-hop barrel re-export lines via `re_export_chains` when `include_re_exports` is true (default).
 
 ## What v1 does not cover
 
 - String literals, comments, dynamic dispatch (`obj[name]`), template-literal property access.
 - JSX component tag renames (use dedicated JSX recipes).
 - Default-import binding shapes beyond direct named specifiers.
+- Imports through barrel files (consumer imports the barrel, not the defining module).
 - Same-line ambiguity when `before_pattern` appears twice on one line (first match only).
 
-Use `rg oldName` for literals/comments. `include_re_exports` controls single-hop `re_export_chains` rows.
+Use `rg oldName` for literals/comments. Pair with `find-symbol-references` for binding sites the rename CTEs skip.

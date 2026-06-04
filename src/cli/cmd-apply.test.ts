@@ -272,4 +272,41 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
       expect(r.out).toContain("--yes");
     });
   });
+
+  describe("migrate-import-source", () => {
+    beforeEach(async () => {
+      mkdirSync(join(projectRoot, "src", "api"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src", "api", "client.ts"),
+        "export function createClient() {}\n",
+        "utf8",
+      );
+      writeFileSync(
+        join(projectRoot, "src", "consumer.ts"),
+        'import { createClient } from "~/api/client";\n\ncreateClient();\n',
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("dry-run emits rows for matching import sources", async () => {
+      const r = await runCli(
+        [
+          "apply",
+          "migrate-import-source",
+          "--params",
+          "old_source=~/api/client,new_source=~/api/client-v2",
+          "--dry-run",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.mode).toBe("dry-run");
+      expect(env.summary.rows).toBeGreaterThan(0);
+      expect(readFile("src/consumer.ts")).toContain('from "~/api/client"');
+    });
+  });
 });

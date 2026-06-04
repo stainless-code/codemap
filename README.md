@@ -221,7 +221,7 @@ codemap skill                                                   # full codemap S
 codemap rule                                                    # full codemap rule markdown to stdout
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
-codemap mcp                                                     # JSON-RPC on stdio (17 tools; watcher default-ON)
+codemap mcp                                                     # JSON-RPC on stdio (18 tools; watcher default-ON)
 # Tools (17): query, query_batch, query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
 #        affected, trace, explore, node, apply

@@ -85,7 +85,7 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (17; snake_case — mirrors CLI verbs where a shell twin exists):
+Tools (18; snake_case — mirrors CLI verbs where a shell twin exists):
   query                One read-only SQL statement.
   query_batch          N statements in one round-trip (CLI: codemap query batch).
   query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
@@ -104,6 +104,7 @@ Tools (17; snake_case — mirrors CLI verbs where a shell twin exists):
   explore              Multi-name neighborhood survey.
   node                 One-hop symbol card (show + depth-1 neighborhood).
   apply                Apply recipe diff rows to disk (confirmation gated).
+  apply_rows           Apply explicit diff rows (no recipe SQL).
 
 Resources:
   Lazy-cached (constant for the server-process lifetime):
