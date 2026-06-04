@@ -904,10 +904,24 @@ describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
       "codemap apply migrate-deprecated --params symbol=SYMBOL,replacement=REPLACEMENT --dry-run",
     );
     expect(
+      actions?.find((a) => a.type === "apply-deprecated-usages")?.command,
+    ).toBe(
+      "codemap apply deprecated-usages --params symbol=SYMBOL,replacement_message=MESSAGE --dry-run",
+    );
+    expect(
       actions?.find((a) => a.type === "apply-add-jsdoc-deprecated")?.command,
     ).toBe(
       "codemap apply add-jsdoc-deprecated --params name=SYMBOL,replacement=REPLACEMENT --dry-run --force",
     );
+  });
+
+  it("find-symbol-definitions renders rename-preview command from name param", () => {
+    const actions = getQueryRecipeActionsRendered("find-symbol-definitions", {
+      name: "Bar",
+    });
+    expect(
+      actions?.find((a) => a.type === "apply-rename-preview")?.command,
+    ).toBe("codemap apply rename-preview --params old=Bar,new=NEW --dry-run");
   });
 
   it("find-symbol-references renders rename-preview command from name param", () => {

@@ -215,7 +215,7 @@ codemap affected --changed-since origin/main --json               # committed de
 # Preview first: codemap query --recipe rename-preview --params old=foo,new=bar --format diff-json
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
-codemap apply migrate-import-source --params old=legacy,new=@app/core --dry-run
+codemap apply migrate-import-source --params old_source=legacy,new_source=@app/core --dry-run
 codemap apply stale-imports --params in_file=src/widget --dry-run  # preview force-gated recipe (--force only for writes)
 # Agent/codemod rows (no recipe policy gates): echo '[{...}]' | codemap apply --rows - --yes
 # External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
