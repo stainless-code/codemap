@@ -45,6 +45,15 @@
         "regex": "import\\s+\\{[^}]+\\}\\s+from",
         "mode": "matches"
       }
+    },
+    {
+      "id": "shop-symbols-recipe",
+      "goldenId": "shop-symbols-recipe",
+      "traditional": {
+        "globs": ["src/components/shop/**/*.tsx"],
+        "regex": "export\\s+function\\s+\\w+",
+        "mode": "matches"
+      }
     }
   ]
 }

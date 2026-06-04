@@ -190,6 +190,15 @@
       ]
     },
     {
+      "id": "recipes.project-local",
+      "description": "State-dir recipes under .codemap/recipes/",
+      "fixtureFiles": [
+        ".codemap/recipes/shop-symbols.sql",
+        ".codemap/recipes/shop-symbols.md"
+      ],
+      "goldenScenarios": ["shop-symbols-recipe"]
+    },
+    {
       "id": "recipes.bundled",
       "description": "Every templates/recipes/*.sql id has a golden scenario",
       "fixtureFiles": [],
@@ -197,16 +206,24 @@
       "enforcedBy": "scripts/query-golden-coverage-matrix.test.mjs"
     },
     {
-      "id": "cli.mcp.http",
-      "description": "Consumer surfaces (show, trace, audit, MCP, HTTP) — not golden-indexed",
+      "id": "cli.bench-smoke",
+      "description": "Spawned CLI smoke on fixtures/minimal (show, snippet, impact, validate, SARIF)",
       "fixtureFiles": [],
       "goldenScenarios": [],
       "unitTests": [
-        "src/cli/cmd-cli-parity-e2e.test.ts",
+        "src/cli/cmd-test-bench-e2e.test.ts",
+        "src/cli/cmd-cli-parity-e2e.test.ts"
+      ]
+    },
+    {
+      "id": "cli.mcp.http",
+      "description": "MCP/HTTP handlers and audit baselines — unit-tested",
+      "fixtureFiles": [],
+      "goldenScenarios": [],
+      "unitTests": [
         "src/application/mcp-server.test.ts",
         "src/application/tool-handlers.test.ts"
-      ],
-      "knownGaps": ["No single spawned CLI matrix over full corpus yet"]
+      ]
     }
   ]
 }

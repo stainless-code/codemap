@@ -1,0 +1,26 @@
+[
+  {
+    "name": "ApiBridge",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "signature": "ApiBridge()"
+  },
+  {
+    "name": "ProductCard",
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 10,
+    "signature": "ProductCard(props)"
+  },
+  {
+    "name": "FormatPrice",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 4,
+    "signature": "FormatPrice(cents): string"
+  },
+  {
+    "name": "ShopButton",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 8,
+    "signature": "ShopButton()"
+  }
+]

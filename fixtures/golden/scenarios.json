@@ -689,6 +689,11 @@
       "sql": "SELECT name, action, from_glob, to_glob FROM boundary_rules ORDER BY name"
     },
     {
+      "id": "shop-symbols-recipe",
+      "prompt": "Project-local shop-symbols recipe lists exported shop functions",
+      "recipe": "shop-symbols"
+    },
+    {
       "id": "call-resolution-stats",
       "prompt": "Call-resolution phase counts on minimal fixture (total, resolved, queue, meta residual)",
       "recipe": "call-resolution-stats"

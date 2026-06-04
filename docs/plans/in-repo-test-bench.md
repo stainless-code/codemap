@@ -1,6 +1,6 @@
 # In-repo test bench (no external corpus)
 
-**Status:** Open — Phase 1 shipped on `feat/unresolved-calls-staging` follow-ups; Phases 2–4 backlog.  
+**Status:** Open — Phase 1–3 in progress on `feat/unresolved-calls-staging`; Phase 4 backlog.  
 **Effort:** M (ongoing; expand incrementally).  
 **Supersedes for maintainers:** relying on Tier B `CODEMAP_ROOT` / private clones to validate Codemap itself.
 
@@ -38,21 +38,18 @@ fixtures/
 - [x] Substrate pin-down goldens + `index-table-stats`
 - [x] Clarify Tier B = consumer-only in `golden-queries.md`
 
-### Phase 2 — Corpus depth (next)
+### Phase 2 — Corpus depth
 
-Target gaps from `knownGaps` in the manifest:
-
-| Gap                             | Fixture slice                                       | Golden                                     |
-| ------------------------------- | --------------------------------------------------- | ------------------------------------------ |
-| Method-call resolution          | `src/bench/method-call-sites.ts`                    | `calls-method-ping-unresolved`             |
-| Qualified heritage / namespaces | extend `heritage-qualified.ts` or `src/bench/`      | new SQL scenarios                          |
-| `affected-tests` param matrix   | already partial — ensure all 6 scenarios stay green |
-| Project-local recipe            | `.codemap/recipes/shop-symbols`                     | dedicated scenario (not only files-hashes) |
+- [x] Method-call slice — `src/bench/method-call-sites.ts` + `calls-method-ping-unresolved`
+- [x] Qualified heritage — `type-ancestors-qualified-child` on `heritage-qualified.ts`
+- [x] `affected-tests` — six param scenarios in `scenarios.json`
+- [x] Project-local recipe — `shop-symbols-recipe` golden
 
 ### Phase 3 — CLI / MCP bench pack
 
-- [ ] `src/cli/cmd-test-bench-e2e.test.ts` — spawn CLI against `fixtures/minimal` for: `show`, `snippet`, `impact`, `trace`, `validate`, `context`, `query --format sarif` (smoke exit 0)
-- [ ] Expand `test:agent-eval` probes to cover one scenario per capability group in `CAPABILITIES.json`
+- [x] `src/cli/cmd-test-bench-e2e.test.ts` — show, snippet, impact, validate, `shop-symbols`, SARIF (`boundary-violations`)
+- [x] `cmd-cli-parity-e2e.test.ts` — trace, explore, node, context, batch, resources
+- [ ] Expand `test:agent-eval` to one probe per `CAPABILITIES.json` group (6/16 today)
 
 ### Phase 4 — Scale (optional, replaces Tier B′)
 
