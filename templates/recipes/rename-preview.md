@@ -51,11 +51,13 @@ codemap query --recipe rename-preview \
 - Single-hop barrel re-export lines via `re_export_chains` when `include_re_exports` is true (default).
 - Barrel **consumer** import specifiers (`barrel_import_rows`) when `resolved_path` is the barrel file and `re_export_chains` links the specifier to the target symbol.
 - Binding-resolved identifier sites (`reference_rows`) from `bindings` × `references`, excluding definition spans and AST call lines already in other CTEs.
+- JSX opening tags from `jsx_elements` (`jsx_element_rows`) when no `references.kind='jsx'` row exists on that line (member/namespaced tags like `UI.Panel`).
+- JSX closing tags on `line_end` (`jsx_closing_rows`) when no binding-resolved `jsx` reference exists on that line.
 
 ## What v1 does not cover
 
 - String literals, comments, dynamic dispatch (`obj[name]`), template-literal property access.
-- JSX component tag renames (use dedicated JSX recipes).
+- JSX attribute renames (use `migrate-jsx-prop`).
 - Default-import binding shapes beyond direct named specifiers.
 - Multi-hop barrel chains beyond `re_export_chains` materialisation.
 - Same-line ambiguity when `before_pattern` appears twice on one line (first match only).

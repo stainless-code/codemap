@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   getQueryRecipeActions,
+  getQueryRecipeActionsRendered,
   getQueryRecipeSql,
   listQueryRecipeCatalog,
 } from "../application/query-recipes";
@@ -888,10 +889,48 @@ describe("getQueryRecipeActions", () => {
 
   it("returns undefined for recipes without actions", () => {
     expect(getQueryRecipeActions("index-summary")).toBeUndefined();
-    expect(getQueryRecipeActions("markers-by-kind")).toBeUndefined();
   });
 
   it("returns undefined for unknown recipes", () => {
     expect(getQueryRecipeActions("nope-not-real")).toBeUndefined();
+  });
+});
+
+describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
+  it("deprecated-symbols exposes apply command hints", () => {
+    const actions = getQueryRecipeActions("deprecated-symbols");
+    expect(actions?.some((a) => a.type === "apply-migrate-deprecated")).toBe(
+      true,
+    );
+    expect(
+      actions?.find((a) => a.type === "apply-migrate-deprecated")?.command,
+    ).toContain("migrate-deprecated");
+  });
+
+  it("find-symbol-references renders rename-preview command from name param", () => {
+    const actions = getQueryRecipeActionsRendered("find-symbol-references", {
+      name: "Foo",
+      file_path: "src/a.ts",
+    });
+    const apply = actions?.find((a) => a.type === "apply-rename-preview");
+    expect(apply?.command).toBe(
+      "codemap apply rename-preview --params old=Foo,new=NEW --dry-run",
+    );
+  });
+
+  it("find-jsx-usages renders component_name into rename-preview command", () => {
+    const actions = getQueryRecipeActionsRendered("find-jsx-usages", {
+      component_name: "ProductCard",
+    });
+    expect(
+      actions?.find((a) => a.type === "apply-rename-preview")?.command,
+    ).toContain("old=ProductCard");
+  });
+
+  it("markers-by-kind exposes replace-marker-kind apply hint", () => {
+    const actions = getQueryRecipeActions("markers-by-kind");
+    expect(
+      actions?.find((a) => a.type === "apply-replace-marker-kind")?.command,
+    ).toContain("replace-marker-kind");
   });
 });

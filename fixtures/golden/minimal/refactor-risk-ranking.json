@@ -48,6 +48,22 @@
     "risk_score": 200
   },
   {
+    "file_path": "src/bench/jsx-ui-namespace.ts",
+    "exported_count": 1,
+    "fan_in": 1,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 200
+  },
+  {
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "exported_count": 2,
+    "fan_in": 1,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 200
+  },
+  {
     "file_path": "src/lib/store.ts",
     "exported_count": 2,
     "fan_in": 1,
@@ -64,6 +80,14 @@
     "risk_score": 200
   },
   {
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "exported_count": 1,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
     "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
     "exported_count": 1,
     "fan_in": 0,
@@ -73,6 +97,14 @@
   },
   {
     "file_path": "src/bench/method-call-sites.ts",
+    "exported_count": 1,
+    "fan_in": 0,
+    "avg_coverage_pct": 0,
+    "measured_symbols": 0,
+    "risk_score": 100
+  },
+  {
+    "file_path": "src/bench/stale-multi-import.ts",
     "exported_count": 1,
     "fan_in": 0,
     "avg_coverage_pct": 0,

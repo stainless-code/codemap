@@ -20,6 +20,10 @@
     "exports": 4
   },
   {
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "exports": 2
+  },
+  {
     "file_path": "src/components/shop/ShopButton.tsx",
     "exports": 2
   },
@@ -60,6 +64,10 @@
     "exports": 1
   },
   {
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "exports": 1
+  },
+  {
     "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
     "exports": 1
   },
@@ -68,15 +76,7 @@
     "exports": 1
   },
   {
-    "file_path": "src/bench/method-call-sites.ts",
-    "exports": 1
-  },
-  {
-    "file_path": "src/components/shop/ApiBridge.tsx",
-    "exports": 1
-  },
-  {
-    "file_path": "src/components/shop/ProductCard.tsx",
+    "file_path": "src/bench/jsx-ui-namespace.ts",
     "exports": 1
   }
 ]

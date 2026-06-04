@@ -33,17 +33,20 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 ### Apply-shaped recipes (diff row contract)
 
-| Recipe id               | Golden scenario(s)                                                               | CLI e2e (`cmd-apply.test.ts`)                |
-| ----------------------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
-| `rename-preview`        | `rename-preview`, `rename-preview-product-card` (barrel + re-export + reference) | dry-run, `--yes` disk apply, Q6/Q7           |
-| `migrate-import-source` | `migrate-import-source`                                                          | dry-run                                      |
-| `replace-marker-kind`   | `replace-marker-kind`                                                            | `--yes` disk apply (temp project)            |
-| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                           | — (query golden only; writes need `--force`) |
-| `stale-imports`         | `stale-imports`                                                                  | dry-run + `--force --yes` disk apply         |
-| `migrate-deprecated`    | `migrate-deprecated`                                                             | dry-run + `--force --yes` disk apply         |
-| `deprecated-usages`     | `deprecated-usages`                                                              | `--force --yes` disk apply (JSDoc line)      |
+| Recipe id               | Golden scenario(s)                                                           | CLI e2e (`cmd-apply.test.ts`)                |
+| ----------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
+| `rename-preview`        | `rename-preview`, `rename-preview-product-card`, `rename-preview-jsx-member` | dry-run, `--yes` disk apply, member JSX tag  |
+| `migrate-import-source` | `migrate-import-source`                                                      | dry-run                                      |
+| `replace-marker-kind`   | `replace-marker-kind`                                                        | `--yes` disk apply (temp project)            |
+| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                       | — (query golden only; writes need `--force`) |
+| `stale-imports`         | `stale-imports`, `stale-imports-multi-specifier`                             | dry-run + sole/multi `--force --yes` apply   |
+| `migrate-jsx-prop`      | `migrate-jsx-prop-product-card`                                              | `--force --yes` attribute rename on disk     |
+| `migrate-deprecated`    | `migrate-deprecated`                                                         | dry-run + `--force --yes` disk apply         |
+| `deprecated-usages`     | `deprecated-usages`                                                          | `--force --yes` disk apply (JSDoc line)      |
 
-**Input modes:** recipe id (above); `--rows` JSON file (e2e); `--diff-input` (`apply-diff-input.test.ts` unit). MCP `apply_rows` shares the rows path — no separate e2e yet.
+**Read→apply (C.6):** `deprecated-symbols`, `find-symbol-references`, `find-symbol-definitions`, `find-jsx-usages`, `find-import-sites`, `markers-by-kind` frontmatter `actions[].command` → apply twins; `cmd-query.test.ts` rendered-command cases.
+
+**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. MCP: `apply_rows`, `apply_diff_input`, `apply` (`until_empty`, `commit_message`) wired in `http-server.ts` / `mcp-server.ts`; consent + dry-run covered in `tool-handlers.test.ts` for `handleApply` (extend for `apply_rows` / `apply_diff_input` when touched).
 
 ---
 

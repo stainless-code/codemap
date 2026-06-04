@@ -16,7 +16,15 @@
     "deps": 1
   },
   {
+    "from_path": "src/bench/jsx-member-gap.tsx",
+    "deps": 1
+  },
+  {
     "from_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "deps": 1
+  },
+  {
+    "from_path": "src/bench/stale-multi-import.ts",
     "deps": 1
   },
   {
@@ -29,14 +37,6 @@
   },
   {
     "from_path": "src/lib/cache.ts",
-    "deps": 1
-  },
-  {
-    "from_path": "src/lib/store.ts",
-    "deps": 1
-  },
-  {
-    "from_path": "src/types/heritage-qualified.ts",
     "deps": 1
   }
 ]

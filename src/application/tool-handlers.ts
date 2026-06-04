@@ -33,10 +33,14 @@ import {
   executeAffectedTests,
   resolveAffectedChangedPaths,
 } from "./affected-engine";
+import type { ApplyJsonPayload } from "./apply-engine";
 import {
   ApplyRunError,
+  gitCommitAppliedFiles,
+  runApplyFromDiffText,
   runApplyFromRecipe,
   runApplyFromRows,
+  runApplyUntilEmpty,
 } from "./apply-run";
 import {
   makeWorktreeReindex,
@@ -995,6 +999,9 @@ export const applyArgsSchema = {
   /** Q6 (a) — required for the write path; non-TTY transports have no prompt to fall back on. */
   yes: z.boolean().optional(),
   force: z.boolean().optional(),
+  until_empty: z.boolean().optional(),
+  max_passes: z.number().int().positive().optional(),
+  commit_message: z.string().min(1).optional(),
 };
 
 export interface ApplyArgs {
@@ -1003,6 +1010,23 @@ export interface ApplyArgs {
   dry_run?: boolean;
   yes?: boolean;
   force?: boolean;
+  until_empty?: boolean;
+  max_passes?: number;
+  commit_message?: string;
+}
+
+export const applyDiffInputArgsSchema = {
+  diff_text: z.string().min(1),
+  dry_run: z.boolean().optional(),
+  yes: z.boolean().optional(),
+  commit_message: z.string().min(1).optional(),
+};
+
+export interface ApplyDiffInputArgs {
+  diff_text: string;
+  dry_run?: boolean;
+  yes?: boolean;
+  commit_message?: string;
 }
 
 export const applyRowsArgsSchema = {
@@ -1035,11 +1059,27 @@ function assertApplyTransportConsent(
   return undefined;
 }
 
+function maybeGitCommitAfterApply(
+  payload: ApplyJsonPayload,
+  commitMessage: string | undefined,
+  projectRoot: string,
+): string | undefined {
+  if (commitMessage === undefined || !payload.applied) return undefined;
+  return gitCommitAppliedFiles({
+    projectRoot,
+    message: commitMessage,
+    filePaths: payload.files.map((f) => f.file_path),
+  });
+}
+
 /**
  * Substrate-shaped fix executor — recipe SQL → row contract →
  * {@link runApplyFromRecipe} (Q5 envelope). Non-`dry_run` requires `yes: true`.
  */
-export function handleApply(args: ApplyArgs, root: string): ToolResult {
+export async function handleApply(
+  args: ApplyArgs,
+  root: string,
+): Promise<ToolResult> {
   try {
     const dryRun = args.dry_run === true;
     const consentErr = assertApplyTransportConsent(dryRun, args.yes);
@@ -1052,14 +1092,56 @@ export function handleApply(args: ApplyArgs, root: string): ToolResult {
       );
     }
 
-    const { payload } = runApplyFromRecipe({
+    const loopResult =
+      args.until_empty === true
+        ? await runApplyUntilEmpty({
+            projectRoot: root,
+            recipeId: args.recipe,
+            params: args.params,
+            dryRun,
+            force: args.force === true,
+            yes: args.yes === true,
+            maxPasses: args.max_passes ?? 10,
+          })
+        : runApplyFromRecipe({
+            projectRoot: root,
+            recipeId: args.recipe,
+            params: args.params,
+            dryRun,
+            force: args.force === true,
+            yes: args.yes === true,
+          });
+
+    const gitErr = maybeGitCommitAfterApply(
+      loopResult.payload,
+      args.commit_message,
+      root,
+    );
+    if (gitErr !== undefined) return err(gitErr, 400);
+    return ok(loopResult.payload);
+  } catch (e) {
+    if (e instanceof ApplyRunError) return err(e.message, 400);
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+/** Unified diff → row contract → {@link runApplyFromDiffText} (CLI `--diff-input` twin). */
+export async function handleApplyDiffInput(
+  args: ApplyDiffInputArgs,
+  root: string,
+): Promise<ToolResult> {
+  try {
+    const dryRun = args.dry_run === true;
+    const consentErr = assertApplyTransportConsent(dryRun, args.yes);
+    if (consentErr !== undefined) return err(consentErr);
+
+    const { payload } = runApplyFromDiffText({
       projectRoot: root,
-      recipeId: args.recipe,
-      params: args.params,
+      diffText: args.diff_text,
       dryRun,
-      force: args.force === true,
-      yes: args.yes === true,
     });
+    const gitErr = maybeGitCommitAfterApply(payload, args.commit_message, root);
+    if (gitErr !== undefined) return err(gitErr, 400);
     return ok(payload);
   } catch (e) {
     if (e instanceof ApplyRunError) return err(e.message, 400);

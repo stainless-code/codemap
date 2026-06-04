@@ -765,7 +765,18 @@
     {
       "id": "stale-imports",
       "prompt": "Unused sole-specifier import lines (import_specifiers vs references)",
-      "recipe": "stale-imports"
+      "recipe": "stale-imports",
+      "params": {
+        "in_file": "src/components/shop/ProductCard"
+      }
+    },
+    {
+      "id": "stale-imports-multi-specifier",
+      "prompt": "Strip one unused name from a multi-specifier import line",
+      "recipe": "stale-imports",
+      "params": {
+        "in_file": "src/bench/stale-multi-import"
+      }
     },
     {
       "id": "migrate-import-source",
@@ -784,6 +795,26 @@
         "name": "createClient",
         "replacement": "createClientV2",
         "in_file": "src/api/"
+      }
+    },
+    {
+      "id": "rename-preview-jsx-member",
+      "prompt": "Member JSX tag rename via jsx_elements (UI.UiPanel)",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "UiPanel",
+        "new": "TilePanel",
+        "in_file": "src/bench/jsx-member"
+      }
+    },
+    {
+      "id": "migrate-jsx-prop-product-card",
+      "prompt": "Rename data-id JSX attribute on ProductCard article",
+      "recipe": "migrate-jsx-prop",
+      "params": {
+        "old_name": "data-id",
+        "new_name": "data-testid",
+        "in_file": "src/components/shop/ProductCard"
       }
     }
   ]

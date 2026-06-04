@@ -20,9 +20,19 @@
     "sample_targets": "[\"src/lib/complexity-fixture.ts\"]"
   },
   {
+    "from_path": "src/bench/jsx-member-gap.tsx",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/jsx-ui-namespace.ts\"]"
+  },
+  {
     "from_path": "src/bench/jsx-synthesis/PageShell.tsx",
     "deps": 1,
     "sample_targets": "[\"src/bench/jsx-synthesis/ChildCard.tsx\"]"
+  },
+  {
+    "from_path": "src/bench/stale-multi-import.ts",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/stale-multi-helpers.ts\"]"
   },
   {
     "from_path": "src/components/shop/ApiBridge.tsx",
@@ -38,15 +48,5 @@
     "from_path": "src/lib/cache.ts",
     "deps": 1,
     "sample_targets": "[\"src/lib/store.ts\"]"
-  },
-  {
-    "from_path": "src/lib/store.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/lib/cache.ts\"]"
-  },
-  {
-    "from_path": "src/types/heritage-qualified.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/types/hierarchy.ts\"]"
   }
 ]

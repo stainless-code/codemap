@@ -12,7 +12,7 @@ params:
 actions:
   - type: remove-stale-import
     auto_fixable: false
-    description: Remove sole-specifier import lines with no in-file references (review before apply).
+    description: Remove unused import specifiers (whole line or one name from a multi-specifier line).
     command: codemap apply stale-imports --force --yes
 ---
 
@@ -26,14 +26,16 @@ codemap apply stale-imports --dry-run
 codemap apply stale-imports --force --yes
 ```
 
-## v1 apply scope
+## Apply scope
 
-- **Sole specifier per `import_id`** only — one row deletes the whole import line via constructed `before_pattern` + empty `after_pattern`.
-- **Does not** remove one name from multi-specifier `import { a, b, c }` lines (use ESLint/Biome/organize-imports for that).
-- **Quote style:** patterns assume double-quoted module specifiers (`from "…"`). Single-quoted sources may conflict at apply time.
+- **Sole specifier per `import_id`** — deletes the whole import line via constructed `import { … } from "…"` pattern + empty `after_pattern`.
+- **Multi-specifier lines** — one row per unused name: first specifier `name, `; later specifiers `, name` (includes `type Name` when `include_type_only=true`).
+- **Aliases** — patterns use `imported as local` when they differ.
+- **Quote style:** whole-line delete assumes double-quoted module specifiers (`from "…"`). Comma-strip rows match indexed source text only.
 
 ## Detection (conservative)
 
+- `sib_count` / `rn` use **all** specifiers on `import_id`, not only unused rows (so a lone dead name on a multi-import line gets `, name` not a whole-line delete).
 - No `"references"` row in the same file with `name = local_name` on a line other than the import line.
 - Excludes specifiers whose `local_name` appears in `exports` on the same file (re-export surface).
 - Skips `side-effect` and `namespace` kinds.

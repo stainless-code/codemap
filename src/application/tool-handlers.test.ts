@@ -15,6 +15,8 @@ import { closeDb, createTables, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import {
   handleApply,
+  handleApplyDiffInput,
+  handleApplyRows,
   handleContext,
   handleQueryRecipe,
   handleShow,
@@ -119,8 +121,8 @@ describe("handleShow / handleSnippet — field-qualified query", () => {
 });
 
 describe("handleApply", () => {
-  it("returns 404 for an unknown recipe", () => {
-    const result = handleApply(
+  it("returns 404 for an unknown recipe", async () => {
+    const result = await handleApply(
       { recipe: "no-such-recipe-id", dry_run: true },
       projectRoot,
     );
@@ -131,8 +133,8 @@ describe("handleApply", () => {
     });
   });
 
-  it("rejects a write request without yes (Q6 — non-TTY transports)", () => {
-    const result = handleApply(
+  it("rejects a write request without yes (Q6 — non-TTY transports)", async () => {
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry" },
@@ -145,8 +147,8 @@ describe("handleApply", () => {
     });
   });
 
-  it("rejects dry_run + yes as mutually exclusive", () => {
-    const result = handleApply(
+  it("rejects dry_run + yes as mutually exclusive", async () => {
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry" },
@@ -161,7 +163,7 @@ describe("handleApply", () => {
     });
   });
 
-  it("returns the dry-run envelope shape on a parametrised recipe", () => {
+  it("returns the dry-run envelope shape on a parametrised recipe", async () => {
     // Realpath the project root so oxc-resolver's symlink-derefed
     // resolved_path aligns with the indexed file paths (mirrors the
     // CLI integration test).
@@ -173,7 +175,7 @@ describe("handleApply", () => {
       "export function runQuery() {}\n",
       "utf8",
     );
-    const result = handleApply(
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry", kind: "function" },
@@ -194,6 +196,105 @@ describe("handleApply", () => {
       expect(readFileSync(join(realRoot, "src", "query.ts"), "utf8")).toBe(
         "export function runQuery() {}\n",
       );
+    }
+  });
+});
+
+describe("handleApplyRows", () => {
+  it("rejects a write request without yes", async () => {
+    const result = await handleApplyRows(
+      {
+        rows: [
+          {
+            file_path: "src/query.ts",
+            line_start: 1,
+            before_pattern: "runQuery",
+            after_pattern: "runQry",
+          },
+        ],
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("yes: true"),
+    });
+  });
+
+  it("returns dry-run envelope for explicit rows", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApplyRows(
+      {
+        rows: [
+          {
+            file_path: "src/query.ts",
+            line_start: 1,
+            before_pattern: "runQuery",
+            after_pattern: "runQry",
+          },
+        ],
+        dry_run: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toMatchObject({
+        mode: "dry-run",
+        applied: false,
+      });
+    }
+  });
+});
+
+describe("handleApplyDiffInput", () => {
+  it("rejects a write request without yes", async () => {
+    const result = await handleApplyDiffInput(
+      {
+        diff_text: `--- a/src/query.ts
++++ b/src/query.ts
+@@ -1,1 +1,1 @@
+-runQuery
++runQry
+`,
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("yes: true"),
+    });
+  });
+
+  it("returns dry-run envelope for unified diff text", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApplyDiffInput(
+      {
+        diff_text: `diff --git a/src/query.ts b/src/query.ts
+--- a/src/query.ts
++++ b/src/query.ts
+@@ -1,1 +1,1 @@
+-export function runQuery() {}
++export function runQry() {}
+`,
+        dry_run: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toMatchObject({
+        mode: "dry-run",
+        applied: false,
+      });
     }
   });
 });

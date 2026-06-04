@@ -221,18 +221,18 @@ codemap apply replace-marker-kind --params old_kind=TODO,new_kind=FIXME --yes --
 # External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
 # Fixpoint (recipe mode): codemap apply rename-preview --params old=a,new=b --until-empty --yes
 # Optional git commit after clean apply: codemap apply ... --yes --commit "chore: rename a→b"
-# Bundled diff-shape recipes: rename-preview, migrate-import-source, replace-marker-kind, stale-imports, migrate-deprecated, deprecated-usages, add-jsdoc-deprecated
-# All-or-nothing: any conflict aborts before any file is written. MCP: apply + apply_rows (yes: true for writes).
+# Bundled diff-shape recipes: rename-preview, migrate-import-source, replace-marker-kind, stale-imports, migrate-deprecated, deprecated-usages, migrate-jsx-prop, add-jsdoc-deprecated
+# All-or-nothing: any conflict aborts before any file is written. MCP: apply, apply_rows, apply_diff_input (yes: true for writes).
 
 # Live agent content (pointer protocol — full body served from installed package version)
 codemap skill                                                   # full codemap SKILL markdown to stdout
 codemap rule                                                    # full codemap rule markdown to stdout
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
-codemap mcp                                                     # JSON-RPC on stdio (18 tools; watcher default-ON)
-# Tools (18): query, query_batch, query_recipe, audit, save_baseline,
+codemap mcp                                                     # JSON-RPC on stdio (19 tools; watcher default-ON)
+# Tools (19): query, query_batch, query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
-#        affected, trace, explore, node, apply, apply_rows
+#        affected, trace, explore, node, apply, apply_rows, apply_diff_input
 # CLI twins: query batch, trace, explore, node, file, schema, symbols, context --include-snippets (same JSON as MCP/HTTP).
 # Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);

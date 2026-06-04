@@ -22,6 +22,7 @@ export const MCP_TOOL_NAMES = [
   "node",
   "apply",
   "apply_rows",
+  "apply_diff_input",
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];

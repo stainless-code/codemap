@@ -7,6 +7,9 @@ params:
 actions:
   - type: navigate-to-definitions
     description: "Each row carries `file_path:line_start:name_column_start` for IDE / agent jump-to-definition. Column range covers the name token only (per R.6) — drop-in candidate for rename diffs."
+  - type: apply-rename-preview
+    description: "App-wide rename diff — uses query param `name` as `old`; replace NEW with the new identifier before apply."
+    command: codemap apply rename-preview --params old={{name}},new=NEW --dry-run
 ---
 
 # find-symbol-definitions

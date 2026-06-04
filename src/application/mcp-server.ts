@@ -37,11 +37,13 @@ import type { ManagedWatchSession } from "./session-lifecycle";
 import {
   affectedArgsSchema,
   applyArgsSchema,
+  applyDiffInputArgsSchema,
   applyRowsArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
   handleApply,
+  handleApplyDiffInput,
   handleApplyRows,
   handleAudit,
   handleAffected,
@@ -84,7 +86,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * 17 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
+ * 19 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].
@@ -182,6 +184,9 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("node", () => registerNodeTool(server, opts));
   maybeRegister("apply", () => registerApplyTool(server, opts));
   maybeRegister("apply_rows", () => registerApplyRowsTool(server, opts));
+  maybeRegister("apply_diff_input", () =>
+    registerApplyDiffInputTool(server, opts),
+  );
   registerResources(server);
   logMcpToolAllowlist(allowlistResolved, registered);
 
@@ -385,10 +390,22 @@ function registerApplyTool(server: McpServer, opts: ServerOpts): void {
     "apply",
     {
       description:
-        "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run), force (bypass auto_fixable / apply.autoApplyRecipes gates). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
+        "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run), force (bypass auto_fixable / apply.autoApplyRecipes gates), until_empty (fixpoint: dry-run probe → apply → reindex touched files → repeat; adds passes + terminated_by), max_passes (cap for until_empty; default 10), commit_message (git add touched files + commit after clean apply). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}; fixpoint runs add passes + terminated_by ∈ {empty, cap, conflicts, complete}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
       inputSchema: applyArgsSchema,
     },
-    (args) => wrapToolResult(handleApply(args, opts.root)),
+    async (args) => wrapToolResult(await handleApply(args, opts.root)),
+  );
+}
+
+function registerApplyDiffInputTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "apply_diff_input",
+    {
+      description:
+        "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed via parseUnifiedDiffToRows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
+      inputSchema: applyDiffInputArgsSchema,
+    },
+    async (args) => wrapToolResult(await handleApplyDiffInput(args, opts.root)),
   );
 }
 

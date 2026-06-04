@@ -41,7 +41,7 @@ PR comment renderer (audit/SARIF → markdown summary):
   codemap pr-comment <file> [--shape audit|sarif] [--json]   # - for stdin
 
 MCP server (Model Context Protocol — for agent hosts):
-  codemap mcp                                        # stdio JSON-RPC (18 tools; watcher default-ON)
+  codemap mcp                                        # stdio JSON-RPC (19 tools; watcher default-ON)
   # CLI parity: query batch, trace, explore, node, file, schema, symbols, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
@@ -70,8 +70,10 @@ Impact analysis (graph walk for refactor blast-radius):
 Affected tests (reverse dep walk → test files to run):
   codemap affected [--stdin] [--changed-since <ref>] [--json] [<path>...]
 
-Apply (substrate-shaped fix executor; consumes the diff-json row contract):
+Apply (substrate-shaped fix executor; diff-json row contract):
   codemap apply <recipe-id> [--params k=v[,k=v]] [--dry-run] [--yes] [--json]
+  codemap apply --rows -|<file.json>   codemap apply --diff-input <file>
+  (see codemap apply --help for --force, --until-empty, --commit)
 
 Coverage ingest (Istanbul JSON or LCOV from any test runner):
   codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected

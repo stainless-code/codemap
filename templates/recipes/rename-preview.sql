@@ -156,6 +156,89 @@ reference_rows AS (
       WHERE i2.file_path = r.file_path
         AND i2.line_number = r.line_start
     )
+),
+-- jsx_elements covers member/namespaced tags where references suppress JSXMemberExpression.
+jsx_element_rows AS (
+  SELECT DISTINCT
+    j.file_path,
+    j.line_start,
+    j.line_start AS line_end,
+    CASE
+      WHEN j.namespace_prefix IS NOT NULL AND j.namespace_prefix != '' THEN
+        j.namespace_prefix || '.' || p.old_name
+      ELSE
+        p.old_name
+    END AS before_pattern,
+    CASE
+      WHEN j.namespace_prefix IS NOT NULL AND j.namespace_prefix != '' THEN
+        j.namespace_prefix || '.' || p.new_name
+      ELSE
+        p.new_name
+    END AS after_pattern,
+    'jsx_element' AS location_kind,
+    0 AS chain_depth
+  FROM jsx_elements j
+  CROSS JOIN params p
+  WHERE j.component_name = p.old_name
+    AND j.is_fragment = 0
+    AND j.is_lowercase = 0
+    AND (p.in_file IS NULL OR j.file_path LIKE p.in_file || '%')
+    AND (
+      p.include_tests
+      OR (j.file_path NOT LIKE '%test.%' AND j.file_path NOT LIKE '%spec.%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM bindings b
+      JOIN "references" r ON r.id = b.reference_id
+      JOIN target_symbols s ON s.id = b.resolved_symbol_id
+      WHERE r.file_path = j.file_path
+        AND r.line_start = j.line_start
+        AND r.name = p.old_name
+        AND r.kind = 'jsx'
+    )
+),
+jsx_closing_rows AS (
+  SELECT DISTINCT
+    j.file_path,
+    j.line_end AS line_start,
+    j.line_end AS line_end,
+    '</' || CASE
+      WHEN j.namespace_prefix IS NOT NULL AND j.namespace_prefix != '' THEN
+        j.namespace_prefix || '.' || p.old_name
+      ELSE
+        p.old_name
+    END AS before_pattern,
+    '</' || CASE
+      WHEN j.namespace_prefix IS NOT NULL AND j.namespace_prefix != '' THEN
+        j.namespace_prefix || '.' || p.new_name
+      ELSE
+        p.new_name
+    END AS after_pattern,
+    'jsx_closing' AS location_kind,
+    0 AS chain_depth
+  FROM jsx_elements j
+  CROSS JOIN params p
+  WHERE j.component_name = p.old_name
+    AND j.is_fragment = 0
+    AND j.is_lowercase = 0
+    AND j.is_self_closing = 0
+    AND j.line_end > j.line_start
+    AND (p.in_file IS NULL OR j.file_path LIKE p.in_file || '%')
+    AND (
+      p.include_tests
+      OR (j.file_path NOT LIKE '%test.%' AND j.file_path NOT LIKE '%spec.%')
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM bindings b
+      JOIN "references" r ON r.id = b.reference_id
+      JOIN target_symbols s ON s.id = b.resolved_symbol_id
+      WHERE r.file_path = j.file_path
+        AND r.line_start = j.line_end
+        AND r.name = p.old_name
+        AND r.kind = 'jsx'
+    )
 )
 SELECT *
 FROM definition_rows
@@ -174,4 +257,10 @@ FROM barrel_import_rows
 UNION ALL
 SELECT *
 FROM reference_rows
+UNION ALL
+SELECT *
+FROM jsx_element_rows
+UNION ALL
+SELECT *
+FROM jsx_closing_rows
 ORDER BY file_path, line_start, location_kind;

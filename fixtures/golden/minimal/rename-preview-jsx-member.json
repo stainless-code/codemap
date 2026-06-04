@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "line_start": 4,
+    "line_end": 4,
+    "before_pattern": "UI.UiPanel",
+    "after_pattern": "UI.TilePanel",
+    "location_kind": "jsx_element",
+    "chain_depth": 0
+  }
+]
