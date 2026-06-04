@@ -28,6 +28,8 @@ const SUBSTRATE_SCENARIO_BY_TABLE = {
   function_params: "function-params-createClient",
   boundary_rules: "boundary-rules-ui-no-api",
   unresolved_calls: "unresolved-call-sites",
+  calls: "calls-createClient-resolved",
+  coverage: "coverage-rows-after-ingest",
   jsx_elements: "index-table-stats",
   jsx_attributes: "index-table-stats",
   try_catch: "try-catch-rethrow-heuristics",

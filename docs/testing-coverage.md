@@ -34,7 +34,7 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 ## Substrate tables — SQL pin-down scenarios
 
-Recipe goldens prove query _behavior_; these scenarios pin **persisted rows** on the minimal corpus:
+Recipe goldens prove query _behavior_; these scenarios pin **persisted rows** on the minimal corpus. Pin-down ids enforced in CI: `SUBSTRATE_SCENARIO_BY_TABLE` in `scripts/query-golden-coverage-matrix.test.mjs` (plus every bundled recipe id). `index-table-stats` and `call-resolution-stats` are additional aggregate/residual scenarios on the same corpus.
 
 | Table                                 | Scenario id                                             |
 | ------------------------------------- | ------------------------------------------------------- |

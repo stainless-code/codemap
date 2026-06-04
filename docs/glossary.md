@@ -604,7 +604,7 @@ TS shape for one row of the `type_members` table.
 
 ### `unresolved_calls` (table)
 
-Staging queue for call sites that **`resolveCalls`** could not bind after the bindings pass. Rows carry `file_path`, `caller_scope`, `callee_name`, and call-site position; deleted when resolved or when the call row is removed. Bundled recipes: `unresolved-call-sites`, `call-resolution-stats`. See [architecture § Call resolution](./architecture.md#schema).
+Staging queue for call sites that **`resolveCalls`** could not bind after the bindings pass. Rows carry `file_path`, `caller_scope`, `callee_name`, and call-site position; deleted when resolved or when the call row is removed. Bundled recipes: `unresolved-call-sites`, `call-resolution-stats`. See [architecture § `calls` / `unresolved_calls`](./architecture.md#calls--function-scoped-call-edges-deduped-per-file-strict).
 
 ### `unresolved_calls_residual`
 
