@@ -24,4 +24,4 @@ bun scripts/query-golden.ts --update   # refresh snapshots after intentional cha
 
 `bun run test:golden:external` remains for **consumers** validating Codemap against a private checkout (gitignored goldens). It is **not** part of the Codemap maintainer test bench.
 
-Expansion plan: [docs/plans/in-repo-test-bench.md](../docs/plans/in-repo-test-bench.md).
+Optional scale (second corpus or rename): [docs/roadmap.md](../docs/roadmap.md) · harness map: [docs/testing-coverage.md](../docs/testing-coverage.md).

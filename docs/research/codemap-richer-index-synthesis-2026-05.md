@@ -1,6 +1,6 @@
 # Codemap richer-index — consolidated triangulation across 5 model perspectives — 2026-05
 
-> **Status:** Research archive (decisions-of-record). **Live apply status:** [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy). **Utilization plan** [`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) is ready to delete on merge. This note retains consensus / disagreement matrices until fully slimmed per docs-governance.
+> **Status:** Research archive (decisions-of-record). **Live apply status:** [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy). This note retains consensus / disagreement matrices until fully slimmed per docs-governance.
 >
 > **Purpose:** Triangulation record (five model perspectives, May 2026). Do not treat this file as the implementation checklist — use the plans above.
 >
@@ -10,7 +10,7 @@
 
 ## What shipped (fact-checked 2026-05-19) — appendix per § 9 lifecycle
 
-The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half shipped — executor in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); wave-2 queue in [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md). **Live status = those homes**, not this note.
+The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half shipped — [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy). **Live status = those homes**, not this note.
 
 **Shipped via the substrate plan:**
 
@@ -25,7 +25,7 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 
 **Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 7–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, `migrate-deprecated`, …; `organize-imports` **rejected** per [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md)).
+- **§ 6 Steps 2–4, 6, 7–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, `migrate-deprecated`, …; `organize-imports` **rejected** per [§7](#7-rejected-items-with-trigger-conditions)).
 - **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`, `--commit`, `--until-empty`, MCP `until_empty` / `commit_message` on `apply`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). Multi-line row contract remains backlog.
 - **§ 5.7 ambiguity signals** — **partial ship:** `ambiguity_count` on diff-json hunks (Phase D); richer substrate signals still deferred.
 
@@ -444,19 +444,19 @@ A3's framing of how every write workflow flows. The synthesis path embraces step
 
 A4's full ranking of substrate / engine deepenings by leverage and floor-impact. Items 1–10 are floor-preserving; only item 11 crosses the floor. The synthesis path covers items 1, 2, 3 (deferred), 4, 9; item 5 is already in roadmap backlog; item 8 is tracked in the LSP plan; item 11 is **rejected (Path A)**.
 
-| #   | Item                                                          | Cost | Leverage  | Crosses floor? | Status in synthesis                                                                                                                                                                              |
-| --- | ------------------------------------------------------------- | ---- | --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Column anchoring on `symbols` / `exports` / `imports` etc.    | M    | High      | No             | **Synthesis Step 5, 7** · **✓ Shipped 2026-05-15** ([Tier 1 Slices 1.A–1.D](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14)) — full coverage |
-| 2   | `apply --diff-input <file>` (arbitrary diff source)           | S    | High      | No             | **Synthesis Steps 8–9** · **✓ Shipped 2026-06** ([`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) — `apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`) |
-| 3   | `references` table + scope graph                              | XL   | Very high | No             | **Deferred** · **✓ Shipped 2026-05-15** ([Tier 2 closed](../plans/substrate-extraction.md)) — references + scopes + bindings; 1.3% unresolved                                                    |
-| 4   | `RECIPE-AUTHORING.md` skill + 4 new pre-vetted recipes        | M    | High      | No             | **Synthesis Step 2** (3 recipes; skill optional)                                                                                                                                                 |
-| 5   | AST body hashes (`symbols.body_hash`)                         | M    | Medium    | No             | **Already in roadmap backlog**                                                                                                                                                                   |
-| 6   | History table + temporal recipes                              | L    | Medium    | No             | **Already in roadmap backlog**                                                                                                                                                                   |
-| 7   | Cross-language join exemplars + docs                          | S    | Medium    | No             | **Deferred** — docs improvement; not a substrate move                                                                                                                                            |
-| 8   | LSP diagnostic-push server                                    | XL   | High      | No             | **Tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)**                                                                                                                 |
-| 9   | `codemap-to-tsmorph` adapter + recipe-discovery shim (Path B) | M    | High      | No             | **Backlog** — separate package experiment after Step 8                                                                                                                                           |
-| 10  | Real-time feedback for LLM agents (watch + apply integration) | S    | Medium    | No             | **Already shipped** (default-ON watch on `mcp` / `serve`)                                                                                                                                        |
-| 11  | AST-template row shape (Path A)                               | XL   | Variable  | **Yes**        | **Rejected** — per § 3.2                                                                                                                                                                         |
+| #   | Item                                                          | Cost | Leverage  | Crosses floor? | Status in synthesis                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------- | ---- | --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Column anchoring on `symbols` / `exports` / `imports` etc.    | M    | High      | No             | **Synthesis Step 5, 7** · **✓ Shipped 2026-05-15** ([Tier 1 Slices 1.A–1.D](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14)) — full coverage             |
+| 2   | `apply --diff-input <file>` (arbitrary diff source)           | S    | High      | No             | **Synthesis Steps 8–9** · **✓ Shipped 2026-06** ([`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy) — `apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`) |
+| 3   | `references` table + scope graph                              | XL   | Very high | No             | **Deferred** · **✓ Shipped 2026-05-15** ([Tier 2 closed](../plans/substrate-extraction.md)) — references + scopes + bindings; 1.3% unresolved                                                                |
+| 4   | `RECIPE-AUTHORING.md` skill + 4 new pre-vetted recipes        | M    | High      | No             | **Synthesis Step 2** (3 recipes; skill optional)                                                                                                                                                             |
+| 5   | AST body hashes (`symbols.body_hash`)                         | M    | Medium    | No             | **Already in roadmap backlog**                                                                                                                                                                               |
+| 6   | History table + temporal recipes                              | L    | Medium    | No             | **Already in roadmap backlog**                                                                                                                                                                               |
+| 7   | Cross-language join exemplars + docs                          | S    | Medium    | No             | **Deferred** — docs improvement; not a substrate move                                                                                                                                                        |
+| 8   | LSP diagnostic-push server                                    | XL   | High      | No             | **Tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)**                                                                                                                             |
+| 9   | `codemap-to-tsmorph` adapter + recipe-discovery shim (Path B) | M    | High      | No             | **Backlog** — separate package experiment after Step 8                                                                                                                                                       |
+| 10  | Real-time feedback for LLM agents (watch + apply integration) | S    | Medium    | No             | **Already shipped** (default-ON watch on `mcp` / `serve`)                                                                                                                                                    |
+| 11  | AST-template row shape (Path A)                               | XL   | Variable  | **Yes**        | **Rejected** — per § 3.2                                                                                                                                                                                     |
 
 Items 1–10 are all pre-floor; the floor is doing zero blocking until item 11.
 
@@ -517,7 +517,7 @@ Defer until 2+ recipes hit it. The current `apply-engine.ts` "same-line ambiguit
 
 ## 6. Synthesised 12-step path (shipped index)
 
-The minimum synthesis preserving every consensus claim (§ 2) and resolving every disagreement (§ 3). **Live implementation detail** lives in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy), [`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) (delete on merge), and [`substrate-extraction.md`](../plans/substrate-extraction.md). This section is an **index only** — per-step open questions were settled in those PRs; disagreement maps (§ 3) and reference views (§ 5) remain the strategic record.
+The minimum synthesis preserving every consensus claim (§ 2) and resolving every disagreement (§ 3). **Live implementation detail** lives in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy) and [`substrate-extraction.md`](../plans/substrate-extraction.md). This section is an **index only** — per-step open questions were settled in those PRs; disagreement maps (§ 3) and reference views (§ 5) remain the strategic record.
 
 | Step | Item                                                                                              | Status                                                                                   |
 | ---- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -534,7 +534,7 @@ The minimum synthesis preserving every consensus claim (§ 2) and resolving ever
 | 11   | `--until-empty` / `max_passes` / fixpoint envelope                                                | ✓ Shipped 2026-06                                                                        |
 | 12   | `apply.autoApplyRecipes` allowlist                                                                | ✓ Shipped 2026-06                                                                        |
 
-**Follow-on (not § 6 steps):** `define_in` on `rename-preview` for homonym-safe renames (shipped PR #165+); optional `codemap rename` CLI alias — [`scoped-rename-define-in.md`](../plans/scoped-rename-define-in.md). Multi-line row contract and global rename verb remain backlog per architecture § Apply.
+**Follow-on (not § 6 steps):** `define_in` on `rename-preview` for homonym-safe renames (shipped [#165](https://github.com/stainless-code/codemap/pull/165)); optional `codemap rename` CLI alias — [roadmap](../roadmap.md). Multi-line row contract and global rename verb remain backlog per architecture § Apply.
 
 ---
 
@@ -579,7 +579,7 @@ The "no fix engine" line was right about the **product class**; it was wrong abo
 
 Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance/SKILL.md#closing-research):
 
-- **Open implementation** → [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
+- **Open implementation** → [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update that plan on ship; do not add inventory appendices here.
 - **When all 12 steps ship or close:** retire this note per [`docs/README.md` Rule 8](../README.md). Lift any remaining durable strategic claim into [`why-codemap.md`](../why-codemap.md) before deletion.
 - **When a deferred / rejected item triggers** (per § 7 trigger conditions): open a plan PR with this note as the rationale anchor; this synthesis is the disagreement record that justifies the trigger.
 - **Annual re-evaluation** — re-run the triangulation against the substrate / recipe count of the day; update verdicts with current data.
