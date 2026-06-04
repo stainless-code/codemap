@@ -4,7 +4,7 @@ import { closeDb, openDb } from "../db";
 import { getApplyAutoApplyRecipes } from "../runtime";
 import { parseUnifiedDiffToRows } from "./apply-diff-input";
 import { applyDiffPayload } from "./apply-engine";
-import type { ApplyJsonPayload } from "./apply-engine";
+import type { ApplyFile, ApplyJsonPayload } from "./apply-engine";
 import { assertApplyAllowlist, assertApplyAutoFixable } from "./apply-policy";
 import { queryRows } from "./index-engine";
 import { getQueryRecipeParams, getQueryRecipeSql } from "./query-recipes";
@@ -98,6 +98,41 @@ export function runApplyFromDiffText(opts: {
   });
 }
 
+function mergeApplyFiles(
+  accumulated: Map<string, ApplyFile>,
+  incoming: ApplyFile[],
+): void {
+  for (const f of incoming) {
+    const prev = accumulated.get(f.file_path);
+    if (prev === undefined) {
+      accumulated.set(f.file_path, { ...f });
+      continue;
+    }
+    accumulated.set(f.file_path, {
+      file_path: f.file_path,
+      rows_applied: prev.rows_applied + f.rows_applied,
+      warnings: [...(prev.warnings ?? []), ...(f.warnings ?? [])],
+    });
+  }
+}
+
+function withMergedApplyFiles(
+  payload: ApplyJsonPayload,
+  accumulated: Map<string, ApplyFile>,
+): ApplyJsonPayload {
+  if (accumulated.size === 0) return payload;
+  const files = [...accumulated.values()];
+  return {
+    ...payload,
+    files,
+    summary: {
+      ...payload.summary,
+      files: files.length,
+      files_modified: files.filter((f) => f.rows_applied > 0).length,
+    },
+  };
+}
+
 export async function runApplyUntilEmpty(opts: {
   projectRoot: string;
   recipeId: string;
@@ -107,6 +142,7 @@ export async function runApplyUntilEmpty(opts: {
   yes: boolean;
   maxPasses: number;
 }): Promise<ApplyRunResult> {
+  const touchedAcrossPasses = new Map<string, ApplyFile>();
   let last: ApplyRunResult = {
     payload: {
       mode: opts.dryRun ? "dry-run" : "apply",
@@ -135,33 +171,42 @@ export async function runApplyUntilEmpty(opts: {
     });
     if (last.payload.conflicts.length > 0) {
       return {
-        payload: {
-          ...last.payload,
-          passes: pass,
-          terminated_by: "conflicts",
-        },
+        payload: withMergedApplyFiles(
+          {
+            ...last.payload,
+            passes: pass,
+            terminated_by: "conflicts",
+          },
+          touchedAcrossPasses,
+        ),
         passes: pass,
         terminated_by: "conflicts",
       };
     }
     if (last.payload.summary.rows === 0) {
       return {
-        payload: {
-          ...last.payload,
-          passes: pass,
-          terminated_by: "empty",
-        },
+        payload: withMergedApplyFiles(
+          {
+            ...last.payload,
+            passes: pass,
+            terminated_by: "empty",
+          },
+          touchedAcrossPasses,
+        ),
         passes: pass,
         terminated_by: "empty",
       };
     }
     if (opts.dryRun) {
       return {
-        payload: {
-          ...last.payload,
-          passes: pass,
-          terminated_by: "complete",
-        },
+        payload: withMergedApplyFiles(
+          {
+            ...last.payload,
+            passes: pass,
+            terminated_by: "complete",
+          },
+          touchedAcrossPasses,
+        ),
         passes: pass,
         terminated_by: "complete",
       };
@@ -177,14 +222,20 @@ export async function runApplyUntilEmpty(opts: {
     });
     if (last.payload.conflicts.length > 0) {
       return {
-        payload: {
-          ...last.payload,
-          passes: pass,
-          terminated_by: "conflicts",
-        },
+        payload: withMergedApplyFiles(
+          {
+            ...last.payload,
+            passes: pass,
+            terminated_by: "conflicts",
+          },
+          touchedAcrossPasses,
+        ),
         passes: pass,
         terminated_by: "conflicts",
       };
+    }
+    if (last.payload.applied) {
+      mergeApplyFiles(touchedAcrossPasses, last.payload.files);
     }
     const touched = last.payload.files.map((f) => f.file_path);
     if (touched.length > 0) {
@@ -202,14 +253,39 @@ export async function runApplyUntilEmpty(opts: {
   }
 
   return {
-    payload: {
-      ...last.payload,
-      passes: opts.maxPasses,
-      terminated_by: "cap",
-    },
+    payload: withMergedApplyFiles(
+      {
+        ...last.payload,
+        passes: opts.maxPasses,
+        terminated_by: "cap",
+      },
+      touchedAcrossPasses,
+    ),
     passes: opts.maxPasses,
     terminated_by: "cap",
   };
+}
+
+/** Git commit after apply when payload is commit-safe (no partial fixpoint). */
+export function gitCommitAfterApplyIfEligible(opts: {
+  projectRoot: string;
+  message: string;
+  payload: ApplyJsonPayload;
+}): string | undefined {
+  if (!opts.payload.applied || opts.payload.conflicts.length > 0) {
+    return undefined;
+  }
+  const term = opts.payload.terminated_by;
+  if (term !== undefined && term !== "empty") {
+    return `codemap apply: --commit requires fixpoint terminated_by "empty" (got "${term}"). Omit --commit or raise --max-passes.`;
+  }
+  const filePaths = opts.payload.files.map((f) => f.file_path);
+  if (filePaths.length === 0) return undefined;
+  return gitCommitAppliedFiles({
+    projectRoot: opts.projectRoot,
+    message: opts.message,
+    filePaths,
+  });
 }
 
 export function gitCommitAppliedFiles(opts: {

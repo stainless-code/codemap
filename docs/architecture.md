@@ -154,7 +154,7 @@ Three **mutually exclusive** CLI entry shapes; all converge on `applyDiffPayload
 
 **Fixpoint (recipe transport only):** `--until-empty` / MCP `until_empty` on `apply` + `--max-passes` / `max_passes` (default 10) run `runApplyUntilEmpty` — dry-run probe → apply → targeted reindex of touched files → repeat until zero rows, conflicts, or cap; envelope adds `passes` and `terminated_by` ∈ `{empty, cap, conflicts, complete}`. Requires a recipe id (CLI) or `recipe` (MCP) — not on `apply_rows` / `apply_diff_input`.
 
-**Git commit after apply:** `--commit "<msg>"` / `commit_message` on recipe `apply` and `apply_diff_input` (and CLI recipe apply) runs `git add -- <touched>` + `git commit` after a clean apply (stderr / tool `{error}` on git failure; apply still succeeded).
+**Git commit after apply:** `--commit "<msg>"` / `commit_message` on recipe `apply` and `apply_diff_input` runs `git add -- <touched>` + `git commit` after a clean apply (stderr / tool `{error}` on git failure; apply still succeeded). With `--until-empty` / `until_empty`, commit runs only when `terminated_by === "empty"` (not on `cap` / `conflicts`); fixpoint passes merge all touched paths into `files` before staging.
 
 **diff-json preview:** each emitted hunk includes `ambiguity_count` (extra `before_pattern` matches on the line beyond the first); warnings when `> 0` — mirrors apply engine first-match-only behaviour.
 

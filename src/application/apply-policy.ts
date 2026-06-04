@@ -1,5 +1,4 @@
 import { getQueryRecipeActions } from "./query-recipes";
-import type { RecipeAction } from "./recipes-loader";
 
 /**
  * Step 4 — `auto_fixable` gates writes unless `--force`.
@@ -33,10 +32,4 @@ export function assertApplyAllowlist(opts: {
   if (opts.force || !opts.yes) return undefined;
   if (list.includes(opts.recipeId)) return undefined;
   return `codemap apply: recipe "${opts.recipeId}" is not in apply.autoApplyRecipes. Add it to config or pass --force.`;
-}
-
-export function recipeActionsForApply(
-  recipeId: string,
-): RecipeAction[] | undefined {
-  return getQueryRecipeActions(recipeId);
 }

@@ -666,6 +666,42 @@ export function staleOne(): number { return 2; }
       });
     });
 
+    it("rejects --commit when --until-empty hits max-passes cap", async () => {
+      writeFileSync(
+        join(projectRoot, "src", "marked.ts"),
+        "// FIXME: todo item\nexport const MARKED = 1;\n",
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+
+      const r = await runCli(
+        [
+          "apply",
+          "replace-marker-kind",
+          "--params",
+          "from_kind=FIXME,to_kind=XXX",
+          "--until-empty",
+          "--max-passes",
+          "1",
+          "--yes",
+          "--commit",
+          "codemap: should not commit partial fixpoint",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(1);
+      const env = JSON.parse(r.out);
+      expect(env.error).toContain('terminated_by "empty"');
+      expect(env.error).toContain("cap");
+      const log = execSync("git log --oneline", {
+        cwd: projectRoot,
+        encoding: "utf8",
+      });
+      expect(log.trim().split("\n").length).toBe(1);
+    });
+
     it("creates a git commit for touched files after a clean apply", async () => {
       const r = await runCli(
         [

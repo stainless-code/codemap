@@ -36,7 +36,7 @@ import {
 import type { ApplyJsonPayload } from "./apply-engine";
 import {
   ApplyRunError,
-  gitCommitAppliedFiles,
+  gitCommitAfterApplyIfEligible,
   runApplyFromDiffText,
   runApplyFromRecipe,
   runApplyFromRows,
@@ -1064,11 +1064,11 @@ function maybeGitCommitAfterApply(
   commitMessage: string | undefined,
   projectRoot: string,
 ): string | undefined {
-  if (commitMessage === undefined || !payload.applied) return undefined;
-  return gitCommitAppliedFiles({
+  if (commitMessage === undefined) return undefined;
+  return gitCommitAfterApplyIfEligible({
     projectRoot,
     message: commitMessage,
-    filePaths: payload.files.map((f) => f.file_path),
+    payload,
   });
 }
 

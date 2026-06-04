@@ -4,7 +4,7 @@ import { createInterface } from "node:readline/promises";
 import type { ApplyJsonPayload } from "../application/apply-engine";
 import {
   ApplyRunError,
-  gitCommitAppliedFiles,
+  gitCommitAfterApplyIfEligible,
   runApplyFromDiffText,
   runApplyFromRecipe,
   runApplyFromRows,
@@ -496,11 +496,11 @@ async function finishApply(
     projectRoot: string;
   },
 ): Promise<void> {
-  if (opts.commitMessage !== undefined && payload.applied) {
-    const gitErr = gitCommitAppliedFiles({
+  if (opts.commitMessage !== undefined) {
+    const gitErr = gitCommitAfterApplyIfEligible({
       projectRoot: opts.projectRoot,
       message: opts.commitMessage,
-      filePaths: payload.files.map((f) => f.file_path),
+      payload,
     });
     if (gitErr !== undefined) {
       emitError(gitErr, opts.json);
