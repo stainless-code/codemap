@@ -216,7 +216,7 @@ codemap affected --changed-since origin/main --json               # committed de
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
 codemap apply migrate-import-source --params old=legacy,new=@app/core --dry-run
-codemap apply replace-marker-kind --params old_kind=TODO,new_kind=FIXME --yes --force  # when not auto_fixable
+codemap apply stale-imports --params in_file=src/widget --dry-run --force --yes  # force-gated recipe example
 # Agent/codemod rows (no recipe policy gates): echo '[{...}]' | codemap apply --rows - --yes
 # External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
 # Fixpoint (recipe mode): codemap apply rename-preview --params old=a,new=b --until-empty --yes

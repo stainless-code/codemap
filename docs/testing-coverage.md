@@ -46,7 +46,7 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 **Read→apply (C.6):** `deprecated-symbols`, `find-symbol-references`, `find-symbol-definitions`, `find-jsx-usages`, `find-import-sites`, `markers-by-kind` frontmatter `actions[].command` → apply twins; `cmd-query.test.ts` rendered-command cases.
 
-**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. MCP: `apply_rows`, `apply_diff_input`, `apply` (`until_empty`, `commit_message`) wired in `http-server.ts` / `mcp-server.ts`; consent + dry-run covered in `tool-handlers.test.ts` for `handleApply` (extend for `apply_rows` / `apply_diff_input` when touched).
+**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. MCP: `apply_rows`, `apply_diff_input`, `apply` (`until_empty`, `commit_message`) wired in `http-server.ts` / `mcp-server.ts`; consent + dry-run in `tool-handlers.test.ts` (`handleApply`, `handleApplyRows`, `handleApplyDiffInput`).
 
 ---
 

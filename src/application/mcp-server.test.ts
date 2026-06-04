@@ -381,11 +381,21 @@ describe("MCP server — query_recipe tool", () => {
       const json = readJson(r);
       expect(Array.isArray(json)).toBe(true);
       expect(json.length).toBeGreaterThan(0);
-      // Every row carries the recipe's actions template.
+      // Every row carries the recipe's actions template (read + C.6 apply hints).
       expect(json[0]).toMatchObject({
         name: "oldFn",
-        actions: [{ type: "flag-caller" }],
+        file_path: "src/a.ts",
+        kind: "function",
       });
+      const actions = json[0].actions as Array<{ type: string }>;
+      expect(actions.map((a) => a.type)).toEqual(
+        expect.arrayContaining([
+          "flag-caller",
+          "apply-migrate-deprecated",
+          "apply-deprecated-usages",
+          "apply-add-jsdoc-deprecated",
+        ]),
+      );
     } finally {
       await server.close();
     }
