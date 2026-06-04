@@ -1,6 +1,6 @@
 # Codemap richer-index — consolidated triangulation across 5 model perspectives — 2026-05
 
-> **Status:** Open research archive — **canonical open work** for apply follow-on (wave-2 recipes, tests) lives in [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md); apply executor in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); substrate tiers in [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). This note retains consensus / disagreement matrices and per-source argumentation until synthesis fully closes.
+> **Status:** Research archive (decisions-of-record). **Live apply status:** [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy). **Utilization plan** [`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) is ready to delete on merge. This note retains consensus / disagreement matrices until fully slimmed per docs-governance.
 >
 > **Purpose:** Triangulation record (five model perspectives, May 2026). Do not treat this file as the implementation checklist — use the plans above.
 >
@@ -25,9 +25,9 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 
 **Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, …; `organize-imports` **rejected** per [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md)) and test gaps there.
+- **§ 6 Steps 2–4, 6, 7–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, `migrate-deprecated`, …; `organize-imports` **rejected** per [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md)).
 - **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`, `--commit`, `--until-empty`, MCP `until_empty` / `commit_message` on `apply`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). Multi-line row contract remains backlog.
-- **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
+- **§ 5.7 ambiguity signals** — **partial ship:** `ambiguity_count` on diff-json hunks (Phase D); richer substrate signals still deferred.
 
 The disagreement maps (§ 3), reference views (§ 5), rejected items (§ 7), and preserved moats (§ 8) stay verbatim — they're the strategic record that justifies the 12-step path's open steps and any future trigger-firing on rejected items.
 
@@ -590,7 +590,7 @@ Extend `rename-preview.sql` with a `call_rows` CTE joining `calls` × `symbols`.
 
 ### Step 7 — `exports.{line_start, column_start}` + extend `rename-preview.sql` with `re_export_rows` CTE (S) — ✓ Shipped (partial) 2026-05-15
 
-**What shipped:** Substrate column part shipped as [`substrate-extraction.md` Tier 1 Slice 1.B](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `exports.{line_start, line_end, column_start, column_end, is_re_export}` + bundled `find-export-sites` recipe. Re-export chain walking landed in [Tier 2.2](../plans/substrate-extraction.md) via the `re_export_chains` materialised table (10-hop bound, cycle detection), and `bindings-engine` resolves through it. **Open:** the `rename-preview.sql` recipe extension itself — the substrate is in place; the recipe-side `re_export_rows` CTE is the remaining work.
+**What shipped:** Substrate column part shipped as [`substrate-extraction.md` Tier 1 Slice 1.B](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `exports.{line_start, line_end, column_start, column_end, is_re_export}` + bundled `find-export-sites` recipe. Re-export chain walking landed in [Tier 2.2](../plans/substrate-extraction.md) via the `re_export_chains` materialised table (10-hop bound, cycle detection), and `bindings-engine` resolves through it. **✓ Shipped 2026-06:** `rename-preview.sql` `re_export_rows`, `barrel_import_rows`, `reference_rows`, JSX member CTEs (PR #165 / utilization plan).
 
 Mirror of Step 5 for the exports table. Closes the second rename-preview substrate gap (re-export alias chains; barrel-safe rewrites).
 

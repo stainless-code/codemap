@@ -51,6 +51,8 @@ import_rows AS (
   JOIN deprecated_targets t ON t.file_path = i.resolved_path
   CROSS JOIN params p
   WHERE (p.in_file IS NULL OR i.file_path LIKE p.in_file || '%')
+    AND instr(p.replacement, '.') = 0
+    AND length(trim(p.replacement)) > 0
 )
 SELECT *
 FROM call_rows

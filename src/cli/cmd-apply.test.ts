@@ -448,6 +448,14 @@ describe("codemap apply <recipe-id> — CLI integration", () => {
       expect(readFile("src/widget.ts")).toContain("unusedBinding");
     });
 
+    it("rejects --yes without --force when recipe is not auto_fixable", async () => {
+      const r = await runCli(["apply", "stale-imports", "--yes", "--json"], {
+        CODEMAP_ROOT: projectRoot,
+      });
+      expect(r.exitCode).toBe(1);
+      expect(r.err + r.out).toMatch(/auto_fixable|--force/);
+    });
+
     it("removes the unused import line with --force --yes", async () => {
       const r = await runCli(
         ["apply", "stale-imports", "--force", "--yes", "--json"],
@@ -673,6 +681,34 @@ export function staleOne(): number { return 2; }
         cwd: projectRoot,
         stdio: "ignore",
       });
+    });
+
+    it("exits non-zero when --until-empty hits max-passes cap", async () => {
+      writeFileSync(
+        join(projectRoot, "src", "marked-cap.ts"),
+        "// FIXME: todo item\nexport const MARKED_CAP = 1;\n",
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+
+      const r = await runCli(
+        [
+          "apply",
+          "replace-marker-kind",
+          "--params",
+          "from_kind=FIXME,to_kind=XXX",
+          "--until-empty",
+          "--max-passes",
+          "1",
+          "--yes",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(1);
+      const env = JSON.parse(r.out);
+      expect(env.terminated_by).toBe("cap");
     });
 
     it("rejects --commit when --until-empty hits max-passes cap", async () => {

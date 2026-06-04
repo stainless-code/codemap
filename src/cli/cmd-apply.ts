@@ -350,13 +350,41 @@ async function runRecipeApply(opts: {
   }
 
   if (opts.untilEmpty) {
+    let loopYes = opts.yes;
+    if (!opts.dryRun && !loopYes && canPrompt) {
+      const preview = runApplyFromRecipe({
+        projectRoot: opts.projectRoot,
+        recipeId: opts.recipeId,
+        params: opts.params,
+        dryRun: true,
+        force: opts.force,
+        yes: false,
+      }).payload;
+      if (preview.conflicts.length > 0 || preview.summary.rows === 0) {
+        emitResult(preview, opts);
+        return;
+      }
+      printPromptSummary(preview, opts.recipeId);
+      const proceed = await promptYesNo();
+      if (!proceed) {
+        if (opts.json) {
+          emitResult(preview, opts);
+        } else {
+          console.log(
+            `apply ${opts.recipeId}: aborted by user; no files written.`,
+          );
+        }
+        return;
+      }
+      loopYes = true;
+    }
     const loopResult = await runApplyUntilEmpty({
       projectRoot: opts.projectRoot,
       recipeId: opts.recipeId,
       params: opts.params,
       dryRun: opts.dryRun,
       force: opts.force,
-      yes: opts.yes,
+      yes: loopYes,
       maxPasses: opts.maxPasses,
     });
     await finishApply(loopResult.payload, {
@@ -532,6 +560,8 @@ function emitResult(
     renderTerminal(result, opts.recipeId, opts.dryRun);
   }
   if (result.conflicts.length > 0) {
+    process.exitCode = 1;
+  } else if (result.terminated_by === "cap") {
     process.exitCode = 1;
   }
 }

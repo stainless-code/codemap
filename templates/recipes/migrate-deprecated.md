@@ -39,7 +39,7 @@ codemap apply migrate-deprecated --params symbol=now,replacement=Date.now,requir
 ## v1 scope
 
 - **Call sites** — `calls` where `callee_name = symbol` (`provenance` ast-only).
-- **Direct imports** — `imports.specifiers` when `resolved_path` is the defining file of the deprecated symbol.
+- **Direct imports** — simple binding renames only (`replacement` must be a single identifier — no `.`); member-style replacements (`Date.now`) emit **call_site** rows only.
 - Does not rewrite barrel-only consumers (use `rename-preview` `barrel_import_rows`) or JSDoc text (use `deprecated-usages`).
 
 ## Caveats
