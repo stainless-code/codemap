@@ -70,7 +70,7 @@ CREATE TABLE http_routes (
 ## Dependencies
 
 - **Blocked on** [c9-plugin-layer](./c9-plugin-layer.md) plugin loader (Q1–Q2 minimum)
-- Synergy with [callback-dispatch-synthesis](./callback-dispatch-synthesis.md) for handler resolution
+- Synergy with JSX callback-synthesis heuristic `calls` (shipped [#164](https://github.com/stainless-code/codemap/pull/164); [architecture § `calls`](../architecture.md#calls--function-scoped-call-edges-deduped-per-file-strict)) for handler resolution
 
 ---
 
