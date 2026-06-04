@@ -11,6 +11,9 @@ params:
 actions:
   - type: navigate-to-reference
     description: "Bindings-precise per R.12 — every row's `resolved_symbol_id` matches the named symbol at the given file (not just same-name elsewhere). Pair with `find-symbol-definitions` to anchor a rename across an entire app. Drops same-name refs that shadow in inner scopes or come from different imports."
+  - type: apply-rename-preview
+    description: "App-wide rename diff — uses query param `name` as `old`; replace NEW with the new identifier before apply."
+    command: codemap apply rename-preview --params old={{name}},new=NEW,define_in={{file_path}} --dry-run
 ---
 
 # find-symbol-references

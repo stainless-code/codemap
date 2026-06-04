@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { execSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -11,10 +12,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb } from "../db";
+import { closeDb, createTables, insertFile, openDb } from "../db";
 import { initCodemap } from "../runtime";
 import {
   handleApply,
+  handleApplyDiffInput,
+  handleApplyRows,
   handleContext,
   handleQueryRecipe,
   handleShow,
@@ -119,8 +122,8 @@ describe("handleShow / handleSnippet — field-qualified query", () => {
 });
 
 describe("handleApply", () => {
-  it("returns 404 for an unknown recipe", () => {
-    const result = handleApply(
+  it("returns 404 for an unknown recipe", async () => {
+    const result = await handleApply(
       { recipe: "no-such-recipe-id", dry_run: true },
       projectRoot,
     );
@@ -131,8 +134,8 @@ describe("handleApply", () => {
     });
   });
 
-  it("rejects a write request without yes (Q6 — non-TTY transports)", () => {
-    const result = handleApply(
+  it("rejects a write request without yes (Q6 — non-TTY transports)", async () => {
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry" },
@@ -145,8 +148,8 @@ describe("handleApply", () => {
     });
   });
 
-  it("rejects dry_run + yes as mutually exclusive", () => {
-    const result = handleApply(
+  it("rejects dry_run + yes as mutually exclusive", async () => {
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry" },
@@ -161,7 +164,7 @@ describe("handleApply", () => {
     });
   });
 
-  it("returns the dry-run envelope shape on a parametrised recipe", () => {
+  it("returns the dry-run envelope shape on a parametrised recipe", async () => {
     // Realpath the project root so oxc-resolver's symlink-derefed
     // resolved_path aligns with the indexed file paths (mirrors the
     // CLI integration test).
@@ -173,7 +176,7 @@ describe("handleApply", () => {
       "export function runQuery() {}\n",
       "utf8",
     );
-    const result = handleApply(
+    const result = await handleApply(
       {
         recipe: "rename-preview",
         params: { old: "runQuery", new: "runQry", kind: "function" },
@@ -194,6 +197,263 @@ describe("handleApply", () => {
       expect(readFileSync(join(realRoot, "src", "query.ts"), "utf8")).toBe(
         "export function runQuery() {}\n",
       );
+    }
+  });
+
+  it("writes disk when yes: true on an auto_fixable recipe", async () => {
+    const realRoot = realpathSync(projectRoot);
+    writeFileSync(
+      join(realRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry", kind: "function" },
+        yes: true,
+      },
+      realRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toMatchObject({ mode: "apply", applied: true });
+      expect(readFileSync(join(realRoot, "src", "query.ts"), "utf8")).toBe(
+        "export function runQry() {}\n",
+      );
+    }
+  });
+
+  it("rejects yes without force when recipe is not auto_fixable", async () => {
+    const result = await handleApply(
+      {
+        recipe: "add-jsdoc-deprecated",
+        params: {
+          name: "runQuery",
+          replacement: "Use runQry instead.",
+        },
+        yes: true,
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("auto_fixable"),
+    });
+  });
+
+  it("returns fixpoint envelope fields on until_empty dry_run", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "marked.ts"),
+      "// FIXME: todo item\nexport const MARKED = 1;\n",
+      "utf8",
+    );
+    const db = openDb();
+    try {
+      insertFile(db, {
+        path: "src/marked.ts",
+        content_hash: "h-marked",
+        size: 40,
+        line_count: 2,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      db.run(
+        `INSERT INTO markers (file_path, line_number, kind, content)
+         VALUES ('src/marked.ts', 1, 'FIXME', 'todo item')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const result = await handleApply(
+      {
+        recipe: "replace-marker-kind",
+        params: { from_kind: "FIXME", to_kind: "XXX" },
+        dry_run: true,
+        until_empty: true,
+        max_passes: 2,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as {
+        passes?: number;
+        terminated_by?: string;
+      };
+      expect(payload.passes).toBeGreaterThanOrEqual(1);
+      expect(payload.terminated_by).toBeDefined();
+    }
+  });
+});
+
+describe("handleApplyRows", () => {
+  it("rejects a write request without yes", async () => {
+    const result = await handleApplyRows(
+      {
+        rows: [
+          {
+            file_path: "src/query.ts",
+            line_start: 1,
+            before_pattern: "runQuery",
+            after_pattern: "runQry",
+          },
+        ],
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("yes: true"),
+    });
+  });
+
+  it("returns dry-run envelope for explicit rows", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApplyRows(
+      {
+        rows: [
+          {
+            file_path: "src/query.ts",
+            line_start: 1,
+            before_pattern: "runQuery",
+            after_pattern: "runQry",
+          },
+        ],
+        dry_run: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toMatchObject({
+        mode: "dry-run",
+        applied: false,
+      });
+    }
+  });
+
+  it("writes disk when yes: true", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApplyRows(
+      {
+        rows: [
+          {
+            file_path: "src/query.ts",
+            line_start: 1,
+            before_pattern: "runQuery",
+            after_pattern: "runQry",
+          },
+        ],
+        yes: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(readFileSync(join(projectRoot, "src", "query.ts"), "utf8")).toBe(
+        "export function runQry() {}\n",
+      );
+    }
+  });
+});
+
+describe("handleApply commit_message", () => {
+  beforeEach(() => {
+    execSync("git init", { cwd: projectRoot, stdio: "ignore" });
+    execSync("git config user.email test@codemap.test", {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+    execSync("git config user.name Codemap Test", {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+    execSync("git add -A", { cwd: projectRoot, stdio: "ignore" });
+    execSync('git commit -m "initial"', {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+  });
+
+  it("commits after recipe apply when commit_message is set", async () => {
+    const realRoot = realpathSync(projectRoot);
+    writeFileSync(
+      join(realRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry", kind: "function" },
+        yes: true,
+        commit_message: "chore: rename via MCP handler",
+      },
+      realRoot,
+    );
+    expect(result.ok).toBe(true);
+    const log = execSync("git log --oneline", {
+      cwd: realRoot,
+      encoding: "utf8",
+    });
+    expect(log).toContain("chore: rename via MCP handler");
+  });
+});
+
+describe("handleApplyDiffInput", () => {
+  it("rejects a write request without yes", async () => {
+    const result = await handleApplyDiffInput(
+      {
+        diff_text: `--- a/src/query.ts
++++ b/src/query.ts
+@@ -1,1 +1,1 @@
+-runQuery
++runQry
+`,
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("yes: true"),
+    });
+  });
+
+  it("returns dry-run envelope for unified diff text", async () => {
+    writeFileSync(
+      join(projectRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApplyDiffInput(
+      {
+        diff_text: `diff --git a/src/query.ts b/src/query.ts
+--- a/src/query.ts
++++ b/src/query.ts
+@@ -1,1 +1,1 @@
+-export function runQuery() {}
++export function runQry() {}
+`,
+        dry_run: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toMatchObject({
+        mode: "dry-run",
+        applied: false,
+      });
     }
   });
 });

@@ -3,6 +3,9 @@
     "name": "ChildCard"
   },
   {
+    "name": "MemberHost"
+  },
+  {
     "name": "PageShell"
   },
   {

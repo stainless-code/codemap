@@ -1,5 +1,19 @@
 import type { RecipeParam } from "./recipes-loader";
 
+/** Map positional bind values back to param names for action command templates. */
+export function recipeParamValuesFromResolved(
+  declared: RecipeParam[] | undefined,
+  values: RecipeParamValue[],
+): RecipeParamValues {
+  const out: RecipeParamValues = {};
+  for (let i = 0; i < (declared ?? []).length; i++) {
+    const param = declared![i]!;
+    const value = values[i];
+    if (value !== null && value !== undefined) out[param.name] = value;
+  }
+  return out;
+}
+
 /**
  * One bound parameter value. `null` is internal-only — callers may not pass
  * `null` directly; the resolver assigns it for declared optional params that

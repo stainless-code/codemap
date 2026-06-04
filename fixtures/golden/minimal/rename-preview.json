@@ -9,12 +9,30 @@
     "chain_depth": 0
   },
   {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 11,
+    "line_end": 11,
+    "before_pattern": "usePermissions",
+    "after_pattern": "useAccess",
+    "location_kind": "call_site",
+    "chain_depth": 0
+  },
+  {
     "file_path": "src/components/shop/ShopButton.tsx",
     "line_start": 1,
     "line_end": 1,
     "before_pattern": "usePermissions",
     "after_pattern": "useAccess",
     "location_kind": "import_specifier",
+    "chain_depth": 0
+  },
+  {
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 9,
+    "line_end": 9,
+    "before_pattern": "usePermissions",
+    "after_pattern": "useAccess",
+    "location_kind": "call_site",
     "chain_depth": 0
   },
   {

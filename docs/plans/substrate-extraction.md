@@ -1,6 +1,6 @@
 # Substrate extraction — maximal AST → SQLite enrichment plan
 
-> **Status:** open (tiers **7–13**) · tiers **1–6** shipped — live tables and `SCHEMA_VERSION` in [`architecture.md § Schema`](../architecture.md#schema) / [`src/db.ts`](../../src/db.ts). Apply-engine direction in [`apply-engine-direction.md`](./apply-engine-direction.md).
+> **Status:** open (tiers **7–13**) · tiers **1–6** shipped — live tables and `SCHEMA_VERSION` in [`architecture.md § Schema`](../architecture.md#schema) / [`src/db.ts`](../../src/db.ts). Apply executor shipped — [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); follow-on recipes in [`substrate-apply-utilization.md`](./substrate-apply-utilization.md).
 >
 > **Per-tier ship status (fact-checked 2026-05-19):** Tiers **1–6** remainder shipped. Tier headings carry the PR landing date for that slice; the remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **7–13** open.
 >
@@ -86,7 +86,7 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors `lsp-diagn
 
 - **Q14 — In-place schema migration.** **RESOLVED 2026-05-14 — promoted to [R.16](#pre-locked-decisions).** Every tier bumps `SCHEMA_VERSION`; full rebuild on mismatch; reject in-place migrations. Empirical rebuild cost (~2s worst case) makes optimisation unjustified.
 
-- **Q16 — Extractor-registration architecture.** **RESOLVED 2026-05-14 — promoted to [R.17](#pre-locked-decisions).** Per-tier extractor modules under `src/extractors/<tier>.ts` exporting `TierExtractor { tierId, register(visitor, ctx) }`; `parser.ts` becomes a thin orchestrator; migration PR ships before Tier 1. (Question added during the grill — not in the original Q1-Q15 numbering.)
+- **Q16 — Extractor-registration architecture.** **RESOLVED 2026-05-14 — decision locked in [R.17](#pre-locked-decisions).** Target shape is per-tier modules under `src/extractors/<tier>.ts`; **not implemented** as the `TierExtractor { register(visitor, ctx) }` registry — extend today's extractor layout per R.17. (Question added during the grill — not in the original Q1-Q15 numbering.)
 
 - **Q15 — Indexing strategy on new tables.** SQLite indexes for the new tables — which columns get B-tree indexes? `references(file_path, name)`, `references(resolved_symbol_id)`, `jsx_elements(component_name)`, `bindings(resolved_symbol_id)` are the obvious ones. Plan PR for each tier settles its indexing strategy.
 

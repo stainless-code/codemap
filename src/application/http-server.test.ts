@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -1139,5 +1145,101 @@ describe("http-server — --token auth", () => {
     serverHandle = await startServer({ token: "secret" });
     const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tools`);
     expect(r.status).toBe(401);
+  });
+});
+
+describe("http-server — apply tools", () => {
+  function seedRenameApplyTarget(): void {
+    writeFileSync(
+      join(benchDir, "src", "rename-target.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/rename-target.ts', 'hrt', 30, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/rename-target.ts', 'runQuery', 'function', 1, 1, 'runQuery()', 1, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("POST /tool/apply dry_run returns native JSON envelope", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply", {
+      recipe: "rename-preview",
+      params: { old: "runQuery", new: "runQry", kind: "function" },
+      dry_run: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.mode).toBe("dry-run");
+    expect(r.json.applied).toBe(false);
+  });
+
+  it("POST /tool/apply_rows dry_run returns native JSON envelope", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply_rows", {
+      rows: [
+        {
+          file_path: "src/rename-target.ts",
+          line_start: 1,
+          before_pattern: "runQuery",
+          after_pattern: "runQry",
+        },
+      ],
+      dry_run: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.mode).toBe("dry-run");
+  });
+
+  it("POST /tool/apply_diff_input dry_run parses diff text", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply_diff_input", {
+      diff_text: `--- a/src/rename-target.ts
++++ b/src/rename-target.ts
+@@ -1,1 +1,1 @@
+-runQuery
++runQry
+`,
+      dry_run: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.summary.rows).toBeGreaterThanOrEqual(1);
+  });
+
+  it("POST /tool/apply without yes returns 400", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply", {
+      recipe: "rename-preview",
+      params: { old: "runQuery", new: "runQry" },
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("yes: true");
+  });
+
+  it("POST /tool/apply yes:true writes disk", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply", {
+      recipe: "rename-preview",
+      params: { old: "runQuery", new: "runQry", kind: "function" },
+      yes: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.applied).toBe(true);
+    expect(
+      readFileSync(join(benchDir, "src", "rename-target.ts"), "utf8"),
+    ).toBe("export function runQry() {}\n");
   });
 });

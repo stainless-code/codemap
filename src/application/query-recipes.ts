@@ -3,6 +3,12 @@ import { join } from "node:path";
 
 import { resolveAgentsTemplateDir } from "../agents-template-path";
 import { getProjectRoot, getStateDir } from "../runtime";
+import { renderRecipeActionCommands } from "./apply-command-template";
+import {
+  recipeParamValuesFromResolved,
+  resolveRecipeParams,
+} from "./recipe-params";
+import type { RecipeParamValues } from "./recipe-params";
 import { loadAllRecipes } from "./recipes-loader";
 import type { LoadedRecipe } from "./recipes-loader";
 import { resolveStateDir } from "./state-dir";
@@ -263,6 +269,25 @@ export function getQueryRecipeSql(id: string): string | undefined {
  */
 export function getQueryRecipeActions(id: string): RecipeAction[] | undefined {
   return getRegistry().find((r) => r.id === id)?.actions;
+}
+
+/** {@link getQueryRecipeActions} with `{{param}}` command templates rendered. */
+export function getQueryRecipeActionsRendered(
+  id: string,
+  params: RecipeParamValues | undefined,
+): RecipeAction[] | undefined {
+  const actions = getQueryRecipeActions(id);
+  if (actions === undefined) return undefined;
+  const resolved = resolveRecipeParams({
+    recipeId: id,
+    declared: getQueryRecipeParams(id),
+    provided: params,
+  });
+  if (!resolved.ok) return actions;
+  return renderRecipeActionCommands(
+    actions,
+    recipeParamValuesFromResolved(getQueryRecipeParams(id), resolved.values),
+  );
 }
 
 /**

@@ -28,11 +28,15 @@ import type { ManagedWatchSession } from "./session-lifecycle";
 import {
   affectedArgsSchema,
   applyArgsSchema,
+  applyDiffInputArgsSchema,
+  applyRowsArgsSchema,
   auditArgsSchema,
   contextArgsSchema,
   dropBaselineArgsSchema,
   exploreArgsSchema,
   handleApply,
+  handleApplyDiffInput,
+  handleApplyRows,
   handleAudit,
   handleAffected,
   handleContext,
@@ -117,6 +121,8 @@ const TOOL_NAMES = [
   "explore",
   "node",
   "apply",
+  "apply_rows",
+  "apply_diff_input",
   "save_baseline",
   "list_baselines",
   "drop_baseline",
@@ -570,7 +576,19 @@ async function dispatchTool(
     case "apply": {
       const r = validate(applyArgsSchema, args, "apply");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
-      result = handleApply(r.value, opts.root);
+      result = await handleApply(r.value, opts.root);
+      break;
+    }
+    case "apply_rows": {
+      const r = validate(applyRowsArgsSchema, args, "apply_rows");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleApplyRows(r.value, opts.root);
+      break;
+    }
+    case "apply_diff_input": {
+      const r = validate(applyDiffInputArgsSchema, args, "apply_diff_input");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = await handleApplyDiffInput(r.value, opts.root);
       break;
     }
     case "save_baseline": {

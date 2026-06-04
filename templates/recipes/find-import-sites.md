@@ -7,6 +7,9 @@ params:
 actions:
   - type: navigate-to-import-sites
     description: "Each row carries `file_path:line:column_start` for the local-binding token (the rewrite-relevant token per R.6). For type-only specifiers (`import { type Foo }`) `is_type_only = 1`."
+  - type: apply-migrate-import-source
+    description: "Rewrite import module path — replace OLD_SOURCE with row `source`, NEW_SOURCE with the target module path."
+    command: codemap apply migrate-import-source --params old_source=OLD_SOURCE,new_source=NEW_SOURCE --dry-run
 ---
 
 # find-import-sites

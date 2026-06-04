@@ -211,20 +211,30 @@ codemap affected --changed-since origin/main --json               # committed de
 # Moat-A twin: `affected-tests` recipe. Output: [{test_path, impact_depth}] — CI composes the runner command.
 
 # Apply — substrate-shaped fix executor (recipe SQL describes hunks; codemap validates + writes)
+# Row contract (same as --format diff-json): {file_path, line_start, before_pattern, after_pattern}
+# Preview first: codemap query --recipe rename-preview --params old=foo,new=bar --format diff-json
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
-# Consumes the --format diff-json row contract ({file_path, line_start, before_pattern, after_pattern}).
-# All-or-nothing: any conflict aborts before any file is written. Pair with --format diff-json preview first.
+# Homonym-safe: add define_in=src/path/to/definition.ts (scopes target; in_file only filters output rows)
+codemap apply migrate-import-source --params old_source=legacy,new_source=@app/core --dry-run
+codemap apply stale-imports --params in_file=src/widget --dry-run  # preview; writes need --force --yes
+codemap apply migrate-jsx-prop --params old_name=data-id,new_name=data-testid,component_name=ProductCard --dry-run --force
+# Agent/codemod rows (no recipe policy gates): echo '[{...}]' | codemap apply --rows - --yes
+# External unified diff: codemap apply --diff-input /tmp/patch.diff --dry-run
+# Fixpoint (recipe mode): codemap apply rename-preview --params old=a,new=b --until-empty --yes
+# Optional git commit (recipe id required): codemap apply rename-preview --params old=a,new=b --yes --commit "chore: rename a→b"
+# Bundled diff-shape recipes: rename-preview, migrate-import-source, replace-marker-kind, stale-imports, migrate-deprecated, deprecated-usages, migrate-jsx-prop, add-jsdoc-deprecated
+# All-or-nothing: any conflict aborts before any file is written. MCP: apply, apply_rows, apply_diff_input (yes: true for writes).
 
 # Live agent content (pointer protocol — full body served from installed package version)
 codemap skill                                                   # full codemap SKILL markdown to stdout
 codemap rule                                                    # full codemap rule markdown to stdout
 
 # MCP server (Model Context Protocol) — for agent hosts (Claude Code, Cursor, Codex, generic MCP clients)
-codemap mcp                                                     # JSON-RPC on stdio (17 tools; watcher default-ON)
-# Tools (17): query, query_batch, query_recipe, audit, save_baseline,
+codemap mcp                                                     # JSON-RPC on stdio (19 tools; watcher default-ON)
+# Tools (19): query, query_batch, query_recipe, audit, save_baseline,
 #        list_baselines, drop_baseline, context, validate, show, snippet, impact,
-#        affected, trace, explore, node, apply
+#        affected, trace, explore, node, apply, apply_rows, apply_diff_input
 # CLI twins: query batch, trace, explore, node, file, schema, symbols, context --include-snippets (same JSON as MCP/HTTP).
 # Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);

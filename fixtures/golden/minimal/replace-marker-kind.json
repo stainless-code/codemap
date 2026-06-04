@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/notes.md",
+    "line_start": 3,
+    "line_end": 3,
+    "before_pattern": "TODO",
+    "after_pattern": "FIXME",
+    "location_kind": "marker",
+    "chain_depth": 0
+  }
+]

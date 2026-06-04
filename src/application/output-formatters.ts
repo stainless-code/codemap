@@ -331,6 +331,11 @@ export interface DiffHunk {
   new_start: number;
   new_count: number;
   lines: DiffLine[];
+  /**
+   * Extra `before_pattern` matches on the line beyond the first (apply engine
+   * rewrites the leftmost only — same contract as `applyDiffPayload`).
+   */
+  ambiguity_count: number;
 }
 
 /**
@@ -490,6 +495,12 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
     // legitimately containing `$` (`$inject`, `$$factory`) would otherwise be
     // silently mangled. Pre-escape so the replacement is literal.
     const updated = actual.replace(before, after.replace(/\$/g, "$$$$"));
+    const ambiguityCount = countBeforePatternOccurrences(actual, before) - 1;
+    if (ambiguityCount > 0) {
+      warnings.push(
+        `${canonicalPath}:${lineStart}: before_pattern appears ${ambiguityCount + 1} times on line; diff-json previews first match only`,
+      );
+    }
     file.hunks.push({
       old_start: lineStart,
       old_count: 1,
@@ -499,6 +510,7 @@ export function buildDiffJson(opts: DiffOpts): DiffJsonPayload {
         { type: "remove", text: actual },
         { type: "add", text: updated },
       ],
+      ambiguity_count: ambiguityCount,
     });
   }
 
@@ -565,6 +577,19 @@ export function formatDiff(opts: DiffOpts): string {
  */
 export function formatDiffJson(opts: DiffOpts): string {
   return JSON.stringify(buildDiffJson(opts), null, 2);
+}
+
+function countBeforePatternOccurrences(line: string, before: string): number {
+  if (before.length === 0) return 0;
+  let count = 0;
+  let idx = 0;
+  while (true) {
+    const pos = line.indexOf(before, idx);
+    if (pos === -1) break;
+    count++;
+    idx = pos + before.length;
+  }
+  return count;
 }
 
 function ensureDiffFile(

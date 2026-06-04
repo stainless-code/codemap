@@ -627,6 +627,27 @@ describe("formatDiff / formatDiffJson", () => {
     expect(out).toContain("+todo");
   });
 
+  it("sets ambiguity_count when before_pattern appears more than once on the line", () => {
+    writeFileSync(join(workDir, "src/ambig.ts"), "const foo = foo();\n");
+    const payload = JSON.parse(
+      formatDiffJson({
+        projectRoot: workDir,
+        rows: [
+          {
+            file_path: "src/ambig.ts",
+            line_start: 1,
+            before_pattern: "foo",
+            after_pattern: "bar",
+          },
+        ],
+      }),
+    );
+    expect(payload.files[0].hunks[0].ambiguity_count).toBe(1);
+    expect(payload.warnings.some((w: string) => w.includes("2 times"))).toBe(
+      true,
+    );
+  });
+
   it("marks missing rows when source file is gone", () => {
     const payload = JSON.parse(
       formatDiffJson({

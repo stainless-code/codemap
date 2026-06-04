@@ -30,6 +30,36 @@
     "coverage_pct": 0
   },
   {
+    "name": "useHelperA",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "useHelperB",
+    "file_path": "src/bench/homonym-consumer-b.ts",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "helper",
+    "file_path": "src/bench/homonym-helper-a.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "helper",
+    "file_path": "src/bench/homonym-helper-b.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "MemberHost",
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
     "name": "ChildCard",
     "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
     "line_start": 5,
@@ -39,6 +69,24 @@
     "name": "PageShell",
     "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
     "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
+    "name": "UiPanel",
+    "file_path": "src/bench/jsx-ui-namespace.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "keepMe",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "dropMe",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 5,
     "coverage_pct": 0
   },
   {
@@ -69,54 +117,6 @@
     "name": "run",
     "file_path": "src/consumer.ts",
     "line_start": 22,
-    "coverage_pct": 0
-  },
-  {
-    "name": "get",
-    "file_path": "src/lib/cache.ts",
-    "line_start": 8,
-    "coverage_pct": 0
-  },
-  {
-    "name": "invalidate",
-    "file_path": "src/lib/cache.ts",
-    "line_start": 16,
-    "coverage_pct": 0
-  },
-  {
-    "name": "deeplyNested",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 6,
-    "coverage_pct": 0
-  },
-  {
-    "name": "labyrinth",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 22,
-    "coverage_pct": 0
-  },
-  {
-    "name": "catchInnerArrowRethrow",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 86,
-    "coverage_pct": 0
-  },
-  {
-    "name": "catchDirectRethrow",
-    "file_path": "src/lib/complexity-fixture.ts",
-    "line_start": 98,
-    "coverage_pct": 0
-  },
-  {
-    "name": "read",
-    "file_path": "src/lib/store.ts",
-    "line_start": 7,
-    "coverage_pct": 0
-  },
-  {
-    "name": "write",
-    "file_path": "src/lib/store.ts",
-    "line_start": 11,
     "coverage_pct": 0
   }
 ]

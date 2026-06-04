@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/bench/stale-multi-import.ts",
+    "line_start": 1,
+    "line_end": 1,
+    "before_pattern": ", dropMe",
+    "after_pattern": "",
+    "location_kind": "import_specifier",
+    "chain_depth": 0
+  }
+]

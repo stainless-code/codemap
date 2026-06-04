@@ -24,7 +24,23 @@
     "fan_in": 1
   },
   {
+    "to_path": "src/bench/homonym-helper-a.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/bench/homonym-helper-b.ts",
+    "fan_in": 1
+  },
+  {
     "to_path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/bench/jsx-ui-namespace.ts",
+    "fan_in": 1
+  },
+  {
+    "to_path": "src/bench/stale-multi-helpers.ts",
     "fan_in": 1
   },
   {
@@ -41,14 +57,6 @@
   },
   {
     "to_path": "src/polyfill.ts",
-    "fan_in": 1
-  },
-  {
-    "to_path": "src/types/hierarchy.ts",
-    "fan_in": 1
-  },
-  {
-    "to_path": "src/utils/format.ts",
     "fan_in": 1
   }
 ]

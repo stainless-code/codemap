@@ -30,6 +30,16 @@
       }
     },
     {
+      "id": "rename-preview-product-card",
+      "prompt": "Rename ProductCard: barrel consumer import, re-export, and reference sites.",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "ProductCard",
+        "new": "ProductCardNext",
+        "kind": "function"
+      }
+    },
+    {
       "id": "index-summary",
       "prompt": "Row counts for main tables (same SQL as --recipe index-summary)",
       "recipe": "index-summary"
@@ -723,6 +733,108 @@
       "id": "try-catch-rethrow-heuristics",
       "prompt": "catch_rethrows: nested arrow throw vs direct rethrow (complexity-fixture)",
       "sql": "SELECT s.name, t.catch_rethrows FROM try_catch t JOIN symbols s ON s.file_path = t.file_path AND s.kind = 'function' AND t.try_line_start >= s.line_start AND t.try_line_start <= s.line_end WHERE t.file_path = 'src/lib/complexity-fixture.ts' AND s.name IN ('catchInnerArrowRethrow', 'catchDirectRethrow') ORDER BY s.name"
+    },
+    {
+      "id": "replace-marker-kind",
+      "prompt": "Replace TODO markers with FIXME in notes",
+      "recipe": "replace-marker-kind",
+      "params": {
+        "from_kind": "TODO",
+        "to_kind": "FIXME",
+        "in_file": "src/notes"
+      }
+    },
+    {
+      "id": "migrate-deprecated",
+      "prompt": "Migrate call/import sites from deprecated symbol now to Date.now",
+      "recipe": "migrate-deprecated",
+      "params": {
+        "symbol": "now",
+        "replacement": "Date.now"
+      }
+    },
+    {
+      "id": "deprecated-usages",
+      "prompt": "Rewrite @deprecated JSDoc line on now()",
+      "recipe": "deprecated-usages",
+      "params": {
+        "symbol": "now",
+        "replacement_message": "Use Date.now() only."
+      }
+    },
+    {
+      "id": "stale-imports",
+      "prompt": "Unused sole-specifier import lines (import_specifiers vs references)",
+      "recipe": "stale-imports",
+      "params": {
+        "in_file": "src/components/shop/ProductCard"
+      }
+    },
+    {
+      "id": "stale-imports-multi-specifier",
+      "prompt": "Strip one unused name from a multi-specifier import line",
+      "recipe": "stale-imports",
+      "params": {
+        "in_file": "src/bench/stale-multi-import"
+      }
+    },
+    {
+      "id": "migrate-import-source",
+      "prompt": "Rewrite consumer import source path",
+      "recipe": "migrate-import-source",
+      "params": {
+        "old_source": "~/api/client",
+        "new_source": "~/api/client-v2"
+      }
+    },
+    {
+      "id": "add-jsdoc-deprecated",
+      "prompt": "Insert @deprecated JSDoc above createClient",
+      "recipe": "add-jsdoc-deprecated",
+      "params": {
+        "name": "createClient",
+        "replacement": "createClientV2",
+        "in_file": "src/api/"
+      }
+    },
+    {
+      "id": "rename-preview-jsx-member",
+      "prompt": "Member JSX tag rename via jsx_elements (UI.UiPanel)",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "UiPanel",
+        "new": "TilePanel",
+        "in_file": "src/bench/jsx-member"
+      }
+    },
+    {
+      "id": "rename-preview-homonym-scoped",
+      "prompt": "Rename helper→worker scoped to homonym-helper-a only",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "helper",
+        "new": "worker",
+        "define_in": "src/bench/homonym-helper-a.ts"
+      }
+    },
+    {
+      "id": "rename-preview-homonym-unscoped",
+      "prompt": "Rename helper→worker across both homonym definitions and consumers",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "helper",
+        "new": "worker"
+      }
+    },
+    {
+      "id": "migrate-jsx-prop-product-card",
+      "prompt": "Rename data-id JSX attribute on ProductCard article",
+      "recipe": "migrate-jsx-prop",
+      "params": {
+        "old_name": "data-id",
+        "new_name": "data-testid",
+        "in_file": "src/components/shop/ProductCard"
+      }
     }
   ]
 }

@@ -16,6 +16,7 @@
 | **Agent eval**         | `bun run test:agent-eval`                                                  | Probe arms vs golden ids (MCP-on vs glob/read).                                                                         |
 | **Integration (git)**  | `src/application/run-index.test.ts`                                        | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                                    |
 | **CLI e2e**            | `src/cli/cmd-test-bench-e2e.test.ts`, `src/cli/cmd-cli-parity-e2e.test.ts` | Spawned CLI on `fixtures/minimal` (bench smoke + resource parity).                                                      |
+| **Apply CLI e2e**      | `src/cli/cmd-apply.test.ts`                                                | Temp project + full index: recipe dry-run/apply, `--rows`, second recipe disk apply.                                    |
 | **Check**              | `bun run check`                                                            | build + lint + unit + scripts + golden + agent-eval.                                                                    |
 
 Refresh Tier A goldens after intentional fixture or schema changes:
@@ -29,6 +30,23 @@ bun scripts/query-golden.ts --update
 ## Bundled recipes
 
 Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/scenarios.json` with `"recipe": "<id>"`. Enforced by `query-golden-coverage-matrix.test.mjs`. List ids: `codemap query --recipes-json` or `ls templates/recipes/*.sql`.
+
+### Apply-shaped recipes (diff row contract)
+
+| Recipe id               | Golden scenario(s)                                                           | CLI e2e (`cmd-apply.test.ts`)                |
+| ----------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
+| `rename-preview`        | `rename-preview`, `rename-preview-product-card`, `rename-preview-jsx-member` | dry-run, `--yes` disk apply, member JSX tag  |
+| `migrate-import-source` | `migrate-import-source`                                                      | dry-run                                      |
+| `replace-marker-kind`   | `replace-marker-kind`                                                        | `--yes` disk apply (temp project)            |
+| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                       | — (query golden only; writes need `--force`) |
+| `stale-imports`         | `stale-imports`, `stale-imports-multi-specifier`                             | dry-run + sole/multi `--force --yes` apply   |
+| `migrate-jsx-prop`      | `migrate-jsx-prop-product-card`                                              | `--force --yes` attribute rename on disk     |
+| `migrate-deprecated`    | `migrate-deprecated`                                                         | dry-run + `--force --yes` disk apply         |
+| `deprecated-usages`     | `deprecated-usages`                                                          | `--force --yes` disk apply (JSDoc line)      |
+
+**Read→apply (C.6):** `deprecated-symbols`, `find-symbol-references`, `find-symbol-definitions`, `find-jsx-usages`, `find-import-sites`, `markers-by-kind` frontmatter `actions[].command` → apply twins; `cmd-query.test.ts` rendered-command cases.
+
+**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. **`define_in`** homonym scope: golden `rename-preview-homonym-scoped` + `cmd-apply.test.ts`. MCP/HTTP: `apply` / `apply_rows` / `apply_diff_input` e2e in `mcp-server.test.ts` and `http-server.test.ts`; transport writes/consent/fixpoint in `tool-handlers.test.ts`.
 
 ---
 

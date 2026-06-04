@@ -1,0 +1,11 @@
+[
+  {
+    "file_path": "src/utils/date.ts",
+    "line_start": 2,
+    "line_end": 2,
+    "before_pattern": " * @deprecated Use `Date.now()` directly. Kept as a fixture for the",
+    "after_pattern": " * @deprecated Use Date.now() only.",
+    "location_kind": "deprecated_jsdoc",
+    "chain_depth": 0
+  }
+]

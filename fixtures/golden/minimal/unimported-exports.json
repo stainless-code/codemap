@@ -35,6 +35,27 @@
     "re_export_source": null
   },
   {
+    "name": "useHelperA",
+    "kind": "value",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "useHelperB",
+    "kind": "value",
+    "file_path": "src/bench/homonym-consumer-b.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "MemberHost",
+    "kind": "value",
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "PageShell",
     "kind": "value",
     "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
@@ -42,9 +63,23 @@
     "re_export_source": null
   },
   {
+    "name": "UiPanel",
+    "kind": "value",
+    "file_path": "src/bench/jsx-ui-namespace.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
     "name": "PingService",
     "kind": "value",
     "file_path": "src/bench/method-call-sites.ts",
+    "is_default": 0,
+    "re_export_source": null
+  },
+  {
+    "name": "staleMultiOut",
+    "kind": "value",
+    "file_path": "src/bench/stale-multi-import.ts",
     "is_default": 0,
     "re_export_source": null
   },

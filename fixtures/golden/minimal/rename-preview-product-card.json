@@ -1,0 +1,38 @@
+[
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 10,
+    "line_end": 22,
+    "before_pattern": "ProductCard",
+    "after_pattern": "ProductCardNext",
+    "location_kind": "definition",
+    "chain_depth": 0
+  },
+  {
+    "file_path": "src/components/shop/index.ts",
+    "line_start": 4,
+    "line_end": 4,
+    "before_pattern": "ProductCard",
+    "after_pattern": "ProductCardNext",
+    "location_kind": "re_export",
+    "chain_depth": 1
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 3,
+    "line_end": 3,
+    "before_pattern": "ProductCard",
+    "after_pattern": "ProductCardNext",
+    "location_kind": "barrel_import_specifier",
+    "chain_depth": 1
+  },
+  {
+    "file_path": "src/consumer.ts",
+    "line_start": 26,
+    "line_end": 26,
+    "before_pattern": "ProductCard",
+    "after_pattern": "ProductCardNext",
+    "location_kind": "reference",
+    "chain_depth": 0
+  }
+]

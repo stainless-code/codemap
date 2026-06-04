@@ -4,6 +4,13 @@
   "synthesis": {
     "heuristicCalls": false
   },
+  "apply": {
+    "autoApplyRecipes": [
+      "migrate-import-source",
+      "replace-marker-kind",
+      "rename-preview"
+    ]
+  },
   "boundaries": [
     {
       "name": "ui-cant-touch-server",

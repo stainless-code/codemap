@@ -1,6 +1,6 @@
 # Codemap richer-index — consolidated triangulation across 5 model perspectives — 2026-05
 
-> **Status:** Open research archive — **canonical open work** for apply-engine steps lives in [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md); substrate tiers in [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). This note retains consensus / disagreement matrices and per-source argumentation until all synthesis steps close.
+> **Status:** Research archive (decisions-of-record). **Live apply status:** [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy). **Utilization plan** [`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) is ready to delete on merge. This note retains consensus / disagreement matrices until fully slimmed per docs-governance.
 >
 > **Purpose:** Triangulation record (five model perspectives, May 2026). Do not treat this file as the implementation checklist — use the plans above.
 >
@@ -10,7 +10,7 @@
 
 ## What shipped (fact-checked 2026-05-19) — appendix per § 9 lifecycle
 
-The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half lifted to [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md). **Live status = those plan headings**, not this note.
+The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). The apply-engine half shipped — executor in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy); wave-2 queue in [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md). **Live status = those homes**, not this note.
 
 **Shipped via the substrate plan:**
 
@@ -23,11 +23,11 @@ The substrate-growth half lifted to [`plans/substrate-extraction.md`](../plans/s
 - **Substrate plan Tiers 1–6 (2026-05-19)** — remainder shipped: JSX (`jsx_elements` / `jsx_attributes`), behavioral (`async_calls`, `try_catch`, `decorators`, `jsdoc_tags`), `symbols.{return_type,is_async,is_generator}`, `dynamic_imports`, `files.{is_barrel,has_side_effects}`. **`files.is_entry`** deferred to [`plans/c9-plugin-layer.md`](../plans/c9-plugin-layer.md).
 - **Partial ship** of substrate plan Tiers 9 / 10 / 11 / 12 — foundation tables landed (`test_suites` / `runtime_markers` / `file_metrics` / `module_cycles`); deferred bits stay tracked under each tier's heading. Tier 4 partial: `function_params` shipped; `generic_params` / `type_predicates` deferred.
 
-**Still open (the apply-engine half of this synthesis):**
+**Apply-engine half (shipped 2026-06; fact-check against code, not this appendix):**
 
-- **§ 6 Steps 2–4, 6, 8–12** — not shipped. **Step 1 (doc reframe) shipped** — [`roadmap.md`](../roadmap.md) Floors split + [`why-codemap.md`](../why-codemap.md) verdict/autofix wording. The remaining steps still drive the apply-engine direction (new diff-shape recipes, write-path row contracts, fixpoint loop, workflow flags, allowlist). Cross-references from the rest of this note to those steps remain live design context.
-- **§ 4.4 engine extensions** (`apply --rows -`, `apply --diff-input`, `--until-empty`, etc.) — none shipped; still tracked as the agent-in-the-loop unlock per [§ 5.4 agent-angle gap analysis](#54-agent-angle-gap-analysis-from-a4).
-- **§ 5.7 ambiguity signals as substrate** — still deferred per its own "until 2+ recipes hit it" trigger.
+- **§ 6 Steps 2–4, 6, 7–12** — shipped (executor: [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy)). Wave-2 diff-shape recipes (`stale-imports`, `migrate-deprecated`, …; `organize-imports` **rejected** per [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md)).
+- **§ 4.4 / § 4.5 engine + workflow extensions** — Steps 8–12 shipped (`apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`, `--commit`, `--until-empty`, MCP `until_empty` / `commit_message` on `apply`, `apply.autoApplyRecipes`, `auto_fixable` / `--force`). Multi-line row contract remains backlog.
+- **§ 5.7 ambiguity signals** — **partial ship:** `ambiguity_count` on diff-json hunks (Phase D); richer substrate signals still deferred.
 
 The disagreement maps (§ 3), reference views (§ 5), rejected items (§ 7), and preserved moats (§ 8) stay verbatim — they're the strategic record that justifies the 12-step path's open steps and any future trigger-firing on rejected items.
 
@@ -40,7 +40,7 @@ The disagreement maps (§ 3), reference views (§ 5), rejected items (§ 7), and
 3. [Disagreement map (with full argumentation)](#3-disagreement-map--per-axis-triangulation-with-full-argumentation)
 4. [Substrate catalog (consolidated)](#4-substrate-catalog-consolidated)
 5. [Reference views (lifted from inputs)](#5-reference-views-lifted-from-inputs)
-6. [Synthesised 12-step path with open implementation questions](#6-synthesised-12-step-path-with-open-implementation-questions)
+6. [Synthesised 12-step path (shipped index)](#6-synthesised-12-step-path-shipped-index)
 7. [Rejected items with trigger conditions](#7-rejected-items-with-trigger-conditions)
 8. [Preserved moats (universal)](#8-preserved-moats-universal)
 9. [Status / lifecycle](#9-status--lifecycle)
@@ -80,7 +80,7 @@ These have **6/6** support (counting A1 and A4 separately because their conclusi
 | C7  | **Dry-run-first + explicit confirmation gate is correct** and stays. Phase-1-validates-before-phase-2-writes pattern preserved; non-TTY without `--yes` rejected.                                                                                                                                                                                             | A1, A2, A3, A4, A5, A6                           |
 | C8  | **Watch + apply + reindex is the agent loop.** Default-ON watch on long-running transports keeps reads fresh; codemap-specific structural verification (the index reflects disk truth) is sufficient for the agent path; full typecheck/lint/tests verifier is consumer-side.                                                                                 | A1, A4, A6 explicit; A2, A3, A5 don't contradict |
 
-These eight are the **non-negotiable spine** of any synthesis path. Every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) preserves them.
+These eight are the **non-negotiable spine** of any synthesis path. Every step in [§ 6](#6-synthesised-12-step-path-shipped-index) preserves them.
 
 ---
 
@@ -299,7 +299,7 @@ All five positions propose sequencing; the orderings differ on what ships first.
 | A5     | Expanded rename-preview → stale-imports recipe → C.9 entry-point schema → AST transform contract                       |
 | A6     | Reference locations OR delegation strategy → config for which recipes accept `--yes`                                   |
 
-**Verdict:** Synthesis sequence in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) below combines:
+**Verdict:** Synthesis sequence in [§ 6](#6-synthesised-12-step-path-shipped-index) below combines:
 
 - All 8 consensus points (§ 2) ship first.
 - The agent-in-the-loop unlock (§ 3.3) gets earlier priority than A1 had it.
@@ -361,9 +361,9 @@ Every recipe candidate proposed across all five positions. **Diff-shape** = emit
 
 | Extension                                                                                                      | Sources                                           | Effort | Verdict                                                                                         |
 | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------- |
-| `apply --rows -` (CLI stdin) + `apply_rows` MCP/HTTP tool                                                      | A1, A3 (via WorkspaceEdit), A4 (highest-leverage) | M      | **Synthesis Step 8**                                                                            |
-| `apply --diff-input <file>` (unified diff source)                                                              | A4                                                | S      | **Synthesis Step 9**                                                                            |
-| `--until-empty` apply-loop with `--max-passes N`                                                               | A1                                                | S      | **Synthesis Step 11**                                                                           |
+| `apply --rows -` (CLI stdin) + `apply_rows` MCP/HTTP tool                                                      | A1, A3 (via WorkspaceEdit), A4 (highest-leverage) | M      | **Shipped** (Step 8)                                                                            |
+| `apply --diff-input <file>` (unified diff source)                                                              | A4                                                | S      | **Shipped** (Step 9; CLI + MCP `apply_diff_input`)                                              |
+| `--until-empty` apply-loop with `--max-passes N`                                                               | A1                                                | S      | **Shipped** (Step 11; CLI + recipe-id only)                                                     |
 | Multi-line + kind-tagged row contract (`before_lines`, `kind: replace/insert-before/insert-after/delete-line`) | A1                                                | M × 2  | **Backlog** — ships after Step 11                                                               |
 | Cross-file moves (`move_to: { file_path, line_start }`)                                                        | A1 mentions                                       | L      | **Deferred** — higher risk, less immediate value                                                |
 | Cross-file atomic apply (pre-write backups + restore-on-throw)                                                 | A1 mentions                                       | M      | **Deferred** — current per-file atomicity (temp + rename) is fine for ≤10 files; revisit at 50+ |
@@ -373,11 +373,11 @@ Every recipe candidate proposed across all five positions. **Diff-shape** = emit
 
 | Extension                                                                 | Sources                                                        | Effort | Verdict                                                                                    |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------ |
-| `apply --commit "<msg>"`                                                  | A1                                                             | S      | **Synthesis Step 10**                                                                      |
+| `apply --commit "<msg>"`                                                  | A1                                                             | S      | **Shipped** (Step 10; CLI + MCP `commit_message` on `apply` / `apply_diff_input`)          |
 | `apply --branch <name>`                                                   | A1                                                             | S      | **Backlog**                                                                                |
 | `apply --output-patch <file>` (unified diff without write)                | A1                                                             | S      | **Backlog**                                                                                |
-| `apply.autoApplyRecipes` allowlist config                                 | A6, A1 (Step 12)                                               | S      | **Synthesis Step 12**                                                                      |
-| `auto_fixable` gating (flip from advisory to enforcing)                   | A2 (trust tiers extension), A5 (default false), A6 (allowlist) | S      | **Synthesis Step 4**                                                                       |
+| `apply.autoApplyRecipes` allowlist config                                 | A6, A1 (Step 12)                                               | S      | **Shipped** (Step 12)                                                                      |
+| `auto_fixable` gating (flip from advisory to enforcing)                   | A2 (trust tiers extension), A5 (default false), A6 (allowlist) | S      | **Shipped** (Step 4)                                                                       |
 | Trust tiers (`safe` / `review` / `risky`)                                 | A2                                                             | M      | **Rejected** — covered by `auto_fixable` + allowlist                                       |
 | Per-row confidence scores                                                 | A2                                                             | M      | **Deferred** — speculative; no consensus on computation                                    |
 | Verifier as product surface (typecheck / lint / tests + structural delta) | A3                                                             | L      | **Deferred** — scope creep; consumer-side CI owns this                                     |
@@ -394,7 +394,7 @@ Strategic views from the source notes that serve as design context for the synth
 
 ### 5.1 Architecture diagram (from A1)
 
-The substrate-level data flow that the synthesis path grows. Recipes propose; engines pass through; index is the substrate. Every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) either enriches the index (new columns / tables / recipe categories) or enriches what the engines can consume from it (richer row contract, fixpoint loop, workflow integration). Nothing in the synthesis path adds a new engine — existing ones grow capacity through the data they read.
+The substrate-level data flow that the synthesis path grows. Recipes propose; engines pass through; index is the substrate. Every step in [§ 6](#6-synthesised-12-step-path-shipped-index) either enriches the index (new columns / tables / recipe categories) or enriches what the engines can consume from it (richer row contract, fixpoint loop, workflow integration). Nothing in the synthesis path adds a new engine — existing ones grow capacity through the data they read.
 
 ```text
                                        ┌─────────────────────────────────┐
@@ -447,7 +447,7 @@ A4's full ranking of substrate / engine deepenings by leverage and floor-impact.
 | #   | Item                                                          | Cost | Leverage  | Crosses floor? | Status in synthesis                                                                                                                                                                              |
 | --- | ------------------------------------------------------------- | ---- | --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1   | Column anchoring on `symbols` / `exports` / `imports` etc.    | M    | High      | No             | **Synthesis Step 5, 7** · **✓ Shipped 2026-05-15** ([Tier 1 Slices 1.A–1.D](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14)) — full coverage |
-| 2   | `apply --diff-input <file>` (arbitrary diff source)           | S    | High      | No             | **Synthesis Step 8, 9** — open                                                                                                                                                                   |
+| 2   | `apply --diff-input <file>` (arbitrary diff source)           | S    | High      | No             | **Synthesis Steps 8–9** · **✓ Shipped 2026-06** ([`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) — `apply --rows`, `apply_rows`, `--diff-input`, `apply_diff_input`) |
 | 3   | `references` table + scope graph                              | XL   | Very high | No             | **Deferred** · **✓ Shipped 2026-05-15** ([Tier 2 closed](../plans/substrate-extraction.md)) — references + scopes + bindings; 1.3% unresolved                                                    |
 | 4   | `RECIPE-AUTHORING.md` skill + 4 new pre-vetted recipes        | M    | High      | No             | **Synthesis Step 2** (3 recipes; skill optional)                                                                                                                                                 |
 | 5   | AST body hashes (`symbols.body_hash`)                         | M    | Medium    | No             | **Already in roadmap backlog**                                                                                                                                                                   |
@@ -464,14 +464,14 @@ Items 1–10 are all pre-floor; the floor is doing zero blocking until item 11.
 
 A4's audit of where codemap stands on supporting LLM-driven edits. The under-tapped market is **substrate FOR LLM-driven edits**, not codemap-as-codemod-tool.
 
-| Capability                                | Already there?                 | Gap                                                                                                                                             |
-| ----------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent queries codemap                     | ✓ MCP `query` / `query_recipe` | None                                                                                                                                            |
-| Agent gets blast-radius before editing    | ✓ `impact`                     | None                                                                                                                                            |
-| Agent dry-runs an edit                    | ✓ `apply --dry-run`            | None                                                                                                                                            |
-| Agent emits arbitrary diff (not a recipe) | ✗                              | `apply --diff-input` / `apply --rows -` — turns codemap into the safe-write substrate for any fix source (**Synthesis Steps 8, 9**)             |
-| Agent gets feedback after edit            | ✓ partial via `watch`          | Real-time reindex covers it; LSP-style diagnostics still missing (tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)) |
-| Agent reasons about API safety            | ✗                              | "This rename touches the public API surface" needs a notion of external consumers — beyond v1 substrate                                         |
+| Capability                                | Already there?                                  | Gap                                                                                                                                             |
+| ----------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent queries codemap                     | ✓ MCP `query` / `query_recipe`                  | None                                                                                                                                            |
+| Agent gets blast-radius before editing    | ✓ `impact`                                      | None                                                                                                                                            |
+| Agent dry-runs an edit                    | ✓ `apply --dry-run`                             | None                                                                                                                                            |
+| Agent emits arbitrary diff (not a recipe) | ✓ (`apply_rows`; CLI `--rows` / `--diff-input`) | MCP/HTTP: `apply_rows`; CLI also accepts `--diff-input`. Recipe policy gates do not apply to row/diff paths.                                    |
+| Agent gets feedback after edit            | ✓ partial via `watch`                           | Real-time reindex covers it; LSP-style diagnostics still missing (tracked in [`plans/lsp-diagnostic-push.md`](../plans/lsp-diagnostic-push.md)) |
+| Agent reasons about API safety            | ✗                                               | "This rename touches the public API surface" needs a notion of external consumers — beyond v1 substrate                                         |
 
 Concretely, the codemap-enabled agent flow:
 
@@ -515,148 +515,26 @@ Defer until 2+ recipes hit it. The current `apply-engine.ts` "same-line ambiguit
 
 ---
 
-## 6. Synthesised 12-step path with open implementation questions
+## 6. Synthesised 12-step path (shipped index)
 
-The minimum synthesis preserving every consensus claim (§ 2) and resolving every disagreement (§ 3) per the verdicts. Each step lists open implementation questions to settle in its plan PR (lifted from the per-source plan-PR Q1–Q10 lists; questions internal to a step's design, not reasons to defer the step).
+The minimum synthesis preserving every consensus claim (§ 2) and resolving every disagreement (§ 3). **Live implementation detail** lives in [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy), [`substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) (delete on merge), and [`substrate-extraction.md`](../plans/substrate-extraction.md). This section is an **index only** — per-step open questions were settled in those PRs; disagreement maps (§ 3) and reference views (§ 5) remain the strategic record.
 
-### Step 1 — Doc reframe (XS) — ✓ Shipped 2026-05
+| Step | Item                                                                                              | Status                                                                                   |
+| ---- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 1    | Doc reframe (Floors / Moat A)                                                                     | ✓ Shipped 2026-05 — [`roadmap.md`](../roadmap.md), [`why-codemap.md`](../why-codemap.md) |
+| 2    | Three diff-shape recipes (`replace-marker-kind`, `migrate-import-source`, `add-jsdoc-deprecated`) | ✓ Shipped 2026-06 — wave-2 in utilization plan                                           |
+| 3    | Per-row `actions[].command` (C.6)                                                                 | ✓ Shipped 2026-06                                                                        |
+| 4    | `auto_fixable` + `--force` gating                                                                 | ✓ Shipped 2026-06                                                                        |
+| 5    | `calls.{line_start, column_start, …}`                                                             | ✓ Shipped 2026-05-15 — Tier 1 Slice 1.A                                                  |
+| 6    | `rename-preview` `call_rows`                                                                      | ✓ Shipped 2026-06                                                                        |
+| 7    | `exports` columns + `rename-preview` re-export/JSX/reference CTEs                                 | ✓ Shipped 2026-05-15 substrate + 2026-06 recipe extensions                               |
+| 8    | `apply --rows` + `apply_rows`                                                                     | ✓ Shipped 2026-06                                                                        |
+| 9    | `apply --diff-input` + `apply_diff_input`                                                         | ✓ Shipped 2026-06                                                                        |
+| 10   | `apply --commit`                                                                                  | ✓ Shipped 2026-06                                                                        |
+| 11   | `--until-empty` / `max_passes` / fixpoint envelope                                                | ✓ Shipped 2026-06                                                                        |
+| 12   | `apply.autoApplyRecipes` allowlist                                                                | ✓ Shipped 2026-06                                                                        |
 
-[`roadmap.md`](../roadmap.md) Floors split into verdict-shaped lints vs substrate-shaped `codemap apply`; [`why-codemap.md`](../why-codemap.md) § When to reach for something else updated.
-
-**Source ancestry:** C1, C2; all six positions.
-
-**Open questions (resolved on ship):**
-
-1. Two distinct rows or one row with two clauses? **Shipped: two distinct rows** in [`roadmap.md`](../roadmap.md) Floors.
-2. Lift any salvageable text from the existing row 45 ("Adjacent to Moat A" framing)? **Yes** — both new rows reference Moat A.
-
-### Step 2 — Three more diff-shape recipes (S × 3)
-
-Ship `replace-marker-kind` (params `from`/`to`; joins `markers.line_number` + `content`), `migrate-import-source` (params `old`/`new`; joins `imports.line_number` + `source`), `add-jsdoc-deprecated` (params `name`/`replacement`; inserts above `symbols.line_start`). Pure SQL + frontmatter; no engine work, no schema change.
-
-**Source ancestry:** C5; A1; recipe candidates from [§ 4.3](#43-recipe-additions).
-
-**Open questions:**
-
-1. Ship the 3 in one PR or sequential? Sequential keeps review small per [tracer-bullets](../../.cursor/rules/tracer-bullets.mdc).
-2. Add `organize-imports` (A5; viable today) and `missing-exports` (A5; advisory) alongside, or hold for a second wave? Hold — keeps the first wave's review small.
-
-### Step 3 — Per-row `actions[].command` template (S)
-
-Extend `recipes-loader.ts` + `query-recipes.ts` so per-row `actions[]` carries a `command` template rendered with the recipe's params (e.g. `"codemap apply rename-preview --params old={{old}},new={{new}} --yes"`). Self-describing fixes; agents discover apply path from the row, not the catalog. Defers verb-alias decision until observed agent-host UX demand.
-
-**Source ancestry:** C5; A1.
-
-**Open questions:**
-
-1. Template-rendering shape — reuse the existing param-resolution path from `recipe-params.ts` for consistency? Or a separate Mustache-style template engine? Bias toward reusing — same params, same renderer.
-2. Block-list shape only or allow inline expressions? Block-list only matches existing `actions:` parser shape (no `js-yaml` dep).
-
-### Step 4 — `auto_fixable` gating (S)
-
-Flip the existing `actions[].auto_fixable` flag from advisory to enforcing. `apply` requires `auto_fixable: true` on the matching action OR explicit `--force` flag. Recipe authors opt in per fix.
-
-**Source ancestry:** A2 (trust tiers extension), A5 (default false), A6 (allowlist); § 3.4 verdict.
-
-**Open questions:**
-
-1. Migration: existing recipes with `auto_fixable: false` (most of the catalog) reject by default. Confirm this is the desired migration shape, or grandfather existing recipes?
-2. `--force` flag rejection of phase-2 conflicts — preserve or ignore? Preserve — `--force` only bypasses the `auto_fixable` gate, not phase-1 conflict detection.
-
-### Step 5 — `calls.{line_start, column_start}` substrate column (S) — ✓ Shipped 2026-05-15
-
-**What shipped:** [`substrate-extraction.md` Tier 1 Slice 1.A](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `calls.{line_start, column_start, column_end}` + bundled `find-call-sites` recipe. Call-shape metadata (`args_count`, `is_method_call`, `is_constructor_call`, `is_optional_chain`) shipped 2026-05-19 (schema 34 wave).
-
-Single oxc visitor extension reusing existing `buildLineMap` / `offsetToLine` from `parser.ts`; schema bump triggers one-shot reindex.
-
-**Source ancestry:** C3; all six positions; per § 4.1.
-
-**Open questions:**
-
-1. Schema delta: NULL columns for back-compat or strict NOT NULL with one-shot migration? Bias toward NOT NULL — clean schema; one-shot reindex on consumer upgrade is acceptable.
-2. Column tracking on the existing visitor walker — record `node.start` only (line + col_start) or also `node.end` (col_end)? A5 explicit on col_end; cheap; record both.
-3. Same migration shape for inherited tables (`calls` is referenced by `dependencies` indirectly via files)?
-
-### Step 6 — App-wide rename recipe (S, depends on Step 5)
-
-Extend `rename-preview.sql` with a `call_rows` CTE joining `calls` × `symbols`. Same recipe id; new `location_kind = 'call_site'`. ~80% coverage of an app-wide rename (definition + import specifier + call site).
-
-**Source ancestry:** C3; A1, A5.
-
-**Open questions:**
-
-1. Single recipe (extend `rename-preview.sql`) or new recipe (`rename-app-wide.sql`)? Bias toward extending — keeps the agent's mental model "one rename recipe", not "two renames with overlap".
-2. The `.md` "What v1 covers" / "does not cover" sections re-balance — preserve the explicit gap list (re-exports, JSX, default-import binds) per [§ 5.6 honest-v1 framing](#56-honest-v1-rename-framing-from-a6).
-
-### Step 7 — `exports.{line_start, column_start}` + extend `rename-preview.sql` with `re_export_rows` CTE (S) — ✓ Shipped (partial) 2026-05-15
-
-**What shipped:** Substrate column part shipped as [`substrate-extraction.md` Tier 1 Slice 1.B](../plans/substrate-extraction.md#tier-1--position-precision-on-existing-tables--shipped-2026-05-14) — `exports.{line_start, line_end, column_start, column_end, is_re_export}` + bundled `find-export-sites` recipe. Re-export chain walking landed in [Tier 2.2](../plans/substrate-extraction.md) via the `re_export_chains` materialised table (10-hop bound, cycle detection), and `bindings-engine` resolves through it. **Open:** the `rename-preview.sql` recipe extension itself — the substrate is in place; the recipe-side `re_export_rows` CTE is the remaining work.
-
-Mirror of Step 5 for the exports table. Closes the second rename-preview substrate gap (re-export alias chains; barrel-safe rewrites).
-
-**Source ancestry:** C4; all six positions; per § 4.1.
-
-**Open questions:**
-
-1. Combine with `re_export_source` column (already exists on `exports`) for chain resolution? Yes — JOIN through `re_export_source` to reach the originating definition.
-2. Multi-hop alias chains — recursive CTE or single-hop only? Single-hop in v1; recursive CTE in a follow-up if the gap shows up.
-
-### Step 8 — `apply --rows -` (CLI stdin) + `apply_rows` MCP/HTTP tool (M) — agent-in-the-loop unlock
-
-Reads JSON array of `{file_path, line_start, before_pattern, after_pattern}` rows from stdin (CLI) or args (MCP/HTTP); validates against current disk via the existing phase-1 path; writes via the existing phase-2 path. Bridges LLM-edit / human-edit / codemod-edit through one safe-write substrate without crossing Moat A.
-
-**Source ancestry:** § 3.3; A1, A3, A4 (highest-leverage). Per [§ 5.4 agent-angle gap](#54-agent-angle-gap-analysis-from-a4).
-
-**Open questions:**
-
-1. Stdin shape — JSONL (one row per line) or single JSON array? JSONL streams better for large inputs; array matches the `--json` envelope. Bias toward array (matches the format consumers already produce).
-2. MCP tool — separate `apply_rows` tool or polymorphic `apply` (recipe-id OR rows)? Separate tool — runtime exclusivity check on the polymorphic version is brittle.
-3. HTTP POST `/tool/apply_rows` body shape — match the MCP tool input verbatim.
-
-### Step 9 — `apply --diff-input <file>` (S, sibling to Step 8)
-
-Reads a unified diff, converts to row contract internally, runs same conflict pipeline as recipe-driven path. Two input shapes converge on the same engine. Completes the agent-in-the-loop substrate.
-
-**Source ancestry:** § 3.3; A4.
-
-**Open questions:**
-
-1. Unified-diff parser — bring in a dependency (`parse-diff` etc.) or hand-roll? Hand-roll keeps the dep surface tight; spec is well-known.
-2. Multi-file diff handling — atomic across files (per Step 9)? Same per-file atomicity (sibling-temp + rename) as today; cross-file rollback deferred to a later PR per existing `apply-engine.ts` design.
-
-### Step 10 — `apply --commit "<msg>"` workflow flag (S)
-
-Reuses engine; spawns `git add . && git commit -m <msg>` after a clean apply. Workflow integration; one-shot codemod-commits.
-
-**Source ancestry:** § 4.5; A1.
-
-**Open questions:**
-
-1. Stage all changes or only files written by `apply`? Only the files apply touched — explicit allow-list passed to `git add`.
-2. Commit-message templating with recipe params? Defer to v2 — basic `--commit "<msg>"` first.
-
-### Step 11 — `--until-empty` apply-loop with `--max-passes N` cap (S)
-
-Codemod-loop pattern; apply, reindex, re-run recipe, repeat until 0 rows or cap. Critical for one-rewrite-enables-another (e.g. `migrate-import-source` invalidates `barrel-files` rows → `apply barrel-files` finds new candidates).
-
-**Source ancestry:** A1.
-
-**Open questions:**
-
-1. Default `--max-passes N` value — 10? 25? Lower (5) for safety, with explicit override?
-2. Pass count in result envelope — extend `ApplyJsonPayload` with `passes: number` and `terminated_by: 'empty' | 'cap' | 'conflicts'`?
-3. Termination on conflicts mid-loop — abort the whole loop or mark the pass and continue? Abort — phase-1 conflicts mean the recipe SQL is out of sync with disk; subsequent passes won't help.
-
-### Step 12 — `apply.autoApplyRecipes` allowlist config (S)
-
-`.codemap/config.{ts,js,json}` carries `apply.autoApplyRecipes: string[]`; recipes outside the list require interactive confirm even with `--yes`. Optional, opt-in operational discipline.
-
-**Source ancestry:** § 3.4; A6.
-
-**Open questions:**
-
-1. Config field shape — flat list of recipe ids, or pattern-matchable (`auto-apply-glob: ['rename-*', 'migrate-*']`)? Flat list in v1; glob in v2 if requested.
-2. Interaction with `--force` from Step 4 — does `--force` bypass the allowlist? Yes — `--force` is the universal escape hatch.
+**Follow-on (not § 6 steps):** `define_in` on `rename-preview` for homonym-safe renames (shipped PR #165+); optional `codemap rename` CLI alias — [`scoped-rename-define-in.md`](../plans/scoped-rename-define-in.md). Multi-line row contract and global rename verb remain backlog per architecture § Apply.
 
 ---
 
@@ -701,7 +579,7 @@ The "no fix engine" line was right about the **product class**; it was wrong abo
 
 Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance/SKILL.md#closing-research):
 
-- **Open implementation** → [`plans/apply-engine-direction.md`](../plans/apply-engine-direction.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
+- **Open implementation** → [`plans/substrate-apply-utilization.md`](../plans/substrate-apply-utilization.md) + [`plans/substrate-extraction.md`](../plans/substrate-extraction.md). Update those plans on ship; do not add inventory appendices here.
 - **When all 12 steps ship or close:** retire this note per [`docs/README.md` Rule 8](../README.md). Lift any remaining durable strategic claim into [`why-codemap.md`](../why-codemap.md) before deletion.
 - **When a deferred / rejected item triggers** (per § 7 trigger conditions): open a plan PR with this note as the rationale anchor; this synthesis is the disagreement record that justifies the trigger.
 - **Annual re-evaluation** — re-run the triangulation against the substrate / recipe count of the day; update verdicts with current data.
@@ -739,7 +617,7 @@ Per [`docs-governance § Closing research`](../../.agents/skills/docs-governance
 ### Adjacent skills + rules
 
 - [`docs-governance` skill](../../.agents/skills/docs-governance/SKILL.md) — lifecycle prescription (§ 9)
-- [`audit-pr-architecture`](../../.agents/skills/audit-pr-architecture/SKILL.md) — every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) should pass the moat / boundary checks the skill enforces
+- [`audit-pr-architecture`](../../.agents/skills/audit-pr-architecture/SKILL.md) — every step in [§ 6](#6-synthesised-12-step-path-shipped-index) should pass the moat / boundary checks the skill enforces
 - [`tracer-bullets`](../../.cursor/rules/tracer-bullets.mdc) — every step here is one tracer-bullet PR; never build all 12 in isolation
 - [`codemap.mdc`](../../.cursor/rules/codemap.mdc) — outcome-alias cap (5) is the read-side precedent that shapes § 3.1 verdict
 - [`plan-pr-inspiration-discipline`](../../.cursor/rules/plan-pr-inspiration-discipline.mdc) — primitive-source discipline; partnered codemod tools (Path B) cite their inspiration from JSON-RPC / LSP `WorkspaceEdit` specs, not from peer-tool source paths

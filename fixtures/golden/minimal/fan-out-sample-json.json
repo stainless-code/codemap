@@ -20,33 +20,33 @@
     "sample_targets": "[\"src/lib/complexity-fixture.ts\"]"
   },
   {
+    "from_path": "src/bench/homonym-consumer-a.ts",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/homonym-helper-a.ts\"]"
+  },
+  {
+    "from_path": "src/bench/homonym-consumer-b.ts",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/homonym-helper-b.ts\"]"
+  },
+  {
+    "from_path": "src/bench/jsx-member-gap.tsx",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/jsx-ui-namespace.ts\"]"
+  },
+  {
     "from_path": "src/bench/jsx-synthesis/PageShell.tsx",
     "deps": 1,
     "sample_targets": "[\"src/bench/jsx-synthesis/ChildCard.tsx\"]"
   },
   {
+    "from_path": "src/bench/stale-multi-import.ts",
+    "deps": 1,
+    "sample_targets": "[\"src/bench/stale-multi-helpers.ts\"]"
+  },
+  {
     "from_path": "src/components/shop/ApiBridge.tsx",
     "deps": 1,
     "sample_targets": "[\"src/api/client.ts\"]"
-  },
-  {
-    "from_path": "src/components/shop/ShopButton.default.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/components/shop/ShopButton.tsx\"]"
-  },
-  {
-    "from_path": "src/lib/cache.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/lib/store.ts\"]"
-  },
-  {
-    "from_path": "src/lib/store.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/lib/cache.ts\"]"
-  },
-  {
-    "from_path": "src/types/heritage-qualified.ts",
-    "deps": 1,
-    "sample_targets": "[\"src/types/hierarchy.ts\"]"
   }
 ]

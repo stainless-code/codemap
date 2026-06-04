@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -381,11 +387,21 @@ describe("MCP server — query_recipe tool", () => {
       const json = readJson(r);
       expect(Array.isArray(json)).toBe(true);
       expect(json.length).toBeGreaterThan(0);
-      // Every row carries the recipe's actions template.
+      // Every row carries the recipe's actions template (read + C.6 apply hints).
       expect(json[0]).toMatchObject({
         name: "oldFn",
-        actions: [{ type: "flag-caller" }],
+        file_path: "src/a.ts",
+        kind: "function",
       });
+      const actions = json[0].actions as Array<{ type: string }>;
+      expect(actions.map((a) => a.type)).toEqual(
+        expect.arrayContaining([
+          "flag-caller",
+          "apply-migrate-deprecated",
+          "apply-deprecated-usages",
+          "apply-add-jsdoc-deprecated",
+        ]),
+      );
     } finally {
       await server.close();
     }
@@ -1979,6 +1995,155 @@ describe("MCP server — trace / explore / node tools", () => {
       expect(names).toContain("trace");
       expect(names).not.toContain("explore");
       expect(names).not.toContain("node");
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("MCP server — apply tools", () => {
+  function seedRenameApplyTarget(root: string): void {
+    writeFileSync(
+      join(root, "src", "rename-target.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/rename-target.ts', 'hrt', 30, 1, 'typescript', 1, 1)`,
+      );
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/rename-target.ts', 'runQuery', 'function', 1, 1, 'runQuery()', 1, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+  }
+
+  it("lists apply, apply_rows, and apply_diff_input", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("apply");
+      expect(names).toContain("apply_rows");
+      expect(names).toContain("apply_diff_input");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply dry_run returns the apply envelope", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply",
+        arguments: {
+          recipe: "rename-preview",
+          params: { old: "runQuery", new: "runQry", kind: "function" },
+          dry_run: true,
+        },
+      });
+      const json = readJson(r);
+      expect(json.mode).toBe("dry-run");
+      expect(json.applied).toBe(false);
+      expect(json.summary.rows).toBeGreaterThanOrEqual(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply_rows dry_run returns the apply envelope", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply_rows",
+        arguments: {
+          rows: [
+            {
+              file_path: "src/rename-target.ts",
+              line_start: 1,
+              before_pattern: "runQuery",
+              after_pattern: "runQry",
+            },
+          ],
+          dry_run: true,
+        },
+      });
+      const json = readJson(r);
+      expect(json.mode).toBe("dry-run");
+      expect(json.applied).toBe(false);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply_diff_input dry_run parses unified diff text", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply_diff_input",
+        arguments: {
+          diff_text: `diff --git a/src/rename-target.ts b/src/rename-target.ts
+--- a/src/rename-target.ts
++++ b/src/rename-target.ts
+@@ -1,1 +1,1 @@
+-export function runQuery() {}
++export function runQry() {}
+`,
+          dry_run: true,
+        },
+      });
+      const json = readJson(r);
+      expect(json.mode).toBe("dry-run");
+      expect(json.summary.rows).toBeGreaterThanOrEqual(1);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply rejects write without yes (Q6)", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply",
+        arguments: {
+          recipe: "rename-preview",
+          params: { old: "runQuery", new: "runQry" },
+        },
+      });
+      expect(r.isError).toBe(true);
+      const text = (r.content as { text: string }[])[0]?.text ?? "";
+      expect(text).toContain("yes: true");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply yes:true writes disk via MCP", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply",
+        arguments: {
+          recipe: "rename-preview",
+          params: { old: "runQuery", new: "runQry", kind: "function" },
+          yes: true,
+        },
+      });
+      const json = readJson(r);
+      expect(json.applied).toBe(true);
+      expect(
+        readFileSync(join(benchDir, "src", "rename-target.ts"), "utf8"),
+      ).toBe("export function runQry() {}\n");
     } finally {
       await server.close();
     }

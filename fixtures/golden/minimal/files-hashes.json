@@ -42,6 +42,36 @@
     "line_count": 5
   },
   {
+    "path": "src/bench/homonym-consumer-a.ts",
+    "content_hash": "8b1e408d2dee9f4e02afa3a9c3a7b8cc67a348eb8a828c1c3f88b0b2cc504f35",
+    "language": "ts",
+    "line_count": 6
+  },
+  {
+    "path": "src/bench/homonym-consumer-b.ts",
+    "content_hash": "2607e093490751b6d28d5a8808b2c83625113d97091725434f2c3cb77bf9e902",
+    "language": "ts",
+    "line_count": 6
+  },
+  {
+    "path": "src/bench/homonym-helper-a.ts",
+    "content_hash": "caf186cf466b408b22123e9146c8b98c948b67c474a666f23f54ed5a0b8a7d35",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
+    "path": "src/bench/homonym-helper-b.ts",
+    "content_hash": "792f8d6861f4bdb340333e67eb0a9f59f34fcb63bb1372da9df01ee6c48a729e",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
+    "path": "src/bench/jsx-member-gap.tsx",
+    "content_hash": "5a3de7db633de17dced457e77ba6a44ae99a589fe9b33f086e9a6ced728b4036",
+    "language": "tsx",
+    "line_count": 6
+  },
+  {
     "path": "src/bench/jsx-synthesis/ChildCard.tsx",
     "content_hash": "7990d39f36b4cfe4c478a020d56b822ec94ea3fcb1c3695b3e21af1584727d26",
     "language": "tsx",
@@ -54,10 +84,28 @@
     "line_count": 10
   },
   {
+    "path": "src/bench/jsx-ui-namespace.ts",
+    "content_hash": "b9187850ba4f5c9e2f16218c3865eb3a8bd14eb140e7301e0df77a6b390d1d7d",
+    "language": "ts",
+    "line_count": 4
+  },
+  {
     "path": "src/bench/method-call-sites.ts",
     "content_hash": "76a69f0d65b9b3b07547b93c73e15a81f5604234465d17f92b6e0bf487392d1a",
     "language": "ts",
     "line_count": 11
+  },
+  {
+    "path": "src/bench/stale-multi-helpers.ts",
+    "content_hash": "daf504ab7d2dff9a53564041e6660589e53a7adc2b5a9043512ec73e4545e99b",
+    "language": "ts",
+    "line_count": 8
+  },
+  {
+    "path": "src/bench/stale-multi-import.ts",
+    "content_hash": "2e82fe5b6d44083a4f59df3fe79417cd02b93436ac7f503c8694e06223626cc2",
+    "language": "ts",
+    "line_count": 4
   },
   {
     "path": "src/components/shop/ApiBridge.tsx",

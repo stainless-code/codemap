@@ -59,6 +59,10 @@ export function getHeuristicCallsEnabled(): boolean {
   return getCodemapConfig().synthesis.heuristicCalls;
 }
 
+export function getApplyAutoApplyRecipes(): readonly string[] | undefined {
+  return getCodemapConfig().applyAutoApplyRecipes;
+}
+
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
   const set = getExcludeDirNames();

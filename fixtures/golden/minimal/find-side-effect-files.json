@@ -6,6 +6,12 @@
     "has_side_effects": 1
   },
   {
+    "path": "src/bench/stale-multi-import.ts",
+    "language": "ts",
+    "is_barrel": 0,
+    "has_side_effects": 1
+  },
+  {
     "path": "src/consumer.ts",
     "language": "ts",
     "is_barrel": 0,

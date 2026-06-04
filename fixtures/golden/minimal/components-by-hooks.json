@@ -10,6 +10,11 @@
     "hook_count": 1
   },
   {
+    "name": "MemberHost",
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "hook_count": 0
+  },
+  {
     "name": "ChildCard",
     "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
     "hook_count": 0
