@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -2116,6 +2122,28 @@ describe("MCP server — apply tools", () => {
       expect(r.isError).toBe(true);
       const text = (r.content as { text: string }[])[0]?.text ?? "";
       expect(text).toContain("yes: true");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("apply yes:true writes disk via MCP", async () => {
+    seedRenameApplyTarget(benchDir);
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "apply",
+        arguments: {
+          recipe: "rename-preview",
+          params: { old: "runQuery", new: "runQry", kind: "function" },
+          yes: true,
+        },
+      });
+      const json = readJson(r);
+      expect(json.applied).toBe(true);
+      expect(
+        readFileSync(join(benchDir, "src", "rename-target.ts"), "utf8"),
+      ).toBe("export function runQry() {}\n");
     } finally {
       await server.close();
     }

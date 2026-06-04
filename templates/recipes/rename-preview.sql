@@ -200,6 +200,18 @@ jsx_element_rows AS (
       p.include_tests
       OR (j.file_path NOT LIKE '%test.%' AND j.file_path NOT LIKE '%spec.%')
     )
+    AND (
+      p.define_in IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM bindings b
+        JOIN "references" r ON r.id = b.reference_id
+        JOIN target_symbols s ON s.id = b.resolved_symbol_id
+        WHERE r.file_path = j.file_path
+          AND r.line_start = j.line_start
+          AND r.kind = 'jsx'
+      )
+    )
     AND NOT EXISTS (
       SELECT 1
       FROM bindings b
@@ -241,6 +253,18 @@ jsx_closing_rows AS (
     AND (
       p.include_tests
       OR (j.file_path NOT LIKE '%test.%' AND j.file_path NOT LIKE '%spec.%')
+    )
+    AND (
+      p.define_in IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM bindings b
+        JOIN "references" r ON r.id = b.reference_id
+        JOIN target_symbols s ON s.id = b.resolved_symbol_id
+        WHERE r.file_path = j.file_path
+          AND r.line_start = j.line_end
+          AND r.kind = 'jsx'
+      )
     )
     AND NOT EXISTS (
       SELECT 1

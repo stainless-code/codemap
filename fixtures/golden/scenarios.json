@@ -818,6 +818,15 @@
       }
     },
     {
+      "id": "rename-preview-homonym-unscoped",
+      "prompt": "Rename helper→worker across both homonym definitions and consumers",
+      "recipe": "rename-preview",
+      "params": {
+        "old": "helper",
+        "new": "worker"
+      }
+    },
+    {
       "id": "migrate-jsx-prop-product-card",
       "prompt": "Rename data-id JSX attribute on ProductCard article",
       "recipe": "migrate-jsx-prop",

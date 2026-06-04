@@ -26,10 +26,12 @@ export function assertApplyAllowlist(opts: {
   yes: boolean;
   force: boolean;
   allowlist: readonly string[] | undefined;
+  /** CLI TTY Proceed? counts as interactive confirm for unlisted recipes. */
+  ttyConfirmed?: boolean;
 }): string | undefined {
   const list = opts.allowlist;
   if (list === undefined || list.length === 0) return undefined;
-  if (opts.force || !opts.yes) return undefined;
+  if (opts.force || !opts.yes || opts.ttyConfirmed === true) return undefined;
   if (list.includes(opts.recipeId)) return undefined;
   return `codemap apply: recipe "${opts.recipeId}" is not in apply.autoApplyRecipes. Add it to config or pass --force.`;
 }

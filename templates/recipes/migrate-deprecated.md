@@ -47,3 +47,4 @@ codemap apply migrate-deprecated --params symbol=now,replacement=Date.now,requir
 - Substring replace on the line (same as `rename-preview`) — ambiguous when `symbol` appears twice on one line.
 - `replacement` is identifier text, not a full expression rewrite — pass `Date.now` for `now()` call sites.
 - Set `require_deprecated=false` only when intentionally migrating a symbol not yet tagged `@deprecated`.
+- With `require_deprecated=true` (default), call sites must bind to a `@deprecated` definition in `deprecated_targets` — not merely share the name globally.

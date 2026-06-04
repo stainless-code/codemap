@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -1220,5 +1226,20 @@ describe("http-server — apply tools", () => {
     });
     expect(r.status).toBe(400);
     expect(r.json.error).toContain("yes: true");
+  });
+
+  it("POST /tool/apply yes:true writes disk", async () => {
+    seedRenameApplyTarget();
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "apply", {
+      recipe: "rename-preview",
+      params: { old: "runQuery", new: "runQry", kind: "function" },
+      yes: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.applied).toBe(true);
+    expect(
+      readFileSync(join(benchDir, "src", "rename-target.ts"), "utf8"),
+    ).toBe("export function runQry() {}\n");
   });
 });

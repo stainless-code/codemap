@@ -27,6 +27,7 @@ export interface ApplyFromRecipeOpts {
   dryRun: boolean;
   force: boolean;
   yes: boolean;
+  ttyConfirmed?: boolean;
 }
 
 export function runApplyFromRecipe(opts: ApplyFromRecipeOpts): ApplyRunResult {
@@ -35,6 +36,7 @@ export function runApplyFromRecipe(opts: ApplyFromRecipeOpts): ApplyRunResult {
     yes: opts.yes,
     force: opts.force,
     allowlist: getApplyAutoApplyRecipes(),
+    ttyConfirmed: opts.ttyConfirmed,
   });
   if (allowErr !== undefined) {
     throw new ApplyRunError(allowErr);
@@ -170,6 +172,7 @@ export async function runApplyUntilEmpty(opts: {
   force: boolean;
   yes: boolean;
   maxPasses: number;
+  ttyConfirmed?: boolean;
 }): Promise<ApplyRunResult> {
   const touchedAcrossPasses = new Map<string, ApplyFile>();
   let last: ApplyRunResult = {
@@ -197,6 +200,7 @@ export async function runApplyUntilEmpty(opts: {
       dryRun: true,
       force: opts.force,
       yes: opts.yes,
+      ttyConfirmed: opts.ttyConfirmed,
     });
     if (last.payload.conflicts.length > 0) {
       return {
@@ -239,6 +243,7 @@ export async function runApplyUntilEmpty(opts: {
       dryRun: false,
       force: opts.force,
       yes: opts.yes,
+      ttyConfirmed: opts.ttyConfirmed,
     });
     if (last.payload.conflicts.length > 0) {
       return {

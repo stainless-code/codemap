@@ -523,6 +523,11 @@ export function staleOne(): number { return 2; }
         'import { helper } from "./homonym-helper-a";\n\nexport function useHelperA(): string {\n  return helper();\n}\n',
         "utf8",
       );
+      writeFileSync(
+        join(projectRoot, "src", "bench", "homonym-consumer-b.ts"),
+        'import { helper } from "./homonym-helper-b";\n\nexport function useHelperB(): string {\n  return helper();\n}\n',
+        "utf8",
+      );
       const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
       expect(idx.exitCode).toBe(0);
     });
@@ -547,6 +552,9 @@ export function staleOne(): number { return 2; }
       expect(readFile("src/bench/homonym-helper-b.ts")).toMatch(
         /function helper\(\)/,
       );
+      const consumerB = readFile("src/bench/homonym-consumer-b.ts");
+      expect(consumerB).toContain("helper()");
+      expect(consumerB).not.toContain("worker");
     });
   });
 

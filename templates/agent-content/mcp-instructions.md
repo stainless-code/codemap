@@ -58,7 +58,7 @@ Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commi
 - Type hierarchy: **`query_recipe`** `type-ancestors` / `type-descendants`; pass `file_path` when symbol names collide across files. On **`type-descendants`**, `file_path` also limits results to descendants defined in that file.
 - Refactor risk: `fan-in` + `refactor-risk-ranking`.
 - Edit path: **`show`** → **`snippet`**; if `stale: true`, line range may have drifted.
-- Apply path: **`query_recipe`** (or audit baseline `added`) with `format: "diff-json"` → **`apply`** `dry_run: true` → **`apply`** `yes: true` (+ `force: true` when recipe is not `auto_fixable`). Pre-built rows: **`apply_rows`**; unified diff: **`apply_diff_input`**. Fixpoint: **`apply`** `until_empty: true`; git: **`commit_message`** on **`apply`** / **`apply_diff_input`**.
+- Apply path: **`query_recipe`** (or audit baseline `added`) with `format: "diff-json"` → **`apply`** `dry_run: true` → **`apply`** `yes: true` (+ `force: true` when recipe is not `auto_fixable`). Pre-built rows: **`apply_rows`**; unified diff: **`apply_diff_input`**. Fixpoint: **`apply`** `until_empty: true`; git: **`commit_message`** on **`apply`** / **`apply_diff_input`**. **`rename-preview` homonyms:** pass `define_in` in `params` (definition `file_path` anchor — not the same as `in_file`).
 
 ## Anti-patterns
 

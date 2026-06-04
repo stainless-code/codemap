@@ -386,6 +386,7 @@ async function runRecipeApply(opts: {
       force: opts.force,
       yes: loopYes,
       maxPasses: opts.maxPasses,
+      ttyConfirmed: loopYes && !opts.yes && canPrompt,
     });
     await finishApply(loopResult.payload, {
       recipeId: opts.recipeId,
@@ -442,6 +443,7 @@ async function runRecipeApply(opts: {
     dryRun: false,
     force: opts.force,
     yes: true,
+    ttyConfirmed: true,
   });
   await finishApply(payload, opts);
 }

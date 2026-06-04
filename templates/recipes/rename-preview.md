@@ -68,4 +68,4 @@ codemap query --recipe rename-preview \
 
 Use `rg oldName` for literals/comments. Pair with `find-symbol-references` for audit-only views of binding sites.
 
-**Homonyms:** pass `define_in=src/path/to/definition.ts` (same anchor as `find-symbol-references` definition `file_path`) so only that symbol's definitions, imports, and binding-resolved call sites appear — bare `old`/`new` still unions every homonym in the index.
+**Homonyms:** pass `define_in=src/path/to/definition.ts` (same anchor as `find-symbol-references` definition `file_path`) so only that symbol's definitions, imports, binding-resolved call sites, and binding-resolved JSX tags appear — bare `old`/`new` still unions every homonym in the index.

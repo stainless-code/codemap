@@ -24,7 +24,7 @@ The right framing now: **what does the SQL-index-with-three-transports + worker-
 
 The original capability inventory had 10 rows. Shipped picks — lift trail, PR/commit anchors, and canonical homes — are in [§ 7](#7-lifted-to). Implementation detail lives in those canonical homes (not duplicated here).
 
-**Still open:** C.9 plugin layer, LSP diagnostic-push, apply-engine steps — [§ 7](#7-lifted-to) open rows + linked plans.
+**Still open:** C.9 plugin layer, LSP diagnostic-push — [§ 7](#7-lifted-to) open rows + linked plans. Apply-engine steps 2–12 shipped 2026-06 ([`architecture.md` § Apply](../architecture.md#apply--input-modes-transport-and-policy)).
 
 ---
 

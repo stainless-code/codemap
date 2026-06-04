@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { execSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -363,6 +364,49 @@ describe("handleApplyRows", () => {
         "export function runQry() {}\n",
       );
     }
+  });
+});
+
+describe("handleApply commit_message", () => {
+  beforeEach(() => {
+    execSync("git init", { cwd: projectRoot, stdio: "ignore" });
+    execSync("git config user.email test@codemap.test", {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+    execSync("git config user.name Codemap Test", {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+    execSync("git add -A", { cwd: projectRoot, stdio: "ignore" });
+    execSync('git commit -m "initial"', {
+      cwd: projectRoot,
+      stdio: "ignore",
+    });
+  });
+
+  it("commits after recipe apply when commit_message is set", async () => {
+    const realRoot = realpathSync(projectRoot);
+    writeFileSync(
+      join(realRoot, "src", "query.ts"),
+      "export function runQuery() {}\n",
+      "utf8",
+    );
+    const result = await handleApply(
+      {
+        recipe: "rename-preview",
+        params: { old: "runQuery", new: "runQry", kind: "function" },
+        yes: true,
+        commit_message: "chore: rename via MCP handler",
+      },
+      realRoot,
+    );
+    expect(result.ok).toBe(true);
+    const log = execSync("git log --oneline", {
+      cwd: realRoot,
+      encoding: "utf8",
+    });
+    expect(log).toContain("chore: rename via MCP handler");
   });
 });
 

@@ -61,7 +61,7 @@ Wave 1–2 shipped in [#126](https://github.com/stainless-code/codemap/pull/126)
 
 **Open (P1)**
 
-- [ ] **Scoped rename (`define_in`)** — homonym-safe `rename-preview` + optional `codemap rename` alias. Plan: [`plans/scoped-rename-define-in.md`](./plans/scoped-rename-define-in.md). Effort: S (+S alias).
+- [x] **Scoped rename (`define_in`)** — homonym-safe `rename-preview` (binding-scoped calls/JSX). Plan: [`plans/scoped-rename-define-in.md`](./plans/scoped-rename-define-in.md) (delete on merge). Optional alias still open: `codemap rename`.
 
 **P2 — strategic (trigger-gated where noted)**
 

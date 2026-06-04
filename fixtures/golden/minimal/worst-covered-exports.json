@@ -36,6 +36,12 @@
     "coverage_pct": 0
   },
   {
+    "name": "useHelperB",
+    "file_path": "src/bench/homonym-consumer-b.ts",
+    "line_start": 3,
+    "coverage_pct": 0
+  },
+  {
     "name": "helper",
     "file_path": "src/bench/homonym-helper-a.ts",
     "line_start": 1,
@@ -111,12 +117,6 @@
     "name": "run",
     "file_path": "src/consumer.ts",
     "line_start": 22,
-    "coverage_pct": 0
-  },
-  {
-    "name": "get",
-    "file_path": "src/lib/cache.ts",
-    "line_start": 8,
     "coverage_pct": 0
   }
 ]

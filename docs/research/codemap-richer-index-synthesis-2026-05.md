@@ -40,7 +40,7 @@ The disagreement maps (§ 3), reference views (§ 5), rejected items (§ 7), and
 3. [Disagreement map (with full argumentation)](#3-disagreement-map--per-axis-triangulation-with-full-argumentation)
 4. [Substrate catalog (consolidated)](#4-substrate-catalog-consolidated)
 5. [Reference views (lifted from inputs)](#5-reference-views-lifted-from-inputs)
-6. [Synthesised 12-step path with open implementation questions](#6-synthesised-12-step-path-with-open-implementation-questions)
+6. [Synthesised 12-step path (shipped index)](#6-synthesised-12-step-path-shipped-index)
 7. [Rejected items with trigger conditions](#7-rejected-items-with-trigger-conditions)
 8. [Preserved moats (universal)](#8-preserved-moats-universal)
 9. [Status / lifecycle](#9-status--lifecycle)
@@ -80,7 +80,7 @@ These have **6/6** support (counting A1 and A4 separately because their conclusi
 | C7  | **Dry-run-first + explicit confirmation gate is correct** and stays. Phase-1-validates-before-phase-2-writes pattern preserved; non-TTY without `--yes` rejected.                                                                                                                                                                                             | A1, A2, A3, A4, A5, A6                           |
 | C8  | **Watch + apply + reindex is the agent loop.** Default-ON watch on long-running transports keeps reads fresh; codemap-specific structural verification (the index reflects disk truth) is sufficient for the agent path; full typecheck/lint/tests verifier is consumer-side.                                                                                 | A1, A4, A6 explicit; A2, A3, A5 don't contradict |
 
-These eight are the **non-negotiable spine** of any synthesis path. Every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) preserves them.
+These eight are the **non-negotiable spine** of any synthesis path. Every step in [§ 6](#6-synthesised-12-step-path-shipped-index) preserves them.
 
 ---
 
@@ -299,7 +299,7 @@ All five positions propose sequencing; the orderings differ on what ships first.
 | A5     | Expanded rename-preview → stale-imports recipe → C.9 entry-point schema → AST transform contract                       |
 | A6     | Reference locations OR delegation strategy → config for which recipes accept `--yes`                                   |
 
-**Verdict:** Synthesis sequence in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) below combines:
+**Verdict:** Synthesis sequence in [§ 6](#6-synthesised-12-step-path-shipped-index) below combines:
 
 - All 8 consensus points (§ 2) ship first.
 - The agent-in-the-loop unlock (§ 3.3) gets earlier priority than A1 had it.
@@ -394,7 +394,7 @@ Strategic views from the source notes that serve as design context for the synth
 
 ### 5.1 Architecture diagram (from A1)
 
-The substrate-level data flow that the synthesis path grows. Recipes propose; engines pass through; index is the substrate. Every step in [§ 6](#6-synthesised-12-step-path-with-open-implementation-questions) either enriches the index (new columns / tables / recipe categories) or enriches what the engines can consume from it (richer row contract, fixpoint loop, workflow integration). Nothing in the synthesis path adds a new engine — existing ones grow capacity through the data they read.
+The substrate-level data flow that the synthesis path grows. Recipes propose; engines pass through; index is the substrate. Every step in [§ 6](#6-synthesised-12-step-path-shipped-index) either enriches the index (new columns / tables / recipe categories) or enriches what the engines can consume from it (richer row contract, fixpoint loop, workflow integration). Nothing in the synthesis path adds a new engine — existing ones grow capacity through the data they read.
 
 ```text
                                        ┌─────────────────────────────────┐

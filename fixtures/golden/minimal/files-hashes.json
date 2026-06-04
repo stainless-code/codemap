@@ -48,6 +48,12 @@
     "line_count": 6
   },
   {
+    "path": "src/bench/homonym-consumer-b.ts",
+    "content_hash": "2607e093490751b6d28d5a8808b2c83625113d97091725434f2c3cb77bf9e902",
+    "language": "ts",
+    "line_count": 6
+  },
+  {
     "path": "src/bench/homonym-helper-a.ts",
     "content_hash": "caf186cf466b408b22123e9146c8b98c948b67c474a666f23f54ed5a0b8a7d35",
     "language": "ts",

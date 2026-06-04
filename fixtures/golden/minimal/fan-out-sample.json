@@ -25,6 +25,11 @@
     "sample_targets": "src/bench/homonym-helper-a.ts"
   },
   {
+    "from_path": "src/bench/homonym-consumer-b.ts",
+    "deps": 1,
+    "sample_targets": "src/bench/homonym-helper-b.ts"
+  },
+  {
     "from_path": "src/bench/jsx-member-gap.tsx",
     "deps": 1,
     "sample_targets": "src/bench/jsx-ui-namespace.ts"
@@ -43,10 +48,5 @@
     "from_path": "src/components/shop/ApiBridge.tsx",
     "deps": 1,
     "sample_targets": "src/api/client.ts"
-  },
-  {
-    "from_path": "src/components/shop/ShopButton.default.ts",
-    "deps": 1,
-    "sample_targets": "src/components/shop/ShopButton.tsx"
   }
 ]

@@ -31,9 +31,12 @@ call_rows AS (
       OR p.require_deprecated = 0
       OR EXISTS (
         SELECT 1
-        FROM symbols s
-        WHERE s.name = p.symbol
-          AND s.doc_comment LIKE '%@deprecated%'
+        FROM deprecated_targets dt
+        JOIN bindings b ON b.resolved_symbol_id = dt.id
+        JOIN "references" r ON r.id = b.reference_id
+        WHERE r.file_path = c.file_path
+          AND r.line_start = c.line_start
+          AND r.name = p.symbol
       )
     )
 ),

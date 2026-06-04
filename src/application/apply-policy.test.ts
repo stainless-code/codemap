@@ -93,4 +93,16 @@ describe("assertApplyAllowlist", () => {
       }),
     ).toBeUndefined();
   });
+
+  it("allows unlisted recipe after TTY confirm (ttyConfirmed)", () => {
+    expect(
+      assertApplyAllowlist({
+        recipeId: "rename-preview",
+        yes: true,
+        force: false,
+        allowlist: ["migrate-import-source"],
+        ttyConfirmed: true,
+      }),
+    ).toBeUndefined();
+  });
 });
