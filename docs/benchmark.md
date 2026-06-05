@@ -300,7 +300,7 @@ Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shi
 | ------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
 | **Log** | `AGENT_EVAL_LOG_ON` + `AGENT_EVAL_LOG_OFF` (or `compare-live-logs.ts`) | Parses exported MCP-on vs MCP-off agent transcripts |
 
-**Eval layers** (full methodology and exploratory findings: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md)):
+**Eval layers** (dual-agent provisional findings: [§ Dual-agent study](#dual-agent-study-codemap-self-index-provisional) below):
 
 | Layer          | MCP-on                         | MCP-off / baseline                         | In CI today?                                                                  |
 | -------------- | ------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------- |
@@ -309,7 +309,7 @@ Dev-only A/B harness in [`scripts/agent-eval/`](../scripts/agent-eval/) (not shi
 | **Log**        | Parsed MCP-on export           | Parsed MCP-off export                      | Parser smoke only (`test:agent-eval` on sample logs); no CI on ad-hoc exports |
 | **Dual-agent** | Live MCP tools in an LLM agent | Same tasks; MCP/`codemap query` prohibited | No (research only)                                                            |
 
-**Probe** and **live** index the fixture, then compare MCP-on against a simulated **MCP-off** arm (`glob` → `read` × N → `grep`). **Log** mode is orthogonal to `AGENT_EVAL_MODE`: it compares two exported session logs via `compare-live-logs.ts`. The traditional arm models **naive** discovery; a skilled grep-only agent may match MCP on simple lookups — see the research note § 4.
+**Probe** and **live** index the fixture, then compare MCP-on against a simulated **MCP-off** arm (`glob` → `read` × N → `grep`). **Log** mode is orthogonal to `AGENT_EVAL_MODE`: it compares two exported session logs via `compare-live-logs.ts`. The traditional arm models **naive** discovery; a skilled grep-only agent may match MCP on simple lookups — see [§ Dual-agent study](#dual-agent-study-codemap-self-index-provisional) finding #1.
 
 Probe **prompts and SQL/recipe** reuse [golden scenarios](../fixtures/golden/scenarios.json) via `goldenId` (override with `--scenarios` / `AGENT_EVAL_SCENARIOS` when using an external corpus); probe definitions live in [`scripts/agent-eval/scenarios.json`](../scripts/agent-eval/scenarios.json) (override with `--probes` / `AGENT_EVAL_PROBES`). The MCP-off **traditional** regex/globs in each probe approximate naive file discovery (not byte-identical to golden SQL).
 
@@ -365,7 +365,32 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EV
 | `find-call-sites`            | 1            | 25            | 375                | 2,667               |
 | **Totals**                   | **3**        | **75**        | **601**            | **7,955**           |
 
-Numbers are stable for a given fixture + schema; re-run locally after intentional schema or probe changes. Dual-agent and self-index studies: [research/agent-eval-findings-2026-05.md](./research/agent-eval-findings-2026-05.md).
+Numbers are stable for a given fixture + schema; re-run locally after intentional schema or probe changes.
+
+#### Dual-agent study (codemap self-index, provisional)
+
+Exploratory runs on the **codemap repo** index (not `fixtures/minimal`) — four structural tasks, MCP-on vs MCP-forbidden (grep/read/shell only). Not pinned in CI; methodology caveats apply.
+
+| Task                                                       | MCP-on                             | MCP-off                       | Verdict                                      |
+| ---------------------------------------------------------- | ---------------------------------- | ----------------------------- | -------------------------------------------- |
+| Call path `createCodemap` → `resolveStateDir`              | 2 hops, 1 MCP call                 | Same path, 8 tools            | Tie on answer; MCP cheaper                   |
+| Transitive dependents of `src/db.ts` (depth 4)             | **132 files**                      | 124–133 (scope-dependent)     | MCP exact; grep approximate                  |
+| Rename preview `resolveStateDir` → `resolveStateDirectory` | **8 code files** (21 binding refs) | 11 files (+ docs, comments)   | MCP matches `rename-preview` scope           |
+| Upstream callers of `resolveStateDir` (2 hops)             | **28 symbols**, 6 depth-1          | ~28 (text-inferred), 23 tools | Similar count; MCP 1 call, higher confidence |
+
+**Structural cost (same session):** MCP-on ~6 MCP calls (+ schema reads), ~38 KB payload; MCP-off ~37 tools (21 grep, 13 read, 3 shell), ~85 KB.
+
+**Provisional findings:**
+
+1. **Naive discovery vs skilled grep** — harness MCP-off models glob→read→grep. Skilled targeted grep can tie MCP on tool count for simple symbol/import/call-site lookups.
+2. **Graph questions favor MCP** — transitive deps, impact, trace, rename-preview: indexed answers in 1–2 calls; grep chains cost more and often report medium confidence.
+3. **Token estimate nuance** — recipe payloads with `actions` metadata can make MCP **larger** than grep on simple tasks; MCP still wins on correctness (resolved edges, column-precise call sites, binding kinds).
+4. **Dual-agent > simulation** — hand-waving grep token math understates real agent cost (re-reads, shell graph scripts, scope ambiguity).
+5. **Not an LLM eval** — layers measure **structural tool cost** and answer alignment with the index, not model reasoning quality or task success rate.
+
+**Limitations:** corpus-dependent (minimal fixture magnifies MCP-off read fan-out); re-run after `SCHEMA_VERSION` or fixture changes; log mode omits full read payloads unless exports include them.
+
+**Follow-up:** scripted dual-agent harness + external fixture CI — [roadmap § Backlog](./roadmap.md#backlog) (`Scripted dual-agent harness`, `Falsifiable benchmark CI`).
 
 **Correctness (golden queries):** `bun run test:golden` indexes `fixtures/minimal`, runs declared **`setup`** steps when present (e.g. coverage ingest), then runs SQL against [fixtures/golden/scenarios.json](../fixtures/golden/scenarios.json) and compares to [fixtures/golden/minimal/](../fixtures/golden/minimal/). See [golden-queries.md](./golden-queries.md). Refresh goldens after intentional fixture or schema changes: `bun scripts/query-golden.ts --update`.
 

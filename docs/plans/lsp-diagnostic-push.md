@@ -284,7 +284,7 @@ Convert (Option 2 or 3) when **any** of these triggers fire — not preemptively
 4. **Locked versioning across packages becomes painful** with the hand-script approach in Option 1 (e.g. CLI bumps without LSP server changes still need a changeset entry for the LSP package — annoying enough times that the workspace tooling pays for itself).
 5. **Docs site needs to import codemap source.** Markdown-only Fumadocs site (using `@fumadocs/local-md` to read `../docs/*.md`) ships as a flat `website/` dir — NOT a trigger by itself. Trigger fires only when the site adds a live recipe runner, an interactive schema explorer, a WASM CLI demo, or anything else that imports from codemap's TS source. Then workspace tooling becomes the cleanest path: extract `@stainless-code/codemap-core`, import from the website package.
 
-Mirrors the doc's other "wait for two consumers / two asks" disciplines (research note § 6 Q5 history table, B.5 verdict thresholds).
+Mirrors the doc's other "wait for two consumers / two asks" disciplines ([`roadmap.md` § `history` table backlog](../roadmap.md#core-substrate--platform), audit verdict thresholds).
 
 ### Default bias (revisit during plan iteration)
 

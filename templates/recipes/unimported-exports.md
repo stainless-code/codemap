@@ -17,7 +17,7 @@ The recipe ships intentionally simple. Three known classes of false positive:
 
 ## What's NOT covered (orthogonal recipes)
 
-- **Re-export chain handling** — wait for a future recipe with recursive CTE walking `re_export_source`. Tracked under research note § 1.2 ("re-export chains need a JOIN through `re_export_source` to avoid false positives").
+- **Re-export chain handling** — wait for a future recipe with recursive CTE walking `re_export_source` (v1 filters `kind != 're-export'` and documents barrel false positives above).
 - **Component-touching-deprecated** style cross-checks — not applicable here; this recipe is about EXPORTS, not symbol references inside files.
 
 ## Tuning axes for project-local overrides

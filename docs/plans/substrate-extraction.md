@@ -1452,7 +1452,7 @@ Tier 8 (project meta) — parallel-safe; cheapest; ship first or last.
 
 ## Capability matrix — what unlocks post-extraction
 
-Every capability discussed in [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) — plus everything the "AND MORE" framing extends to:
+Every capability from the May 2026 write-engine triangulation (12-step apply path + substrate tiers in this plan) — plus everything the "AND MORE" framing extends to:
 
 | Capability                                                                           | Tier(s)                       | Status post-extraction                                                          |
 | ------------------------------------------------------------------------------------ | ----------------------------- | ------------------------------------------------------------------------------- |
@@ -1624,7 +1624,7 @@ Plan-PR-shape per [`plan-pr-inspiration-discipline`](../../.agents/rules/plan-pr
 
 ### Internal anchors
 
-- [`research/codemap-richer-index-synthesis-2026-05.md`](../research/codemap-richer-index-synthesis-2026-05.md) — the write-engine direction this substrate unlocks
+- [`architecture.md` § Apply](../architecture.md#apply--input-modes-transport-and-policy) — shipped write-engine executor + rejected-alternative table
 - [`roadmap.md § Moats`](../roadmap.md#moats-load-bearing) — Moat B is the load-bearing axis ("Extracted structure ≥ verdicts")
 - [`roadmap.md § Floors`](../roadmap.md#floors-v1-product-shape) — preserved: no JS execution at index time; no opinionated rule engine
 - [`architecture.md § Schema`](../architecture.md#schema) — current schema documentation; grows substantially with each tier's PR

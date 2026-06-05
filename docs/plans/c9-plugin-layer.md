@@ -155,14 +155,14 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) — ship one verti
 
 ## Risks / non-goals
 
-| Item                                                     | Mitigation                                                                                                                                                                                          |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Non-goal:** edge injection via plugins (v2).           | Per L.5; deferred. If demand emerges, additive in v2.                                                                                                                                               |
-| **Non-goal:** verdict-shaped CLI verb.                   | Per L.3; recipe + `--format sarif` already covers CI gating.                                                                                                                                        |
-| **Risk:** plugin contract over-engineered.               | Slice 3 ships the smallest contract; iterate based on real plugin-author feedback (community plugins are the leverage signal).                                                                      |
-| **Risk:** bundled starter-plugin maintenance.            | Limit v1 to 1-2 plugins; document community-plugin path clearly so contributors take over framework-specific knowledge. Mirrors community-adapter discipline.                                       |
-| **Risk:** false-positives from misdeclared entry points. | Plugins are opt-in (project lists them in config or installs as peerDep); reachability recipe output is advisory until users verify. Cross-ref item 1.6 advisory-recipe pattern from research note. |
-| **Risk:** plan abandoned mid-iteration.                  | Per [`docs/README.md` Rule 8](../README.md), close as `Status: Rejected (YYYY-MM-DD) — <reason>`. Design surface captured either way.                                                               |
+| Item                                                     | Mitigation                                                                                                                                                                                                                          |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Non-goal:** edge injection via plugins (v2).           | Per L.5; deferred. If demand emerges, additive in v2.                                                                                                                                                                               |
+| **Non-goal:** verdict-shaped CLI verb.                   | Per L.3; recipe + `--format sarif` already covers CI gating.                                                                                                                                                                        |
+| **Risk:** plugin contract over-engineered.               | Slice 3 ships the smallest contract; iterate based on real plugin-author feedback (community plugins are the leverage signal).                                                                                                      |
+| **Risk:** bundled starter-plugin maintenance.            | Limit v1 to 1-2 plugins; document community-plugin path clearly so contributors take over framework-specific knowledge. Mirrors community-adapter discipline.                                                                       |
+| **Risk:** false-positives from misdeclared entry points. | Plugins are opt-in (project lists them in config or installs as peerDep); reachability recipe output is advisory until users verify. Same advisory pattern as [`unused-type-members`](../templates/recipes/unused-type-members.md). |
+| **Risk:** plan abandoned mid-iteration.                  | Per [`docs/README.md` Rule 8](../README.md), close as `Status: Rejected (YYYY-MM-DD) — <reason>`. Design surface captured either way.                                                                                               |
 
 ---
 

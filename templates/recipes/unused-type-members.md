@@ -41,6 +41,6 @@ The recipe inherits all the false-positive classes of `unimported-exports`, **pl
 
 ## What's NOT covered (orthogonal recipes)
 
-- **Re-export chain following** — same gap as `unimported-exports`; tracked in research notes.
+- **Re-export chain following** — same gap as [`unimported-exports`](./unimported-exports.md) (v1 limitations § re-export chains).
 - **Property-access tracking** — would require a new substrate column on `calls` or a separate `property_reads` table; not on the v1 roadmap.
 - **Component prop usage** — for React props, [`components-by-hooks`](./components-by-hooks.md) gives hook usage; per-prop reference is the same property-access gap.
