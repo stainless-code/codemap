@@ -52,6 +52,7 @@ import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
+import { runIngestCoverageOnDb } from "./ingest-coverage-run";
 import {
   formatAnnotations,
   formatDiff,
@@ -59,6 +60,10 @@ import {
   formatMermaid,
   formatSarif,
 } from "./output-formatters";
+import {
+  baselineQueryIncompatibility,
+  compareQueryBaseline,
+} from "./query-baseline";
 import { executeQuery } from "./query-engine";
 import {
   getQueryRecipeActionsRendered,
@@ -113,6 +118,10 @@ const err = (error: string, status: 400 | 404 | 500 = 400): ToolResult => ({
   error,
   status,
 });
+
+function baselineCompareErr(error: string): ToolResult {
+  return err(error, error.includes("no baseline named") ? 404 : 400);
+}
 
 /**
  * Resolve `changed_since: <ref>` to a Set of project-relative paths.
@@ -194,6 +203,7 @@ export const queryArgsSchema = {
   changed_since: z.string().optional(),
   group_by: groupByEnum.optional(),
   format: formatEnum.optional(),
+  baseline: z.string().min(1).optional(),
 };
 
 export interface QueryArgs {
@@ -202,14 +212,28 @@ export interface QueryArgs {
   changed_since?: string;
   group_by?: GroupByMode;
   format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
+  baseline?: string;
 }
 
 export function handleQuery(args: QueryArgs, root: string): ToolResult {
   try {
+    const baselineIncompat = baselineQueryIncompatibility(args);
+    if (baselineIncompat !== undefined) return err(baselineIncompat);
+
     const resolveChanged = makeChangedFilesResolver(root);
     const changed = resolveChanged(args.changed_since);
     if (changed && typeof changed === "object" && "error" in changed) {
       return err(changed.error);
+    }
+    if (args.baseline !== undefined) {
+      const payload = compareQueryBaseline({
+        baselineName: args.baseline,
+        sql: args.sql,
+        changedFiles: changed as Set<string> | undefined,
+        summary: args.summary,
+      });
+      if ("error" in payload) return baselineCompareErr(payload.error);
+      return ok(payload);
     }
     if (
       args.format === "sarif" ||
@@ -251,6 +275,7 @@ export const queryRecipeArgsSchema = {
   changed_since: z.string().optional(),
   group_by: groupByEnum.optional(),
   format: formatEnum.optional(),
+  baseline: z.string().min(1).optional(),
   params: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .optional(),
@@ -262,6 +287,7 @@ export interface QueryRecipeArgs {
   changed_since?: string;
   group_by?: GroupByMode;
   format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
+  baseline?: string;
   params?: RecipeParamValues;
 }
 
@@ -270,6 +296,9 @@ export function handleQueryRecipe(
   root: string,
 ): ToolResult {
   try {
+    const baselineIncompat = baselineQueryIncompatibility(args);
+    if (baselineIncompat !== undefined) return err(baselineIncompat);
+
     const sql = getQueryRecipeSql(args.recipe);
     if (sql === undefined) {
       return err(
@@ -291,6 +320,19 @@ export function handleQueryRecipe(
     const changed = resolveChanged(args.changed_since);
     if (changed && typeof changed === "object" && "error" in changed) {
       return err(changed.error);
+    }
+    if (args.baseline !== undefined) {
+      const payload = compareQueryBaseline({
+        baselineName: args.baseline,
+        sql,
+        bindValues: resolvedParams.values,
+        changedFiles: changed as Set<string> | undefined,
+        summary: args.summary,
+        recipeActions,
+      });
+      if ("error" in payload) return baselineCompareErr(payload.error);
+      tryRecordRecipeRun(args.recipe);
+      return ok(payload);
     }
     if (
       args.format === "sarif" ||
@@ -1164,6 +1206,41 @@ export function handleApplyRows(args: ApplyRowsArgs, root: string): ToolResult {
     return ok(payload);
   } catch (e) {
     if (e instanceof ApplyRunError) return err(e.message, 400);
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === ingest_coverage ========================================================
+
+export const ingestCoverageArgsSchema = {
+  path: z.string().min(1, "path must be a non-empty string"),
+  runtime: z.boolean().optional(),
+};
+
+export interface IngestCoverageArgs {
+  path: string;
+  runtime?: boolean;
+}
+
+export async function handleIngestCoverage(
+  args: IngestCoverageArgs,
+  root: string,
+): Promise<ToolResult> {
+  try {
+    const db = openDb();
+    let outcome: Awaited<ReturnType<typeof runIngestCoverageOnDb>>;
+    try {
+      outcome = await runIngestCoverageOnDb(db, {
+        projectRoot: root,
+        path: args.path,
+        runtime: args.runtime,
+      });
+    } finally {
+      closeDb(db);
+    }
+    if (!outcome.ok) return err(outcome.error);
+    return ok(outcome.result);
+  } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
   }
 }

@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
-import { closeDb, createTables, openDb } from "../db";
+import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import { handleRequest } from "./http-server";
 import { createManagedWatchSession } from "./session-lifecycle";
@@ -726,6 +726,132 @@ describe("http-server — POST /tool/{other tools}", () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "drop_baseline", {
       name: "does-not-exist",
+    });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toContain("does-not-exist");
+  });
+
+  it("ingest_coverage returns 400 when path is missing", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "ingest_coverage", {
+      path: "no-such/coverage-final.json",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("path not found");
+  });
+
+  it("query with missing baseline returns 404", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT 1",
+      baseline: "does-not-exist",
+    });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toContain("does-not-exist");
+  });
+
+  it("query with baseline diff returns 200 envelope", async () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "snap-files",
+        recipe_id: null,
+        sql: "SELECT path FROM files ORDER BY path",
+        rows_json: JSON.stringify([{ path: "src/a.ts" }]),
+        row_count: 1,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT path FROM files ORDER BY path",
+      baseline: "snap-files",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      added: [{ path: "src/b.ts" }],
+      removed: [],
+    });
+  });
+
+  it("query rejects baseline + group_by with 400", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT path FROM files",
+      baseline: "snap",
+      group_by: "directory",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("group_by");
+  });
+
+  it("query with corrupt baseline rows_json returns 400", async () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "bad",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "not-json",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT 1",
+      baseline: "bad",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("corrupt rows_json");
+  });
+
+  it("ingest_coverage ingests istanbul artifact successfully", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/a.ts', 'A', 'const', 1, 1, 'const A', 1, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const coverageDir = join(benchDir, "coverage");
+    mkdirSync(coverageDir);
+    writeFileSync(
+      join(coverageDir, "coverage-final.json"),
+      JSON.stringify({
+        [`${benchDir}/src/a.ts`]: {
+          path: `${benchDir}/src/a.ts`,
+          statementMap: {
+            "0": { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } },
+          },
+          s: { "0": 1 },
+        },
+      }),
+    );
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "ingest_coverage", {
+      path: "coverage/coverage-final.json",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      format: "istanbul",
+      ingested: { symbols: 1 },
+    });
+  });
+
+  it("query_recipe with missing baseline returns 404", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query_recipe", {
+      recipe: "deprecated-symbols",
+      baseline: "does-not-exist",
     });
     expect(r.status).toBe(404);
     expect(r.json.error).toContain("does-not-exist");

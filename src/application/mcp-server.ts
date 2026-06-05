@@ -49,6 +49,7 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleIngestCoverage,
   exploreArgsSchema,
   handleExplore,
   handleImpact,
@@ -65,6 +66,7 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  ingestCoverageArgsSchema,
   listBaselinesArgsSchema,
   queryArgsSchema,
   queryBatchArgsSchema,
@@ -86,7 +88,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * 19 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
+ * 20 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].
@@ -175,6 +177,9 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("save_baseline", () => registerSaveBaselineTool(server, opts));
   maybeRegister("list_baselines", () => registerListBaselinesTool(server));
   maybeRegister("drop_baseline", () => registerDropBaselineTool(server));
+  maybeRegister("ingest_coverage", () =>
+    registerIngestCoverageTool(server, opts),
+  );
   maybeRegister("show", () => registerShowTool(server, opts));
   maybeRegister("snippet", () => registerSnippetTool(server, opts));
   maybeRegister("impact", () => registerImpactTool(server));
@@ -198,7 +203,7 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
     "query",
     {
       description:
-        'Run one read-only SQL statement against the codemap index (default `.codemap/index.db`). Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
+        'Run one read-only SQL statement against the codemap index (default `.codemap/index.db`). Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`, baseline diff under `baseline` (incompatible with non-json `format` / `group_by`). Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by` / `baseline`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
       inputSchema: queryArgsSchema,
     },
     (args) => wrapToolResult(handleQuery(args, opts.root)),
@@ -210,7 +215,7 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
     "query_recipe",
     {
       description:
-        'Run a recipe by id (bundled or project-local). Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` exactly like `query`. Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
+        'Run a recipe by id (bundled or project-local). Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` / `baseline` exactly like `query` (`baseline` adds `actions` on `added` rows only). Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by` / `baseline`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: queryRecipeArgsSchema,
     },
     (args) => wrapToolResult(handleQueryRecipe(args, opts.root)),
@@ -286,6 +291,18 @@ function registerListBaselinesTool(server: McpServer): void {
       inputSchema: listBaselinesArgsSchema,
     },
     () => wrapToolResult(handleListBaselines()),
+  );
+}
+
+function registerIngestCoverageTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "ingest_coverage",
+    {
+      description:
+        "Ingest a coverage artifact (Istanbul JSON, LCOV, or NODE_V8_COVERAGE directory with `runtime: true`) into the index `coverage` table. Same JSON envelope as `codemap ingest-coverage --json`. Enables coverage-aware recipes (`worst-covered-exports`, `files-by-coverage`, `untested-and-dead`). Args: `path` (required), `runtime` (optional).",
+      inputSchema: ingestCoverageArgsSchema,
+    },
+    async (args) => wrapToolResult(await handleIngestCoverage(args, opts.root)),
   );
 }
 
@@ -402,7 +419,7 @@ function registerApplyDiffInputTool(server: McpServer, opts: ServerOpts): void {
     "apply_diff_input",
     {
       description:
-        "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed via parseUnifiedDiffToRows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
+        "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed into diff rows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
       inputSchema: applyDiffInputArgsSchema,
     },
     async (args) => wrapToolResult(await handleApplyDiffInput(args, opts.root)),
@@ -446,13 +463,13 @@ function registerResources(server: McpServer): void {
     server,
     "skill",
     "codemap://skill",
-    "Full text of the assembled codemap skill (`templates/agent-content/skill/`). Agents that don't preload the skill at session start can fetch it here.",
+    "Full text of the assembled codemap skill. Agents that don't preload the skill at session start can fetch it here.",
   );
   registerStaticResource(
     server,
     "rule",
     "codemap://rule",
-    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents in the indexed project).",
+    "Full text of the assembled codemap rule (always-on priming for agents in the indexed project).",
   );
   registerStaticResource(
     server,
