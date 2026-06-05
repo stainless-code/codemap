@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { execSync } from "node:child_process";
 import {
   mkdirSync,
@@ -203,6 +203,64 @@ describe("handleQuery baseline", () => {
       ok: false,
       error: expect.stringContaining("cannot be combined with group_by"),
     });
+  });
+
+  it("rejects baseline + format=codeclimate", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "codeclimate" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "cannot be combined with format=codeclimate",
+      ),
+    });
+  });
+
+  it("rejects baseline + format=badge", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "badge" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with format=badge"),
+    });
+  });
+
+  it("rejects format=codeclimate + group_by", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path FROM symbols",
+        format: "codeclimate",
+        group_by: "directory",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+
+  it("emits stderr warning for aggregate rows with format=codeclimate", () => {
+    const stderr = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = handleQuery(
+        {
+          sql: "SELECT COUNT(*) AS count FROM symbols",
+          format: "codeclimate",
+        },
+        projectRoot,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.format !== "codeclimate") return;
+      expect(JSON.parse(result.payload)).toEqual([]);
+      expect(stderr.mock.calls[0]?.[0]).toContain("codeclimate");
+    } finally {
+      stderr.mockRestore();
+    }
   });
 
   it("handleQueryRecipe format=codeclimate uses recipe check_name", () => {

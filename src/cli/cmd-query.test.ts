@@ -918,6 +918,51 @@ describe("parseQueryRest — --format flag", () => {
         expect(r.message).toContain("--summary");
       }
     });
+
+    it("rejects --format codeclimate + --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "codeclimate",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("codeclimate");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
+    it("rejects --format codeclimate + --baseline=<name>", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "codeclimate",
+        "--baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("codeclimate");
+        expect(r.message).toContain("--baseline");
+      }
+    });
+
+    it("rejects --format badge + --baseline on a recipe", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--baseline",
+        "-r",
+        "boundary-violations",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") expect(r.message).toContain("badge");
+    });
   });
 
   it("parses --badge-style json with --format badge", () => {

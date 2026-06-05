@@ -556,7 +556,7 @@ Issue-count presentation derived from locatable-row count only — not a triage 
 
 ### `codemap-badge/v1`
 
-JSON schema for structured badge output (`badge_style: "json"`). Fields: `schema`, `label` (`"codemap"`), `message`, `count`, `status` (`pass` when `count === 0`). Intended for CI gates (`jq -e '.status == "pass"'`) and future shields/HTTP `/badge` consumers.
+JSON schema for structured badge output (`badge_style: "json"`). Fields: `schema`, `label` (`"codemap"`), `message`, `count`, `status` (`pass` when `count === 0`). Intended for CI gates (`jq -e '.status == "pass"'`).
 
 ### SARIF
 

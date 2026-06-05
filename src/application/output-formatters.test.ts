@@ -92,6 +92,12 @@ describe("noLocatableFindingsWarning", () => {
       noLocatableFindingsWarning("mermaid", [{ count: 5 }]),
     ).toBeUndefined();
   });
+
+  it("suppresses warning when ci is true", () => {
+    expect(
+      noLocatableFindingsWarning("codeclimate", [{ count: 5 }], { ci: true }),
+    ).toBeUndefined();
+  });
 });
 
 describe("hasLocatableRows", () => {
@@ -328,6 +334,41 @@ describe("formatCodeClimate", () => {
       path: "a.ts",
       lines: { begin: 1 },
     });
+    expect(issues[0].fingerprint).toBe(
+      buildCodeClimateFingerprint(
+        "fan-in",
+        "a.ts",
+        undefined,
+        "fan-in",
+        issues[0].description,
+      ),
+    );
+  });
+
+  it("fingerprints differ when only line_start changes", () => {
+    const base = { file_path: "a.ts", name: "foo" };
+    const a = JSON.parse(
+      formatCodeClimate({
+        rows: [{ ...base, line_start: 1 }],
+        recipeId: "r",
+      }),
+    )[0].fingerprint;
+    const b = JSON.parse(
+      formatCodeClimate({
+        rows: [{ ...base, line_start: 2 }],
+        recipeId: "r",
+      }),
+    )[0].fingerprint;
+    expect(a).not.toBe(b);
+  });
+
+  it("treats line_start 0 as absent (begin and fingerprint use 1)", () => {
+    const out = formatCodeClimate({
+      rows: [{ file_path: "a.ts", line_start: 0, name: "foo" }],
+      recipeId: "r",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location.lines.begin).toBe(1);
   });
 
   it("emits begin for boundary-style rows without line_start", () => {

@@ -198,7 +198,8 @@ export function countLocatableFindings(
 
 /**
  * Stable GitLab Code Quality fingerprint from `(recipe_id, file_path,
- * line_start, check_name, row message)` per plan F.3 — SHA-256 truncated to 16 hex chars.
+ * emitted line, check_name, row message)` — SHA-256 truncated to 16 hex chars.
+ * Emitted line matches `location.lines.begin` (defaults to `1` without `line_start`).
  */
 export function buildCodeClimateFingerprint(
   recipeId: string | undefined,
@@ -207,9 +208,8 @@ export function buildCodeClimateFingerprint(
   checkName: string,
   rowSignature: string,
 ): string {
-  const line =
-    lineStart !== undefined && lineStart > 0 ? String(lineStart) : "";
-  const key = `${recipeId ?? "adhoc"}\0${filePath}\0${line}\0${checkName}\0${rowSignature}`;
+  const begin = lineStart !== undefined && lineStart > 0 ? lineStart : 1;
+  const key = `${recipeId ?? "adhoc"}\0${filePath}\0${String(begin)}\0${checkName}\0${rowSignature}`;
   return createHash("sha256").update(key).digest("hex").slice(0, 16);
 }
 
@@ -235,16 +235,17 @@ export function formatCodeClimate(opts: FormatOpts): string {
       path,
       lines: { begin },
     };
+    const description = buildMessageText(row);
     return [
       {
-        description: buildMessageText(row),
+        description,
         check_name: checkName,
         fingerprint: buildCodeClimateFingerprint(
           opts.recipeId,
           path,
           lineStart,
           checkName,
-          buildMessageText(row),
+          description,
         ),
         severity: "minor" as const,
         location,

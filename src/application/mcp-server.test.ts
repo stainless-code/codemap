@@ -517,6 +517,89 @@ describe("MCP server — query_recipe tool", () => {
     }
   });
 
+  it("returns Code Climate JSON with format=codeclimate", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", format: "codeclimate" },
+      });
+      const issues = readJson(r);
+      expect(Array.isArray(issues)).toBe(true);
+      expect(issues.length).toBeGreaterThan(0);
+      expect(issues[0]).toMatchObject({
+        check_name: "deprecated-symbols",
+        severity: "minor",
+        location: { path: "src/a.ts", lines: { begin: 1 } },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns badge markdown with format=badge", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", format: "badge" },
+      });
+      const text = (r as { content: { text: string }[] }).content[0]!.text;
+      expect(text).toBe("codemap: 1 issue");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns codemap-badge/v1 with format=badge badge_style=json", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: {
+          recipe: "deprecated-symbols",
+          format: "badge",
+          badge_style: "json",
+        },
+      });
+      const doc = readJson(r);
+      expect(doc).toMatchObject({
+        schema: "codemap-badge/v1",
+        count: 1,
+        status: "fail",
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("rejects format=codeclimate combined with summary", async () => {
     const { client, server } = await makeClient();
     try {

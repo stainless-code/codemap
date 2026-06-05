@@ -135,8 +135,9 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # Code Scanning; annotations for GH Actions ::notice lines; codeclimate for GitLab Code Quality;
 # badge for issue-count summaries; mermaid/diff for graph and edit previews. All
 # formatted outputs require a flat row list
-# (no --summary / --group-by / baseline). SARIF / annotations auto-detect file_path /
-# path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc). Mermaid
+# (no --summary / --group-by / baseline). SARIF / annotations / codeclimate / badge
+# auto-detect file_path / path / to_path / from_path; rule.id is codemap.<recipe-id>
+# (or codemap.adhoc). codeclimate/badge skip aggregate-only rows. Mermaid
 # requires {from, to, label?, kind?} rows and rejects unbounded inputs (>50 edges) with a
 # scope-suggestion error — alias columns via SELECT col AS "from", col2 AS "to".
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
