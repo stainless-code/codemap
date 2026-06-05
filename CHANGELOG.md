@@ -1,5 +1,15 @@
 # @stainless-code/codemap
 
+## 0.10.1
+
+### Patch Changes
+
+- [#169](https://github.com/stainless-code/codemap/pull/169) [`1632bdd`](https://github.com/stainless-code/codemap/commit/1632bdd5cff7560bf6d437f2c6bd940996d20bc3) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Refresh runtime and toolchain dependencies (oxc-parser, oxc-resolver, oxfmt, oxlint, @clack/prompts, tinyglobby, and related dev tooling) to latest compatible releases.
+
+- [#166](https://github.com/stainless-code/codemap/pull/166) [`4bfb067`](https://github.com/stainless-code/codemap/commit/4bfb06732d5ebdc607bdf73b0460cd25cc926d38) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `codemap rename` CLI alias for homonym-safe renames via `apply rename-preview` (`--define-in`, `--in-file`, `--kind`).
+
+- [#167](https://github.com/stainless-code/codemap/pull/167) [`231d6cc`](https://github.com/stainless-code/codemap/commit/231d6cc32d77fa94b69ded7394457dfc558060c8) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add MCP/HTTP transport parity for coverage ingest and query baselines: new `ingest_coverage` tool (CLI twin `codemap ingest-coverage --json`) and optional `baseline` param on `query` / `query_recipe` (same diff envelope as `codemap query --baseline`). Tool count 19 → 20.
+
 ## 0.10.0
 
 ### Minor Changes
