@@ -1,6 +1,6 @@
 # CI output formats (CodeClimate + badge) — plan
 
-> **Status:** open · **Priority:** P3 · **Effort:** S–M (~1–2 weeks)
+> **Status:** shipped · **PR:** [#172](https://github.com/stainless-code/codemap/pull/172) · delete this plan on merge (lift lives in `architecture.md` + `glossary.md`)
 >
 > **Motivator:** `query --format` ships `sarif`, `annotations`, and `mermaid`. GitLab Code Quality ingestion expects [Code Climate JSON](https://docs.gitlab.com/ee/ci/testing/code_quality.html); README / CI summary badges need a compact pass/fail or issue-count line. Both are **output modes** on existing recipe rows — not new analysis primitives.
 >
