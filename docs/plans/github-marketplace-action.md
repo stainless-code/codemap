@@ -5,6 +5,54 @@
 > **Motivator:** GitHub Marketplace is the dominant discovery + adoption surface for tools in the codebase-intelligence cohort, and codemap is currently absent from it. The in-repo Action closes the CI wrapper gap once it is tagged and listed; until then consumers can use the CLI surfaces directly or a local-path action ref.
 >
 > **Tier:** M effort. Wraps existing CLI surface; no schema changes, no new engines, no new transports. Only new substrate is the optional PR-comment writer (~one TS module).
+>
+> **Roadmap:** [§ Core substrate & platform](../roadmap.md#core-substrate--platform)
+
+---
+
+## Agent start here
+
+**Slices 1–4 are shipped in-tree.** Open work is **Slice 5 only** (git tags, Marketplace listing, sacrificial-repo smoke, harden `action-smoke`). Do not re-implement SARIF/`--ci`/composite steps unless fixing a regression. Follow [§ Slice 5 runbook](#slice-5-runbook-post-merge--anyone-can-pick-up) sequentially.
+
+### Key touchpoints
+
+| File                                                                                 | What to read                                                  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| [`action.yml`](../../action.yml)                                                     | Composite inputs + install/run/upload steps (shipped wrapper) |
+| [`src/cli/cmd-audit.ts`](../../src/cli/cmd-audit.ts)                                 | `--format sarif`, `--ci` (Slice 1a)                           |
+| [`src/cli/cmd-query.ts`](../../src/cli/cmd-query.ts)                                 | `query --ci` (Slice 1b)                                       |
+| [`src/cli/cmd-pr-comment.ts`](../../src/cli/cmd-pr-comment.ts)                       | PR summary renderer (Slice 3)                                 |
+| [`src/application/output-formatters.ts`](../../src/application/output-formatters.ts) | `formatSarif` audit delta mapping                             |
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)                         | `action-smoke` job (`continue-on-error` until v1 publishes)   |
+| [`.github/workflows/release.yml`](../../.github/workflows/release.yml)               | Changesets tag workflow — Slice 5 tags piggyback here         |
+
+### Architecture (shipped)
+
+```text
+GitHub workflow: uses: stainless-code/codemap@v1
+  → action.yml: detect PM → install @stainless-code/codemap → run audit --base --ci (PR only)
+  → SARIF upload (Code Scanning) + optional pr-comment step
+```
+
+### Tracer bullet (Slice 5)
+
+`MARKETPLACE.md` → tag `v1.0.0` + floating `v1` → listing metadata → sacrificial-repo smoke → flip `action-smoke` to blocking gate.
+
+### Out of scope (Slice 5)
+
+New Action inputs; `mode: aggregate` multi-recipe SARIF; audit verdict thresholds; Docker action image.
+
+### Verification
+
+```bash
+# Shipped surfaces (regression before tagging)
+bun test src/cli/cmd-audit.test.ts src/cli/cmd-query.test.ts
+bun src/index.ts audit --base origin/main --ci            # SARIF + exit code on additions
+bun src/index.ts query --recipe deprecated-symbols --ci
+
+# After v1 tag + listing
+# sacrificial public repo: uses: stainless-code/codemap@v1 on pull_request
+```
 
 ---
 

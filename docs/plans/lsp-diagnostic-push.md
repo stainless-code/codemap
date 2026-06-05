@@ -7,6 +7,49 @@
 > **Tier:** XL effort. Two paired components: `codemap-lsp` server + `codemap-vscode` extension. Server alone is incomplete — extension is required to consume the custom `codemap/analysisComplete` notification + render status bar / tree views.
 >
 > **Implementation libraries:** [`vscode-languageserver`](https://github.com/microsoft/vscode-languageserver-node) for the server side; [`vscode-languageclient`](https://github.com/microsoft/vscode-languageserver-node) for the paired VSCode extension. Both Microsoft-official LSP libraries on top of which the codemap-specific diagnostic-push behavior is built.
+>
+> **Roadmap:** [§ Core substrate & platform](../roadmap.md#core-substrate--platform) · soft ordering after [C.9](./c9-plugin-layer.md)
+
+---
+
+## Agent start here
+
+**Nothing in-tree yet** — start with **Slice 1** only: `codemap-lsp` stdio server + **one** recipe (`untested-and-dead`) → `Diagnostic[]` via new `--format lsp-diagnostic` formatter. Resolve **Q1 repo structure** first (default bias: **Option 1 stay flat** — add `lsp/` + `editors/vscode/` without monorepo conversion per [§ Repo-structure tradeoffs](#repo-structure-tradeoffs-canonical-home-for-the-monorepo-vs-flat-decision)). Do **not** implement `definition` / `references` handlers (L.1).
+
+### Key touchpoints
+
+| File                                                                                       | What to read                                                         |
+| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| [`src/application/output-formatters.ts`](../../src/application/output-formatters.ts)       | Add `formatLspDiagnostic` beside `formatSarif` / `formatAnnotations` |
+| [`src/application/query-engine.ts`](../../src/application/query-engine.ts)                 | Recipe row execution — server reuses, no SQL in LSP layer            |
+| [`src/application/show-engine.ts`](../../src/application/show-engine.ts)                   | Hover symbol lookup                                                  |
+| [`src/application/watcher.ts`](../../src/application/watcher.ts)                           | File-change → reindex → republish diagnostics                        |
+| [`src/application/recipes-loader.ts`](../../src/application/recipes-loader.ts)             | Recipe ids for diagnostic code mapping                               |
+| [`templates/recipes/untested-and-dead.sql`](../../templates/recipes/untested-and-dead.sql) | Slice 1 diagnostic source                                            |
+| [`package.json`](../../package.json)                                                       | Add `codemap-lsp` bin entry (flat layout)                            |
+
+### Tracer bullet (Slice 1)
+
+`formatLspDiagnostic` + minimal `lsp/server.ts` → run `untested-and-dead` → push diagnostics for one open file. Manual VSCode `launch.json` attaches to stdio — **no extension yet**. Verify squiggle on fixture dead export.
+
+### Out of scope (Slice 1)
+
+VSCode extension package; six-recipe bundle; marketplace publish; `textDocument/definition` / `references`; new CLI verdict verb.
+
+### Verification
+
+```bash
+# After formatLspDiagnostic lands
+bun test src/application/output-formatters.test.ts
+bun src/index.ts query --recipe untested-and-dead --format lsp-diagnostic   # CLI parity first
+
+# After codemap-lsp binary lands (Slice 1)
+# integration test: stdio LSP client sends textDocument/diagnostic → assert Diagnostic[] shape
+
+# Per-slice: bun run typecheck on touched src/ + lsp/
+```
+
+Extension E2E (`vscode-test`) starts at **Slice 2**. Full recipe set at **Slice 3**.
 
 ---
 

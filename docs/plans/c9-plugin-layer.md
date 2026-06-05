@@ -5,6 +5,51 @@
 > **Motivator:** **closed-dead-subgraph case** — N-file packs where every file imports a sibling (non-zero `dependencies` fan-in for all) but none is reachable from a real entry point. Today's `untested-and-dead` recipe false-positives Next.js `app/**/page.tsx` files for the same reason: framework entry points aren't recognized as live without per-framework awareness. This plan proposes the smallest plugin contract that closes the gap.
 >
 > **Tier:** XL effort. Ships last in the impact-vs-cadence sequence — parallel iteration unblocks impl before the slot opens.
+>
+> **Roadmap:** [§ Core substrate & platform](../roadmap.md#core-substrate--platform)
+
+---
+
+## Agent start here
+
+Start with **Slice 1**: `files.is_entry` column + hard-coded Next.js-style glob in a **test fixture only** — no plugin discovery yet. Prove reachability predicate via SQL before loader/contract work. Ships **last** in cadence but parallel design iteration is fine.
+
+### Key touchpoints
+
+| File                                                                                         | What to read                                         |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [`src/db.ts`](../../src/db.ts)                                                               | `files` DDL — add `is_entry` (Q3)                    |
+| [`src/application/index-engine.ts`](../../src/application/index-engine.ts)                   | Post-`files` insert hook for annotations             |
+| [`src/config.ts`](../../src/config.ts)                                                       | Future `plugins:` config surface (Q2)                |
+| [`templates/recipes/untested-and-dead.sql`](../../templates/recipes/untested-and-dead.sql)   | Reachability false-positive class to fix             |
+| [`templates/recipes/unimported-exports.sql`](../../templates/recipes/unimported-exports.sql) | Second live-predicate recipe                         |
+| [`docs/plans/lsp-diagnostic-push.md`](./lsp-diagnostic-push.md)                              | Complementary consumer — same FP class on squigglies |
+
+### Architecture
+
+```text
+plugin loader (Slice 3) → (glob, is_entry) annotations
+index hook → files.is_entry = 1 for matched paths
+reachability sweep (Slice 2) → dead-files-by-reachability recipe
+live-predicate recipes JOIN is_entry / reachable CTE
+```
+
+### Tracer bullet (Slice 1)
+
+`is_entry` column + migration; fixture sets one `app/page.tsx` entry; `SELECT path FROM files WHERE is_entry = 1` returns expected row. **No** plugin JSON contract in slice 1.
+
+### Out of scope (Slice 1)
+
+Plugin npm packages; edge injection; verdict CLI; changes to non-reachability recipes.
+
+### Verification
+
+```bash
+bun run typecheck                              # db.ts + index hook
+bun src/index.ts --files fixtures/golden/c9-fixture/…   # after fixture lands
+bun src/index.ts query "SELECT path, is_entry FROM files" --json
+bun test scripts/query-golden-coverage-matrix.test.mjs    # after Slice 2 recipe
+```
 
 ---
 
