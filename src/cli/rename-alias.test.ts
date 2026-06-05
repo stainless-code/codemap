@@ -161,6 +161,18 @@ describe("resolveRenameAlias", () => {
       renameError(["rename", "--params", "old=foo", "--dry-run"]),
     ).toContain("requires <old> and <new>");
   });
+
+  it("errors on stray positional after complete --params", () => {
+    expect(
+      renameError([
+        "rename",
+        "--params",
+        "old=foo,new=bar",
+        "--dry-run",
+        "stray",
+      ]),
+    ).toMatch(/unexpected argument "stray"/);
+  });
 });
 
 describe("formatParamsCli", () => {
