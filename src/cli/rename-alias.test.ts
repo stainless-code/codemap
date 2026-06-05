@@ -100,6 +100,60 @@ describe("resolveRenameAlias", () => {
     expect(resolveRenameAlias(["rename", "--help"])).toBeNull();
   });
 
+  it("does not treat a symbol named --help as help when it is not first", () => {
+    expect(rewrite(["rename", "--help", "Bar", "--dry-run"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=Bar,old=--help",
+      "--dry-run",
+    ]);
+  });
+
+  it("accepts equals-form --params", () => {
+    expect(
+      rewrite(["rename", "--params=old=foo,new=bar", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=bar,old=foo",
+      "--dry-run",
+    ]);
+  });
+
+  it("errors when positional old/new conflicts with --params old/new", () => {
+    expect(
+      renameError([
+        "rename",
+        "--params",
+        "old=foo,new=bar",
+        "helper",
+        "worker",
+      ]),
+    ).toContain("cannot mix --params old=/new= with positional");
+  });
+
+  it("passes equals-form --commit through to apply", () => {
+    expect(
+      rewrite(["rename", "a", "b", "--yes", "--commit=chore: rename a→b"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--yes",
+      "--commit",
+      "chore: rename a→b",
+    ]);
+  });
+
+  it("rejects empty old/new in --params", () => {
+    expect(renameError(["rename", "--params", "old=,new=bar"])).toContain(
+      "must be non-empty",
+    );
+  });
+
   it("preserves missing --params operand for downstream apply parser", () => {
     expect(rewrite(["rename", "--params"])).toEqual([
       "apply",

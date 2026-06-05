@@ -2,7 +2,7 @@
 
 Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
-**Outcome aliases:** **`codemap dead-code`** · **`deprecated`** · **`boundaries`** · **`hotspots`** · **`coverage-gaps`** — thin wrappers over `query --recipe <id>`. Every `query` flag passes through (`--json`, `--format sarif`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Run **`codemap <alias> --help`** for the wrapped recipe id. Capped at 5 to avoid sprawl.
+**Outcome aliases:** **`codemap dead-code`** · **`deprecated`** · **`boundaries`** · **`hotspots`** · **`coverage-gaps`** — thin wrappers over `query --recipe <id>`. Every `query` flag passes through (`--json`, `--format sarif`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Run **`codemap <alias> --help`** for the wrapped recipe id. Capped at 5 to avoid sprawl. **Write alias (outside the cap):** **`codemap rename`** → **`apply rename-preview`** (homonym-safe via `--define-in` / `define_in` in params).
 
 **Suppressions (opt-in):** `// codemap-ignore-next-line <recipe-id>` and `// codemap-ignore-file <recipe-id>` (also `#`, `--`, `<!--`, `/*` leaders) get parsed into the `suppressions(file_path, line_number, recipe_id)` table. Recipe authors opt in by `LEFT JOIN`-ing on `(file_path, recipe_id)` with `line_number = 0` for file scope or `line_number = <row's line>` for next-line. Ad-hoc SQL is unaffected. No severity, no suppression-by-default, no universal-honor — consumer-chosen substrate. Today's opt-in recipes: `untested-and-dead` (line + file), `unimported-exports` (file only — exports has no `line_number`).
 

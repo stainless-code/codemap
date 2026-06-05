@@ -61,7 +61,7 @@ export async function main(): Promise<void> {
   if (rest[0] === "rename") {
     const { printRenameAliasHelp, resolveRenameAlias } =
       await import("./rename-alias.js");
-    if (rest.includes("--help") || rest.includes("-h")) {
+    if ((rest[1] === "--help" || rest[1] === "-h") && rest.length === 2) {
       printRenameAliasHelp();
       return;
     }

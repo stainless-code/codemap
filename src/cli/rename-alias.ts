@@ -3,6 +3,23 @@ import type { RecipeParamValues } from "../application/recipe-params.js";
 
 const RENAME_RECIPE_ID = "rename-preview";
 
+const APPLY_BOOLEAN_FLAGS = new Set([
+  "--dry-run",
+  "--yes",
+  "--force",
+  "--json",
+  "--until-empty",
+]);
+
+function isApplyPassthroughFlag(token: string): boolean {
+  if (APPLY_BOOLEAN_FLAGS.has(token)) return true;
+  if (token === "--params" || token.startsWith("--params=")) return true;
+  if (token === "--max-passes" || token.startsWith("--max-passes="))
+    return true;
+  if (token === "--commit" || token.startsWith("--commit=")) return true;
+  return false;
+}
+
 /** Serialize a param map for `codemap apply --params` (stable key order). */
 export function formatParamsCli(params: RecipeParamValues): string {
   return Object.keys(params)
@@ -29,18 +46,27 @@ function splitPassthrough(tokens: string[]): {
   let i = 0;
   while (i < tokens.length) {
     const a = tokens[i]!;
-    if (a === "--max-passes" || a === "--commit") {
-      const next = tokens[i + 1];
-      if (next === undefined) {
-        applyTail.push(a);
-        i++;
-        continue;
+    const maxPasses = readFlagOperand("--max-passes", a, tokens, i);
+    if (maxPasses !== null) {
+      if (maxPasses.value !== undefined) {
+        applyTail.push("--max-passes", maxPasses.value);
+      } else {
+        applyTail.push("--max-passes");
       }
-      applyTail.push(a, next);
-      i += 2;
+      i = maxPasses.nextIndex;
       continue;
     }
-    if (a.startsWith("-")) {
+    const commit = readFlagOperand("--commit", a, tokens, i);
+    if (commit !== null) {
+      if (commit.value !== undefined) {
+        applyTail.push("--commit", commit.value);
+      } else {
+        applyTail.push("--commit");
+      }
+      i = commit.nextIndex;
+      continue;
+    }
+    if (isApplyPassthroughFlag(a)) {
       applyTail.push(a);
       i++;
       continue;
@@ -114,7 +140,7 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
   if (rest[0] !== "rename") return null;
 
   const tail = rest.slice(1);
-  if (tail.includes("--help") || tail.includes("-h")) {
+  if ((tail[0] === "--help" || tail[0] === "-h") && tail.length === 1) {
     return null;
   }
 
@@ -124,6 +150,17 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
 
   while (i < tail.length) {
     const a = tail[i]!;
+    if (a.startsWith("--params=")) {
+      const value = a.slice("--params=".length);
+      if (value === "" || value.startsWith("-")) {
+        return renameError(
+          'codemap rename: "--params" requires a value (old=…,new=…).',
+        );
+      }
+      params = mergeParams(params, parseParamsCli(value));
+      i++;
+      continue;
+    }
     if (a === "--params") {
       const next = tail[i + 1];
       if (next === undefined || next.startsWith("-")) {
@@ -188,7 +225,25 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     );
   }
 
+  for (const p of positionals) {
+    if (p.startsWith("old=") || p.startsWith("new=")) {
+      return renameError(
+        "codemap rename: use --params old=…,new=… instead of positional key=value tokens.",
+      );
+    }
+  }
+
+  const paramsHadOldNew =
+    params !== undefined &&
+    params.old !== undefined &&
+    params.new !== undefined;
+
   if (positionals.length === 2) {
+    if (paramsHadOldNew) {
+      return renameError(
+        "codemap rename: cannot mix --params old=/new= with positional <old> <new>.",
+      );
+    }
     params = mergeParams(params, {
       old: positionals[0]!,
       new: positionals[1]!,
@@ -199,6 +254,16 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     params !== undefined &&
     params.old !== undefined &&
     params.new !== undefined;
+
+  if (hasOldNew && params !== undefined) {
+    const oldStr = String(params.old);
+    const newStr = String(params.new);
+    if (oldStr === "" || newStr === "") {
+      return renameError(
+        "codemap rename: old and new must be non-empty strings.",
+      );
+    }
+  }
 
   if (positionals.length === 1) {
     if (hasOldNew) {
