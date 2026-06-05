@@ -58,6 +58,24 @@ export async function main(): Promise<void> {
     if (rewritten) rest.splice(0, rest.length, ...rewritten);
   }
 
+  if (rest[0] === "rename") {
+    const { printRenameAliasHelp, resolveRenameAlias } =
+      await import("./rename-alias.js");
+    if ((rest[1] === "--help" || rest[1] === "-h") && rest.length === 2) {
+      printRenameAliasHelp();
+      return;
+    }
+    const renameResult = resolveRenameAlias(rest);
+    if (renameResult?.kind === "error") {
+      console.error(renameResult.message);
+      process.exitCode = 1;
+      return;
+    }
+    if (renameResult?.kind === "rewrite") {
+      rest.splice(0, rest.length, ...renameResult.argv);
+    }
+  }
+
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
       console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--mcp] [--targets <ids>] [--link-mode symlink|copy] [--git-hooks] [--no-git-hooks]

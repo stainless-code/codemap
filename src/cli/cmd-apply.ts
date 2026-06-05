@@ -150,6 +150,9 @@ export function parseApplyRest(rest: string[]):
     }
     if (a === "--max-passes") {
       const next = rest[i + 1];
+      if (next !== undefined && next.startsWith("-")) {
+        continue;
+      }
       if (next === undefined || !/^\d+$/.test(next)) {
         return {
           kind: "error",
@@ -174,8 +177,10 @@ export function parseApplyRest(rest: string[]):
           message: `codemap apply: "--commit" requires a message string.`,
         };
       }
-      commitMessage = next;
-      i++;
+      if (!next.startsWith("-")) {
+        commitMessage = next;
+        i++;
+      }
       continue;
     }
     if (a === "--params") {

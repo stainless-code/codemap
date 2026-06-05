@@ -2,7 +2,7 @@
 
 Replace placeholders (`'...'`) with your module path, file glob, or symbol name.
 
-**Outcome aliases:** **`codemap dead-code`** · **`deprecated`** · **`boundaries`** · **`hotspots`** · **`coverage-gaps`** — thin wrappers over `query --recipe <id>`. Every `query` flag passes through (`--json`, `--format sarif`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Run **`codemap <alias> --help`** for the wrapped recipe id. Capped at 5 to avoid sprawl.
+**Outcome aliases:** **`codemap dead-code`** · **`deprecated`** · **`boundaries`** · **`hotspots`** · **`coverage-gaps`** — thin wrappers over `query --recipe <id>`. Every `query` flag passes through (`--json`, `--format sarif`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Run **`codemap <alias> --help`** for the wrapped recipe id. Capped at 5 to avoid sprawl. **Write alias (outside the cap):** **`codemap rename`** → **`apply rename-preview`** (homonym-safe via `--define-in` / `define_in` in params).
 
 **Suppressions (opt-in):** `// codemap-ignore-next-line <recipe-id>` and `// codemap-ignore-file <recipe-id>` (also `#`, `--`, `<!--`, `/*` leaders) get parsed into the `suppressions(file_path, line_number, recipe_id)` table. Recipe authors opt in by `LEFT JOIN`-ing on `(file_path, recipe_id)` with `line_number = 0` for file scope or `line_number = <row's line>` for next-line. Ad-hoc SQL is unaffected. No severity, no suppression-by-default, no universal-honor — consumer-chosen substrate. Today's opt-in recipes: `untested-and-dead` (line + file), `unimported-exports` (file only — exports has no `line_number`).
 
@@ -64,7 +64,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 4. **Commit (optional)** — CLI `--commit "<msg>"` or MCP `commit_message` on recipe `apply` / `apply_diff_input` after a clean apply; with `until_empty`, only when `terminated_by` is `empty`.
 5. **Agent rows / diffs** — when you already have hunks (codemod output), skip recipe policy: `apply_rows` / `apply_diff_input` or CLI `codemap apply --rows -` / `--diff-input` (both need `--yes` / `yes: true`).
 
-**Homonym renames:** `rename-preview` unions every `symbols.name` match unless you pass `define_in=<definition file_path>` (same anchor as `find-symbol-references`). `in_file` only narrows output row paths — it does not scope the target symbol.
+**Homonym renames:** `rename-preview` unions every `symbols.name` match unless you pass `define_in=<definition file_path>` (same anchor as `find-symbol-references`). `in_file` only narrows output row paths — it does not scope the target symbol. CLI shorthand: `codemap rename <old> <new> [--define-in <file_path>] [--in-file <prefix>] [--kind <k>]` (alias → `apply rename-preview`).
 
 **diff-json preview:** each hunk includes `ambiguity_count` (extra `before_pattern` matches on the line); apply rewrites the first match only.
 
