@@ -84,6 +84,14 @@ describe("resolveRenameAlias", () => {
   it("returns null when help is requested", () => {
     expect(resolveRenameAlias(["rename", "--help"])).toBeNull();
   });
+
+  it("preserves missing --params operand for downstream apply parser", () => {
+    expect(resolveRenameAlias(["rename", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+    ]);
+  });
 });
 
 describe("formatParamsCli", () => {

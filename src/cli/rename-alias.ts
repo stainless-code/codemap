@@ -32,7 +32,7 @@ export function resolveRenameAlias(rest: string[]): string[] | null {
     if (a === "--params") {
       const next = tail[i + 1];
       if (next === undefined) {
-        return ["apply", RENAME_RECIPE_ID, "--params", ""];
+        return ["apply", RENAME_RECIPE_ID, "--params"];
       }
       params = mergeParams(params, parseParamsCli(next));
       i += 2;
