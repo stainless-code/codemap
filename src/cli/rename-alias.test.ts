@@ -1,0 +1,324 @@
+import { describe, expect, it } from "bun:test";
+
+import { parseApplyRest } from "./cmd-apply.js";
+import { formatParamsCli, resolveRenameAlias } from "./rename-alias.js";
+
+function rewrite(rest: string[]): string[] | undefined {
+  const r = resolveRenameAlias(rest);
+  if (r?.kind === "rewrite") return r.argv;
+  return undefined;
+}
+
+function renameError(rest: string[]): string | undefined {
+  const r = resolveRenameAlias(rest);
+  if (r?.kind === "error") return r.message;
+  return undefined;
+}
+
+describe("resolveRenameAlias", () => {
+  it("rewrites positional old/new with scoped flags", () => {
+    expect(
+      rewrite([
+        "rename",
+        "helper",
+        "worker",
+        "--define-in",
+        "src/a.ts",
+        "--yes",
+      ]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "define_in=src/a.ts,new=worker,old=helper",
+      "--yes",
+    ]);
+  });
+
+  it("rewrites --params form", () => {
+    expect(
+      rewrite([
+        "rename",
+        "--params",
+        "old=foo,new=bar,define_in=src/x.ts",
+        "--dry-run",
+      ]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "define_in=src/x.ts,new=bar,old=foo",
+      "--dry-run",
+    ]);
+  });
+
+  it("merges --params with positional when both present", () => {
+    expect(
+      rewrite(["rename", "a", "b", "--params", "kind=function", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "kind=function,new=b,old=a",
+      "--dry-run",
+    ]);
+  });
+
+  it("maps --in-file and --kind to recipe params", () => {
+    expect(
+      rewrite([
+        "rename",
+        "Foo",
+        "Bar",
+        "--in-file",
+        "src/lib/",
+        "--kind",
+        "function",
+      ]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "in_file=src/lib/,kind=function,new=Bar,old=Foo",
+    ]);
+  });
+
+  it("allows apply flags before positional old/new", () => {
+    expect(rewrite(["rename", "--dry-run", "helper", "worker"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("returns null for non-rename commands", () => {
+    expect(resolveRenameAlias(["apply", "rename-preview"])).toBeNull();
+  });
+
+  it("returns null when help is requested", () => {
+    expect(resolveRenameAlias(["rename", "--help"])).toBeNull();
+    expect(resolveRenameAlias(["rename", "-h"])).toBeNull();
+  });
+
+  it("does not treat a symbol named --help as help when it is not first", () => {
+    expect(rewrite(["rename", "--help", "Bar", "--dry-run"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=Bar,old=--help",
+      "--dry-run",
+    ]);
+  });
+
+  it("accepts equals-form --params", () => {
+    expect(
+      rewrite(["rename", "--params=old=foo,new=bar", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=bar,old=foo",
+      "--dry-run",
+    ]);
+  });
+
+  it("errors when positional old/new conflicts with --params old/new", () => {
+    expect(
+      renameError([
+        "rename",
+        "--params",
+        "old=foo,new=bar",
+        "helper",
+        "worker",
+      ]),
+    ).toContain("cannot mix --params old=/new= with positional");
+  });
+
+  it("passes equals-form --commit through to apply", () => {
+    expect(
+      rewrite(["rename", "a", "b", "--yes", "--commit=chore: rename a→b"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--yes",
+      "--commit",
+      "chore: rename a→b",
+    ]);
+  });
+
+  it("passes space-separated --commit through to apply", () => {
+    expect(
+      rewrite(["rename", "a", "b", "--commit", "chore: rename a→b", "--yes"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--commit",
+      "chore: rename a→b",
+      "--yes",
+    ]);
+  });
+
+  it("does not treat a following flag as --commit operand", () => {
+    const argv = rewrite(["rename", "a", "b", "--commit", "--dry-run"]);
+    expect(argv).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--commit",
+      "--dry-run",
+    ]);
+    const parsed = parseApplyRest(argv!);
+    expect(parsed.kind).toBe("run");
+    if (parsed.kind === "run") {
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.commitMessage).toBeUndefined();
+    }
+  });
+
+  it("rejects empty old/new in --params", () => {
+    expect(renameError(["rename", "--params", "old=,new=bar"])).toContain(
+      "must be non-empty",
+    );
+  });
+
+  it("preserves missing --params operand for downstream apply parser", () => {
+    expect(rewrite(["rename", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+    ]);
+  });
+
+  it("drops redundant bare --params when old/new are already bound", () => {
+    expect(
+      rewrite(["rename", "--params", "old=foo,new=bar", "--params"]),
+    ).toEqual(["apply", "rename-preview", "--params", "new=bar,old=foo"]);
+    expect(rewrite(["rename", "helper", "worker", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+    ]);
+    expect(
+      rewrite(["rename", "helper", "worker", "--params", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("delegates incomplete old/new with bare --params in apply tail", () => {
+    expect(rewrite(["rename", "--dry-run", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--dry-run",
+      "--params",
+    ]);
+  });
+
+  it("does not treat a following flag as --params operand", () => {
+    expect(
+      rewrite(["rename", "helper", "worker", "--params", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("errors on missing --define-in operand", () => {
+    expect(renameError(["rename", "a", "b", "--define-in"])).toContain(
+      '"--define-in" requires a file path',
+    );
+  });
+
+  it("errors on missing --in-file operand", () => {
+    expect(renameError(["rename", "a", "b", "--in-file"])).toContain(
+      '"--in-file" requires a path prefix',
+    );
+  });
+
+  it("errors on missing --kind operand", () => {
+    expect(renameError(["rename", "a", "b", "--kind"])).toContain(
+      '"--kind" requires a symbol kind',
+    );
+  });
+
+  it("errors when a scoped flag is followed by another flag", () => {
+    expect(
+      renameError(["rename", "a", "b", "--define-in", "--dry-run"]),
+    ).toContain('"--define-in" requires a file path');
+  });
+
+  it("errors on bare rename with no old/new", () => {
+    expect(renameError(["rename"])).toContain("requires <old> and <new>");
+  });
+
+  it("errors on a single positional", () => {
+    expect(renameError(["rename", "helper"])).toContain(
+      "requires <old> and <new>",
+    );
+  });
+
+  it("errors on a third positional", () => {
+    expect(renameError(["rename", "a", "b", "c"])).toMatch(
+      /unexpected argument "c"/,
+    );
+  });
+
+  it("accepts equals-form scoped flags", () => {
+    expect(
+      rewrite([
+        "rename",
+        "helper",
+        "worker",
+        "--define-in=src/a.ts",
+        "--dry-run",
+      ]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "define_in=src/a.ts,new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("errors on partial old/new via --params", () => {
+    expect(
+      renameError(["rename", "--params", "old=foo", "--dry-run"]),
+    ).toContain("requires <old> and <new>");
+  });
+
+  it("errors on stray positional after complete --params", () => {
+    expect(
+      renameError([
+        "rename",
+        "--params",
+        "old=foo,new=bar",
+        "--dry-run",
+        "stray",
+      ]),
+    ).toMatch(/unexpected argument "stray"/);
+  });
+});
+
+describe("formatParamsCli", () => {
+  it("serializes key=value pairs", () => {
+    expect(formatParamsCli({ old: "a", new: "b", define_in: "src/x.ts" })).toBe(
+      "define_in=src/x.ts,new=b,old=a",
+    );
+  });
+});

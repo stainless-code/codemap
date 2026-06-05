@@ -33,20 +33,20 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 ### Apply-shaped recipes (diff row contract)
 
-| Recipe id               | Golden scenario(s)                                                           | CLI e2e (`cmd-apply.test.ts`)                |
-| ----------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
-| `rename-preview`        | `rename-preview`, `rename-preview-product-card`, `rename-preview-jsx-member` | dry-run, `--yes` disk apply, member JSX tag  |
-| `migrate-import-source` | `migrate-import-source`                                                      | dry-run                                      |
-| `replace-marker-kind`   | `replace-marker-kind`                                                        | `--yes` disk apply (temp project)            |
-| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                       | — (query golden only; writes need `--force`) |
-| `stale-imports`         | `stale-imports`, `stale-imports-multi-specifier`                             | dry-run + sole/multi `--force --yes` apply   |
-| `migrate-jsx-prop`      | `migrate-jsx-prop-product-card`                                              | `--force --yes` attribute rename on disk     |
-| `migrate-deprecated`    | `migrate-deprecated`                                                         | dry-run + `--force --yes` disk apply         |
-| `deprecated-usages`     | `deprecated-usages`                                                          | `--force --yes` disk apply (JSDoc line)      |
+| Recipe id               | Golden scenario(s)                                                                                                                               | CLI e2e (`cmd-apply.test.ts`)                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `rename-preview`        | `rename-preview`, `rename-preview-product-card`, `rename-preview-jsx-member`, `rename-preview-homonym-scoped`, `rename-preview-homonym-unscoped` | dry-run, `--yes` disk apply, member JSX tag, homonym `define_in` scoped/unscoped |
+| `migrate-import-source` | `migrate-import-source`                                                                                                                          | dry-run                                                                          |
+| `replace-marker-kind`   | `replace-marker-kind`                                                                                                                            | `--yes` disk apply (temp project)                                                |
+| `add-jsdoc-deprecated`  | `add-jsdoc-deprecated`                                                                                                                           | — (query golden only; writes need `--force`)                                     |
+| `stale-imports`         | `stale-imports`, `stale-imports-multi-specifier`                                                                                                 | dry-run + sole/multi `--force --yes` apply                                       |
+| `migrate-jsx-prop`      | `migrate-jsx-prop-product-card`                                                                                                                  | `--force --yes` attribute rename on disk                                         |
+| `migrate-deprecated`    | `migrate-deprecated`                                                                                                                             | dry-run + `--force --yes` disk apply                                             |
+| `deprecated-usages`     | `deprecated-usages`                                                                                                                              | `--force --yes` disk apply (JSDoc line)                                          |
 
 **Read→apply (C.6):** `deprecated-symbols`, `find-symbol-references`, `find-symbol-definitions`, `find-jsx-usages`, `find-import-sites`, `markers-by-kind` frontmatter `actions[].command` → apply twins; `cmd-query.test.ts` rendered-command cases.
 
-**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. **`define_in`** homonym scope: golden `rename-preview-homonym-scoped` + `cmd-apply.test.ts`. MCP/HTTP: `apply` / `apply_rows` / `apply_diff_input` e2e in `mcp-server.test.ts` and `http-server.test.ts`; transport writes/consent/fixpoint in `tool-handlers.test.ts`.
+**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. **`define_in`** homonym scope: goldens `rename-preview-homonym-scoped` / `rename-preview-homonym-unscoped` + `cmd-apply.test.ts`; **`codemap rename`** alias: `rename-alias.test.ts` + homonym e2e in `cmd-apply.test.ts`. MCP/HTTP: `apply` / `apply_rows` / `apply_diff_input` e2e in `mcp-server.test.ts` and `http-server.test.ts`; transport writes/consent/fixpoint in `tool-handlers.test.ts`.
 
 ---
 

@@ -73,7 +73,8 @@ Affected tests (reverse dep walk → test files to run):
 Apply (substrate-shaped fix executor; diff-json row contract):
   codemap apply <recipe-id> [--params k=v[,k=v]] [--dry-run] [--yes] [--json]
   codemap apply --rows -|<file.json>   codemap apply --diff-input <file>
-  (see codemap apply --help for --force, --until-empty, --commit)
+  codemap rename <old> <new> [--define-in <file_path>] [--in-file <prefix>] [--kind <k>] [apply flags...]   # or: rename --params old=…,new=… — alias → apply rename-preview
+  (see codemap apply --help for --force, --until-empty, --commit; codemap rename --help)
 
 Coverage ingest (Istanbul JSON or LCOV from any test runner):
   codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected
