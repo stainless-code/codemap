@@ -198,7 +198,7 @@ export function countLocatableFindings(
 
 /**
  * Stable GitLab Code Quality fingerprint from `(recipe_id, file_path,
- * line_start, check_name)` per plan F.3 — SHA-256 truncated to 16 hex chars.
+ * line_start, check_name, row message)` per plan F.3 — SHA-256 truncated to 16 hex chars.
  */
 export function buildCodeClimateFingerprint(
   recipeId: string | undefined,

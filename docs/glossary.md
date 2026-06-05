@@ -548,7 +548,7 @@ Long-running HTTP server exposing the same tool taxonomy as `codemap mcp` over `
 
 ### Code Climate format (`codeclimate`)
 
-GitLab [Code Quality](https://docs.gitlab.com/ee/ci/testing/code_quality.html) JSON array emitted by `codemap query --format codeclimate` (MCP/HTTP: `format: "codeclimate"`). One object per locatable row (`file_path` / `path` / `to_path` / `from_path` + optional `line_start`); flat `severity: "minor"` in v1; stable SHA-256 fingerprints for dedup. Aggregate recipes emit `[]` + stderr warning. Incompatible with `--summary` / `--group-by` / baseline.
+GitLab [Code Quality](https://docs.gitlab.com/ee/ci/testing/code_quality.html) JSON array emitted by `codemap query --format codeclimate` (MCP/HTTP: `format: "codeclimate"`). One object per locatable row (`file_path` / `path` / `to_path` / `from_path` + optional `line_start`); flat `severity: "minor"` in v1; `location.lines.begin` defaults to `1` without `line_start`; stable SHA-256 fingerprints (recipe + path + line + check name + row message) for GitLab dedup. Aggregate recipes emit `[]` + stderr warning. Incompatible with `--summary` / `--group-by` / baseline.
 
 ### Badge format (`badge`)
 
