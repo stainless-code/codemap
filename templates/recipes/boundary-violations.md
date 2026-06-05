@@ -35,9 +35,11 @@ The shape lives in Codemap's Zod config schema (the `boundaries` array on the us
 codemap query --recipe boundary-violations --json
 codemap query --recipe boundary-violations --format sarif > findings.sarif
 codemap query --recipe boundary-violations --format annotations
+codemap query --recipe boundary-violations --format codeclimate > gl-code-quality-report.json
+codemap query --recipe boundary-violations --format badge
 ```
 
-SARIF / annotations consume the `file_path` location column (the `from_path` of the violating import) and emit one finding per row. SARIF rule id is `codemap.boundary-violations` (the per-rule `name` is in the row body via the `rule_name` field).
+SARIF / annotations / codeclimate / badge consume the `file_path` location column (the `from_path` of the violating import) and emit one finding per row. Code Climate uses `location.lines.begin: 1` when the recipe has no `line_start` column. SARIF rule id is `codemap.boundary-violations` (the per-rule `name` is in the row body via the `rule_name` field).
 
 ## What v1 covers
 

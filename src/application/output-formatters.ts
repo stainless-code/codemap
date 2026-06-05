@@ -205,10 +205,11 @@ export function buildCodeClimateFingerprint(
   filePath: string,
   lineStart: number | undefined,
   checkName: string,
+  rowSignature: string,
 ): string {
   const line =
     lineStart !== undefined && lineStart > 0 ? String(lineStart) : "";
-  const key = `${recipeId ?? "adhoc"}\0${filePath}\0${line}\0${checkName}`;
+  const key = `${recipeId ?? "adhoc"}\0${filePath}\0${line}\0${checkName}\0${rowSignature}`;
   return createHash("sha256").update(key).digest("hex").slice(0, 16);
 }
 
@@ -243,6 +244,7 @@ export function formatCodeClimate(opts: FormatOpts): string {
           path,
           lineStart,
           checkName,
+          buildMessageText(row),
         ),
         severity: "minor" as const,
         location,

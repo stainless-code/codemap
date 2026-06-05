@@ -302,6 +302,7 @@ describe("formatCodeClimate", () => {
         "src/ui/App.tsx",
         3,
         "boundary-violations",
+        "rule_name=ui-cant-touch-server",
       ),
     );
   });
@@ -346,11 +347,31 @@ describe("formatCodeClimate", () => {
 
   it("buildCodeClimateFingerprint uses adhoc when recipeId omitted", () => {
     expect(
-      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc"),
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"),
     ).toHaveLength(16);
-    expect(buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc")).toBe(
-      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc"),
-    );
+    expect(
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"),
+    ).toBe(buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"));
+  });
+
+  it("fingerprints differ for same-file boundary rows without line_start", () => {
+    const rowA = {
+      file_path: "src/ui/App.tsx",
+      to_path: "src/server/a.ts",
+      rule_name: "rule-a",
+    };
+    const rowB = {
+      file_path: "src/ui/App.tsx",
+      to_path: "src/server/b.ts",
+      rule_name: "rule-b",
+    };
+    const fpA = JSON.parse(
+      formatCodeClimate({ rows: [rowA], recipeId: "boundary-violations" }),
+    )[0].fingerprint;
+    const fpB = JSON.parse(
+      formatCodeClimate({ rows: [rowB], recipeId: "boundary-violations" }),
+    )[0].fingerprint;
+    expect(fpA).not.toBe(fpB);
   });
 
   it("fingerprints are stable across identical inputs", () => {
