@@ -15,8 +15,9 @@ AI agents tend to produce complete solutions in one leap — all parsers, all sc
 
 1. **Start with one vertical slice** that touches all relevant layers for the simplest case
 2. **Commit and validate** that slice before expanding — the pre-commit hook will run format, lint, typecheck, and tests on staged files (when AI/agent env vars trigger it)
-3. **Expand outward** from the working slice in subsequent commits
-4. **Never build horizontal layers in isolation** (e.g. all DB helpers before any CLI wiring, or all docs before any working index path)
+3. **Lite-harden the slice** — run [`harden-pr`](../skills/harden-pr/SKILL.md) in **lite** mode (parallel reviewers → fix in-bounds → up to 2 passes). When the user has asked for commits: one `harden: …` commit before the next slice. Does not change feature intent — production polish only.
+4. **Expand outward** from the working slice in subsequent commits
+5. **Never build horizontal layers in isolation** (e.g. all DB helpers before any CLI wiring, or all docs before any working index path)
 
 ## Feature layers in this project
 
@@ -65,3 +66,5 @@ Good — tracer bullet:
 ## Commit cadence
 
 Each commit should represent a functional, describable milestone — not a placeholder. Every tracer bullet is a shippable slice that works end-to-end, even if the feature isn't complete yet. Small commits get validated by the pre-commit hook and are easier to review and revert.
+
+Before opening a PR, run [`harden-pr`](../skills/harden-pr/SKILL.md) in **full** mode on `origin/main...HEAD` (or accept the offer when the plan checklist is complete).

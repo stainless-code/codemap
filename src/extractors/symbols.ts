@@ -424,6 +424,7 @@ function registerSymbolHandlers(
         symbols,
         jsDocComments,
         source,
+        complexity,
       );
     },
     "ClassDeclaration:exit"(node: any) {
@@ -448,6 +449,7 @@ function extractClassMembers(
   out: SymbolRow[],
   jsDocComments: JsDocEntry[],
   source: string,
+  complexity: ExtractContext["complexity"],
 ) {
   if (!members?.length) return;
   for (const m of members) {
@@ -467,6 +469,7 @@ function extractClassMembers(
       const sig = `${prefix}${buildFunctionSignature(name, fn)}`;
       const methodLineStart = offsetToLine(lineMap, m.start);
       const methodLineEnd = offsetToLine(lineMap, m.end);
+      const symbolIndex = out.length;
       out.push({
         file_path: filePath,
         name,
@@ -487,6 +490,14 @@ function extractClassMembers(
         param_count: fn?.params?.length ?? 0,
         ...functionShapeColumns(fn),
       });
+      // Method bodies are FunctionExpression nodes — mark for the same
+      // push/pop bridge as named arrow inits (see complexityExtractor).
+      if (
+        fn?.type === "FunctionExpression" ||
+        fn?.type === "ArrowFunctionExpression"
+      ) {
+        complexity.markArrowSymbol(fn, symbolIndex);
+      }
     } else if (m.type === "PropertyDefinition") {
       let prefix = "";
       if (m.accessibility && m.accessibility !== "public") {

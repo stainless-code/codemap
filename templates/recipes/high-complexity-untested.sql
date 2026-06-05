@@ -12,6 +12,7 @@ SELECT
   s.line_start,
   s.line_end,
   s.complexity,
+  s.cognitive_complexity,
   ROUND(COALESCE(c.coverage_pct, 0), 1) AS coverage_pct
 FROM symbols s
 LEFT JOIN coverage c ON c.file_path = s.file_path

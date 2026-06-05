@@ -50,7 +50,8 @@ If the question matches any of these, use the index instead of grepping:
 | "Are there import cycles?" / "Files in cycles"               | `--recipe circular-imports` / `module_cycles`                                                                                                        |
 | "Where do barrel files re-export from?"                      | `--recipe barrel-chains` / `re_export_chains`                                                                                                        |
 | "Functions over 50 lines / deeply nested"                    | `--recipe large-functions` / `deeply-nested-functions`                                                                                               |
-| "What's the cyclomatic complexity / nesting depth of X?"     | `symbols.complexity` / `symbols.nesting_depth`                                                                                                       |
+| "What's the cyclomatic / cognitive complexity of X?"         | `symbols.complexity` / `symbols.cognitive_complexity` (Sonar-inspired; class methods included)                                                       |
+| "What's the nesting depth of X?"                             | `symbols.nesting_depth`                                                                                                                              |
 | "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `codemap ingest-coverage`)                                                                                                         |
 | "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                                                                                                                         |
 | "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                                                                                                                     |
@@ -58,6 +59,7 @@ If the question matches any of these, use the index instead of grepping:
 | "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                                                                                                            |
 | "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                                                                                                                     |
 | "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested`                                                                                                                  |
+| "What's cognitively complex (nesting-heavy)?"                | `--recipe high-cognitive-complexity` (default `min_score=15`; `--params min_score=20` to tighten)                                                    |
 
 ## Quick reference queries
 

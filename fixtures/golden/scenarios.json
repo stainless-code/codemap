@@ -453,6 +453,11 @@
       "recipe": "deeply-nested-functions"
     },
     {
+      "id": "high-cognitive-complexity",
+      "prompt": "Functions with cognitive complexity >= default threshold (15).",
+      "recipe": "high-cognitive-complexity"
+    },
+    {
       "id": "circular-imports",
       "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
       "recipe": "circular-imports"

@@ -16,7 +16,11 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's pa
 - `&&` / `||` / `??` short-circuit operators (`?` / `:` ternary too)
 - `catch` clauses
 
-**Computed for function-shaped symbols only** — non-function kinds (interfaces, types, enums, plain consts) and class member methods get `complexity = NULL` and are excluded by `WHERE s.complexity IS NOT NULL`.
+**Computed for function-shaped symbols** — top-level `function` declarations, named arrow/const bindings, and class methods. Non-function kinds (interfaces, types, enums, plain consts) get `complexity = NULL` and are excluded by `WHERE s.complexity IS NOT NULL`.
+
+## Cognitive complexity column (`symbols.cognitive_complexity`)
+
+Each row also includes **SonarSource cognitive complexity** for the same symbol (nesting-heavy control flow scores higher than flat branch chains). The recipe **filter** still uses cyclomatic `>= 10`; use `high-cognitive-complexity` when cognitive score alone is the gate.
 
 ## Why the joint signal
 
@@ -31,8 +35,4 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's pa
 - **Complexity threshold**: change `>= 10` to project's risk-appetite (5 for strict; 15 for tolerant).
 - **Coverage threshold**: change `< 50` to project's risk-appetite (`< 80` for strict).
 - **Filter to a directory**: `AND s.file_path LIKE 'src/api/%'` to scope.
-- **Include class members**: complexity is computed per top-level function; class methods currently inherit `null` (see "v1 limitation" below).
-
-## v1 limitation — class methods are NULL
-
-Complexity is currently computed for top-level `function` declarations and arrow-function consts; class methods (`MethodDefinition`) inherit `NULL`. Tracked for a future codemap release — file an issue if class-heavy projects need this sooner.
+- **Sort by cognitive instead of cyclomatic**: `ORDER BY s.cognitive_complexity DESC` in a project-local recipe override.

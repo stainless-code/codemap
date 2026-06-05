@@ -147,5 +147,5 @@ Register golden scenario per [`docs/golden-queries.md`](../golden-queries.md); g
 ## Dependencies
 
 - Shipped: `symbols` extraction, `hashContent`, recipe loader
-- Independent of [churn-complexity-hotspots](./churn-complexity-hotspots.md), [cognitive-complexity](./cognitive-complexity.md)
+- Independent of [churn-complexity-hotspots](./churn-complexity-hotspots.md), [`symbols.cognitive_complexity`](../glossary.md#symbolscognitive_complexity--cognitive-complexity)
 - Supersedes motivation for suffix-array semantic dupes (stay deferred)

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
 
 /** Moat-A: default call-graph surfaces exclude callback-synthesis edges. */
 export const CALLS_AST_ONLY_SQL = "(provenance IS NULL OR provenance = 'ast')";
@@ -62,6 +62,7 @@ export function createTables(db: CodemapDatabase) {
       parent_name TEXT,
       visibility TEXT,
       complexity REAL,
+      cognitive_complexity INTEGER,
       name_column_start INTEGER NOT NULL DEFAULT 0,
       name_column_end INTEGER NOT NULL DEFAULT 0,
       scope_local_id INTEGER NOT NULL DEFAULT 0,
@@ -910,6 +911,11 @@ export interface SymbolRow {
    * column existed; absence binds as `null`.
    */
   complexity?: number | null;
+  /**
+   * SonarSource cognitive complexity for function-shaped symbols (same NULL
+   * rules as `complexity`). Optional for back-compat; absence binds as `null`.
+   */
+  cognitive_complexity?: number | null;
   /** 0-based byte column of the symbol-name token start on `line_start` (per [R.6]). Optional for back-compat; defaults to 0. */
   name_column_start?: number;
   /** 0-based byte column one past the symbol-name token end. Optional for back-compat; defaults to 0. */
@@ -980,7 +986,7 @@ function batchInsert<T>(
 ) {
   if (items.length === 0) return;
   // Per-table cap: narrow tables (4-col bindings) batch up to 5000 rows;
-  // wide tables (20-col symbols) batch up to floor(32766/20) = 1638. Both
+  // wide tables (24-col symbols) batch up to floor(32766/24) = 1365. Both
   // are much higher than the pre-2026-05 fixed 500 → fewer round-trips
   // through the bun:sqlite / better-sqlite3 binding boundary.
   const batchSize = batchSizeForTuple(one);
@@ -1000,8 +1006,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, cognitive_complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -1018,6 +1024,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.parent_name,
         s.visibility,
         s.complexity ?? null,
+        s.cognitive_complexity ?? null,
         s.name_column_start ?? 0,
         s.name_column_end ?? 0,
         s.scope_local_id ?? 0,
