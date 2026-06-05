@@ -17,7 +17,7 @@
 | **Integration (git)**  | `src/application/run-index.test.ts`                                        | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                                    |
 | **CLI e2e**            | `src/cli/cmd-test-bench-e2e.test.ts`, `src/cli/cmd-cli-parity-e2e.test.ts` | Spawned CLI on `fixtures/minimal` (bench smoke + resource parity).                                                      |
 | **Apply CLI e2e**      | `src/cli/cmd-apply.test.ts`                                                | Temp project + full index: recipe dry-run/apply, `--rows`, second recipe disk apply.                                    |
-| **Check**              | `bun run check`                                                            | build + lint + unit + scripts + golden + agent-eval.                                                                    |
+| **Check**              | `bun run check`                                                            | build + format + lint + typecheck + unit + scripts + golden + agent-eval.                                               |
 
 Refresh Tier A goldens after intentional fixture or schema changes:
 

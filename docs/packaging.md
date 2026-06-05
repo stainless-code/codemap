@@ -7,9 +7,9 @@ How **@stainless-code/codemap** is built and published. **Doc index:** [README.m
 - **`bun run build`** → **tsdown** (`tsdown.config.ts`) → **`dist/`** (main **`index.mjs`**, lazy CLI chunks from **`src/cli/main.ts`**, workers, shared chunks) + types. **`prepublishOnly`** runs **`check`** (build, format, lint, tests, typecheck, golden queries, agent-eval harness smoke).
 - **`package.json`**: **`bin`** and **`exports`** → **`./dist/index.mjs`**; **`files`**: **`CHANGELOG.md`**, **`dist/`**, **`templates/`** — no `src/` on npm.
 
-The `templates/` directory ships two parallel subtrees:
+The `templates/` directory ships three subtrees — two parallel agent trees plus bundled recipes:
 
-- **`templates/agents/`** — consumer-disk targets copied by `codemap agents init` (thin pointer files: ~16-line SKILL.md + ~23-line rule).
+- **`templates/agents/`** — consumer-disk targets copied by `codemap agents init` (thin pointer files: ~18-line SKILL.md + ~25-line rule).
 - **`templates/agent-content/`** — server-side source assembled live by `codemap skill` / `codemap rule` / `codemap://skill` / `codemap://rule` / `codemap://mcp-instructions`. Section files in `agent-content/skill/` concatenate in lexical order; `*.gen.md` files are replaced at fetch time by renderers in `src/application/agent-content.ts`. Root-level `mcp-instructions.md` feeds MCP initialize `instructions`. See [agents.md](./agents.md#section-assembler-and-genmd) for the split rationale.
 - **`templates/recipes/`** — bundled SQL recipe `.sql` + `.md` pairs shipped in the npm package; project-local recipes in `<state-dir>/recipes/` also appear in `--recipes-json`.
 

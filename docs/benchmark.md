@@ -216,7 +216,7 @@ Independent of the consumer-facing scenarios above, the repo carries a **per-pha
 
 | Surface                                  | Audience                       | Fixture                                            | Gate?                                         |
 | ---------------------------------------- | ------------------------------ | -------------------------------------------------- | --------------------------------------------- |
-| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | No (informational; runs in PR CI)             |
+| `bun run benchmark` (`src/benchmark.ts`) | Consumers — speedup claims     | `fixtures/minimal` (or `CODEMAP_BENCHMARK_CONFIG`) | Numbers not perf-gated; job is merge-blocking |
 | `bun run check:perf-baseline`            | Maintainers — regression guard | This repo (self-index)                             | Local + weekly scheduled (not merge-blocking) |
 
 The perf-baseline targets _this_ repo because (a) the bindings/cycles tail is only measurable on a tree with real cross-file edges, and (b) the audit triangulation's numbers were captured here.
@@ -283,7 +283,7 @@ bun run dev --full
 bun run benchmark
 ```
 
-**CI:** the **Test** job runs `bun run test:agent-eval` after `test:golden` (harness smoke reuses the golden index via `--skip-index` when present; typically ~1–2 min combined); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
+**CI:** the **Test** job runs `bun run test:agent-eval` after `test:golden` (probe/live scripts accept `--skip-index` when `.codemap/index.db` already exists — see `run-probes.ts`; typically ~1–2 min combined); **Benchmark (fixture)** indexes the same corpus and runs `bun run benchmark`.
 
 ### Agent eval harness
 

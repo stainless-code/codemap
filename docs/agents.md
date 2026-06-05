@@ -44,7 +44,7 @@ codemap agents init --no-git-hooks    # remove codemap hook blocks
 
 Codemap maintains its own self-managed **`<state-dir>/.gitignore`** (default `.codemap/.gitignore`) — a blacklist of generated artifacts (`index.db` + WAL/SHM, `audit-cache/` entry in the canonical list) reconciled to canonical on every codemap boot via `ensureStateGitignore` (`src/application/state-dir.ts`). **`audit --base` cache** physically lives at `<projectRoot>/.codemap/audit-cache/` (hardcoded; does not follow `--state-dir`). Project-tracked sources (`recipes/`, `config.{ts,js,json}`) default to tracked.
 
-The user's root **`.gitignore`** is no longer touched by `codemap agents init`. Future codemap versions can add new generated artifacts to the canonical blacklist; every consumer's project repairs itself on the next `codemap` invocation. **The setup logic IS the migration** (per plan §D11).
+The user's root **`.gitignore`** is no longer touched by `codemap agents init`. Future codemap versions can add new generated artifacts to the canonical blacklist; every consumer's project repairs itself on the next `codemap` invocation. **The setup logic IS the migration** — `ensureStateGitignore` reconciles on every boot (`src/application/state-dir.ts`).
 
 ## Optional IDE / tool wiring
 
@@ -97,7 +97,7 @@ Bundled templates ship **`<!-- codemap-init:managed -->`**. **Copy mode** writes
 
 ## Live fetch surface (CLI + MCP + HTTP)
 
-Once `agents init` has written the pointer templates, the consumer's disk holds ~16-line SKILL + ~23-line rule. The actual content is served live:
+Once `agents init` has written the pointer templates, the consumer's disk holds ~18-line SKILL + ~25-line rule. The actual content is served live:
 
 | Surface                | Skill                                                    | Rule                                                    |
 | ---------------------- | -------------------------------------------------------- | ------------------------------------------------------- |
@@ -127,11 +127,11 @@ Long-running **`codemap mcp`** stays up for the whole IDE session while the stdi
 
 **Not idle timeout:** HTTP **`serve --watch`** uses a 5s **watch release grace** after the last non-`/health` request — that stops chokidar between stateless requests, not the MCP/HTTP process. **`GET /health`** never acquires a watch client.
 
-See [architecture.md § Session lifecycle wiring](./architecture.md#cli-usage).
+See [architecture.md § Session lifecycle wiring](./architecture.md#session-lifecycle-wiring).
 
 ## MCP tool allowlist
 
-**`context.index_freshness`** — session bootstrap includes index-level freshness metadata: `commit_drift` (HEAD ≠ `last_indexed_commit`), `pending_sync` (watcher debounce queue or in-flight reindex), optional disk-drift counts when watch is off, and a single `warning` string when agents should pause or re-index. **`context.start_here`** (non-compact) adds inline index summary, intent-ranked `query_recipe` cards, and top hub files with export signatures (adaptive caps by file count; optional MCP/HTTP `include_snippets` for one-line previews). Debug intent biases `sample_markers` toward FIXME/TODO. **MCP:** array-shaped JSON tools (`query`, …) keep row payloads verbatim and append a second `content` block prefixed `@codemap/index_freshness`; object-shaped tools merge `index_freshness` inline. **HTTP:** `POST /tool/*` adds `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, and `X-Codemap-Warning` headers without changing JSON bodies; **`GET /health`** includes full cheap `index_freshness` when the DB is readable. Complements per-file `validate` / snippet `stale`. See [`architecture.md` § Context wiring](./architecture.md).
+**`context.index_freshness`** — session bootstrap includes index-level freshness metadata: `commit_drift` (HEAD ≠ `last_indexed_commit`), `pending_sync` (watcher debounce queue or in-flight reindex), optional disk-drift counts when watch is off, and a single `warning` string when agents should pause or re-index. **`context.start_here`** (non-compact) adds inline index summary, intent-ranked `query_recipe` cards, and top hub files with export signatures (adaptive caps by file count; optional MCP/HTTP `include_snippets` for one-line previews). Debug intent biases `sample_markers` toward FIXME/TODO. **MCP:** array-shaped JSON tools (`query`, …) keep row payloads verbatim and append a second `content` block prefixed `@codemap/index_freshness`; object-shaped tools merge `index_freshness` inline. **HTTP:** `POST /tool/*` adds `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, and `X-Codemap-Warning` headers without changing JSON bodies; **`GET /health`** includes full cheap `index_freshness` when the DB is readable. Complements per-file `validate` / snippet `stale`. See [architecture.md § Context wiring](./architecture.md#context-wiring).
 
 **`CODEMAP_MCP_TOOLS`** — comma-separated snake_case MCP tool names. When set, only listed tools register (stderr lists the active set). Unknown names are ignored with a warning. Unset = all tools (default). **`query_batch`** registers only when listed or when unset (eval ablation).
 
