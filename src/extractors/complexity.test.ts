@@ -61,6 +61,29 @@ describe("cognitive complexity", () => {
     );
   });
 
+  it("named arrow and function expression: cognitive_complexity populated", () => {
+    const src = `export const arrow = (level: number): number => {
+  if (level > 0) {
+    if (level > 1) {
+      if (level > 2) return level;
+    }
+  }
+  return 0;
+};
+export const bind = function (n: number): number {
+  if (n % 2 === 0) return 1;
+  return 0;
+};
+`;
+    const d = extractFileData("/proj/x.ts", src, "x.ts");
+    const arrow = d.symbols.find((s) => s.name === "arrow");
+    const bind = d.symbols.find((s) => s.name === "bind");
+    expect(arrow?.complexity).toBe(4);
+    expect(arrow?.cognitive_complexity).toBeGreaterThan(arrow!.complexity!);
+    expect(bind?.complexity).toBe(2);
+    expect(bind?.cognitive_complexity).toBe(1);
+  });
+
   it("class method: both complexity and cognitive_complexity populated", () => {
     const src = `export class Svc {
   run(level: number): void {

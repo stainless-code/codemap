@@ -986,7 +986,7 @@ function batchInsert<T>(
 ) {
   if (items.length === 0) return;
   // Per-table cap: narrow tables (4-col bindings) batch up to 5000 rows;
-  // wide tables (20-col symbols) batch up to floor(32766/20) = 1638. Both
+  // wide tables (24-col symbols) batch up to floor(32766/24) = 1365. Both
   // are much higher than the pre-2026-05 fixed 500 → fewer round-trips
   // through the bun:sqlite / better-sqlite3 binding boundary.
   const batchSize = batchSizeForTuple(one);
