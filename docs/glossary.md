@@ -137,7 +137,11 @@ React components (PascalCase + JSX return or hook usage). PascalCase functions t
 
 ### `symbols.complexity` / cyclomatic complexity / McCabe
 
-Per-function decision-point count (REAL column on `symbols`). Computed by the parser walker (`src/parser.ts`) per the McCabe formula: `1 + (decision points)`. Counted nodes: `if`, `while`, `do…while`, `for`, `for…in`, `for…of`, `case X:` (not `default:` — that's the fall-through arm, not a decision), `&&`, `||`, `??`, `?:`, `catch`. Function-shaped symbols only — non-functions (interfaces, types, enums, plain consts) and class methods get `complexity = NULL` (v1 limitation; class methods tracked under `high-complexity-untested.md`). Joins to `coverage` via `(file_path, name, line_start)` natural key for the bundled `high-complexity-untested` recipe (complexity ≥ 10 ⨯ coverage < 50%).
+Per-function decision-point count (REAL column on `symbols`). Computed by the parser walker per the McCabe formula: `1 + (decision points)`. Counted nodes: `if`, `while`, `do…while`, `for`, `for…in`, `for…of`, `case X:` (not `default:`), `&&`, `||`, `??`, `?:`, `catch`. Function-shaped symbols only (top-level `function`, named arrow/const, class methods); non-functions get `complexity = NULL`. Joins to `coverage` for `high-complexity-untested` (cyclomatic ≥ 10 ⨯ coverage < 50%). See also [`symbols.cognitive_complexity`](#symbolscognitive_complexity--cognitive-complexity).
+
+### `symbols.cognitive_complexity` / cognitive complexity
+
+SonarSource cognitive complexity (INTEGER on `symbols`) for the same function-shaped symbols as cyclomatic `complexity`. Penalizes nested control flow; same oxc walk as McCabe (`src/extractors/complexity.ts`). Recipes: `high-cognitive-complexity` (`min_score` default 15); `high-complexity-untested` includes the column while filtering on cyclomatic `complexity`.
 
 ### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
 

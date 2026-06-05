@@ -125,5 +125,5 @@ bun test scripts/query-golden-coverage-matrix.test.mjs   # after golden scenario
 ## Dependencies
 
 - Shipped: `symbols.complexity`, `coverage`, `dependencies`, `calls`, `references`, `test_suites`, `affected-tests` glob conventions
-- Synergy: [cognitive-complexity](./cognitive-complexity.md) (optional second axis in same recipe later); [coverage-deletion-confidence](./coverage-deletion-confidence.md) (opposite signal — dead + zero coverage)
+- Synergy: [`symbols.cognitive_complexity`](../glossary.md#symbolscognitive_complexity--cognitive-complexity) (optional second axis in same recipe later); [coverage-deletion-confidence](./coverage-deletion-confidence.md) (opposite signal — dead + zero coverage)
 - Weaker until: [c9-plugin-layer](./c9-plugin-layer.md) (framework test files may be misclassified)

@@ -5,8 +5,8 @@
     "file_path": "src/lib/complexity-fixture.ts",
     "line_start": 22,
     "line_end": 83,
-    "complexity": 19,
     "cognitive_complexity": 40,
-    "coverage_pct": 0
+    "complexity": 19,
+    "nesting_depth": 5
   }
 ]

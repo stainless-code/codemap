@@ -519,6 +519,15 @@ describe("extractFileData", () => {
       expect(create?.signature).toContain("static");
     });
 
+    it("class methods get cyclomatic and cognitive complexity", () => {
+      const src = `export class Svc {\n  score(level: number): number {\n    if (level > 0) {\n      if (level > 1) {\n        if (level > 2) return level;\n      }\n    }\n    return 0;\n  }\n}\n`;
+      const d = extractFileData("/proj/x.ts", src, "x.ts");
+      const score = d.symbols.find((s) => s.name === "score");
+      expect(score?.kind).toBe("method");
+      expect(score?.complexity).toBe(4);
+      expect(score?.cognitive_complexity).toBeGreaterThan(score!.complexity!);
+    });
+
     it("class properties get parent_name", () => {
       const src = `export class Config {\n  private host: string;\n  readonly port = 3000;\n}\n`;
       const d = extractFileData("/proj/x.ts", src, "x.ts");

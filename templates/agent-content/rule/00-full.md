@@ -58,6 +58,7 @@ If the question matches any of these, use the index instead of grepping:
 | "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                                                                                                            |
 | "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                                                                                                                     |
 | "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested`                                                                                                                  |
+| "What's cognitively complex (nesting-heavy)?"                | `--recipe high-cognitive-complexity` (default `min_score=15`; `--params min_score=20` to tighten)                                                    |
 
 ## Quick reference queries
 

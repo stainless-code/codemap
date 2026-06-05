@@ -70,6 +70,12 @@ export interface ComplexityTracker {
   exitNest(): void;
   markArrowSymbol(node: object, symbolIndex: number): void;
   getArrowSymbol(node: object): number | undefined;
+  /** Sonar structural break (+1 + current cognitive nesting). */
+  cognitiveStructural(): void;
+  /** Flat +1 (switch case, boolean operator) — no nesting penalty. */
+  cognitiveFlat(): void;
+  enterCognitiveNest(): void;
+  exitCognitiveNest(): void;
 }
 
 /**
