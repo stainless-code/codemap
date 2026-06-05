@@ -62,7 +62,7 @@ Moat A: formatters only — no new analysis.
 
 1. `formatCodeClimate(opts: FormatOpts): string` in `output-formatters.ts`.
 2. `buildBadgeSummary(opts)` + `formatBadge` (markdown default) + `formatBadgeJson` (`codemap-badge/v1`; see F.8). CLI/MCP flag `--badge-style markdown|json` (default `markdown`).
-3. Wire `--format codeclimate|badge` in `cmd-query.ts` + `query-engine.ts` validation list.
+3. Wire `--format codeclimate|badge` in `cmd-query.ts` + `tool-handlers.ts` (MCP/HTTP dispatch).
 4. MCP/HTTP `format` enum extension + `badge_style` on query tools when `format=badge`.
 5. Snapshot tests in `output-formatters.test.ts` — Code Climate golden JSON; badge markdown + `codemap-badge/v1` JSON goldens.
 6. Docs — `architecture.md` output formatters §; README GitLab CI artifact example; agent note: badge is presentation — use JSON rows for triage.
@@ -83,11 +83,11 @@ bun src/index.ts query --recipe boundary-violations --format badge --badge-style
 
 ## Acceptance
 
-- [ ] `codemap query --recipe boundary-violations --format codeclimate` emits valid GitLab-ingestible JSON
-- [ ] Fingerprints stable across two runs with identical rows
-- [ ] `badge` markdown: `codemap: N issues` / `codemap: clean` for N>0 and N=0
-- [ ] `badge --badge-style json` emits stable `codemap-badge/v1` with matching `count` / `status`
-- [ ] Incompatible with `summary` / `group_by` / `baseline` (same rules as SARIF)
+- [x] `codemap query --recipe boundary-violations --format codeclimate` emits valid GitLab-ingestible JSON
+- [x] Fingerprints stable across two runs with identical rows
+- [x] `badge` markdown: `codemap: N issues` / `codemap: clean` for N>0 and N=0
+- [x] `badge --badge-style json` emits stable `codemap-badge/v1` with matching `count` / `status`
+- [x] Incompatible with `summary` / `group_by` / `baseline` (same rules as SARIF)
 
 ---
 

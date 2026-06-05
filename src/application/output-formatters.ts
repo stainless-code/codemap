@@ -10,9 +10,11 @@
  * aggregates (`index-summary`, `markers-by-kind`), not findings. See
  * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  *
- * Both formatters are pure: take rows + recipe metadata, return a string.
+ * Formatters are pure: take rows + recipe metadata, return a string.
  * No I/O, no DB access. Same engine wired into both the CLI (`cmd-query.ts`)
- * and the MCP `query` / `query_recipe` tools.
+ * and the MCP `query` / `query_recipe` tools. Also ships
+ * {@link formatCodeClimate} (GitLab Code Quality JSON) and
+ * {@link formatBadge} / {@link formatBadgeJson} (issue-count summary).
  */
 
 import { createHash } from "node:crypto";
@@ -62,6 +64,21 @@ export function detectLocationColumn(
 export function hasLocatableRows(rows: Record<string, unknown>[]): boolean {
   if (rows.length === 0) return false;
   return rows.some((r) => detectLocationColumn(r) !== null);
+}
+
+/**
+ * Warning text when a formatted output skips aggregate rows (plan F.5). Returns
+ * `undefined` when no warning applies (mermaid, empty rows, or ≥1 locatable row).
+ */
+export function noLocatableFindingsWarning(
+  format: string,
+  rows: Record<string, unknown>[],
+  opts?: { ci?: boolean },
+): string | undefined {
+  if (opts?.ci === true) return undefined;
+  if (format === "mermaid") return undefined;
+  if (rows.length === 0 || hasLocatableRows(rows)) return undefined;
+  return `codemap: --format ${format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${format} v1.)`;
 }
 
 /**

@@ -63,6 +63,7 @@ import {
   formatDiffJson,
   formatMermaid,
   formatSarif,
+  noLocatableFindingsWarning,
 } from "./output-formatters";
 import {
   baselineQueryIncompatibility,
@@ -237,6 +238,9 @@ export interface QueryArgs {
 
 export function handleQuery(args: QueryArgs, root: string): ToolResult {
   try {
+    const badgeIncompat = badgeStyleIncompatibility(args.format, args);
+    if (badgeIncompat !== undefined) return err(badgeIncompat);
+
     const baselineIncompat = baselineQueryIncompatibility(args);
     if (baselineIncompat !== undefined) return err(baselineIncompat);
 
@@ -256,8 +260,6 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
       return ok(payload);
     }
     if (args.format !== undefined && args.format !== "json") {
-      const badgeIncompat = badgeStyleIncompatibility(args.format, args);
-      if (badgeIncompat !== undefined) return err(badgeIncompat);
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       return runFormattedQuery({
@@ -323,6 +325,9 @@ export function handleQueryRecipe(
   root: string,
 ): ToolResult {
   try {
+    const badgeIncompat = badgeStyleIncompatibility(args.format, args);
+    if (badgeIncompat !== undefined) return err(badgeIncompat);
+
     const baselineIncompat = baselineQueryIncompatibility(args);
     if (baselineIncompat !== undefined) return err(baselineIncompat);
 
@@ -362,8 +367,6 @@ export function handleQueryRecipe(
       return ok(payload);
     }
     if (args.format !== undefined && args.format !== "json") {
-      const badgeIncompat = badgeStyleIncompatibility(args.format, args);
-      if (badgeIncompat !== undefined) return err(badgeIncompat);
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       const result = runFormattedQuery({
@@ -1277,7 +1280,7 @@ export async function handleIngestCoverage(
  * parser's `formatIncompatibility` for the tool wrapper layer.
  */
 function badgeStyleIncompatibility(
-  fmt: QueryArgs["format"],
+  fmt: QueryArgs["format"] | undefined,
   args: { badge_style?: BadgeStyle },
 ): string | undefined {
   if (args.badge_style === undefined || args.badge_style === "markdown") {
@@ -1336,6 +1339,8 @@ function runFormattedQuery(args: {
     return err("codemap: internal — formatted output requires flat row list.");
   }
   const rows = payload as Record<string, unknown>[];
+  const locWarning = noLocatableFindingsWarning(args.format, rows);
+  if (locWarning !== undefined) console.error(locWarning);
   if (args.format === "sarif") {
     const catalog =
       args.recipeId !== undefined

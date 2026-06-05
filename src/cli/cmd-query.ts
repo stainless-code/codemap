@@ -15,7 +15,7 @@ import {
   formatDiffJson,
   formatMermaid,
   formatSarif,
-  hasLocatableRows,
+  noLocatableFindingsWarning,
 } from "../application/output-formatters";
 import { compareQueryBaseline } from "../application/query-baseline";
 import { attachActions } from "../application/query-engine";
@@ -638,9 +638,9 @@ function resolveFormat(
 }
 
 /**
- * Reject combinations of `--format sarif|annotations` with flags that change
- * the output shape away from "flat row list" (group-by buckets, summary
- * counts, baseline diffs). Returns an error message or `undefined`.
+ * Reject combinations of non-`text`/`json` `--format` values with flags that
+ * change the output shape away from "flat row list" (group-by buckets,
+ * summary counts, baseline diffs). Returns an error message or `undefined`.
  *
  * Trade-off: keeps SARIF / annotations on the cleanest row → finding mapping
  * for v1; aggregate/diff shapes can be re-introduced if a real consumer asks.
@@ -761,7 +761,8 @@ Flags:
                                          before_pattern, after_pattern}.
                             diff-json    Structured diff envelope for agents.
                             codeclimate  GitLab Code Quality JSON array (severity minor; stable fingerprints).
-                            badge        Single-line issue count (codemap: N issues / codemap: clean).
+                            badge        Single-line issue count from locatable rows only
+                                         (codemap: N issues / codemap: clean — same contract as SARIF).
                           Formatted outputs require a flat row list — incompatible with --summary,
                           --group-by, --save-baseline, --baseline (parser rejects at parse time).
   --badge-style <style>   With --format badge only: markdown (default) or json (codemap-badge/v1 schema).
@@ -1131,18 +1132,10 @@ function printFormattedQuery(
       >[];
     }
 
-    // SARIF / annotations need locations; mermaid validates inside formatMermaid.
-    // `--ci` suppresses this warning — the row-set is the gating signal under CI.
-    if (
-      opts.format !== "mermaid" &&
-      rows.length > 0 &&
-      !hasLocatableRows(rows) &&
-      opts.ci !== true
-    ) {
-      console.error(
-        `codemap: --format ${opts.format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${opts.format} v1.)`,
-      );
-    }
+    const locWarning = noLocatableFindingsWarning(opts.format, rows, {
+      ci: opts.ci === true,
+    });
+    if (locWarning !== undefined) console.error(locWarning);
 
     const catalog =
       opts.recipeId !== undefined

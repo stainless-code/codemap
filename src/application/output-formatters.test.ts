@@ -18,6 +18,7 @@ import {
   escapeAnnotationProperty,
   formatAuditSarif,
   formatBadge,
+  countLocatableFindings,
   formatBadgeJson,
   formatCodeClimate,
   formatDiff,
@@ -27,6 +28,7 @@ import {
   formatSarif,
   hasLocatableRows,
   MERMAID_MAX_EDGES,
+  noLocatableFindingsWarning,
 } from "./output-formatters";
 
 let workDir: string;
@@ -69,6 +71,26 @@ describe("detectLocationColumn", () => {
 
   it("returns null on empty string", () => {
     expect(detectLocationColumn({ file_path: "" })).toBeNull();
+  });
+});
+
+describe("noLocatableFindingsWarning", () => {
+  it("returns undefined for locatable rows", () => {
+    expect(
+      noLocatableFindingsWarning("badge", [{ file_path: "a.ts" }]),
+    ).toBeUndefined();
+  });
+
+  it("returns message for aggregate-only rows", () => {
+    expect(noLocatableFindingsWarning("codeclimate", [{ count: 5 }])).toContain(
+      "codeclimate",
+    );
+  });
+
+  it("skips mermaid", () => {
+    expect(
+      noLocatableFindingsWarning("mermaid", [{ count: 5 }]),
+    ).toBeUndefined();
   });
 });
 
@@ -295,6 +317,24 @@ describe("formatCodeClimate", () => {
     expect(JSON.parse(out)).toHaveLength(1);
   });
 
+  it("omits location.lines when line_start is absent", () => {
+    const out = formatCodeClimate({
+      rows: [{ file_path: "a.ts", fan_in: 17 }],
+      recipeId: "fan-in",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location).toEqual({ path: "a.ts" });
+  });
+
+  it("buildCodeClimateFingerprint uses adhoc when recipeId omitted", () => {
+    expect(
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc"),
+    ).toHaveLength(16);
+    expect(buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc")).toBe(
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc"),
+    );
+  });
+
   it("fingerprints are stable across identical inputs", () => {
     const row = { file_path: "a.ts", line_start: 1, name: "foo" };
     const a = JSON.parse(
@@ -350,6 +390,24 @@ describe("formatBadge", () => {
       count: 1,
       status: "fail",
     });
+  });
+
+  it("json clean when no locatable rows", () => {
+    const doc = JSON.parse(
+      formatBadgeJson({ rows: [], recipeId: "index-summary" }),
+    );
+    expect(doc).toMatchObject({
+      schema: "codemap-badge/v1",
+      count: 0,
+      status: "pass",
+      message: "clean",
+    });
+  });
+
+  it("countLocatableFindings matches locatable row semantics", () => {
+    const rows = [{ kind: "TODO" }, { file_path: "a.ts" }];
+    expect(countLocatableFindings(rows)).toBe(1);
+    expect(hasLocatableRows(rows)).toBe(true);
   });
 
   it("buildBadgeSummary matches markdown/json count", () => {

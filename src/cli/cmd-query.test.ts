@@ -870,6 +870,39 @@ describe("parseQueryRest — --format flag", () => {
       expect(r.kind).toBe("run");
     });
 
+    it("rejects --format badge + --summary", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--summary",
+        "-r",
+        "boundary-violations",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("badge");
+        expect(r.message).toContain("--summary");
+      }
+    });
+
+    it("rejects --format badge + --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("badge");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
     it("rejects --format codeclimate + --summary", () => {
       const r = parseQueryRest([
         "query",
@@ -899,6 +932,32 @@ describe("parseQueryRest — --format flag", () => {
     ]);
     if (r.kind !== "run") throw new Error("expected run");
     expect(r.format).toBe("badge");
+    expect(r.badgeStyle).toBe("json");
+  });
+
+  it("rejects unknown --badge-style", () => {
+    const r = parseQueryRest([
+      "query",
+      "--format",
+      "badge",
+      "--badge-style",
+      "xml",
+      "-r",
+      "boundary-violations",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("xml");
+  });
+
+  it("accepts --badge-style=json equals form", () => {
+    const r = parseQueryRest([
+      "query",
+      "--format=badge",
+      "--badge-style=json",
+      "-r",
+      "boundary-violations",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
     expect(r.badgeStyle).toBe("json");
   });
 

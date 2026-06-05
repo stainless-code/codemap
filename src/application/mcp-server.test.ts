@@ -517,6 +517,45 @@ describe("MCP server — query_recipe tool", () => {
     }
   });
 
+  it("rejects format=codeclimate combined with summary", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: {
+          recipe: "deprecated-symbols",
+          format: "codeclimate",
+          summary: true,
+        },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("summary"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("rejects badge_style without format=badge", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query",
+        arguments: {
+          sql: "SELECT 1",
+          badge_style: "json",
+        },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("badge_style"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
   it("rejects format=sarif combined with summary", async () => {
     const { client, server } = await makeClient();
     try {
