@@ -74,7 +74,9 @@ export interface ComplexityTracker {
   cognitiveStructural(opts?: { elseIf?: boolean }): void;
   /** Flat +1 (switch case, boolean operator) — no nesting penalty. */
   cognitiveFlat(): void;
+  /** Enter cognitive nesting scope (paired with exitCognitiveNest). */
   enterCognitiveNest(): void;
+  /** Exit cognitive nesting scope. */
   exitCognitiveNest(): void;
 }
 
