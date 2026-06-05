@@ -85,7 +85,7 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (19; snake_case — mirrors CLI verbs where a shell twin exists):
+Tools (20; snake_case — mirrors CLI verbs where a shell twin exists):
   query                One read-only SQL statement.
   query_batch          N statements in one round-trip (CLI: codemap query batch).
   query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints.
@@ -93,6 +93,7 @@ Tools (19; snake_case — mirrors CLI verbs where a shell twin exists):
   save_baseline        Snapshot rows under a name (sql or recipe).
   list_baselines       Catalog of saved baselines.
   drop_baseline        Delete a baseline.
+  ingest_coverage      Load Istanbul/LCOV/V8 coverage into the index.
   context              Project bootstrap envelope.
   validate             On-disk hash vs indexed hash.
   show                 Symbol metadata: file:line + signature.

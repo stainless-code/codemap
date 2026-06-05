@@ -13,12 +13,15 @@ import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, insertFile, openDb } from "../db";
+import { upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import {
   handleApply,
   handleApplyDiffInput,
   handleApplyRows,
   handleContext,
+  handleIngestCoverage,
+  handleQuery,
   handleQueryRecipe,
   handleShow,
   handleSnippet,
@@ -46,6 +49,98 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
+});
+
+describe("handleQuery baseline", () => {
+  it("diffs against a saved baseline", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "pre",
+        recipe_id: null,
+        sql: "SELECT name FROM symbols",
+        rows_json: JSON.stringify([]),
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQuery(
+      {
+        sql: "SELECT name FROM symbols",
+        baseline: "pre",
+        summary: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      baseline: { name: "pre" },
+      added: 1,
+      removed: 0,
+    });
+  });
+
+  it("rejects baseline + format=sarif", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "sarif" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with format=sarif"),
+    });
+  });
+});
+
+describe("handleQueryRecipe baseline", () => {
+  it("diffs recipe rows with actions on added", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "funcs",
+        recipe_id: "find-symbol-by-kind",
+        sql: "SELECT name FROM symbols WHERE kind = 'function'",
+        rows_json: JSON.stringify([]),
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        params: { kind: "function", name_pattern: "%Query%" },
+        baseline: "funcs",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const payload = result.payload as {
+      added: Array<{ name: string; actions?: unknown[] }>;
+    };
+    expect(payload.added).toHaveLength(1);
+    expect(payload.added[0]?.actions).toBeDefined();
+  });
+});
+
+describe("handleIngestCoverage", () => {
+  it("returns error when path is missing on disk", async () => {
+    const result = await handleIngestCoverage(
+      { path: "no-such/coverage-final.json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("path not found"),
+    });
+  });
 });
 
 describe("handleQueryRecipe params", () => {

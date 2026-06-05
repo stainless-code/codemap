@@ -41,6 +41,7 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleIngestCoverage,
   handleExplore,
   handleImpact,
   handleNode,
@@ -54,6 +55,7 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  ingestCoverageArgsSchema,
   nodeArgsSchema,
   traceArgsSchema,
   listBaselinesArgsSchema,
@@ -126,6 +128,7 @@ const TOOL_NAMES = [
   "save_baseline",
   "list_baselines",
   "drop_baseline",
+  "ingest_coverage",
 ] as const;
 
 /**
@@ -607,6 +610,12 @@ async function dispatchTool(
       const r = validate(dropBaselineArgsSchema, args, "drop_baseline");
       if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
       result = handleDropBaseline(r.value);
+      break;
+    }
+    case "ingest_coverage": {
+      const r = validate(ingestCoverageArgsSchema, args, "ingest_coverage");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = await handleIngestCoverage(r.value, opts.root);
       break;
     }
     default: {

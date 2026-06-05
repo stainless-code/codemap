@@ -1,19 +1,5 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
-
-import {
-  ingestIstanbul,
-  ingestLcov,
-  ingestV8,
-} from "../application/coverage-engine";
-import type {
-  CoverageFormat,
-  IngestResult,
-  IstanbulPayload,
-  V8CoveragePayload,
-  V8ScriptCoverage,
-} from "../application/coverage-engine";
+import type { IngestResult } from "../application/coverage-engine";
+import { runIngestCoverageOnDb } from "../application/ingest-coverage-run";
 import { closeDb, openDb } from "../db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
@@ -21,15 +7,10 @@ interface IngestCoverageOpts {
   root: string;
   configFile: string | undefined;
   stateDir?: string | undefined;
-  /** Resolved absolute path to coverage-final.json, lcov.info, or a directory. */
   path: string;
   json: boolean;
-  /** Treat <path> as a NODE_V8_COVERAGE directory (one or more `coverage-*.json` files). */
   runtime: boolean;
 }
-
-const ISTANBUL_FILENAME = "coverage-final.json";
-const LCOV_FILENAME = "lcov.info";
 
 export function printIngestCoverageCmdHelp(): void {
   console.log(`Usage: codemap ingest-coverage <path> [--runtime] [--json]
@@ -118,152 +99,39 @@ export function parseIngestCoverageRest(
   return { kind: "run", path, json, runtime };
 }
 
-/**
- * Resolve the user-supplied path to a concrete (artifact, format) pair.
- * Directory inputs probe for `coverage-final.json` and `lcov.info`;
- * presence of both is an explicit error per the plan ("no precedence
- * guessing — explicit is better than implicit").
- */
-function resolveArtifact(
-  inputPath: string,
-  cwd: string,
-): { format: CoverageFormat; absPath: string } {
-  const abs = isAbsolute(inputPath) ? inputPath : resolve(cwd, inputPath);
-  if (!existsSync(abs)) {
-    throw new Error(`codemap ingest-coverage: path not found: ${abs}`);
-  }
-  const stat = statSync(abs);
-  if (stat.isDirectory()) {
-    const istanbul = join(abs, ISTANBUL_FILENAME);
-    const lcov = join(abs, LCOV_FILENAME);
-    const hasIstanbul = existsSync(istanbul);
-    const hasLcov = existsSync(lcov);
-    if (hasIstanbul && hasLcov) {
-      throw new Error(
-        `codemap ingest-coverage: directory ${abs} contains both ${ISTANBUL_FILENAME} and ${LCOV_FILENAME}. Pass the file path explicitly.`,
-      );
-    }
-    if (hasIstanbul) return { format: "istanbul", absPath: istanbul };
-    if (hasLcov) return { format: "lcov", absPath: lcov };
-    throw new Error(
-      `codemap ingest-coverage: directory ${abs} contains neither ${ISTANBUL_FILENAME} nor ${LCOV_FILENAME}.`,
-    );
-  }
-  if (abs.endsWith(".json")) return { format: "istanbul", absPath: abs };
-  if (abs.endsWith(".info")) return { format: "lcov", absPath: abs };
-  throw new Error(
-    `codemap ingest-coverage: cannot auto-detect format from "${abs}". Expected a .json (Istanbul) or .info (LCOV) file, or a directory containing one.`,
-  );
-}
-
-/** Filters to NODE_V8_COVERAGE's `coverage-<pid>-<ts>-<seq>.json` shape so a wrong dir errors loudly instead of producing a zero-row "successful" ingest. */
-const V8_FILENAME_RE = /^coverage-.*\.json$/;
-
-function resolveV8Directory(
-  inputPath: string,
-  cwd: string,
-): { absDir: string; jsonFiles: string[] } {
-  const abs = isAbsolute(inputPath) ? inputPath : resolve(cwd, inputPath);
-  if (!existsSync(abs)) {
-    throw new Error(`codemap ingest-coverage: path not found: ${abs}`);
-  }
-  const stat = statSync(abs);
-  if (!stat.isDirectory()) {
-    throw new Error(
-      `codemap ingest-coverage --runtime: expected a directory (NODE_V8_COVERAGE-style), got file ${abs}`,
-    );
-  }
-  const jsonFiles = readdirSync(abs)
-    .filter((f) => V8_FILENAME_RE.test(f))
-    .map((f) => join(abs, f));
-  if (jsonFiles.length === 0) {
-    throw new Error(
-      `codemap ingest-coverage --runtime: directory ${abs} contains no coverage-*.json files. NODE_V8_COVERAGE writes coverage-<pid>-<ts>-<seq>.json — point --runtime at the directory the test runner wrote to.`,
-    );
-  }
-  return { absDir: abs, jsonFiles };
-}
-
-/**
- * Read a JSON file via the canonical Node-vs-Bun split — Bun.file().json()
- * uses Bun's native parser (materially faster on multi-MB Istanbul payloads);
- * Node falls through to readFile + JSON.parse. Mirrors `config.ts`.
- * See docs/packaging.md § Node vs Bun.
- */
-async function readJsonFile(filePath: string): Promise<unknown> {
-  if (typeof Bun !== "undefined") {
-    return Bun.file(filePath).json();
-  }
-  const text = await readFile(filePath, "utf-8");
-  return JSON.parse(text) as unknown;
-}
-
-async function readTextFile(filePath: string): Promise<string> {
-  if (typeof Bun !== "undefined") {
-    return Bun.file(filePath).text();
-  }
-  return readFile(filePath, "utf-8");
-}
-
 export async function runIngestCoverageCmd(
   opts: IngestCoverageOpts,
 ): Promise<void> {
   try {
     await bootstrapCodemap(opts);
 
-    let result: IngestResult;
-    let displayPath: string;
     const db = openDb();
+    let outcome: Awaited<ReturnType<typeof runIngestCoverageOnDb>>;
     try {
-      if (opts.runtime) {
-        const { absDir, jsonFiles } = resolveV8Directory(opts.path, opts.root);
-        displayPath = absDir;
-        const scripts: V8ScriptCoverage[] = [];
-        for (const file of jsonFiles) {
-          const payload = (await readJsonFile(file)) as V8CoveragePayload;
-          if (Array.isArray(payload?.result)) scripts.push(...payload.result);
-        }
-        if (scripts.length === 0) {
-          throw new Error(
-            `codemap ingest-coverage --runtime: ${jsonFiles.length} coverage-*.json file(s) under ${absDir} contained no V8 \`result\` arrays. Confirm the directory is the one NODE_V8_COVERAGE wrote to.`,
-          );
-        }
-        result = ingestV8({
-          db,
-          projectRoot: opts.root,
-          scripts,
-          sourcePath: absDir,
-        });
-      } else {
-        const { format, absPath } = resolveArtifact(opts.path, opts.root);
-        displayPath = absPath;
-        if (format === "istanbul") {
-          const payload = (await readJsonFile(absPath)) as IstanbulPayload;
-          result = ingestIstanbul({
-            db,
-            projectRoot: opts.root,
-            payload,
-            sourcePath: absPath,
-          });
-        } else {
-          const payload = await readTextFile(absPath);
-          result = ingestLcov({
-            db,
-            projectRoot: opts.root,
-            payload,
-            sourcePath: absPath,
-          });
-        }
-      }
+      outcome = await runIngestCoverageOnDb(db, {
+        projectRoot: opts.root,
+        path: opts.path,
+        runtime: opts.runtime,
+      });
     } finally {
       closeDb(db);
     }
 
-    if (opts.json) {
-      console.log(JSON.stringify(result));
+    if (!outcome.ok) {
+      if (opts.json) {
+        console.log(JSON.stringify({ error: outcome.error }));
+      } else {
+        console.error(outcome.error);
+      }
+      process.exitCode = 1;
       return;
     }
-    renderTerminal(result, displayPath);
+
+    if (opts.json) {
+      console.log(JSON.stringify(outcome.result));
+      return;
+    }
+    renderTerminal(outcome.result, outcome.sourcePath);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (opts.json) {
