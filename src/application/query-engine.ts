@@ -199,7 +199,11 @@ function resolveBucketizer(
   return { fn: (path: string) => firstDirectory(path) };
 }
 
-function attachActions(row: unknown, actions: ReadonlyArray<unknown>): unknown {
+/** Attach recipe `actions` when absent — shared by query, baseline diff, grouped output. */
+export function attachActions(
+  row: unknown,
+  actions: ReadonlyArray<unknown>,
+): unknown {
   if (typeof row !== "object" || row === null) return row;
   const obj = row as Record<string, unknown>;
   if ("actions" in obj) return obj;

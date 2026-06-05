@@ -41,6 +41,7 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleIngestCoverage,
   handleExplore,
   handleImpact,
   handleNode,
@@ -54,6 +55,7 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  ingestCoverageArgsSchema,
   nodeArgsSchema,
   traceArgsSchema,
   listBaselinesArgsSchema,
@@ -126,6 +128,7 @@ const TOOL_NAMES = [
   "save_baseline",
   "list_baselines",
   "drop_baseline",
+  "ingest_coverage",
 ] as const;
 
 /**
@@ -609,6 +612,12 @@ async function dispatchTool(
       result = handleDropBaseline(r.value);
       break;
     }
+    case "ingest_coverage": {
+      const r = validate(ingestCoverageArgsSchema, args, "ingest_coverage");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = await handleIngestCoverage(r.value, opts.root);
+      break;
+    }
     default: {
       // Reachable only if TOOL_NAMES gains an entry without a switch arm —
       // the route guard above catches user-typed unknown names.
@@ -658,8 +667,9 @@ function validate<T extends ZodRawShape>(
  * issue `fetch('http://127.0.0.1:7878/tool/save_baseline', {method: 'POST', body: '{...}'})`.
  * The browser sends the request (CORS only blocks the *response* from
  * being read by JS — the request itself reaches us and any side effect
- * executes). For state-changing tools (`save_baseline`, `drop_baseline`)
- * this lets a malicious page mutate the developer's `.codemap/index.db`.
+ * executes). For state-changing tools (`save_baseline`, `drop_baseline`,
+ * `ingest_coverage`) this lets a malicious page mutate the developer's
+ * `.codemap/index.db`.
  *
  * DNS rebinding extends the same attack: `evil.com` resolves to
  * `127.0.0.1` after page load; the browser sends `Host: evil.com:7878`

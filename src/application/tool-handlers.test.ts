@@ -13,12 +13,15 @@ import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, insertFile, openDb } from "../db";
+import { upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import {
   handleApply,
   handleApplyDiffInput,
   handleApplyRows,
   handleContext,
+  handleIngestCoverage,
+  handleQuery,
   handleQueryRecipe,
   handleShow,
   handleSnippet,
@@ -46,6 +49,304 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
+});
+
+describe("handleQuery baseline", () => {
+  it("diffs against a saved baseline", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "pre",
+        recipe_id: null,
+        sql: "SELECT name FROM symbols",
+        rows_json: JSON.stringify([]),
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQuery(
+      {
+        sql: "SELECT name FROM symbols",
+        baseline: "pre",
+        summary: true,
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      baseline: { name: "pre" },
+      added: 1,
+      removed: 0,
+    });
+  });
+
+  it("rejects baseline + format=sarif", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "sarif" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with format=sarif"),
+    });
+  });
+
+  it("rejects baseline + group_by", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", group_by: "directory" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+
+  it("returns 404 for missing baseline", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "missing-baseline" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 404,
+      error: expect.stringContaining('no baseline named "missing-baseline"'),
+    });
+  });
+
+  it("returns 400 for corrupt baseline rows_json", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "bad",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "not-json",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "bad" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 400,
+      error: expect.stringContaining("corrupt rows_json"),
+    });
+  });
+});
+
+describe("handleQueryRecipe baseline", () => {
+  it("diffs recipe rows with actions on added", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "funcs",
+        recipe_id: "find-symbol-by-kind",
+        sql: "SELECT name FROM symbols WHERE kind = 'function'",
+        rows_json: JSON.stringify([]),
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        params: { kind: "function", name_pattern: "%Query%" },
+        baseline: "funcs",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const payload = result.payload as {
+      added: Array<{ name: string; actions?: unknown[] }>;
+    };
+    expect(payload.added).toHaveLength(1);
+    expect(payload.added[0]?.actions?.[0]).toMatchObject({
+      type: "inspect-symbols",
+    });
+  });
+
+  it("returns 404 for missing baseline", () => {
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        params: { kind: "function", name_pattern: "%Query%" },
+        baseline: "missing-baseline",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 404,
+      error: expect.stringContaining('no baseline named "missing-baseline"'),
+    });
+  });
+
+  it("rejects baseline + group_by", () => {
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        baseline: "funcs",
+        group_by: "directory",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+});
+
+describe("handleIngestCoverage", () => {
+  it("returns error when path is missing on disk", async () => {
+    const result = await handleIngestCoverage(
+      { path: "no-such/coverage-final.json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("path not found"),
+    });
+  });
+
+  it("ingests istanbul artifact successfully", async () => {
+    const db = openDb();
+    try {
+      insertFile(db, {
+        path: "src/lib/cache.ts",
+        content_hash: "h2",
+        size: 1,
+        line_count: 100,
+        language: "typescript",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      db.run(
+        "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity) VALUES ('src/lib/cache.ts', 'get', 'function', 9, 15, 'get(): void', 1, 0, NULL, NULL, NULL, NULL, NULL, 1)",
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const coverageDir = join(projectRoot, "coverage");
+    mkdirSync(coverageDir);
+    writeFileSync(
+      join(coverageDir, "coverage-final.json"),
+      JSON.stringify({
+        [`${projectRoot}/src/lib/cache.ts`]: {
+          path: `${projectRoot}/src/lib/cache.ts`,
+          statementMap: {
+            "0": {
+              start: { line: 10, column: 0 },
+              end: { line: 10, column: 1 },
+            },
+          },
+          s: { "0": 1 },
+        },
+      }),
+    );
+
+    const result = await handleIngestCoverage(
+      { path: "coverage/coverage-final.json" },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      format: "istanbul",
+      ingested: { symbols: 1 },
+    });
+  });
+
+  it("ingests v8 runtime directory when runtime is true", async () => {
+    const db = openDb();
+    try {
+      insertFile(db, {
+        path: "src/lib/cache.ts",
+        content_hash: "h2",
+        size: 1,
+        line_count: 3,
+        language: "typescript",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      db.run(
+        "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity) VALUES ('src/lib/cache.ts', 'get', 'function', 1, 3, 'get(): void', 1, 0, NULL, NULL, NULL, NULL, NULL, 1)",
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const source = "export function get() {\n  return 1;\n}\n";
+    mkdirSync(join(projectRoot, "src/lib"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/lib/cache.ts"), source);
+    const dir = join(projectRoot, "v8-runtime");
+    mkdirSync(dir);
+    const { pathToFileURL } = await import("node:url");
+    writeFileSync(
+      join(dir, "coverage-1.json"),
+      JSON.stringify({
+        result: [
+          {
+            scriptId: "1",
+            url: pathToFileURL(
+              join(projectRoot, "src/lib/cache.ts"),
+            ).toString(),
+            functions: [
+              {
+                functionName: "get",
+                isBlockCoverage: true,
+                ranges: [
+                  { startOffset: 0, endOffset: source.length, count: 1 },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const result = await handleIngestCoverage(
+      { path: "v8-runtime", runtime: true },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      format: "v8",
+      ingested: { symbols: 1 },
+    });
+  });
+
+  it("returns error for malformed istanbul JSON", async () => {
+    const coverageDir = join(projectRoot, "coverage");
+    mkdirSync(coverageDir);
+    writeFileSync(join(coverageDir, "coverage-final.json"), "{not-json");
+
+    const result = await handleIngestCoverage(
+      { path: "coverage/coverage-final.json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.any(String),
+    });
+  });
 });
 
 describe("handleQueryRecipe params", () => {

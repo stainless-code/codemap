@@ -884,6 +884,152 @@ describe("MCP server — baseline tools", () => {
   });
 });
 
+describe("MCP server — ingest_coverage tool", () => {
+  it("lists ingest_coverage in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("ingest_coverage");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("ingests istanbul artifact and returns IngestResult envelope", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/a.ts', 'A', 'const', 1, 1, 'const A', 1, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    const coverageDir = join(benchDir, "coverage");
+    mkdirSync(coverageDir);
+    writeFileSync(
+      join(coverageDir, "coverage-final.json"),
+      JSON.stringify({
+        [`${benchDir}/src/a.ts`]: {
+          path: `${benchDir}/src/a.ts`,
+          statementMap: {
+            "0": { start: { line: 1, column: 0 }, end: { line: 1, column: 1 } },
+          },
+          s: { "0": 1 },
+        },
+      }),
+    );
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "ingest_coverage",
+        arguments: { path: "coverage/coverage-final.json" },
+      });
+      expect((r as { isError?: boolean }).isError).toBeUndefined();
+      expect(readJson(r)).toMatchObject({
+        format: "istanbul",
+        ingested: { symbols: 1 },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns isError when path is missing", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "ingest_coverage",
+        arguments: { path: "no-such/coverage-final.json" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("path not found"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe("MCP server — query baseline compare", () => {
+  it("query with missing baseline returns isError", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query",
+        arguments: { sql: "SELECT 1", baseline: "does-not-exist" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("does-not-exist"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("query rejects baseline + group_by", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query",
+        arguments: {
+          sql: "SELECT path FROM files",
+          baseline: "snap",
+          group_by: "directory",
+        },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("group_by"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("query_recipe baseline diff attaches actions on added rows", async () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "funcs",
+        recipe_id: "deprecated-symbols",
+        sql: "SELECT name FROM symbols WHERE doc_comment LIKE '%@deprecated%'",
+        rows_json: JSON.stringify([]),
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'oldFn', 'function', 1, 5, 'function oldFn()', '/** @deprecated */')`,
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "query_recipe",
+        arguments: { recipe: "deprecated-symbols", baseline: "funcs" },
+      });
+      const json = readJson(r) as {
+        added: Array<{ name: string; actions?: Array<{ type: string }> }>;
+      };
+      expect(json.added).toHaveLength(1);
+      expect(json.added[0]?.actions?.map((a) => a.type)).toEqual(
+        expect.arrayContaining(["flag-caller", "apply-migrate-deprecated"]),
+      );
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 function readResourceText(r: { contents: unknown[] }): string {
   const first = r.contents[0] as { text?: string };
   if (typeof first.text !== "string") {
