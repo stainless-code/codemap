@@ -237,7 +237,7 @@ TS shape for one row of the `exports` table.
 
 ### fan-in
 
-Number of edges _into_ a file in the `dependencies` table — `COUNT(*) FROM dependencies WHERE to_path = ?`. Surfaces as the `fan-in` recipe (top files by inbound edges, i.e. **hubs**).
+Number of edges _into_ a file in the `dependencies` table — `COUNT(*) FROM dependencies WHERE to_path = ?`. Surfaces as the `fan-in` recipe (top files by inbound edges, i.e. **hubs**). **Hotspot ranker only** — not an orphan/dead-code detector; N-file packs with sibling imports can all have non-zero fan-in yet be unreachable from a real entry point ([`plans/c9-plugin-layer.md`](./plans/c9-plugin-layer.md) closed-dead-subgraph caveat).
 
 ### fan-out
 

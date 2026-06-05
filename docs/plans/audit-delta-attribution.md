@@ -51,7 +51,7 @@ Baseline-prefix audits without ref-scoped key store; audit verdict + thresholds;
 | A.2 | **Stable finding keys.** Each auditable row maps to a deterministic string key from its delta's `requiredColumns` (canonical column order, joined with `\0` or stable JSON). Same key at base SHA and at HEAD.                           | Existing `AuditDeltaSpec.requiredColumns`           |
 | A.3 | **Reuse audit-cache infrastructure.** Base-side keys come from the sha-keyed extract under `.codemap/audit-cache/<sha>/` (already populated by `git archive` + reindex). Cache key snapshots alongside or derived from the cached index. | [architecture § audit-worktree](../architecture.md) |
 | A.4 | **`--base` path only for v1 attribution.** Baseline-prefix audits (`source: "baseline"`) keep today's flat `added`/`removed` shape unless a follow-up adds historical key stores in `query_baselines`.                                   | Tracer bullet — ship ref-scoped first               |
-| A.5 | **Composable CI.** Consumers filter `added` where `attribution === "introduced"` via SQL/`jq`; complements deferred [audit verdict + thresholds](../roadmap.md#recipe--audit-enrichment).                                                | Roadmap trigger-gated verdict item                  |
+| A.5 | **Composable CI.** Consumers filter `added` where `attribution === "introduced"` via SQL/`jq`; complements deferred [audit verdict + thresholds](../roadmap.md#core-substrate--platform).                                                | Roadmap trigger-gated verdict item                  |
 
 ---
 
@@ -123,4 +123,4 @@ MCP/HTTP: same envelope via `tool-handlers` audit handler — spot-check JSON sh
 ## Dependencies
 
 - Shipped: `audit-worktree.ts`, `runAuditFromRef`, v1 delta registry (`files`, `dependencies`, `deprecated`)
-- Independent of [audit verdict + thresholds](../roadmap.md#recipe--audit-enrichment) (trigger-gated)
+- Independent of [audit verdict + thresholds](../roadmap.md#core-substrate--platform) (trigger-gated)
