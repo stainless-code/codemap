@@ -2,10 +2,22 @@ import { describe, expect, it } from "bun:test";
 
 import { formatParamsCli, resolveRenameAlias } from "./rename-alias.js";
 
+function rewrite(rest: string[]): string[] | undefined {
+  const r = resolveRenameAlias(rest);
+  if (r?.kind === "rewrite") return r.argv;
+  return undefined;
+}
+
+function renameError(rest: string[]): string | undefined {
+  const r = resolveRenameAlias(rest);
+  if (r?.kind === "error") return r.message;
+  return undefined;
+}
+
 describe("resolveRenameAlias", () => {
   it("rewrites positional old/new with scoped flags", () => {
     expect(
-      resolveRenameAlias([
+      rewrite([
         "rename",
         "helper",
         "worker",
@@ -24,7 +36,7 @@ describe("resolveRenameAlias", () => {
 
   it("rewrites --params form", () => {
     expect(
-      resolveRenameAlias([
+      rewrite([
         "rename",
         "--params",
         "old=foo,new=bar,define_in=src/x.ts",
@@ -41,14 +53,7 @@ describe("resolveRenameAlias", () => {
 
   it("merges --params with positional when both present", () => {
     expect(
-      resolveRenameAlias([
-        "rename",
-        "a",
-        "b",
-        "--params",
-        "kind=function",
-        "--dry-run",
-      ]),
+      rewrite(["rename", "a", "b", "--params", "kind=function", "--dry-run"]),
     ).toEqual([
       "apply",
       "rename-preview",
@@ -60,7 +65,7 @@ describe("resolveRenameAlias", () => {
 
   it("maps --in-file and --kind to recipe params", () => {
     expect(
-      resolveRenameAlias([
+      rewrite([
         "rename",
         "Foo",
         "Bar",
@@ -77,6 +82,16 @@ describe("resolveRenameAlias", () => {
     ]);
   });
 
+  it("allows apply flags before positional old/new", () => {
+    expect(rewrite(["rename", "--dry-run", "helper", "worker"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
   it("returns null for non-rename commands", () => {
     expect(resolveRenameAlias(["apply", "rename-preview"])).toBeNull();
   });
@@ -86,11 +101,41 @@ describe("resolveRenameAlias", () => {
   });
 
   it("preserves missing --params operand for downstream apply parser", () => {
-    expect(resolveRenameAlias(["rename", "--params"])).toEqual([
+    expect(rewrite(["rename", "--params"])).toEqual([
       "apply",
       "rename-preview",
       "--params",
     ]);
+  });
+
+  it("errors on missing --define-in operand", () => {
+    expect(renameError(["rename", "a", "b", "--define-in"])).toContain(
+      '"--define-in" requires a file path',
+    );
+  });
+
+  it("errors on missing --in-file operand", () => {
+    expect(renameError(["rename", "a", "b", "--in-file"])).toContain(
+      '"--in-file" requires a path prefix',
+    );
+  });
+
+  it("errors on missing --kind operand", () => {
+    expect(renameError(["rename", "a", "b", "--kind"])).toContain(
+      '"--kind" requires a symbol kind',
+    );
+  });
+
+  it("errors on a single positional", () => {
+    expect(renameError(["rename", "helper"])).toContain(
+      "requires <old> and <new>",
+    );
+  });
+
+  it("errors on a third positional", () => {
+    expect(renameError(["rename", "a", "b", "c"])).toMatch(
+      /unexpected argument "c"/,
+    );
   });
 });
 

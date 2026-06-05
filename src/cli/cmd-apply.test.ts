@@ -606,6 +606,9 @@ export function staleOne(): number { return 2; }
       expect(readFile("src/bench/homonym-helper-b.ts")).toMatch(
         /function helper\(\)/,
       );
+      const consumerB = readFile("src/bench/homonym-consumer-b.ts");
+      expect(consumerB).toContain("helper()");
+      expect(consumerB).not.toContain("worker");
     });
   });
 

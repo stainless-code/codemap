@@ -65,8 +65,15 @@ export async function main(): Promise<void> {
       printRenameAliasHelp();
       return;
     }
-    const rewritten = resolveRenameAlias(rest);
-    if (rewritten) rest.splice(0, rest.length, ...rewritten);
+    const renameResult = resolveRenameAlias(rest);
+    if (renameResult?.kind === "error") {
+      console.error(renameResult.message);
+      process.exitCode = 1;
+      return;
+    }
+    if (renameResult?.kind === "rewrite") {
+      rest.splice(0, rest.length, ...renameResult.argv);
+    }
   }
 
   if (rest[0] === "agents" && rest[1] === "init") {
