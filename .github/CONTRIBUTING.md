@@ -9,6 +9,8 @@ Codemap is in **bootstrap / extraction** phase. Before large PRs, please open an
 
 ```bash
 bun install   # runs `prepare` → Husky git hooks
+# Optional supply-chain guard — [Socket Firewall Free](https://github.com/SocketDev/sfw-free):
+# npm i -g sfw && sfw bun install
 bun run dev   # same as `bun src/index.ts` — CLI from source
 bun test
 bun run test:golden   # golden SQL vs fixtures/minimal (also runs at end of `bun run check`)

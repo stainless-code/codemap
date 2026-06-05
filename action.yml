@@ -146,7 +146,12 @@ runs:
         RESOLVED_WORKDIR="$(bash "${{ github.action_path }}/scripts/action-resolve-working-directory.sh" "$GITHUB_WORKSPACE" "$WORK_DIR")"
         # Action runs without its own node_modules; install the detector lazily.
         # Pinned to a known version so consumers get reproducible builds.
-        npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0
+        NPM_INSTALL=(npm install --no-save --prefix "$ACTION_STAGE" package-manager-detector@1.6.0)
+        if command -v sfw >/dev/null 2>&1; then
+          sfw "${NPM_INSTALL[@]}"
+        else
+          "${NPM_INSTALL[@]}"
+        fi
         cp "${{ github.action_path }}/scripts/detect-pm.mjs" \
           "${{ github.action_path }}/scripts/codemap-invocation.mjs" \
           "$ACTION_STAGE/"
