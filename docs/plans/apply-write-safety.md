@@ -44,16 +44,7 @@ Cross-file rollback on phase-2 failure; BOM round-trip policy (Q2); adversarial 
 
 ## Current state (shipped)
 
-| Behavior                                    | Status                                 |
-| ------------------------------------------- | -------------------------------------- |
-| Phase-1 line match (`line content drifted`) | ✅                                     |
-| Per-file temp + `rename`                    | ✅                                     |
-| All-or-nothing on phase-1 conflicts         | ✅                                     |
-| Symlink / path-escape guards                | ✅                                     |
-| Content-hash recheck before write           | ❌                                     |
-| `fsync` before `rename`                     | ❌                                     |
-| Mixed CRLF/LF skip                          | ❌                                     |
-| Cross-file rollback on phase-2 failure      | ❌ (deferred per architecture § Apply) |
+See [`architecture.md` § Apply](../architecture.md#apply--input-modes-transport-and-policy) and the TOCTOU / EOL comments in [`apply-engine.ts`](../../src/application/apply-engine.ts). **Open (this plan):** content-hash recheck before write, `fsync` before `rename`, mixed CRLF/LF skip. Cross-file rollback stays deferred per architecture § Apply.
 
 ---
 

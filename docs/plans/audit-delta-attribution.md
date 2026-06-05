@@ -27,7 +27,7 @@ Implement **`findingKey()`** + attribution on the **`deprecated`** delta first (
 ```text
 audit --base <ref>
   → git resolve ref → sha
-  → audit-worktree.ensureCachedWorktree(sha)  →  .codemap/audit-cache/<sha>/index.db
+  → lookupCacheEntry(sha) or populateWorktree({ sha, … })  →  .codemap/audit-cache/<sha>/index.db
   → runAuditFromRef: HEAD index + base cached index
   → per delta: compute added rows → findingKey(row) vs base key Set → attribution
   → envelope.deltas[<key>].added[].attribution  (CLI / MCP / HTTP identical)

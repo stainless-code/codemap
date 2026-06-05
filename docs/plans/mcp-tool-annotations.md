@@ -28,7 +28,7 @@ Smallest slice: add **`mcp-tool-annotations.ts`** map + thread into **one** `reg
 MCP_TOOL_ANNOTATIONS: Record<toolName, ToolAnnotations>
   → mcp-server registerTool({ …, annotations })
   → tools/list response (advisory hints only)
-  → GET /tools parity (F.5)
+  → GET /tools parity (architecture § HTTP wiring)
 ```
 
 Apply tools already gated by `--yes` / `yes: true` in handlers — annotations are client-side UX only.

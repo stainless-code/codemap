@@ -2,7 +2,7 @@
 
 > **Status:** open · **Priority:** P2 · **Effort:** M (~2 weeks)
 >
-> **Motivator:** CRAP (Change Risk Analysis and Predictions) ranks functions that are **complex and undertested** — a standard refactor-risk metric. Codemap already has `symbols.complexity` and real `coverage` after `ingest-coverage`, but recipes like `high-complexity-untested` are empty or misleading when no coverage file exists (`COALESCE(coverage_pct, 0)` treats everything as 0%). Graph-estimated coverage uses **test-file reachability** over `dependencies` / `calls` / `test_suites` to infer coverage tiers when measured data is absent.
+> **Motivator:** CRAP ranks **complex and undertested** functions. Codemap has `symbols.complexity` + ingested `coverage`, but `high-complexity-untested` is **misleading without ingest** (`COALESCE(coverage_pct, 0)` treats missing as 0%). Graph-estimated tiers (85/40/0%) from test reachability when measured coverage is absent.
 >
 > **Roadmap:** [§ Recipe & audit enrichment](../roadmap.md#recipe--audit-enrichment)
 

@@ -14,7 +14,7 @@
 | --- | ----------------------------------------------------------------------------------------------------------- | ------------------------- |
 | L.1 | **Measure before flipping default** — benchmark 3 fixture sizes for index time + DB bytes with/without FTS. | Empirical gate            |
 | L.2 | If adopted: change **`config.ts` default** `fts5: true` for new projects only; existing configs unchanged.  | No silent behavior change |
-| L.3 | **`--with-fts` / `--no-fts`** CLI flags continue to override.                                               | Explicit escape hatch     |
+| L.3 | **`--with-fts`** CLI flag overrides config; config `fts5: false` opts out (no `--no-fts` flag today).       | Explicit escape hatch     |
 | L.4 | Document size tax in README + packaging.md.                                                                 | Transparency              |
 
 ---

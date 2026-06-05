@@ -1,6 +1,6 @@
 # Perf-triangulation rollout
 
-**Status:** Phases 0-2 + Phase 5 shipped (via PRs [#95](https://github.com/stainless-code/codemap/pull/95) audit docs · [#96](https://github.com/stainless-code/codemap/pull/96) Tier 1-5 + Tier 5.1 · [#99](https://github.com/stainless-code/codemap/pull/99) CI-runner baseline · [#100](https://github.com/stainless-code/codemap/pull/100) hard gate · [#101](https://github.com/stainless-code/codemap/pull/101) docs refresh · [#102](https://github.com/stainless-code/codemap/pull/102) audit closure · [#103](https://github.com/stainless-code/codemap/pull/103) Phase 2). **Hard gate superseded by [#137](https://github.com/stainless-code/codemap/pull/137)** — perf baseline is local + weekly scheduled only (see [`benchmark.md` § Perf baseline](../benchmark.md#perf-baseline-regression-guardrail)). Surviving deferrals (Tier 5.2 / 5.4 / 5.6 / 5.7 / 6.1 / 6.2) lifted to [`roadmap.md`](../roadmap.md). Phases 3-4 pending.
+**Status:** Phases 0-2 + Phase 5 **shipped**; Phase 3 **open** (parse-insert + ast-cache plan PRs); Phase 4 **closed** (deferrals in [`roadmap.md`](../roadmap.md)). (via PRs [#95](https://github.com/stainless-code/codemap/pull/95) audit docs · [#96](https://github.com/stainless-code/codemap/pull/96) Tier 1-5 + Tier 5.1 · [#99](https://github.com/stainless-code/codemap/pull/99) CI-runner baseline · [#100](https://github.com/stainless-code/codemap/pull/100) hard gate · [#101](https://github.com/stainless-code/codemap/pull/101) docs refresh · [#102](https://github.com/stainless-code/codemap/pull/102) audit closure · [#103](https://github.com/stainless-code/codemap/pull/103) Phase 2). **Hard gate superseded by [#137](https://github.com/stainless-code/codemap/pull/137)** — perf baseline is local + weekly scheduled only (see [`benchmark.md` § Perf baseline](../benchmark.md#perf-baseline-regression-guardrail)). Surviving deferrals (Tier 5.2 / 5.4 / 5.6 / 5.7 / 6.1 / 6.2) lifted to [`roadmap.md`](../roadmap.md). Phase 3 open; Phase 4 closed (deferrals lifted to roadmap).
 
 **Provenance:** Synthesis + execution of 5 independent perf/architecture audits authored 2026-05-17 by Codex 5.3, Kimi K2.5, Claude Opus 4.7, Composer, and GPT-5.5. All five obeyed the same constraint set: **no behavior change, no schema slimming, no FTS5 default flip** (per [`roadmap.md` Moat B](../roadmap.md) + [`README.md` Rule 6](../README.md)). Per-model audit text was consolidated into this doc on 2026-05-18; full original text recoverable via `git show cc28bce -- docs/audits/2026-05-17-performance-architecture-audit-*.md`.
 
@@ -20,63 +20,9 @@
 
 ## What shipped
 
-| Tier      | Item                                                                                                                                                       | Commit on `main`                                                                    |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 1.1       | Instrument bindings / cycles / re-export tail (`bindings_ms` / `module_cycles_ms` / `re_export_chains_ms`) + `CODEMAP_PERFORMANCE_JSON` env var            | `cc8daed` (#96)                                                                     |
-| 1.2       | Perf-baseline regression guardrail (`scripts/check-perf-baseline.ts` + CI job + docs)                                                                      | `cc8daed` (#96); CI baseline re-capture `ebb862e` (#99); hard gate `c0cdf0e` (#100) |
-| 2.1       | `collectFiles` glob `ignore` + single-call refactor (collect_ms -93%)                                                                                      | `cc8daed` (#96)                                                                     |
-| 2.2       | `query_batch` single read-only connection                                                                                                                  | `cc8daed` (#96)                                                                     |
-| 2.3       | Incremental double read+hash kill                                                                                                                          | `cc8daed` (#96)                                                                     |
-| 3.1       | Shared `countLines` helper                                                                                                                                 | `cc8daed` (#96)                                                                     |
-| 3.2       | `queryRows` `query_only=1` parity (correctness hardening — the one user-visible behavior change)                                                           | `cc8daed` (#96)                                                                     |
-| 3.2b      | `printQueryResult` `query_only=1` parity — ad-hoc `codemap query "<SQL>"` CLI path (closes last read-only gap vs `executeQuery`)                           | #107                                                                                |
-| 3.3       | `CODEMAP_PARSE_WORKERS` env override                                                                                                                       | `cc8daed` (#96)                                                                     |
-| 3.4       | `stmtCache` placeholder memo                                                                                                                               | `cc8daed` (#96)                                                                     |
-| 4.1       | SQLite `busy_timeout = 100`                                                                                                                                | `cc8daed` (#96)                                                                     |
-| 4.2       | Duplicate `createSchema` call dedupe                                                                                                                       | `cc8daed` (#96)                                                                     |
-| 4.3       | `localeCompare` → byte-order sort                                                                                                                          | `cc8daed` (#96)                                                                     |
-| 4.4       | `getAdapterForExtension` Map lookup                                                                                                                        | `cc8daed` (#96)                                                                     |
-| 5.3       | FTS5 batched delete                                                                                                                                        | `cc8daed` (#96)                                                                     |
-| 5.5       | `getAllFileHashes` hoist between `getChangedFiles` + `indexFiles`                                                                                          | `cc8daed` (#96)                                                                     |
-| **5.1**   | **bindings_ms -33% on 2k-file corpus** — NOT the predicted Map.get hoist (see § Decisions of record below); profile-driven PRAGMA-window extension instead | `cc8daed` (#96)                                                                     |
-| Phase 2.1 | `PRAGMA journal_mode = OFF` during full-rebuild bulk-insert window                                                                                         | `be78b6c` (#103)                                                                    |
-| Phase 2.2 | `INSERT` (not `INSERT OR REPLACE`) on full-rebuild bulk paths                                                                                              | `be78b6c` (#103)                                                                    |
-| Phase 2.3 | Per-table `BATCH_SIZE = min(5000, floor(32766/col_count))` (10× wider for 4-col tables)                                                                    | `be78b6c` (#103)                                                                    |
+Live inventory: [`benchmark.md` § Perf baseline](../benchmark.md#perf-baseline-regression-guardrail) + `scripts/check-perf-baseline.ts`. Key milestones: Tier 1.1 instrumentation (`bindings_ms` / `module_cycles_ms` / `re_export_chains_ms`), Tier 2.1 glob `ignore`, Tier 3.2 `query_only=1` parity, Tier 5.1 PRAGMA-window bindings win (not Map hoist — see § Decisions of record), Phase 2 PRAGMA `journal_mode=OFF` bulk window ([#103](https://github.com/stainless-code/codemap/pull/103)). Hard gate demoted to weekly scheduled ([#137](https://github.com/stainless-code/codemap/pull/137)).
 
----
-
-## Consensus matrix
-
-Every distinct finding across the five source audits, with per-audit priority. Empty cell = not raised. **This is the audit synthesis's main durable artifact: the only place that shows which audits agreed on what, and the only way to reconstruct it without re-reading all five originals.**
-
-| #   | Finding                                                                       | Codex            | Kimi     | Claude                                                         | Composer | GPT-5.5                                 | Audits           |
-| --- | ----------------------------------------------------------------------------- | ---------------- | -------- | -------------------------------------------------------------- | -------- | --------------------------------------- | ---------------- |
-| 1   | Main-thread / worker→main IPC cost (existence)                                | P1 (FTS payload) | P2       | P2 (4.6)                                                       | P2       | P2                                      | **5**            |
-| 2   | Shared `line_count` / double-newline-scan helper                              | —                | P1       | P2 (4.5)                                                       | P1       | —                                       | **3**            |
-| 3   | Falsifiable benchmark CI                                                      | —                | P1       | —                                                              | P1       | P1                                      | **3**            |
-| 4   | Bindings resolver memory + CPU scaling                                        | —                | P2       | P2 (4.7)                                                       | P2       | —                                       | **3**            |
-| 5   | `queryRows` ↔ `executeQuery` `query_only=1` parity                            | —                | P3       | P3 (4.13 echo)                                                 | P3       | —                                       | **3**            |
-| 5b  | `printQueryResult` ↔ `executeQuery` `query_only=1` parity (CLI ad-hoc SQL)    | —                | —        | —                                                              | —        | —                                       | **1** (#107)     |
-| 6   | `stmtCache` eviction (LRU or placeholder pre-compute)                         | —                | P4       | P3 (4.12)                                                      | P4       | —                                       | **3**            |
-| 7   | Worker pool configurability (env / dynamic)                                   | P1 (dynamic)     | P3 (env) | —                                                              | P3 (env) | —                                       | **3**            |
-| 8   | `collectFiles` glob `ignore` + single-call                                    | —                | —        | **P0 (4.1, measured ~12.8× on glob, ~24% on cold-build wall)** | —        | P0                                      | **2**            |
-| 9   | `query_batch` single read-only connection                                     | P0               | —        | —                                                              | —        | P0                                      | **2**            |
-| 10  | Instrument bindings / cycles / re-export tail in `--performance`              | —                | —        | P1 (4.3, ~32% of `total_ms` invisible)                         | —        | P0                                      | **2**            |
-| 11  | Incremental path: avoid double read+hash                                      | —                | —        | P1 (4.2)                                                       | —        | P1                                      | **2**            |
-| 12  | Persistent read-only connection pool (long-running transports)                | —                | P3       | —                                                              | P3       | (deferred)                              | **2** + 1 caveat |
-| 13  | Duplicate `createSchema` in `runCodemapIndex`                                 | P0               | —        | —                                                              | —        | —                                       | 1                |
-| 14  | `--group-by owner\|package` bucketizer cache                                  | P0               | —        | —                                                              | —        | —                                       | 1                |
-| 15  | Sync git subprocess collapse (`spawnSync`)                                    | P1               | —        | —                                                              | —        | —                                       | 1                |
-| 16  | FTS worker payload amplification (`parsed.content` cross-thread)              | P1               | —        | —                                                              | —        | —                                       | 1                |
-| 17  | CI: repeated `bun install` / `package-manager-detector` install               | P2               | —        | —                                                              | —        | —                                       | 1                |
-| 18  | SQLite `busy_timeout` for benign writer collisions (`recency` lock seen live) | —                | —        | —                                                              | —        | **P1 (direct evidence from audit run)** | 1                |
-| 19  | `localeCompare` → byte-order sort for ASCII paths                             | —                | —        | P2 (4.4)                                                       | —        | —                                       | 1                |
-| 20  | `getAdapterForExtension` linear scan → `Map`                                  | —                | —        | P3 (4.8)                                                       | —        | —                                       | 1                |
-| 21  | FTS5 batched delete (1-`db.run`-per-path today)                               | —                | —        | P3 (4.9)                                                       | —        | —                                       | 1                |
-| 22  | `extractMarkers` lineMap reuse on TS/JS                                       | —                | —        | P3 (4.10)                                                      | —        | —                                       | 1                |
-| 23  | `getAllFileHashes` hoist (shared between `getChangedFiles` + `indexFiles`)    | —                | —        | P3 (4.11)                                                      | —        | —                                       | 1                |
-
----
+**Consensus matrix (5 audits):** archived — `git show cc28bce -- docs/audits/2026-05-17-performance-architecture-audit-*.md`. Surviving deferrals: [`roadmap.md` § Perf-triangulation deferrals](../roadmap.md#perf-triangulation-deferrals-trigger-gated).
 
 ## Decisions of record
 
@@ -121,63 +67,6 @@ None of the five source audits examined these — useful starting points if a fo
 
 ---
 
-## Historical evidence (preserved verbatim from source audits)
-
-These numbers ground the audit's measurement claims and are not reproducible by re-running today (different code state, different machine). Useful as historical comparison points.
-
-### Pre-perf-work baseline (GPT-5.5 audit, 2026-05-17)
-
-`bun src/index.ts --full --performance` on this repo at the audit-time commit:
-
-| Phase         |      ms |
-| ------------- | ------: |
-| collect       |     260 |
-| parse         |     162 |
-| insert        |     163 |
-| index_create  |      68 |
-| **index_run** | **596** |
-
-`bun src/benchmark.ts` at the same commit:
-
-| Area                                      | Result                |
-| ----------------------------------------- | --------------------- |
-| Indexed queries vs traditional scan total | 43.98 ms vs 462.92 ms |
-| Traditional bytes read across scenarios   | ~6.9 MB               |
-| Reindex benchmark, targeted 3 files       | avg 185.66 ms         |
-| Reindex benchmark, incremental no changes | avg 202.79 ms         |
-| Reindex benchmark, full rebuild           | avg 705.84 ms         |
-
-Indexed substrate at that time: 340 files, 6,593 symbols, 42,598 references, 32,144 bindings, 393 dependencies.
-
-### Claude's `tinyglobby` micro-bench (the evidence behind Tier 2.1)
-
-Standalone `bun -e` micro-bench from repo root at the audit-time commit:
-
-| Strategy                                                                                                  | Paths returned             |    Wall time |
-| --------------------------------------------------------------------------------------------------------- | -------------------------- | -----------: |
-| Current (5 calls, no `ignore`)                                                                            | 6,838 (post-filter to 340) | **198.6 ms** |
-| Single call, all 5 patterns + `ignore: ['**/node_modules/**','**/.git/**','**/dist/**','**/.codemap/**']` | 366                        |  **15.5 ms** |
-
-This was the empirical basis for Tier 2.1's design (single-call + `ignore` + tinyglobby on both runtimes since `Bun.Glob` lacks `ignore`).
-
-### Codex hotspot SQL queries (validation kit for future perf audits)
-
-```sql
--- Largest files
-SELECT path, size, line_count, language FROM files ORDER BY size DESC LIMIT 20;
-
--- Complexity hotspots
-SELECT name, file_path, complexity, body_line_count, nesting_depth, param_count
-FROM symbols WHERE complexity IS NOT NULL
-ORDER BY complexity DESC, body_line_count DESC LIMIT 20;
-
--- node:child_process concentration (a perf-relevant subprocess signal)
-SELECT file_path, source FROM imports
-WHERE source='node:child_process' ORDER BY file_path;
-```
-
----
-
 ## Surviving deferrals (lifted to `roadmap.md`, trigger-gated)
 
 | Item                                                          | Trigger                                                                                                                            |
@@ -195,21 +84,9 @@ See [`roadmap.md`](../roadmap.md) for the consolidated backlog entry.
 
 ## Phases — execution sequence
 
-### Phase 0 — pre-merge housekeeping ✅
-
-- [x] **Changeset** for PR #96. Shipped in [#96](https://github.com/stainless-code/codemap/pull/96).
-- [x] PR #95 + #96 marked ready for review, merged.
-
-### Phase 1 — merge + CI variance characterisation ✅
-
-- [x] Merged [#95](https://github.com/stainless-code/codemap/pull/95) (audit docs) + [#96](https://github.com/stainless-code/codemap/pull/96) (Tier 1-5 + 5.1 code).
-- [x] **CI variance characterised on first run** — within-run variance ~5% (882/838/866 ms total across 3 internal samples), well inside the 25% threshold. Issue was systematic CI-slowness (2-4× vs local), not noise.
-- [x] **Re-baselined from CI runner medians** in [#99](https://github.com/stainless-code/codemap/pull/99) — local was the wrong baseline source.
-- [x] **Promoted `📈 Perf baseline (self-index)` to hard gate** in [#100](https://github.com/stainless-code/codemap/pull/100) — **later demoted to weekly scheduled only in [#137](https://github.com/stainless-code/codemap/pull/137)** (GHA runner variance; not on PR CI path today).
-
-### Phase 2 — PRAGMA + INSERT tuning trio ✅
-
-Shipped in [#103](https://github.com/stainless-code/codemap/pull/103) as three focused commits. See § What shipped above for per-sub-item refs.
+- **Phases 0–2, 5:** shipped (see § What shipped). Checklist archaeology: `git log --follow -- docs/plans/perf-triangulation-rollout.md`.
+- **Phase 3:** open — plan PRs for `parse-insert-pipeline.md` and `ast-cache.md` before code (see below).
+- **Phase 4:** closed — trigger-gated items in roadmap.
 
 ### Phase 3 — plan PRs before code (architectural changes) — pending
 
@@ -240,17 +117,6 @@ Open questions:
 - Cold-start cost on first run (no cache yet) — no regression vs today.
 - Cache poisoning: detection + recovery.
 - Interaction with the worker pool: workers consult cache before parsing; main reconciles.
-
-### Phase 4 — trigger-gated deferrals (not on the critical path)
-
-See § Surviving deferrals above + [`roadmap.md`](../roadmap.md) for the canonical list.
-
-### Phase 5 — close the triangulation audit ✅
-
-- [x] Added one `roadmap.md` backlog line consolidating Phase 4 deferrals with explicit trigger conditions. Shipped in [#102](https://github.com/stainless-code/codemap/pull/102).
-- [x] **Consolidated all audit content into this plan** (PR shipping this consolidation) so the audit substrate doesn't drift apart from the rollout substrate. Per-model source audits and the triangulation file deleted from `docs/audits/`; full text recoverable via git history at SHA `cc28bce`.
-
----
 
 ## What NOT to do
 
