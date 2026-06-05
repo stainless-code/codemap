@@ -105,10 +105,18 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     if (a === "--params") {
       const next = tail[i + 1];
       if (next === undefined) {
-        return {
-          kind: "rewrite",
-          argv: ["apply", RENAME_RECIPE_ID, "--params"],
-        };
+        const bareOnly =
+          passthrough.length === 0 &&
+          (params === undefined || Object.keys(params).length === 0);
+        if (bareOnly) {
+          return {
+            kind: "rewrite",
+            argv: ["apply", RENAME_RECIPE_ID, "--params"],
+          };
+        }
+        passthrough.push(a);
+        i++;
+        continue;
       }
       params = mergeParams(params, parseParamsCli(next));
       i += 2;
@@ -181,6 +189,9 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
   }
 
   if (!hasOldNew) {
+    if (applyTail.includes("--params")) {
+      return { kind: "rewrite", argv: buildApplyArgv(params, applyTail) };
+    }
     return renameError(
       "codemap rename: requires <old> and <new> (or pass old=/new= via --params).",
     );

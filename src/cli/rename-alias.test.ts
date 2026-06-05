@@ -108,6 +108,34 @@ describe("resolveRenameAlias", () => {
     ]);
   });
 
+  it("preserves prior state when trailing bare --params follows values", () => {
+    expect(
+      rewrite(["rename", "--params", "old=foo,new=bar", "--params"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=bar,old=foo",
+      "--params",
+    ]);
+  });
+
+  it("preserves positionals and apply flags when trailing bare --params", () => {
+    expect(rewrite(["rename", "helper", "worker", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--params",
+    ]);
+    expect(rewrite(["rename", "--dry-run", "--params"])).toEqual([
+      "apply",
+      "rename-preview",
+      "--dry-run",
+      "--params",
+    ]);
+  });
+
   it("errors on missing --define-in operand", () => {
     expect(renameError(["rename", "a", "b", "--define-in"])).toContain(
       '"--define-in" requires a file path',
