@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import { parseApplyRest } from "./cmd-apply.js";
 import { formatParamsCli, resolveRenameAlias } from "./rename-alias.js";
 
 function rewrite(rest: string[]): string[] | undefined {
@@ -98,6 +99,7 @@ describe("resolveRenameAlias", () => {
 
   it("returns null when help is requested", () => {
     expect(resolveRenameAlias(["rename", "--help"])).toBeNull();
+    expect(resolveRenameAlias(["rename", "-h"])).toBeNull();
   });
 
   it("does not treat a symbol named --help as help when it is not first", () => {
@@ -146,6 +148,38 @@ describe("resolveRenameAlias", () => {
       "--commit",
       "chore: rename a→b",
     ]);
+  });
+
+  it("passes space-separated --commit through to apply", () => {
+    expect(
+      rewrite(["rename", "a", "b", "--commit", "chore: rename a→b", "--yes"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--commit",
+      "chore: rename a→b",
+      "--yes",
+    ]);
+  });
+
+  it("does not treat a following flag as --commit operand", () => {
+    const argv = rewrite(["rename", "a", "b", "--commit", "--dry-run"]);
+    expect(argv).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=b,old=a",
+      "--commit",
+      "--dry-run",
+    ]);
+    const parsed = parseApplyRest(argv!);
+    expect(parsed.kind).toBe("run");
+    if (parsed.kind === "run") {
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.commitMessage).toBeUndefined();
+    }
   });
 
   it("rejects empty old/new in --params", () => {

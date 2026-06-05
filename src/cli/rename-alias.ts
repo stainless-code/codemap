@@ -48,22 +48,32 @@ function splitPassthrough(tokens: string[]): {
     const a = tokens[i]!;
     const maxPasses = readFlagOperand("--max-passes", a, tokens, i);
     if (maxPasses !== null) {
-      if (maxPasses.value !== undefined) {
-        applyTail.push("--max-passes", maxPasses.value);
+      const operand =
+        maxPasses.value !== undefined && !maxPasses.value.startsWith("-")
+          ? maxPasses.value
+          : undefined;
+      if (operand !== undefined) {
+        applyTail.push("--max-passes", operand);
+        i = maxPasses.nextIndex;
       } else {
         applyTail.push("--max-passes");
+        i++;
       }
-      i = maxPasses.nextIndex;
       continue;
     }
     const commit = readFlagOperand("--commit", a, tokens, i);
     if (commit !== null) {
-      if (commit.value !== undefined) {
-        applyTail.push("--commit", commit.value);
+      const operand =
+        commit.value !== undefined && !commit.value.startsWith("-")
+          ? commit.value
+          : undefined;
+      if (operand !== undefined) {
+        applyTail.push("--commit", operand);
+        i = commit.nextIndex;
       } else {
         applyTail.push("--commit");
+        i++;
       }
-      i = commit.nextIndex;
       continue;
     }
     if (isApplyPassthroughFlag(a)) {
