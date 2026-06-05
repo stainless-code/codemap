@@ -22,6 +22,8 @@ import {
 } from "../db";
 import { initCodemap } from "../runtime";
 import { createMcpServer } from "./mcp-server";
+import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
+import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 
 let benchDir: string;
 
@@ -123,6 +125,49 @@ describe("MCP server — tool allowlist", () => {
       const names = tools.tools.map((t) => t.name);
       expect(names).toContain("query");
       expect(names).not.toContain("query_batch");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("registers ToolAnnotations on every default tool", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools.map((t) => t.name).sort()).toEqual(
+        [...MCP_TOOL_NAMES].sort(),
+      );
+      for (const tool of tools.tools) {
+        expect(tool.annotations).toEqual(
+          MCP_TOOL_ANNOTATIONS[tool.name as keyof typeof MCP_TOOL_ANNOTATIONS],
+        );
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("registers MCP ToolAnnotations on allowlisted tools", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,apply,show",
+    });
+    try {
+      const tools = await client.listTools();
+      const byName = new Map(tools.tools.map((t) => [t.name, t]));
+      expect(byName.get("query")?.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+      expect(byName.get("apply")?.annotations).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      });
+      expect(byName.get("show")?.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
     } finally {
       await server.close();
     }

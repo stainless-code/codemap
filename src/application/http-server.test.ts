@@ -15,6 +15,8 @@ import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import { handleRequest } from "./http-server";
+import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
+import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 import { createManagedWatchSession } from "./session-lifecycle";
 import { _resetWatchStateForTests } from "./watcher";
 
@@ -126,14 +128,38 @@ describe("http-server — health + tools catalog", () => {
     expect(body.version).toBe("0.0.0-test");
   });
 
-  it("GET /tools returns the catalog", async () => {
+  it("GET /tools returns the catalog with annotation hints", async () => {
     serverHandle = await startServer();
     const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tools`);
-    const body = (await r.json()) as { tools: { name: string }[] };
+    const body = (await r.json()) as {
+      tools: {
+        name: string;
+        readOnlyHint: boolean;
+        destructiveHint: boolean;
+        idempotentHint: boolean;
+      }[];
+    };
     expect(body.tools.map((t) => t.name)).toContain("query");
     expect(body.tools.map((t) => t.name)).toContain("audit");
     expect(body.tools.map((t) => t.name)).toContain("affected");
     expect(body.tools.map((t) => t.name)).toContain("trace");
+    const query = body.tools.find((t) => t.name === "query");
+    const apply = body.tools.find((t) => t.name === "apply");
+    expect(query).toMatchObject({
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+    });
+    expect(apply).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: false,
+    });
+    expect(body.tools).toHaveLength(MCP_TOOL_NAMES.length);
+    for (const name of MCP_TOOL_NAMES) {
+      const entry = body.tools.find((t) => t.name === name);
+      expect(entry).toMatchObject(MCP_TOOL_ANNOTATIONS[name]);
+    }
   });
 
   it("404 for unknown route", async () => {

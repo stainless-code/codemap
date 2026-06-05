@@ -18,6 +18,8 @@ import {
   warnIndexFreshnessToStderr,
 } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
+import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
+import { buildHttpToolCatalogEntry } from "./mcp-tool-annotations";
 import { listResources, readResource } from "./resource-handlers";
 import {
   bindWatchClientRelease,
@@ -107,29 +109,6 @@ export interface HttpServerOpts {
   /** Injected by `runHttpServer` or tests. */
   managedWatchSession?: ManagedWatchSession;
 }
-
-const TOOL_NAMES = [
-  "query",
-  "query_batch",
-  "query_recipe",
-  "audit",
-  "context",
-  "validate",
-  "show",
-  "snippet",
-  "impact",
-  "affected",
-  "trace",
-  "explore",
-  "node",
-  "apply",
-  "apply_rows",
-  "apply_diff_input",
-  "save_baseline",
-  "list_baselines",
-  "drop_baseline",
-  "ingest_coverage",
-] as const;
 
 /**
  * Bootstrap codemap once at server boot, then attach a long-running HTTP
@@ -311,7 +290,7 @@ export async function handleRequest(
     return writeJson(
       res,
       200,
-      { tools: TOOL_NAMES.map((name) => ({ name })) },
+      { tools: MCP_TOOL_NAMES.map((name) => buildHttpToolCatalogEntry(name)) },
       opts.version,
     );
   }
@@ -356,7 +335,7 @@ export async function handleRequest(
 
   if (method === "POST" && path.startsWith("/tool/")) {
     const name = path.slice("/tool/".length);
-    if (!(TOOL_NAMES as readonly string[]).includes(name)) {
+    if (!(MCP_TOOL_NAMES as readonly string[]).includes(name)) {
       return writeJson(
         res,
         404,
@@ -619,7 +598,7 @@ async function dispatchTool(
       break;
     }
     default: {
-      // Reachable only if TOOL_NAMES gains an entry without a switch arm —
+      // Reachable only if MCP_TOOL_NAMES gains an entry without a switch arm —
       // the route guard above catches user-typed unknown names.
       return writeJson(
         res,
