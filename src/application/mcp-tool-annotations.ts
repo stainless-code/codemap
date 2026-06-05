@@ -15,7 +15,8 @@ export function sdkSupportsMcpToolAnnotations(): boolean {
     typeof shape === "object" &&
     shape !== null &&
     "readOnlyHint" in shape &&
-    "destructiveHint" in shape
+    "destructiveHint" in shape &&
+    "idempotentHint" in shape
   );
 }
 
