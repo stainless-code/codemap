@@ -667,8 +667,9 @@ function validate<T extends ZodRawShape>(
  * issue `fetch('http://127.0.0.1:7878/tool/save_baseline', {method: 'POST', body: '{...}'})`.
  * The browser sends the request (CORS only blocks the *response* from
  * being read by JS — the request itself reaches us and any side effect
- * executes). For state-changing tools (`save_baseline`, `drop_baseline`)
- * this lets a malicious page mutate the developer's `.codemap/index.db`.
+ * executes). For state-changing tools (`save_baseline`, `drop_baseline`,
+ * `ingest_coverage`) this lets a malicious page mutate the developer's
+ * `.codemap/index.db`.
  *
  * DNS rebinding extends the same attack: `evil.com` resolves to
  * `127.0.0.1` after page load; the browser sends `Host: evil.com:7878`
