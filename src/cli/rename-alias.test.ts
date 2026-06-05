@@ -168,6 +168,16 @@ describe("resolveRenameAlias", () => {
     );
   });
 
+  it("errors when a scoped flag is followed by another flag", () => {
+    expect(
+      renameError(["rename", "a", "b", "--define-in", "--dry-run"]),
+    ).toContain('"--define-in" requires a file path');
+  });
+
+  it("errors on bare rename with no old/new", () => {
+    expect(renameError(["rename"])).toContain("requires <old> and <new>");
+  });
+
   it("errors on a single positional", () => {
     expect(renameError(["rename", "helper"])).toContain(
       "requires <old> and <new>",

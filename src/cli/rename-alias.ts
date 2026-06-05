@@ -147,7 +147,7 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     }
     const defineIn = readFlagOperand("--define-in", a, tail, i);
     if (defineIn !== null) {
-      if (defineIn.value === undefined) {
+      if (defineIn.value === undefined || defineIn.value.startsWith("-")) {
         return renameError(
           'codemap rename: "--define-in" requires a file path.',
         );
@@ -158,7 +158,7 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     }
     const inFile = readFlagOperand("--in-file", a, tail, i);
     if (inFile !== null) {
-      if (inFile.value === undefined) {
+      if (inFile.value === undefined || inFile.value.startsWith("-")) {
         return renameError(
           'codemap rename: "--in-file" requires a path prefix.',
         );
@@ -169,7 +169,7 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     }
     const kind = readFlagOperand("--kind", a, tail, i);
     if (kind !== null) {
-      if (kind.value === undefined) {
+      if (kind.value === undefined || kind.value.startsWith("-")) {
         return renameError('codemap rename: "--kind" requires a symbol kind.');
       }
       params = mergeParams(params, { kind: kind.value });
