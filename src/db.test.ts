@@ -182,6 +182,66 @@ describe("SQLite layer (in-memory)", () => {
     }
   });
 
+  it("symbols.cognitive_complexity round-trips via insertSymbols", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      insertFile(db, {
+        path: "x.ts",
+        content_hash: "abc",
+        size: 1,
+        line_count: 1,
+        language: "ts",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      insertSymbols(db, [
+        {
+          file_path: "x.ts",
+          name: "nested",
+          kind: "function",
+          line_start: 1,
+          line_end: 10,
+          signature: "nested(): void",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+          complexity: 4,
+          cognitive_complexity: 6,
+        },
+        {
+          file_path: "x.ts",
+          name: "plain",
+          kind: "interface",
+          line_start: 12,
+          line_end: 12,
+          signature: "interface plain",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+        },
+      ]);
+
+      const rows = db
+        .query("SELECT name, cognitive_complexity FROM symbols ORDER BY name")
+        .all() as Array<{ name: string; cognitive_complexity: number | null }>;
+      expect(rows).toEqual([
+        { name: "nested", cognitive_complexity: 6 },
+        { name: "plain", cognitive_complexity: null },
+      ]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("query_baselines round-trips upsert / get / list / delete", () => {
     const db = openCodemapDatabase(":memory:");
     try {
@@ -409,6 +469,15 @@ describe("SQLite layer (in-memory)", () => {
             .get() as { n: number }
         ).n,
       ).toBe(2);
+      expect(
+        (
+          db
+            .query<{ n: number }>(
+              "SELECT COUNT(*) AS n FROM pragma_table_info('symbols') WHERE name = 'cognitive_complexity'",
+            )
+            .get() as { n: number }
+        ).n,
+      ).toBe(1);
 
       expect(listQueryBaselines(db).map((b) => b.name)).toEqual(["fan-out"]);
       expect(getQueryBaseline(db, "fan-out")?.git_ref).toBe("v27-head");
