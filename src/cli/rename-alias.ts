@@ -68,6 +68,28 @@ function readFlagOperand(
   return null;
 }
 
+/** Drop bare `--params` tokens when recipe params are already serialized. */
+function stripRedundantBareParams(applyTail: string[]): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < applyTail.length) {
+    const a = applyTail[i]!;
+    if (a === "--params") {
+      const next = applyTail[i + 1];
+      if (next === undefined || next.startsWith("-")) {
+        i++;
+        continue;
+      }
+      out.push(a, next);
+      i += 2;
+      continue;
+    }
+    out.push(a);
+    i++;
+  }
+  return out;
+}
+
 function buildApplyArgv(
   params: RecipeParamValues | undefined,
   applyTail: string[],
@@ -198,7 +220,10 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     );
   }
 
-  return { kind: "rewrite", argv: buildApplyArgv(params, applyTail) };
+  return {
+    kind: "rewrite",
+    argv: buildApplyArgv(params, stripRedundantBareParams(applyTail)),
+  };
 }
 
 export function printRenameAliasHelp(): void {

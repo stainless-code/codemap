@@ -108,26 +108,28 @@ describe("resolveRenameAlias", () => {
     ]);
   });
 
-  it("preserves prior state when trailing bare --params follows values", () => {
+  it("drops redundant bare --params when old/new are already bound", () => {
     expect(
       rewrite(["rename", "--params", "old=foo,new=bar", "--params"]),
-    ).toEqual([
-      "apply",
-      "rename-preview",
-      "--params",
-      "new=bar,old=foo",
-      "--params",
-    ]);
-  });
-
-  it("preserves positionals and apply flags when trailing bare --params", () => {
+    ).toEqual(["apply", "rename-preview", "--params", "new=bar,old=foo"]);
     expect(rewrite(["rename", "helper", "worker", "--params"])).toEqual([
       "apply",
       "rename-preview",
       "--params",
       "new=worker,old=helper",
-      "--params",
     ]);
+    expect(
+      rewrite(["rename", "helper", "worker", "--params", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("delegates incomplete old/new with bare --params in apply tail", () => {
     expect(rewrite(["rename", "--dry-run", "--params"])).toEqual([
       "apply",
       "rename-preview",
@@ -144,7 +146,6 @@ describe("resolveRenameAlias", () => {
       "rename-preview",
       "--params",
       "new=worker,old=helper",
-      "--params",
       "--dry-run",
     ]);
   });
