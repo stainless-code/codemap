@@ -104,8 +104,9 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     const a = tail[i]!;
     if (a === "--params") {
       const next = tail[i + 1];
-      if (next === undefined) {
+      if (next === undefined || next.startsWith("-")) {
         const bareOnly =
+          next === undefined &&
           passthrough.length === 0 &&
           (params === undefined || Object.keys(params).length === 0);
         if (bareOnly) {

@@ -136,6 +136,19 @@ describe("resolveRenameAlias", () => {
     ]);
   });
 
+  it("does not treat a following flag as --params operand", () => {
+    expect(
+      rewrite(["rename", "helper", "worker", "--params", "--dry-run"]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "new=worker,old=helper",
+      "--params",
+      "--dry-run",
+    ]);
+  });
+
   it("errors on missing --define-in operand", () => {
     expect(renameError(["rename", "a", "b", "--define-in"])).toContain(
       '"--define-in" requires a file path',
