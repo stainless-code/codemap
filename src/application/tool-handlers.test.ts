@@ -117,6 +117,32 @@ describe("handleQuery baseline", () => {
       error: expect.stringContaining('no baseline named "missing-baseline"'),
     });
   });
+
+  it("returns 400 for corrupt baseline rows_json", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "bad",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "not-json",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "bad" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 400,
+      error: expect.stringContaining("corrupt rows_json"),
+    });
+  });
 });
 
 describe("handleQueryRecipe baseline", () => {

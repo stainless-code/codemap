@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { resolveCodemapConfig } from "../config";
 import {
@@ -80,6 +81,25 @@ describe("resolveCoverageArtifact", () => {
     mkdirSync(dir);
     expect(() => resolveCoverageArtifact(dir, projectRoot)).toThrow(
       /contains neither/,
+    );
+  });
+
+  it("resolves directory with istanbul only", () => {
+    const dir = join(projectRoot, "cov-istanbul");
+    mkdirSync(dir);
+    const file = join(dir, "coverage-final.json");
+    writeFileSync(file, "{}");
+    expect(resolveCoverageArtifact(dir, projectRoot)).toEqual({
+      format: "istanbul",
+      absPath: file,
+    });
+  });
+
+  it("errors on undetectable file extension", () => {
+    const file = join(projectRoot, "coverage.txt");
+    writeFileSync(file, "data");
+    expect(() => resolveCoverageArtifact(file, projectRoot)).toThrow(
+      /cannot auto-detect format/,
     );
   });
 });
@@ -184,6 +204,135 @@ describe("runIngestCoverageOnDb", () => {
         name: string;
       }>;
       expect(rows.map((r) => r.name)).toEqual(["get"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("ingests lcov artifact into coverage table", async () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      createIndexes(db);
+      insertFile(db, {
+        path: "src/lib/cache.ts",
+        content_hash: "h1",
+        size: 1,
+        line_count: 100,
+        language: "typescript",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      insertSymbols(db, [
+        {
+          file_path: "src/lib/cache.ts",
+          name: "get",
+          kind: "function",
+          line_start: 9,
+          line_end: 15,
+          signature: "get(): void",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+        },
+      ]);
+
+      const lcov = [
+        "TN:",
+        `SF:${projectRoot}/src/lib/cache.ts`,
+        "DA:10,1",
+        "end_of_record",
+        "",
+      ].join("\n");
+      writeFileSync(join(projectRoot, "lcov.info"), lcov);
+
+      const outcome = await runIngestCoverageOnDb(db, {
+        projectRoot,
+        path: "lcov.info",
+      });
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      expect(outcome.result.format).toBe("lcov");
+      expect(outcome.result.ingested.symbols).toBe(1);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("ingests v8 runtime directory into coverage table", async () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      createIndexes(db);
+      insertFile(db, {
+        path: "src/lib/cache.ts",
+        content_hash: "h1",
+        size: 1,
+        line_count: 100,
+        language: "typescript",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      insertSymbols(db, [
+        {
+          file_path: "src/lib/cache.ts",
+          name: "get",
+          kind: "function",
+          line_start: 1,
+          line_end: 3,
+          signature: "get(): void",
+          is_exported: 1,
+          is_default_export: 0,
+          members: null,
+          doc_comment: null,
+          value: null,
+          parent_name: null,
+          visibility: null,
+        },
+      ]);
+
+      const source = "export function get() {\n  return 1;\n}\n";
+      mkdirSync(join(projectRoot, "src/lib"), { recursive: true });
+      writeFileSync(join(projectRoot, "src/lib/cache.ts"), source);
+      const url = pathToFileURL(
+        join(projectRoot, "src/lib/cache.ts"),
+      ).toString();
+      const dir = join(projectRoot, "v8-runtime");
+      mkdirSync(dir);
+      writeFileSync(
+        join(dir, "coverage-1.json"),
+        JSON.stringify({
+          result: [
+            {
+              scriptId: "1",
+              url,
+              functions: [
+                {
+                  functionName: "get",
+                  isBlockCoverage: true,
+                  ranges: [
+                    { startOffset: 0, endOffset: source.length, count: 1 },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const outcome = await runIngestCoverageOnDb(db, {
+        projectRoot,
+        path: "v8-runtime",
+        runtime: true,
+      });
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      expect(outcome.result.format).toBe("v8");
+      expect(outcome.result.ingested.symbols).toBeGreaterThan(0);
     } finally {
       closeDb(db);
     }

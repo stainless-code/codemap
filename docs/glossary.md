@@ -153,7 +153,7 @@ Statement coverage ingested from Istanbul JSON, LCOV, or V8 runtime (`NODE_V8_CO
 
 ### `codemap ingest-coverage` / Istanbul JSON / LCOV / V8 runtime / static coverage ingestion
 
-`codemap ingest-coverage <path> [--runtime] [--json]` reads a coverage artifact and writes statement-level rows into the `coverage` table. Three formats:
+`codemap ingest-coverage <path> [--runtime] [--json]` reads a coverage artifact and writes statement-level rows into the `coverage` table. MCP/HTTP twin: **`ingest_coverage`** (`{path, runtime?}`). Three formats:
 
 - **Istanbul JSON** (`coverage-final.json`) — emitted natively by `c8`, `nyc`, `vitest --coverage --coverage.reporter=json`, `jest --coverage --coverageReporters=json`. Parser reads `statementMap` + `s` (per-statement hit counts).
 - **LCOV** (`lcov.info`) — emitted by `bun test --coverage`, `c8 --reporter=lcov`, every legacy stack. Parser tokenises `SF:` / `DA:<line>,<count>` / `end_of_record` records; ignores `TN:` / `FN:` / `BRDA:` / `LF:` / `LH:` (statement coverage only).

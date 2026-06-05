@@ -731,6 +731,25 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.error).toContain("does-not-exist");
   });
 
+  it("ingest_coverage returns 400 when path is missing", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "ingest_coverage", {
+      path: "no-such/coverage-final.json",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("path not found");
+  });
+
+  it("query with missing baseline returns 404", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "query", {
+      sql: "SELECT 1",
+      baseline: "does-not-exist",
+    });
+    expect(r.status).toBe(404);
+    expect(r.json.error).toContain("does-not-exist");
+  });
+
   it("save_baseline returns 404 for unknown recipe", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "save_baseline", {

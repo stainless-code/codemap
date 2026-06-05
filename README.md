@@ -237,6 +237,7 @@ codemap mcp                                                     # JSON-RPC on st
 #        affected, trace, explore, node, apply, apply_rows, apply_diff_input,
 #        ingest_coverage
 # CLI twins: query batch, trace, explore, node, file, schema, symbols, context --include-snippets, ingest-coverage (same JSON as MCP/HTTP).
+# query / query_recipe also accept baseline (same diff envelope as codemap query --baseline).
 # Resources: codemap://schema, codemap://skill, codemap://rule, codemap://mcp-instructions (lazy-cached);
 #            codemap://recipes, codemap://recipes/{id} (live read-per-call — recency fields stay fresh);
 #            codemap://files/{path}, codemap://symbols/{name} (live read-per-call)
