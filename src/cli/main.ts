@@ -680,6 +680,7 @@ Copies bundled agent templates into .agents/ under the project root.
       sql: parsed.sql,
       json: parsed.json,
       format: parsed.format,
+      badgeStyle: parsed.badgeStyle,
       ci: parsed.ci,
       summary: parsed.summary,
       changedSince: parsed.changedSince,

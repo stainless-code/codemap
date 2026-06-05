@@ -10,11 +10,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  buildBadgeSummary,
+  buildCodeClimateFingerprint,
   buildMessageText,
   detectLocationColumn,
   escapeAnnotationData,
   escapeAnnotationProperty,
   formatAuditSarif,
+  formatBadge,
+  formatBadgeJson,
+  formatCodeClimate,
   formatDiff,
   formatDiffJson,
   formatAnnotations,
@@ -236,6 +241,124 @@ describe("formatSarif", () => {
     const doc = JSON.parse(out);
     expect(doc.runs[0].tool.driver.rules[0].fullDescription).toEqual({
       text: "## Long form body",
+    });
+  });
+});
+
+describe("formatCodeClimate", () => {
+  it("emits [] for empty rows", () => {
+    expect(
+      formatCodeClimate({ rows: [], recipeId: "boundary-violations" }),
+    ).toBe("[]");
+  });
+
+  it("emits one issue per locatable row with flat minor severity", () => {
+    const out = formatCodeClimate({
+      rows: [
+        {
+          from_path: "src/ui/App.tsx",
+          line_start: 3,
+          rule_name: "ui-cant-touch-server",
+        },
+      ],
+      recipeId: "boundary-violations",
+    });
+    const issues = JSON.parse(out);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      check_name: "boundary-violations",
+      severity: "minor",
+      location: {
+        path: "src/ui/App.tsx",
+        lines: { begin: 3 },
+      },
+      description: "rule_name=ui-cant-touch-server",
+    });
+    expect(issues[0].fingerprint).toBe(
+      buildCodeClimateFingerprint(
+        "boundary-violations",
+        "src/ui/App.tsx",
+        3,
+        "boundary-violations",
+      ),
+    );
+  });
+
+  it("skips rows without a location column", () => {
+    const out = formatCodeClimate({
+      rows: [
+        { kind: "TODO", count: 5 },
+        { file_path: "a.ts", name: "foo" },
+      ],
+      recipeId: "mixed",
+    });
+    expect(JSON.parse(out)).toHaveLength(1);
+  });
+
+  it("fingerprints are stable across identical inputs", () => {
+    const row = { file_path: "a.ts", line_start: 1, name: "foo" };
+    const a = JSON.parse(
+      formatCodeClimate({ rows: [row], recipeId: "deprecated-symbols" }),
+    )[0].fingerprint;
+    const b = JSON.parse(
+      formatCodeClimate({ rows: [row], recipeId: "deprecated-symbols" }),
+    )[0].fingerprint;
+    expect(a).toBe(b);
+  });
+});
+
+describe("formatBadge", () => {
+  it("markdown clean when no locatable rows", () => {
+    expect(
+      formatBadge({ rows: [{ kind: "TODO" }], recipeId: "index-summary" }),
+    ).toBe("codemap: clean");
+  });
+
+  it("markdown pluralizes issue count from locatable rows only", () => {
+    expect(
+      formatBadge({
+        rows: [
+          { file_path: "a.ts", name: "foo" },
+          { kind: "noise" },
+          { file_path: "b.ts", name: "bar" },
+        ],
+        recipeId: "deprecated-symbols",
+      }),
+    ).toBe("codemap: 2 issues");
+  });
+
+  it("markdown singular for one issue", () => {
+    expect(
+      formatBadge({
+        rows: [{ file_path: "a.ts", name: "foo" }],
+        recipeId: "deprecated-symbols",
+      }),
+    ).toBe("codemap: 1 issue");
+  });
+
+  it("json emits codemap-badge/v1", () => {
+    const doc = JSON.parse(
+      formatBadgeJson({
+        rows: [{ file_path: "a.ts", name: "foo" }],
+        recipeId: "deprecated-symbols",
+      }),
+    );
+    expect(doc).toEqual({
+      schema: "codemap-badge/v1",
+      label: "codemap",
+      message: "1 issue",
+      count: 1,
+      status: "fail",
+    });
+  });
+
+  it("buildBadgeSummary matches markdown/json count", () => {
+    const rows = [{ file_path: "a.ts" }, { file_path: "b.ts" }];
+    const summary = buildBadgeSummary({ rows, recipeId: "fan-in" });
+    expect(summary).toMatchObject({
+      count: 2,
+      status: "fail",
+      message: "2 issues",
     });
   });
 });

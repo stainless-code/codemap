@@ -5,8 +5,12 @@ import {
   printQueryResult,
   queryRows,
 } from "../application/index-engine";
+import type { BadgeStyle } from "../application/output-formatters";
 import {
   formatAnnotations,
+  formatBadge,
+  formatBadgeJson,
+  formatCodeClimate,
   formatDiff,
   formatDiffJson,
   formatMermaid,
@@ -80,11 +84,19 @@ export const OUTPUT_FORMATS = [
   "mermaid",
   "diff",
   "diff-json",
+  "codeclimate",
+  "badge",
 ] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
+export const BADGE_STYLES = ["markdown", "json"] as const;
+
 export function isOutputFormat(s: string): s is OutputFormat {
   return (OUTPUT_FORMATS as readonly string[]).includes(s);
+}
+
+export function isBadgeStyle(s: string): s is BadgeStyle {
+  return (BADGE_STYLES as readonly string[]).includes(s);
 }
 
 export function parseQueryRest(rest: string[]):
@@ -95,6 +107,8 @@ export function parseQueryRest(rest: string[]):
       sql: string;
       json: boolean;
       format: OutputFormat;
+      /** `--badge-style` when `--format badge` (default `markdown`). */
+      badgeStyle: BadgeStyle;
       /** `--ci` aliases `--format sarif` + non-zero exit + quiet. */
       ci: boolean;
       summary: boolean;
@@ -136,6 +150,7 @@ export function parseQueryRest(rest: string[]):
   let saveBaseline: string | true | undefined;
   let baseline: string | true | undefined;
   let recipeParams: RecipeParamValues | undefined;
+  let badgeStyle: BadgeStyle = "markdown";
 
   while (i < rest.length) {
     const a = rest[i];
@@ -150,6 +165,25 @@ export function parseQueryRest(rest: string[]):
     if (a === "--ci") {
       ci = true;
       i++;
+      continue;
+    }
+    if (a === "--badge-style" || a.startsWith("--badge-style=")) {
+      const eq = a.indexOf("=");
+      const v = eq !== -1 ? a.slice(eq + 1) : rest[i + 1];
+      if (v === undefined || v === "" || v.startsWith("-")) {
+        return {
+          kind: "error",
+          message: `codemap: "--badge-style" requires a value (${BADGE_STYLES.join(" | ")}).`,
+        };
+      }
+      if (!isBadgeStyle(v)) {
+        return {
+          kind: "error",
+          message: `codemap: unknown --badge-style "${v}". Known styles: ${BADGE_STYLES.join(", ")}.`,
+        };
+      }
+      badgeStyle = v;
+      i += eq !== -1 ? 1 : 2;
       continue;
     }
     if (a === "--format" || a.startsWith("--format=")) {
@@ -491,11 +525,18 @@ export function parseQueryRest(rest: string[]):
       baseline,
     });
     if (incompat !== undefined) return { kind: "error", message: incompat };
+    if (badgeStyle !== "markdown" && resolved !== "badge") {
+      return {
+        kind: "error",
+        message: 'codemap: "--badge-style" is only valid with --format badge.',
+      };
+    }
     return {
       kind: "run",
       sql,
       json,
       format: resolved,
+      badgeStyle,
       ci,
       summary,
       changedSince,
@@ -547,11 +588,18 @@ export function parseQueryRest(rest: string[]):
     baseline,
   });
   if (incompat !== undefined) return { kind: "error", message: incompat };
+  if (badgeStyle !== "markdown" && resolved !== "badge") {
+    return {
+      kind: "error",
+      message: 'codemap: "--badge-style" is only valid with --format badge.',
+    };
+  }
   return {
     kind: "run",
     sql,
     json,
     format: resolved,
+    badgeStyle,
     ci,
     summary,
     changedSince,
@@ -611,7 +659,9 @@ function formatIncompatibility(
     fmt !== "annotations" &&
     fmt !== "mermaid" &&
     fmt !== "diff" &&
-    fmt !== "diff-json"
+    fmt !== "diff-json" &&
+    fmt !== "codeclimate" &&
+    fmt !== "badge"
   )
     return undefined;
   const offenders: string[] = [];
@@ -710,8 +760,12 @@ Flags:
                             diff         Unified diff from rows shaped as {file_path, line_start,
                                          before_pattern, after_pattern}.
                             diff-json    Structured diff envelope for agents.
+                            codeclimate  GitLab Code Quality JSON array (severity minor; stable fingerprints).
+                            badge        Single-line issue count (codemap: N issues / codemap: clean).
                           Formatted outputs require a flat row list — incompatible with --summary,
                           --group-by, --save-baseline, --baseline (parser rejects at parse time).
+  --badge-style <style>   With --format badge only: markdown (default) or json (codemap-badge/v1 schema).
+                          Agents triage via query JSON rows — badge is presentation for README / CI paste.
   --summary               Print only the row count (no rows). With --json: {"count": N}. Without: count: N.
                           With --group-by, output collapses to {"group_by": "<mode>", "groups": [{key, count}]}.
                           With --baseline, collapses to {baseline, current_row_count, added: N, removed: N}.
@@ -809,6 +863,8 @@ export async function runQueryCmd(opts: {
    * caller must reject those combos at parse time.
    */
   format?: OutputFormat;
+  /** `--badge-style` when `format=badge` (default `markdown`). */
+  badgeStyle?: BadgeStyle;
   /** `--ci`: exit 1 on ≥1 row + suppress no-locatable-rows warning. Parser enforces format=sarif. */
   ci?: boolean;
   summary?: boolean;
@@ -919,6 +975,7 @@ export async function runQueryCmd(opts: {
         changedFiles,
         bindValues: bindValues.values,
         ci: opts.ci === true,
+        badgeStyle: opts.badgeStyle ?? "markdown",
       });
       if (result.ok) {
         // exitCode=1 here is the --ci gating signal, not a failure.
@@ -1057,6 +1114,7 @@ function printFormattedQuery(
     bindValues: RecipeParamValue[] | undefined;
     /** `--ci`: suppress no-locatable-rows warning + exit 1 on `rows.length > 0`. */
     ci?: boolean;
+    badgeStyle: BadgeStyle;
   },
 ): FormattedQueryResult {
   let db: Awaited<ReturnType<typeof openDb>> | undefined;
@@ -1118,6 +1176,28 @@ function printFormattedQuery(
 
     if (opts.format === "diff-json") {
       console.log(formatDiffJson({ rows, projectRoot: getProjectRoot() }));
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (opts.format === "codeclimate") {
+      const formatOpts = {
+        rows,
+        recipeId: opts.recipeId,
+      };
+      console.log(formatCodeClimate(formatOpts));
+      return { ok: true, exitCode: 0 };
+    }
+
+    if (opts.format === "badge") {
+      const formatOpts = {
+        rows,
+        recipeId: opts.recipeId,
+      };
+      const out =
+        opts.badgeStyle === "json"
+          ? formatBadgeJson(formatOpts)
+          : formatBadge(formatOpts);
+      console.log(out);
       return { ok: true, exitCode: 0 };
     }
 

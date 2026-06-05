@@ -39,31 +39,33 @@ Moat A: formatters only — no new analysis.
 
 ### Out of scope (v1)
 
-`audit --format codeclimate`; shields.io network fetch; formatters reading recipe frontmatter `severity` unless Q1 resolves in slice 1.
+`audit --format codeclimate`; shields.io network fetch; HTTP `/badge` endpoint; recipe frontmatter `severity:` (see F.7).
 
 ---
 
 ## Pre-locked decisions
 
-| #   | Decision                                                                                                                                                                                                                       | Source                                                                                |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| F.1 | **Two new format ids** — `codeclimate` and `badge` on `codemap query` / MCP `query` / `query_recipe` (same `output-formatters.ts` home as SARIF).                                                                              | [Moat A](../roadmap.md#moats-load-bearing) — output mode only                         |
-| F.2 | **Code Climate shape** — JSON array of objects: `description`, `check_name`, `fingerprint`, `location.path`, `location.lines.begin`, `severity` (`info`\|`minor`\|`major`\|`critical`\|`blocker`).                             | [GitLab Code Quality format](https://docs.gitlab.com/ee/ci/testing/code_quality.html) |
-| F.3 | **Fingerprint** — stable hash from `(recipe_id, file_path, line_start, check_name)` (FNV-1a or SHA-256 truncated) so GitLab dedupes across runs.                                                                               | GitLab dedup semantics                                                                |
-| F.4 | **Badge format** — single-line markdown or shields-compatible JSON snippet: `codemap: N issues` derived from row count (or `--summary` count when composed). No network fetch in core — consumers paste into README workflows. | Output formatter only                                                                 |
-| F.5 | **Location contract** — reuse `detectLocationColumn` from SARIF/annotations; skip rows without locatable columns (same stderr warning as SARIF aggregates).                                                                    | `output-formatters.ts`                                                                |
-| F.6 | **Audit parity deferred** — v1 on `query`/`query_recipe` only; `audit --format codeclimate` follows if consumer asks.                                                                                                          | Tracer bullet                                                                         |
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Source                                                                                |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| F.1 | **Two new format ids** — `codeclimate` and `badge` on `codemap query` / MCP `query` / `query_recipe` (same `output-formatters.ts` home as SARIF).                                                                                                                                                                                                                                                                                                                                                                                                                                                  | [Moat A](../roadmap.md#moats-load-bearing) — output mode only                         |
+| F.2 | **Code Climate shape** — JSON array of objects: `description`, `check_name`, `fingerprint`, `location.path`, `location.lines.begin`, `severity` (`info`\|`minor`\|`major`\|`critical`\|`blocker`).                                                                                                                                                                                                                                                                                                                                                                                                 | [GitLab Code Quality format](https://docs.gitlab.com/ee/ci/testing/code_quality.html) |
+| F.3 | **Fingerprint** — stable hash from `(recipe_id, file_path, line_start, check_name)` (FNV-1a or SHA-256 truncated) so GitLab dedupes across runs.                                                                                                                                                                                                                                                                                                                                                                                                                                                   | GitLab dedup semantics                                                                |
+| F.4 | **Badge count source** — row count after location filtering (same rows Code Climate would emit); no network fetch in core.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Output formatter only                                                                 |
+| F.5 | **Location contract** — reuse `detectLocationColumn` from SARIF/annotations; skip rows without locatable columns (same stderr warning as SARIF aggregates).                                                                                                                                                                                                                                                                                                                                                                                                                                        | `output-formatters.ts`                                                                |
+| F.6 | **Audit parity deferred** — v1 on `query`/`query_recipe` only; `audit --format codeclimate` follows if consumer asks.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Tracer bullet                                                                         |
+| F.7 | **Code Climate severity — flat `minor`** — every row gets `severity: "minor"` in v1; no recipe frontmatter `severity:` parsing. Matches SARIF's flat `level: "note"` (Moat A — presentation, not verdict). Agents triage via recipe id + `actions:` + JSON rows, not CI severity bands. `info` avoided — GitLab default widgets often hide it. Frontmatter `severity:` deferred to v1.x when a recipe needs differentiated GitLab sorting and the field is exposed in recipe catalog too.                                                                                                          | Grill-me Q1                                                                           |
+| F.8 | **Badge — B-lite (`BadgeSummary` + dual serializers)** — internal `BadgeSummary` `{ label, message, count, status }` where `status` is `pass` when `count === 0` else `fail`, `message` is `clean` when zero else `` `${count} issue(s)` ``. **Default stdout:** markdown `codemap: <message>` (README / PR paste). **Opt-in:** `--badge-style json` emits `codemap-badge/v1`: `{ schema, label, message, count, status }`. Agents: triage via `query_recipe` JSON / `--summary`; paste markdown; CI gates read JSON `.count` / `.status`. Shields colors + HTTP `/badge` reuse this schema later. | Grill-me Q2                                                                           |
 
 ---
 
 ## Implementation steps
 
 1. `formatCodeClimate(opts: FormatOpts): string` in `output-formatters.ts`.
-2. `formatBadge(opts: FormatOpts): string` — param `badge_style: markdown|json` optional on query flags.
+2. `buildBadgeSummary(opts)` + `formatBadge` (markdown default) + `formatBadgeJson` (`codemap-badge/v1`; see F.8). CLI/MCP flag `--badge-style markdown|json` (default `markdown`).
 3. Wire `--format codeclimate|badge` in `cmd-query.ts` + `query-engine.ts` validation list.
-4. MCP/HTTP `format` enum extension + tool description one-liner.
-5. Snapshot tests in `output-formatters.test.ts` (fixture rows → golden JSON).
-6. Docs — `architecture.md` output formatters §; README one example for GitLab CI artifact upload.
+4. MCP/HTTP `format` enum extension + `badge_style` on query tools when `format=badge`.
+5. Snapshot tests in `output-formatters.test.ts` — Code Climate golden JSON; badge markdown + `codemap-badge/v1` JSON goldens.
+6. Docs — `architecture.md` output formatters §; README GitLab CI artifact example; agent note: badge is presentation — use JSON rows for triage.
 
 ---
 
@@ -73,6 +75,7 @@ Moat A: formatters only — no new analysis.
 bun test src/application/output-formatters.test.ts
 bun src/index.ts query --recipe boundary-violations --format codeclimate
 bun src/index.ts query --recipe boundary-violations --format badge
+bun src/index.ts query --recipe boundary-violations --format badge --badge-style json
 # Run formatter output through GitLab Code Quality schema validator if available
 ```
 
@@ -82,17 +85,9 @@ bun src/index.ts query --recipe boundary-violations --format badge
 
 - [ ] `codemap query --recipe boundary-violations --format codeclimate` emits valid GitLab-ingestible JSON
 - [ ] Fingerprints stable across two runs with identical rows
-- [ ] `badge` format returns deterministic single-line summary for N>0 and N=0
+- [ ] `badge` markdown: `codemap: N issues` / `codemap: clean` for N>0 and N=0
+- [ ] `badge --badge-style json` emits stable `codemap-badge/v1` with matching `count` / `status`
 - [ ] Incompatible with `summary` / `group_by` / `baseline` (same rules as SARIF)
-
----
-
-## Open decisions (impl PR)
-
-| #   | Question                                                               |
-| --- | ---------------------------------------------------------------------- |
-| Q1  | Map recipe severity from frontmatter `severity:` field when present?   |
-| Q2  | `badge` as markdown only, or also `codemap-badge/v1` JSON for shields? |
 
 ---
 

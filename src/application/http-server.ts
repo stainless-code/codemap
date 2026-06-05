@@ -441,14 +441,15 @@ function writeToolResult(
     return writeJson(res, 200, result.payload, version);
   }
   res.statusCode = 200;
-  res.setHeader(
-    "Content-Type",
+  const jsonPayload =
     result.format === "sarif"
       ? "application/sarif+json"
-      : result.format === "diff-json"
+      : result.format === "diff-json" ||
+          result.format === "codeclimate" ||
+          (result.format === "badge" && result.badgeStyle === "json")
         ? "application/json; charset=utf-8"
-        : "text/plain; charset=utf-8",
-  );
+        : "text/plain; charset=utf-8";
+  res.setHeader("Content-Type", jsonPayload);
   res.setHeader("X-Codemap-Version", version);
   res.end(result.payload);
 }

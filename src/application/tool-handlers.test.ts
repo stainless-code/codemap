@@ -95,6 +95,73 @@ describe("handleQuery baseline", () => {
     });
   });
 
+  it("format=codeclimate returns GitLab-shaped JSON array", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "codeclimate",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.format !== "codeclimate") return;
+    const issues = JSON.parse(result.payload);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      check_name: "adhoc",
+      severity: "minor",
+      location: { path: "src/query.ts", lines: { begin: 1 } },
+    });
+  });
+
+  it("format=badge returns markdown summary", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "badge",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      format: "badge",
+      payload: "codemap: 1 issue",
+      badgeStyle: "markdown",
+    });
+  });
+
+  it("format=badge badge_style=json returns codemap-badge/v1", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "badge",
+        badge_style: "json",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.format !== "badge") return;
+    expect(result.badgeStyle).toBe("json");
+    expect(JSON.parse(result.payload)).toMatchObject({
+      schema: "codemap-badge/v1",
+      count: 1,
+      status: "fail",
+    });
+  });
+
+  it("rejects badge_style without format=badge", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", format: "sarif", badge_style: "json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "badge_style is only valid with format=badge",
+      ),
+    });
+  });
+
   it("rejects baseline + group_by", () => {
     const result = handleQuery(
       { sql: "SELECT 1", baseline: "pre", group_by: "directory" },
