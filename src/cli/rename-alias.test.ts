@@ -137,6 +137,30 @@ describe("resolveRenameAlias", () => {
       /unexpected argument "c"/,
     );
   });
+
+  it("accepts equals-form scoped flags", () => {
+    expect(
+      rewrite([
+        "rename",
+        "helper",
+        "worker",
+        "--define-in=src/a.ts",
+        "--dry-run",
+      ]),
+    ).toEqual([
+      "apply",
+      "rename-preview",
+      "--params",
+      "define_in=src/a.ts,new=worker,old=helper",
+      "--dry-run",
+    ]);
+  });
+
+  it("errors on partial old/new via --params", () => {
+    expect(
+      renameError(["rename", "--params", "old=foo", "--dry-run"]),
+    ).toContain("requires <old> and <new>");
+  });
 });
 
 describe("formatParamsCli", () => {

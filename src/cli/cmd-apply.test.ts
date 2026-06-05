@@ -610,6 +610,14 @@ export function staleOne(): number { return 2; }
       expect(consumerB).toContain("helper()");
       expect(consumerB).not.toContain("worker");
     });
+
+    it("rejects a single positional with rename-local error", async () => {
+      const r = await runCli(["rename", "helper"], {
+        CODEMAP_ROOT: projectRoot,
+      });
+      expect(r.exitCode).toBe(1);
+      expect(r.err).toContain("requires <old> and <new>");
+    });
   });
 
   describe("rename-preview member JSX", () => {

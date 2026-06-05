@@ -51,6 +51,23 @@ function splitPassthrough(tokens: string[]): {
   return { positionals, applyTail };
 }
 
+function readFlagOperand(
+  flag: string,
+  token: string,
+  tail: string[],
+  index: number,
+): { value: string | undefined; nextIndex: number } | null {
+  if (token === flag) {
+    return { value: tail[index + 1], nextIndex: index + 2 };
+  }
+  const prefix = `${flag}=`;
+  if (token.startsWith(prefix)) {
+    const value = token.slice(prefix.length);
+    return { value: value === "" ? undefined : value, nextIndex: index + 1 };
+  }
+  return null;
+}
+
 function buildApplyArgv(
   params: RecipeParamValues | undefined,
   applyTail: string[],
@@ -97,35 +114,35 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
       i += 2;
       continue;
     }
-    if (a === "--define-in") {
-      const next = tail[i + 1];
-      if (next === undefined) {
+    const defineIn = readFlagOperand("--define-in", a, tail, i);
+    if (defineIn !== null) {
+      if (defineIn.value === undefined) {
         return renameError(
           'codemap rename: "--define-in" requires a file path.',
         );
       }
-      params = mergeParams(params, { define_in: next });
-      i += 2;
+      params = mergeParams(params, { define_in: defineIn.value });
+      i = defineIn.nextIndex;
       continue;
     }
-    if (a === "--in-file") {
-      const next = tail[i + 1];
-      if (next === undefined) {
+    const inFile = readFlagOperand("--in-file", a, tail, i);
+    if (inFile !== null) {
+      if (inFile.value === undefined) {
         return renameError(
           'codemap rename: "--in-file" requires a path prefix.',
         );
       }
-      params = mergeParams(params, { in_file: next });
-      i += 2;
+      params = mergeParams(params, { in_file: inFile.value });
+      i = inFile.nextIndex;
       continue;
     }
-    if (a === "--kind") {
-      const next = tail[i + 1];
-      if (next === undefined) {
+    const kind = readFlagOperand("--kind", a, tail, i);
+    if (kind !== null) {
+      if (kind.value === undefined) {
         return renameError('codemap rename: "--kind" requires a symbol kind.');
       }
-      params = mergeParams(params, { kind: next });
-      i += 2;
+      params = mergeParams(params, { kind: kind.value });
+      i = kind.nextIndex;
       continue;
     }
     passthrough.push(a);
@@ -157,7 +174,7 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     params.old !== undefined &&
     params.new !== undefined;
 
-  if (!hasOldNew && positionals.length === 0 && params === undefined) {
+  if (!hasOldNew) {
     return renameError(
       "codemap rename: requires <old> and <new> (or pass old=/new= via --params).",
     );

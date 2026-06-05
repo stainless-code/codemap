@@ -63,7 +63,7 @@ Each emitted delta carries its own `base` metadata so mixed-baseline audits are 
 4. **Commit (optional)** — CLI `--commit "<msg>"` or MCP `commit_message` on recipe `apply` / `apply_diff_input` after a clean apply; with `until_empty`, only when `terminated_by` is `empty`.
 5. **Agent rows / diffs** — when you already have hunks (codemod output), skip recipe policy: `apply_rows` / `apply_diff_input` or CLI `codemap apply --rows -` / `--diff-input` (both need `--yes` / `yes: true`).
 
-**Homonym renames:** `rename-preview` unions every `symbols.name` match unless you pass `define_in=<definition file_path>` (same anchor as `find-symbol-references`). `in_file` only narrows output row paths — it does not scope the target symbol. CLI shorthand: `codemap rename <old> <new> [--define-in <file_path>]` (alias → `apply rename-preview`).
+**Homonym renames:** `rename-preview` unions every `symbols.name` match unless you pass `define_in=<definition file_path>` (same anchor as `find-symbol-references`). `in_file` only narrows output row paths — it does not scope the target symbol. CLI shorthand: `codemap rename <old> <new> [--define-in <file_path>] [--in-file <prefix>] [--kind <k>]` (alias → `apply rename-preview`).
 
 **diff-json preview:** each hunk includes `ambiguity_count` (extra `before_pattern` matches on the line); apply rewrites the first match only.
 
