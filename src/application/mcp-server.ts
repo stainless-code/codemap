@@ -419,7 +419,7 @@ function registerApplyDiffInputTool(server: McpServer, opts: ServerOpts): void {
     "apply_diff_input",
     {
       description:
-        "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed via parseUnifiedDiffToRows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
+        "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed into diff rows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
       inputSchema: applyDiffInputArgsSchema,
     },
     async (args) => wrapToolResult(await handleApplyDiffInput(args, opts.root)),
@@ -463,13 +463,13 @@ function registerResources(server: McpServer): void {
     server,
     "skill",
     "codemap://skill",
-    "Full text of the assembled codemap skill (`templates/agent-content/skill/`). Agents that don't preload the skill at session start can fetch it here.",
+    "Full text of the assembled codemap skill. Agents that don't preload the skill at session start can fetch it here.",
   );
   registerStaticResource(
     server,
     "rule",
     "codemap://rule",
-    "Full text of the assembled codemap rule (`templates/agent-content/rule/`; always-on priming for agents in the indexed project).",
+    "Full text of the assembled codemap rule (always-on priming for agents in the indexed project).",
   );
   registerStaticResource(
     server,

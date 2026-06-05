@@ -15,6 +15,7 @@ import { initCodemap } from "../runtime";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   resolveCoverageArtifact,
+  resolveV8CoverageDirectory,
   runIngestCoverageOnDb,
 } from "./ingest-coverage-run";
 
@@ -47,6 +48,74 @@ describe("resolveCoverageArtifact", () => {
     expect(() => resolveCoverageArtifact(dir, projectRoot)).toThrow(
       /both coverage-final\.json and lcov\.info/,
     );
+  });
+
+  it("errors when path not found", () => {
+    expect(() =>
+      resolveCoverageArtifact("missing/coverage-final.json", projectRoot),
+    ).toThrow(/path not found/);
+  });
+
+  it("resolves lcov file by extension", () => {
+    const file = join(projectRoot, "lcov.info");
+    writeFileSync(file, "TN:\n");
+    expect(resolveCoverageArtifact(file, projectRoot)).toEqual({
+      format: "lcov",
+      absPath: file,
+    });
+  });
+
+  it("resolves directory with lcov only", () => {
+    const dir = join(projectRoot, "cov");
+    mkdirSync(dir);
+    writeFileSync(join(dir, "lcov.info"), "TN:\n");
+    expect(resolveCoverageArtifact(dir, projectRoot)).toEqual({
+      format: "lcov",
+      absPath: join(dir, "lcov.info"),
+    });
+  });
+
+  it("errors when directory has neither artifact", () => {
+    const dir = join(projectRoot, "empty");
+    mkdirSync(dir);
+    expect(() => resolveCoverageArtifact(dir, projectRoot)).toThrow(
+      /contains neither/,
+    );
+  });
+});
+
+describe("resolveV8CoverageDirectory", () => {
+  it("errors when path not found", () => {
+    expect(() =>
+      resolveV8CoverageDirectory("missing-dir", projectRoot),
+    ).toThrow(/path not found/);
+  });
+
+  it("errors when path is a file", () => {
+    const file = join(projectRoot, "coverage-1.json");
+    writeFileSync(file, "{}");
+    expect(() => resolveV8CoverageDirectory(file, projectRoot)).toThrow(
+      /expected a directory/,
+    );
+  });
+
+  it("errors when directory has no coverage-*.json files", () => {
+    const dir = join(projectRoot, "v8-empty");
+    mkdirSync(dir);
+    expect(() => resolveV8CoverageDirectory(dir, projectRoot)).toThrow(
+      /no coverage-\*\.json/,
+    );
+  });
+
+  it("returns json files from a v8 directory", () => {
+    const dir = join(projectRoot, "v8");
+    mkdirSync(dir);
+    const file = join(dir, "coverage-123.json");
+    writeFileSync(file, "{}");
+    expect(resolveV8CoverageDirectory(dir, projectRoot)).toEqual({
+      absDir: dir,
+      jsonFiles: [file],
+    });
   });
 });
 
@@ -115,6 +184,30 @@ describe("runIngestCoverageOnDb", () => {
         name: string;
       }>;
       expect(rows.map((r) => r.name)).toEqual(["get"]);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("returns ok:false when runtime json files have empty result", async () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      const dir = join(projectRoot, "v8-runtime");
+      mkdirSync(dir);
+      writeFileSync(
+        join(dir, "coverage-1.json"),
+        JSON.stringify({ result: [] }),
+      );
+
+      const outcome = await runIngestCoverageOnDb(db, {
+        projectRoot,
+        path: "v8-runtime",
+        runtime: true,
+      });
+      expect(outcome.ok).toBe(false);
+      if (outcome.ok) return;
+      expect(outcome.error).toMatch(/contained no V8/);
     } finally {
       closeDb(db);
     }

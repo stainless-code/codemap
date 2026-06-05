@@ -10,6 +10,7 @@ import {
   baselineQueryIncompatibility,
   compareQueryBaseline,
 } from "./query-baseline";
+import { attachActions } from "./query-engine";
 
 let projectRoot: string;
 
@@ -79,6 +80,77 @@ describe("compareQueryBaseline", () => {
     });
   });
 
+  it("errors on corrupt rows_json", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "bad-json",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "not-json",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const payload = compareQueryBaseline({
+      baselineName: "bad-json",
+      sql: "SELECT 1",
+    });
+    expect(payload).toMatchObject({
+      error: expect.stringContaining("corrupt rows_json"),
+    });
+  });
+
+  it("errors on non-array rows_json", () => {
+    const db = openDb();
+    try {
+      upsertQueryBaseline(db, {
+        name: "object-json",
+        recipe_id: null,
+        sql: "SELECT 1",
+        rows_json: "{}",
+        row_count: 0,
+        git_ref: null,
+        created_at: 1,
+      });
+    } finally {
+      closeDb(db);
+    }
+    const payload = compareQueryBaseline({
+      baselineName: "object-json",
+      sql: "SELECT 1",
+    });
+    expect(payload).toMatchObject({
+      error: expect.stringContaining("corrupt rows_json"),
+    });
+  });
+
+  it("errors on invalid SQL", () => {
+    const payload = compareQueryBaseline({
+      baselineName: "symbols",
+      sql: "SELECT FROM bad",
+    });
+    expect("error" in payload).toBe(true);
+    if (!("error" in payload)) return;
+    expect(payload.error.length).toBeGreaterThan(0);
+  });
+
+  it("filters current rows by changedFiles", () => {
+    const payload = compareQueryBaseline({
+      baselineName: "symbols",
+      sql: "SELECT file_path, name FROM symbols ORDER BY name",
+      changedFiles: new Set(["src/other.ts"]),
+    });
+    expect("error" in payload).toBe(false);
+    if ("error" in payload) return;
+    expect(payload.current_row_count).toBe(0);
+    expect(payload.added).toEqual([]);
+    expect(payload.removed).toEqual([{ name: "bar" }]);
+  });
+
   it("attaches recipe actions on added rows only", () => {
     const actions = [{ type: "inspect", description: "review" }];
     const payload = compareQueryBaseline({
@@ -95,6 +167,13 @@ describe("compareQueryBaseline", () => {
       actions,
     });
     expect(payload.removed[0]).not.toHaveProperty("actions");
+  });
+});
+
+describe("attachActions", () => {
+  it("preserves existing actions on a row", () => {
+    const row = { name: "foo", actions: [{ type: "keep" }] };
+    expect(attachActions(row, [{ type: "replace" }])).toEqual(row);
   });
 });
 

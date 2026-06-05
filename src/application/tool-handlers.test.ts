@@ -94,6 +94,29 @@ describe("handleQuery baseline", () => {
       error: expect.stringContaining("cannot be combined with format=sarif"),
     });
   });
+
+  it("rejects baseline + group_by", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", group_by: "directory" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+
+  it("returns 404 for missing baseline", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "missing-baseline" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 404,
+      error: expect.stringContaining('no baseline named "missing-baseline"'),
+    });
+  });
 });
 
 describe("handleQueryRecipe baseline", () => {
@@ -126,7 +149,40 @@ describe("handleQueryRecipe baseline", () => {
       added: Array<{ name: string; actions?: unknown[] }>;
     };
     expect(payload.added).toHaveLength(1);
-    expect(payload.added[0]?.actions).toBeDefined();
+    expect(payload.added[0]?.actions?.[0]).toMatchObject({
+      type: "inspect-symbols",
+    });
+  });
+
+  it("returns 404 for missing baseline", () => {
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        params: { kind: "function", name_pattern: "%Query%" },
+        baseline: "missing-baseline",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      status: 404,
+      error: expect.stringContaining('no baseline named "missing-baseline"'),
+    });
+  });
+
+  it("rejects baseline + group_by", () => {
+    const result = handleQueryRecipe(
+      {
+        recipe: "find-symbol-by-kind",
+        baseline: "funcs",
+        group_by: "directory",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
   });
 });
 
@@ -139,6 +195,55 @@ describe("handleIngestCoverage", () => {
     expect(result).toMatchObject({
       ok: false,
       error: expect.stringContaining("path not found"),
+    });
+  });
+
+  it("ingests istanbul artifact successfully", async () => {
+    const db = openDb();
+    try {
+      insertFile(db, {
+        path: "src/lib/cache.ts",
+        content_hash: "h2",
+        size: 1,
+        line_count: 100,
+        language: "typescript",
+        last_modified: 0,
+        indexed_at: 0,
+      });
+      db.run(
+        "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity) VALUES ('src/lib/cache.ts', 'get', 'function', 9, 15, 'get(): void', 1, 0, NULL, NULL, NULL, NULL, NULL, 1)",
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const coverageDir = join(projectRoot, "coverage");
+    mkdirSync(coverageDir);
+    writeFileSync(
+      join(coverageDir, "coverage-final.json"),
+      JSON.stringify({
+        [`${projectRoot}/src/lib/cache.ts`]: {
+          path: `${projectRoot}/src/lib/cache.ts`,
+          statementMap: {
+            "0": {
+              start: { line: 10, column: 0 },
+              end: { line: 10, column: 1 },
+            },
+          },
+          s: { "0": 1 },
+        },
+      }),
+    );
+
+    const result = await handleIngestCoverage(
+      { path: "coverage/coverage-final.json" },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.payload).toMatchObject({
+      format: "istanbul",
+      ingested: { symbols: 1 },
     });
   });
 });

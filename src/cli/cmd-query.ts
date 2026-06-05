@@ -13,6 +13,8 @@ import {
   formatSarif,
   hasLocatableRows,
 } from "../application/output-formatters";
+import { compareQueryBaseline } from "../application/query-baseline";
+import { attachActions } from "../application/query-engine";
 import {
   getQueryRecipeActionsRendered,
   getQueryRecipeCatalogEntry,
@@ -39,12 +41,10 @@ import {
 import {
   closeDb,
   deleteQueryBaseline,
-  getQueryBaseline,
   listQueryBaselines,
   openDb,
   upsertQueryBaseline,
 } from "../db";
-import { diffRows } from "../diff-rows";
 import { filterRowsByChangedFiles, getFilesChangedSince } from "../git-changed";
 import type { Bucketizer, GroupByMode } from "../group-by";
 import {
@@ -1187,7 +1187,7 @@ function runGroupedQuery(opts: {
 
   const enriched =
     opts.recipeActions !== undefined && opts.recipeActions.length > 0
-      ? rows.map((row) => attachActionsForGrouped(row, opts.recipeActions!))
+      ? rows.map((row) => attachActions(row, opts.recipeActions!))
       : rows;
 
   const noBucketLabel = opts.groupBy === "owner" ? "<no-owner>" : "<unknown>";
@@ -1223,16 +1223,6 @@ function runGroupedQuery(opts: {
   }
   console.log(`group_by: ${opts.groupBy}`);
   console.table(grouped.map((g) => ({ key: g.key, count: g.count })));
-}
-
-function attachActionsForGrouped(
-  row: unknown,
-  actions: ReadonlyArray<unknown>,
-): unknown {
-  if (typeof row !== "object" || row === null) return row;
-  const obj = row as Record<string, unknown>;
-  if ("actions" in obj) return obj;
-  return { ...obj, actions };
 }
 
 // `git rev-parse HEAD` may legitimately fail (no git, detached worktree, etc.).
@@ -1305,19 +1295,6 @@ function runSaveBaseline(opts: {
   }
 }
 
-interface BaselineDiff {
-  baseline: {
-    name: string;
-    recipe_id: string | null;
-    row_count: number;
-    git_ref: string | null;
-    created_at: number;
-  };
-  current_row_count: number;
-  added: unknown[];
-  removed: unknown[];
-}
-
 function runBaselineDiff(opts: {
   sql: string;
   json: boolean;
@@ -1327,96 +1304,47 @@ function runBaselineDiff(opts: {
   recipeActions: ReadonlyArray<unknown> | undefined;
   bindValues: RecipeParamValue[] | undefined;
 }) {
-  const db = openDb();
-  let baseline: ReturnType<typeof getQueryBaseline>;
-  try {
-    baseline = getQueryBaseline(db, opts.baselineName);
-  } finally {
-    closeDb(db, { readonly: true });
-  }
+  const result = compareQueryBaseline({
+    baselineName: opts.baselineName,
+    sql: opts.sql,
+    bindValues: opts.bindValues,
+    changedFiles: opts.changedFiles,
+    summary: opts.summary,
+    recipeActions: opts.recipeActions,
+  });
 
-  if (baseline === undefined) {
-    emitErrorMaybeJson(
-      `codemap: no baseline named "${opts.baselineName}". Use --baselines to list saved baselines.`,
-      opts.json,
-    );
+  if ("error" in result) {
+    emitErrorMaybeJson(result.error, opts.json);
     return;
   }
-
-  let baselineRows: unknown[];
-  try {
-    baselineRows = JSON.parse(baseline.rows_json) as unknown[];
-  } catch {
-    emitErrorMaybeJson(
-      `codemap: baseline "${opts.baselineName}" has corrupt rows_json — drop and re-save.`,
-      opts.json,
-    );
-    return;
-  }
-
-  let currentRows: unknown[];
-  try {
-    currentRows = queryRows(opts.sql, opts.bindValues);
-  } catch (err) {
-    emitErrorMaybeJson(
-      err instanceof Error ? err.message : String(err),
-      opts.json,
-    );
-    return;
-  }
-  if (opts.changedFiles !== undefined) {
-    currentRows = filterRowsByChangedFiles(currentRows, opts.changedFiles);
-  }
-
-  const { added, removed } = diffRows(baselineRows, currentRows);
-
-  // Recipe actions enrich `added` only — they're the rows the agent should act on.
-  const enrichedAdded =
-    opts.recipeActions !== undefined && opts.recipeActions.length > 0
-      ? added.map((row) => attachActionsForGrouped(row, opts.recipeActions!))
-      : added;
-
-  const diff: BaselineDiff = {
-    baseline: {
-      name: baseline.name,
-      recipe_id: baseline.recipe_id,
-      row_count: baseline.row_count,
-      git_ref: baseline.git_ref,
-      created_at: baseline.created_at,
-    },
-    current_row_count: currentRows.length,
-    added: enrichedAdded,
-    removed,
-  };
 
   if (opts.summary) {
-    const payload = {
-      baseline: diff.baseline,
-      current_row_count: diff.current_row_count,
-      added: added.length,
-      removed: removed.length,
-    };
+    const added = result.added as number;
+    const removed = result.removed as number;
     if (opts.json) {
-      console.log(JSON.stringify(payload));
+      console.log(JSON.stringify(result));
     } else {
       console.log(
-        `baseline "${diff.baseline.name}": ${diff.baseline.row_count} rows → ${diff.current_row_count} rows  (+${added.length} / -${removed.length})`,
+        `baseline "${result.baseline.name}": ${result.baseline.row_count} rows → ${result.current_row_count} rows  (+${added} / -${removed})`,
       );
     }
     return;
   }
 
+  const added = result.added as unknown[];
+  const removed = result.removed as unknown[];
+
   if (opts.json) {
-    console.log(JSON.stringify(diff));
+    console.log(JSON.stringify(result));
     return;
   }
 
   console.log(
-    `baseline "${diff.baseline.name}": ${diff.baseline.row_count} rows → ${diff.current_row_count} rows  (+${added.length} / -${removed.length})`,
+    `baseline "${result.baseline.name}": ${result.baseline.row_count} rows → ${result.current_row_count} rows  (+${added.length} / -${removed.length})`,
   );
   if (added.length > 0) {
     console.log(`\n  added (+${added.length}):`);
-    console.table(enrichedAdded);
+    console.table(added);
   }
   if (removed.length > 0) {
     console.log(`\n  removed (-${removed.length}):`);

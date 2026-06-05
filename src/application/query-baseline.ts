@@ -1,6 +1,7 @@
 import { closeDb, getQueryBaseline, openDb } from "../db";
 import { diffRows } from "../diff-rows";
 import { filterRowsByChangedFiles } from "../git-changed";
+import { attachActions } from "./query-engine";
 import type { QueryBindValue } from "./query-engine";
 
 export interface QueryBaselineMeta {
@@ -29,13 +30,6 @@ export interface QueryBaselineError {
   error: string;
 }
 
-function attachActions(row: unknown, actions: ReadonlyArray<unknown>): unknown {
-  if (typeof row !== "object" || row === null) return row;
-  const obj = row as Record<string, unknown>;
-  if ("actions" in obj) return obj;
-  return { ...obj, actions };
-}
-
 /**
  * Diff current query rows against a saved `query_baselines` snapshot.
  * Mirrors CLI `codemap query --baseline=<name>`.
@@ -58,13 +52,19 @@ export function compareQueryBaseline(opts: {
     baselineRow = getQueryBaseline(db, opts.baselineName);
     if (baselineRow === undefined) {
       return {
-        error: `codemap: no baseline named "${opts.baselineName}". Use list_baselines for the catalog.`,
+        error: `codemap: no baseline named "${opts.baselineName}". List saved baselines via \`codemap query --baselines\` or the \`list_baselines\` tool.`,
       };
     }
 
     let baselineRows: unknown[];
     try {
-      baselineRows = JSON.parse(baselineRow.rows_json) as unknown[];
+      const parsed: unknown = JSON.parse(baselineRow.rows_json);
+      if (!Array.isArray(parsed)) {
+        return {
+          error: `codemap: baseline "${opts.baselineName}" has corrupt rows_json — drop and re-save.`,
+        };
+      }
+      baselineRows = parsed;
     } catch {
       return {
         error: `codemap: baseline "${opts.baselineName}" has corrupt rows_json — drop and re-save.`,

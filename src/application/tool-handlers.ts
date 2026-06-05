@@ -119,6 +119,10 @@ const err = (error: string, status: 400 | 404 | 500 = 400): ToolResult => ({
   status,
 });
 
+function baselineCompareErr(error: string): ToolResult {
+  return err(error, error.includes("no baseline named") ? 404 : 400);
+}
+
 /**
  * Resolve `changed_since: <ref>` to a Set of project-relative paths.
  * Memoised per (root, ref) pair so a batch with N items sharing the same
@@ -228,7 +232,7 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
         changedFiles: changed as Set<string> | undefined,
         summary: args.summary,
       });
-      if ("error" in payload) return err(payload.error);
+      if ("error" in payload) return baselineCompareErr(payload.error);
       return ok(payload);
     }
     if (
@@ -326,7 +330,7 @@ export function handleQueryRecipe(
         summary: args.summary,
         recipeActions,
       });
-      if ("error" in payload) return err(payload.error);
+      if ("error" in payload) return baselineCompareErr(payload.error);
       tryRecordRecipeRun(args.recipe);
       return ok(payload);
     }
