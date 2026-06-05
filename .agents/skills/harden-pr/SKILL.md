@@ -1,18 +1,20 @@
 ---
 name: harden-pr
 description: >-
-  Production-harden a branch without changing PR intent — spawn parallel reviewer
-  subagents, fix in-bounds findings, loop autonomously until clean or pass cap, then
-  report once. Use after a tracer-bullet commit (lite), before PR is done (full), or on
-  "harden", "harden-pr", "review until clean", "production-ready pass". Invoking this
-  skill authorizes one harden commit at cycle end. NEVER stop mid-loop to ask about
-  commits, babysit, or the next pass. NEVER redesign the feature or change observable
-  runtime behavior.
+  Bring a branch to pristine, maximum production readiness without changing PR intent —
+  spawn parallel reviewer subagents, fix in-bounds findings, loop autonomously until
+  clean or pass cap, then report once. Use after a tracer-bullet commit (lite), before PR
+  is done (full), or on "harden", "harden-pr", "pristine", "review until clean",
+  "production-ready pass". Invoking this skill authorizes one harden commit at cycle end.
+  NEVER stop mid-loop to ask about commits, babysit, or the next pass. NEVER redesign the
+  feature or change observable runtime behavior.
 ---
 
 # Harden PR
 
-Local production-hardening loop: parallel reviewer subagents → merge findings → fix in-bounds → re-verify → repeat until clean or cap → **one final report**. Refines bugs, tests, docs, and hygiene — **not** the feature's goal or runtime behavior.
+**Goal:** leave the PR / feature in **pristine, maximum production state** — every changed path shippable, verified, documented, and hygienic. Polish and harden what the PR already does; **never** change its intent or runtime behavior.
+
+Local loop: parallel reviewer subagents → merge findings → fix in-bounds → re-verify → repeat until clean or cap → **one final report**.
 
 **Invoking this skill (`/harden-pr`, `harden-pr lite`, `harden-pr full`) is a run-to-completion command.** The agent executes the full loop before ending the turn.
 
@@ -34,7 +36,7 @@ Otherwise: resolve anchor → run all passes → fix → verify → next pass �
 | Phase           | Behavior                                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **During loop** | Autonomous. Spawn reviewers in parallel, merge findings, fix in-bounds, re-run checks, advance pass counter.                          |
-| **After loop**  | Single concise report: mode, passes run, fixes made, checks status, deferred nits (if any).                                           |
+| **After loop**  | Single concise report: mode, passes run, production-bar status (met / gaps), fixes made, checks status, deferred nits (if any).       |
 | **Commit**      | If there are uncommitted fixes: one `harden: …` commit **without asking** — skill invocation authorizes it. If no fixes: skip commit. |
 | **Babysit**     | Full mode only. One line at end of report: "For GitHub/CI, run `/babysit`." Do not ask.                                               |
 
@@ -46,6 +48,23 @@ Otherwise: resolve anchor → run all passes → fix → verify → next pass �
 | **Full** | User intent ("full harden", "PR done", "production-ready pass") **or** offer when an in-flight `docs/plans/<topic>.md` checklist is complete | `origin/main...HEAD`    | 3          |
 
 Default to **lite** when invoked immediately after a slice commit. Default to **full** when the user signals branch completion.
+
+## Production bar (what "pristine" means)
+
+Reviewers optimize for this bar on in-scope files. **Full** mode applies it to the entire `origin/main...HEAD` diff; **lite** to the slice diff.
+
+| Area            | Pristine =                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Correctness** | No known bugs or unhandled edge cases in changed paths; behavior matches intent anchor                             |
+| **Tests**       | Changed behavior covered; affected tests pass                                                                      |
+| **Checks**      | Format, lint, typecheck clean on touched files ([`verify-after-each-step`](../../rules/verify-after-each-step.md)) |
+| **Docs**        | User-visible changes reflected in docs, changesets, help text — no drift                                           |
+| **Surfaces**    | No maintainer leaks into consumer surfaces ([`consumer-surfaces`](../../rules/consumer-surfaces.md))               |
+| **Structure**   | No boundary violations or barrel bypasses in the diff                                                              |
+| **Hygiene**     | No dead code, TODO slop, or sloppy naming in touched files; errors actionable                                      |
+| **Ship shape**  | A reviewer could merge without "fix before ship" notes (except deferred out-of-scope nits)                         |
+
+If a finding moves the bar toward pristine and stays in-bounds → **fix it**, including nits in touched files.
 
 ## Intent anchor (every reviewer prompt includes this)
 
@@ -69,9 +88,9 @@ Spawn applicable reviewers **in parallel** via subagents in **one batch per pass
 
 ### Core (always)
 
-1. **Correctness** — bugs, edge cases, missing tests in changed paths
-2. **Ship-readiness** — docs, changesets, consumer-surface leaks ([`consumer-surfaces`](../../rules/consumer-surfaces.md)), error messages; run [`verify-after-each-step`](../../rules/verify-after-each-step.md) checks on touched files
-3. **Structure (lite)** — boundary smells on the diff only (imports across declared layers, barrel bypasses); query codemap per [`codemap`](../codemap/SKILL.md)
+1. **Correctness** — gaps vs production bar; bugs, edge cases, missing tests in changed paths
+2. **Ship-readiness** — gaps vs production bar; docs, changesets, consumer-surface leaks, error messages; run [`verify-after-each-step`](../../rules/verify-after-each-step.md) checks on touched files
+3. **Structure (lite)** — gaps vs production bar; boundary smells on the diff (imports across declared layers, barrel bypasses); query codemap per [`codemap`](../codemap/SKILL.md)
 
 ### Extended (adaptive — spawn when diff triggers match)
 
