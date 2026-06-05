@@ -127,6 +127,32 @@ describe("MCP server — tool allowlist", () => {
       await server.close();
     }
   });
+
+  it("registers MCP ToolAnnotations on allowlisted tools", async () => {
+    const { client, server } = await makeClient({
+      CODEMAP_MCP_TOOLS: "query,apply,show",
+    });
+    try {
+      const tools = await client.listTools();
+      const byName = new Map(tools.tools.map((t) => [t.name, t]));
+      expect(byName.get("query")?.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+      expect(byName.get("apply")?.annotations).toMatchObject({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+      });
+      expect(byName.get("show")?.annotations).toMatchObject({
+        readOnlyHint: true,
+        destructiveHint: false,
+      });
+    } finally {
+      await server.close();
+    }
+  });
 });
 
 describe("MCP server — query tool", () => {

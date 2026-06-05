@@ -26,6 +26,7 @@ import {
   resolveMcpToolAllowlist,
 } from "./mcp-tool-allowlist";
 import type { McpToolName } from "./mcp-tool-allowlist";
+import { getMcpToolAnnotations } from "./mcp-tool-annotations";
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import type { ResourcePayload } from "./resource-handlers";
@@ -143,6 +144,20 @@ function wrapToolResult(r: ToolResult) {
   return { content: [{ type: "text" as const, text: r.payload }] };
 }
 
+interface RegisterToolConfig {
+  description: string;
+  inputSchema: unknown;
+}
+
+function withToolAnnotations<T extends RegisterToolConfig>(
+  name: McpToolName,
+  config: T,
+): T & { annotations?: ReturnType<typeof getMcpToolAnnotations> } {
+  const annotations = getMcpToolAnnotations(name);
+  if (annotations === undefined) return config;
+  return { ...config, annotations };
+}
+
 /**
  * Build a fully-configured `McpServer` instance with every codemap tool
  * and resource registered. Doesn't connect to a transport — caller owns
@@ -201,11 +216,11 @@ export function createMcpServer(opts: ServerOpts): McpServer {
 function registerQueryTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "query",
-    {
+    withToolAnnotations("query", {
       description:
         'Run one read-only SQL statement against the codemap index (default `.codemap/index.db`). Returns the JSON envelope `codemap query --json` would print: row array by default, {count} under `summary`, {group_by, groups} under `group_by`, baseline diff under `baseline` (incompatible with non-json `format` / `group_by`). Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by` / `baseline`). Mermaid requires `{from, to, label?, kind?}` rows; diff requires `{file_path, line_start, before_pattern, after_pattern}` rows.',
       inputSchema: queryArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleQuery(args, opts.root)),
   );
 }
@@ -213,11 +228,11 @@ function registerQueryTool(server: McpServer, opts: ServerOpts): void {
 function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "query_recipe",
-    {
+    withToolAnnotations("query_recipe", {
       description:
         'Run a recipe by id (bundled or project-local). Output rows carry per-row `actions` hints (recipe-only — `query` never adds them). Parametrised recipes accept `params: {key: value}` validated against recipe frontmatter. Compose with `summary` / `changed_since` / `group_by` / `baseline` exactly like `query` (`baseline` adds `actions` on `added` rows only). Pass `format: "sarif"` / `"annotations"` / `"mermaid"` / `"diff"` / `"diff-json"` to receive a formatted payload (incompatible with `summary` / `group_by` / `baseline`); SARIF rule id derives from the recipe id (`codemap.<recipe>`). List available recipes via the `codemap://recipes` resource.',
       inputSchema: queryRecipeArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleQueryRecipe(args, opts.root)),
   );
 }
@@ -225,11 +240,11 @@ function registerQueryRecipeTool(server: McpServer, opts: ServerOpts): void {
 function registerQueryBatchTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "query_batch",
-    {
+    withToolAnnotations("query_batch", {
       description:
         "Run N read-only SQL statements in one round-trip. Each item is either a bare SQL string (inherits batch-wide flags) or an object {sql, summary?, changed_since?, group_by?} overriding batch-wide flags per-key. Returns an N-element array; per-element shape mirrors single `query`'s output for that statement's effective flag set.",
       inputSchema: queryBatchArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleQueryBatch(args, opts.root)),
   );
 }
@@ -237,11 +252,11 @@ function registerQueryBatchTool(server: McpServer, opts: ServerOpts): void {
 function registerAuditTool(server: McpServer): void {
   server.registerTool(
     "audit",
-    {
+    withToolAnnotations("audit", {
       description:
         "Structural-drift audit. Composes per-delta snapshots (files / dependencies / deprecated) into a {head, deltas} envelope. Two **primary** snapshot sources are mutually exclusive: (1) `base: <ref>` — materialises a git committish (origin/main, HEAD~5, sha, tag) via `git archive | tar -x` to a sha-keyed cache under `.codemap/audit-cache/` (plain tree, no `.git` artifact — `git clean -xdf` and `rm -rf` both sweep it), reindexes into a cached `.codemap/index.db` at that sha, diffs against current. Cache hit on second run against same sha is sub-100ms. Requires a git repository — non-git projects get `{error: 'codemap audit: --base requires a git repository.'}`. (2) `baseline_prefix` — auto-resolves <prefix>-{files,dependencies,deprecated} from `query_baselines`. Plus optional **per-delta overrides** via `baselines: {<deltaKey>: <name>}` that compose with either primary source. `summary: true` collapses each delta to {added: N, removed: N}. `no_index` controls the head-side incremental-index prelude (default re-indexes; watch-active default is no-op since the watcher keeps the index fresh; pass `no_index: false` to force).",
       inputSchema: auditArgsSchema,
-    },
+    }),
     async (args) => wrapToolResult(await handleAudit(args)),
   );
 }
@@ -249,11 +264,11 @@ function registerAuditTool(server: McpServer): void {
 function registerContextTool(server: McpServer): void {
   server.registerTool(
     "context",
-    {
+    withToolAnnotations("context", {
       description:
         "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders (ignored when compact: true).",
       inputSchema: contextArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleContext(args)),
   );
 }
@@ -261,11 +276,11 @@ function registerContextTool(server: McpServer): void {
 function registerValidateTool(server: McpServer): void {
   server.registerTool(
     "validate",
-    {
+    withToolAnnotations("validate", {
       description:
         "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns only out-of-sync rows with status `stale` / `missing` / `unindexed` (fresh paths omitted). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose a stale index before issuing structural queries.",
       inputSchema: validateArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleValidate(args)),
   );
 }
@@ -273,11 +288,11 @@ function registerValidateTool(server: McpServer): void {
 function registerSaveBaselineTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "save_baseline",
-    {
+    withToolAnnotations("save_baseline", {
       description:
         "Snapshot the rows of a SQL or recipe under `name` in query_baselines. Polymorphic input: pass exactly one of `sql` (ad-hoc SELECT) or `recipe` (catalog recipe id). Mirrors `codemap query --save-baseline=<name>`'s single-verb shape; the runtime check that exactly one is set keeps the agent from accidentally saving an unintended source.",
       inputSchema: saveBaselineArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleSaveBaseline(args, opts.root)),
   );
 }
@@ -285,11 +300,11 @@ function registerSaveBaselineTool(server: McpServer, opts: ServerOpts): void {
 function registerListBaselinesTool(server: McpServer): void {
   server.registerTool(
     "list_baselines",
-    {
+    withToolAnnotations("list_baselines", {
       description:
         "List all saved baselines (no rows_json payload — use the audit tool with a baseline_prefix to compare against current). Returns the same array `codemap query --baselines --json` prints.",
       inputSchema: listBaselinesArgsSchema,
-    },
+    }),
     () => wrapToolResult(handleListBaselines()),
   );
 }
@@ -297,11 +312,11 @@ function registerListBaselinesTool(server: McpServer): void {
 function registerIngestCoverageTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "ingest_coverage",
-    {
+    withToolAnnotations("ingest_coverage", {
       description:
         "Ingest a coverage artifact (Istanbul JSON, LCOV, or NODE_V8_COVERAGE directory with `runtime: true`) into the index `coverage` table. Same JSON envelope as `codemap ingest-coverage --json`. Enables coverage-aware recipes (`worst-covered-exports`, `files-by-coverage`, `untested-and-dead`). Args: `path` (required), `runtime` (optional).",
       inputSchema: ingestCoverageArgsSchema,
-    },
+    }),
     async (args) => wrapToolResult(await handleIngestCoverage(args, opts.root)),
   );
 }
@@ -309,11 +324,11 @@ function registerIngestCoverageTool(server: McpServer, opts: ServerOpts): void {
 function registerDropBaselineTool(server: McpServer): void {
   server.registerTool(
     "drop_baseline",
-    {
+    withToolAnnotations("drop_baseline", {
       description:
         "Delete the named baseline. Returns {dropped: <name>} on success or {error} if the name doesn't exist.",
       inputSchema: dropBaselineArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleDropBaseline(args)),
   );
 }
@@ -321,11 +336,11 @@ function registerDropBaselineTool(server: McpServer): void {
 function registerShowTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "show",
-    {
+    withToolAnnotations("show", {
       description:
         "Look up symbol(s) by exact name or field-qualified `query` search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Query syntax: kind:, name:, path:, in: fields plus optional free text (name LIKE, or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` tool for arbitrary SQL.",
       inputSchema: showArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleShow(args, opts.root)),
   );
 }
@@ -333,11 +348,11 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
 function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "snippet",
-    {
+    withToolAnnotations("snippet", {
       description:
         "Same lookup as `show` (exact `{name}` or field-qualified `{query}` with kind:/name:/path:/in: tokens + optional `with_fts` for free text — FTS matches file bodies and returns every symbol in matching files) but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Returns `{matches, disambiguation?, warning?}`; source/stale/missing are additive fields on each match.",
       inputSchema: snippetArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleSnippet(args, opts.root)),
   );
 }
@@ -345,11 +360,11 @@ function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
 function registerAffectedTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "affected",
-    {
+    withToolAnnotations("affected", {
       description:
         "List test files transitively impacted by changed source files (reverse BFS on `dependencies`). Same preprocessor as `codemap affected` → `affected-tests` recipe. Args: paths (explicit project-relative paths; when set, skips git — `paths: []` is explicit empty, omit paths for git discovery), changed_since (git ref when paths omitted; default HEAD; wins only when paths omitted), test_glob (SQLite GLOB; replaces default suffix globs when set), max_depth (non-negative integer BFS cap). Returns JSON array of {test_path, impact_depth, actions?} — file paths only; CI composes the runner command.",
       inputSchema: affectedArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleAffected(args, opts.root)),
   );
 }
@@ -357,11 +372,11 @@ function registerAffectedTool(server: McpServer, opts: ServerOpts): void {
 function registerImpactTool(server: McpServer): void {
   server.registerTool(
     "impact",
-    {
+    withToolAnnotations("impact", {
       description:
         "Walk the dependency / calls / imports graph from <target> and return the blast radius. Replaces composing `WITH RECURSIVE` queries by hand. Args: target (symbol name or file path), direction (up|down|both, default both), via (dependencies|calls|imports|all, default all — symbol targets walk calls; file targets walk dependencies+imports; mismatched explicit choices land in skipped_backends), depth (default 3, 0=unbounded but cycle-detected and limit-capped), limit (default 500), summary (returns target+summary only). Result envelope: {target, direction, via, depth_limit, matches: [{depth, direction, edge, kind, name?, file_path}], summary: {nodes, max_depth_reached, by_kind, terminated_by: 'depth'|'limit'|'exhausted'}}.",
       inputSchema: impactArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleImpact(args)),
   );
 }
@@ -369,11 +384,11 @@ function registerImpactTool(server: McpServer): void {
 function registerTraceTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "trace",
-    {
+    withToolAnnotations("trace", {
       description:
         "Shortest call path between two symbols plus budget-capped snippets. Composes `call-path` recipe + disk reads (cross-file callee lookup). Args: from, to, max_depth?, via (calls|dependencies|all), budget_chars (adaptive default 15k/10k/6k when omitted; snippet source text only). Returns {from, to, via?, path, snippets, truncated, truncation?, snippets_skipped_reason?}. `truncated` is true when snippet budget hit (`truncation.snippets`); dependency hops omit auto-snippets (`snippets_skipped_reason`). Fall back to `query_recipe` call-path when unsure.",
       inputSchema: traceArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleTrace(args, opts.root)),
   );
 }
@@ -381,11 +396,11 @@ function registerTraceTool(server: McpServer, opts: ServerOpts): void {
 function registerExploreTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "explore",
-    {
+    withToolAnnotations("explore", {
       description:
         "Multi-symbol neighborhood survey with budget-capped snippets. Composes `symbol-neighborhood` (once per deduped name) + disk reads. Args: names (non-empty array), depth?, kind?, budget_chars (adaptive default 15k/10k/6k snippet chars when omitted). Returns {names, rows, snippets, truncated, truncation?} — `truncation.rows` when adaptive row cap hit (500/250/125 by repo size), `truncation.snippets` when budget hit. Fall back to `query_recipe` symbol-neighborhood.",
       inputSchema: exploreArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleExplore(args, opts.root)),
   );
 }
@@ -393,11 +408,11 @@ function registerExploreTool(server: McpServer, opts: ServerOpts): void {
 function registerNodeTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "node",
-    {
+    withToolAnnotations("node", {
       description:
         "One-hop symbol survey: `show` center + scoped depth-1 `symbol-neighborhood` + optional inline snippets. When center is unique (`in` or single match), neighborhood filters to that instance's connected files. Args: name, kind?, in?, include_snippets (default false), budget_chars? (adaptive default 15k/10k/6k when snippets enabled and omitted; snippet source only). Returns {center, neighborhood, snippets, truncated, truncation?}. `truncated` only when `include_snippets: true` and snippet budget hit.",
       inputSchema: nodeArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleNode(args, opts.root)),
   );
 }
@@ -405,11 +420,11 @@ function registerNodeTool(server: McpServer, opts: ServerOpts): void {
 function registerApplyTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "apply",
-    {
+    withToolAnnotations("apply", {
       description:
         "Apply the diff hunks a recipe describes (one per row of {file_path, line_start, before_pattern, after_pattern}) to disk. Substrate-shaped fix executor — recipe SQL is the synthesis surface, codemap executes. Args: recipe (id), params (k=v map for parametrised recipes), dry_run (preview only; phase-1 validates against current disk; no file is written), yes (required for the write path — non-TTY transports always need explicit consent; mutually exclusive with dry_run), force (bypass auto_fixable / apply.autoApplyRecipes gates), until_empty (fixpoint: dry-run probe → apply → reindex touched files → repeat; adds passes + terminated_by), max_passes (cap for until_empty; default 10), commit_message (git add touched files + commit after clean apply). Result envelope (same shape across modes): {mode: 'dry-run'|'apply', applied: bool, files: [{file_path, rows_applied, warnings?}], conflicts: [{file_path, line_start, before_pattern, actual_at_line, reason}], summary: {files, files_modified, rows, rows_applied, conflicts, files_with_conflicts}}; fixpoint runs add passes + terminated_by ∈ {empty, cap, conflicts, complete}. Q2 (c) all-or-nothing — any conflict aborts the whole run before any file is touched.",
       inputSchema: applyArgsSchema,
-    },
+    }),
     async (args) => wrapToolResult(await handleApply(args, opts.root)),
   );
 }
@@ -417,11 +432,11 @@ function registerApplyTool(server: McpServer, opts: ServerOpts): void {
 function registerApplyDiffInputTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "apply_diff_input",
-    {
+    withToolAnnotations("apply_diff_input", {
       description:
         "Apply a unified diff (git-style `-`/`+` hunks) to disk — same row contract and executor as `apply_rows`, but `diff_text` is parsed into diff rows (CLI twin: codemap apply --diff-input). Args: diff_text, dry_run, yes (required for writes), commit_message (optional git commit after clean apply). No recipe policy gates.",
       inputSchema: applyDiffInputArgsSchema,
-    },
+    }),
     async (args) => wrapToolResult(await handleApplyDiffInput(args, opts.root)),
   );
 }
@@ -429,11 +444,11 @@ function registerApplyDiffInputTool(server: McpServer, opts: ServerOpts): void {
 function registerApplyRowsTool(server: McpServer, opts: ServerOpts): void {
   server.registerTool(
     "apply_rows",
-    {
+    withToolAnnotations("apply_rows", {
       description:
         "Apply explicit diff rows (agent-in-the-loop) — same phase-1/2 engine as `apply` but rows are supplied directly instead of from recipe SQL. Args: rows (array of {file_path, line_start, before_pattern, after_pattern}), dry_run, yes (required for writes).",
       inputSchema: applyRowsArgsSchema,
-    },
+    }),
     (args) => wrapToolResult(handleApplyRows(args, opts.root)),
   );
 }
