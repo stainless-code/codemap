@@ -141,7 +141,7 @@ Per-function decision-point count (REAL column on `symbols`). Computed by the pa
 
 ### `symbols.cognitive_complexity` / cognitive complexity
 
-SonarSource cognitive complexity (INTEGER on `symbols`) for the same function-shaped symbols as cyclomatic `complexity`. Penalizes nested control flow; same oxc walk as McCabe (`src/extractors/complexity.ts`). Recipes: `high-cognitive-complexity` (`min_score` default 15); `high-complexity-untested` includes the column while filtering on cyclomatic `complexity`.
+SonarSource-inspired cognitive complexity (INTEGER on `symbols`) for the same function-shaped symbols as cyclomatic `complexity`. Penalizes nested control flow; computed in the same parser walk as McCabe. Recipes: `high-cognitive-complexity` (`min_score` default 15, Sonar rule threshold); `high-complexity-untested` includes the column while filtering on cyclomatic `complexity`.
 
 ### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
 

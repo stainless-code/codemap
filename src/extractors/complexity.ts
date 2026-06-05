@@ -66,10 +66,13 @@ export function createComplexityTracker(
     getArrowSymbol(node) {
       return arrowMap.get(node);
     },
-    cognitiveStructural() {
+    cognitiveStructural(opts?: { elseIf?: boolean }) {
       const top = stack[stack.length - 1];
       if (!top) return;
-      top.cognitive += 1 + top.cognitiveNest;
+      const nestLevel = opts?.elseIf
+        ? Math.max(0, top.cognitiveNest - 1)
+        : top.cognitiveNest;
+      top.cognitive += 1 + nestLevel;
     },
     cognitiveFlat() {
       const top = stack[stack.length - 1];
@@ -91,14 +94,33 @@ export const complexityExtractor: TierExtractor = {
   tierId: "complexity",
   register(visitor, ctx) {
     const { complexity } = ctx;
+    // Else-if chains reuse the parent `if`'s cognitive nesting level (Sonar
+    // spec) — mark alternate `IfStatement` nodes on the parent enter.
+    const elseIfNodes = new WeakSet<object>();
+
     const nest = () => {
-      complexity.cognitiveStructural();
+      complexity.cognitiveStructural({});
       complexity.enterCognitiveNest();
       complexity.enterNest();
       complexity.increment();
     };
     const unnest = () => {
       complexity.exitCognitiveNest();
+      complexity.exitNest();
+    };
+    const nestIf = (node: any) => {
+      if (node.alternate?.type === "IfStatement") {
+        elseIfNodes.add(node.alternate);
+      }
+      const isElseIf = elseIfNodes.has(node);
+      complexity.cognitiveStructural({ elseIf: isElseIf });
+      if (!isElseIf) complexity.enterCognitiveNest();
+      complexity.enterNest();
+      complexity.increment();
+    };
+    const unnestIf = (node: any) => {
+      if (!elseIfNodes.has(node)) complexity.exitCognitiveNest();
+      elseIfNodes.delete(node);
       complexity.exitNest();
     };
 
@@ -122,8 +144,8 @@ export const complexityExtractor: TierExtractor = {
       // forms (if/for/while/try/ternary) ALSO increment nesting_depth
       // on enter and decrement on exit. Cognitive uses Sonar structural
       // increments (+1 + nesting) on the same shapes.
-      IfStatement: nest,
-      "IfStatement:exit": unnest,
+      IfStatement: nestIf,
+      "IfStatement:exit": unnestIf,
       WhileStatement: nest,
       "WhileStatement:exit": unnest,
       DoWhileStatement: nest,

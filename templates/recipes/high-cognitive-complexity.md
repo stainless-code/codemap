@@ -4,7 +4,7 @@ params:
     type: number
     required: false
     default: 15
-    description: Minimum SonarSource cognitive complexity score (default matches Sonar rule threshold)
+    description: Minimum cognitive complexity score (default 15 matches Sonar rule threshold)
 actions:
   - type: review-cognitive-complexity
     auto_fixable: false
@@ -13,7 +13,7 @@ actions:
 
 # high-cognitive-complexity
 
-Functions with **cognitive complexity** ≥ `min_score` (default **15**, Sonar-aligned). Uses the same function-shaped symbol coverage as cyclomatic `symbols.complexity` (top-level functions, named arrow/const, class methods).
+Functions with **cognitive complexity** ≥ `min_score` (default **15**, Sonar rule threshold). Uses the same function-shaped symbol coverage as cyclomatic `symbols.complexity` (top-level functions, named arrow/const, class methods).
 
 Distinct from `high-complexity-untested` (cyclomatic gate + coverage) and `deeply-nested-functions` (`nesting_depth` only).
 

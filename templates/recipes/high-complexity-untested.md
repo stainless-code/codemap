@@ -16,7 +16,7 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's pa
 - `&&` / `||` / `??` short-circuit operators (`?` / `:` ternary too)
 - `catch` clauses
 
-**Computed for function-shaped symbols** — top-level `function` declarations, named arrow/const bindings, and class methods (`MethodDefinition` bodies). Non-function kinds (interfaces, types, enums, plain consts) get `complexity = NULL` and are excluded by `WHERE s.complexity IS NOT NULL`.
+**Computed for function-shaped symbols** — top-level `function` declarations, named arrow/const bindings, and class methods. Non-function kinds (interfaces, types, enums, plain consts) get `complexity = NULL` and are excluded by `WHERE s.complexity IS NOT NULL`.
 
 ## Cognitive complexity column (`symbols.cognitive_complexity`)
 
