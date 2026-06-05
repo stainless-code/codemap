@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import { execSync } from "node:child_process";
 import {
   mkdirSync,
@@ -93,6 +93,187 @@ describe("handleQuery baseline", () => {
       ok: false,
       error: expect.stringContaining("cannot be combined with format=sarif"),
     });
+  });
+
+  it("format=codeclimate returns GitLab-shaped JSON array", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "codeclimate",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.format !== "codeclimate") return;
+    const issues = JSON.parse(result.payload);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      check_name: "adhoc",
+      severity: "minor",
+      location: { path: "src/query.ts", lines: { begin: 1 } },
+    });
+  });
+
+  it("format=badge returns markdown summary", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "badge",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      format: "badge",
+      payload: "codemap: 1 issue",
+      badgeStyle: "markdown",
+    });
+  });
+
+  it("format=badge badge_style=json returns codemap-badge/v1", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path, line_start, name FROM symbols",
+        format: "badge",
+        badge_style: "json",
+      },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.format !== "badge") return;
+    expect(result.badgeStyle).toBe("json");
+    expect(JSON.parse(result.payload)).toMatchObject({
+      schema: "codemap-badge/v1",
+      count: 1,
+      status: "fail",
+    });
+  });
+
+  it("rejects badge_style without format=badge", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", format: "sarif", badge_style: "json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "badge_style is only valid with format=badge",
+      ),
+    });
+  });
+
+  it("rejects badge_style=json when format is omitted", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", badge_style: "json" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "badge_style is only valid with format=badge",
+      ),
+    });
+  });
+
+  it("rejects format=codeclimate + summary", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path FROM symbols",
+        format: "codeclimate",
+        summary: true,
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with summary"),
+    });
+  });
+
+  it("rejects format=badge + group_by", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path FROM symbols",
+        format: "badge",
+        group_by: "directory",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+
+  it("rejects baseline + format=codeclimate", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "codeclimate" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining(
+        "cannot be combined with format=codeclimate",
+      ),
+    });
+  });
+
+  it("rejects baseline + format=badge", () => {
+    const result = handleQuery(
+      { sql: "SELECT 1", baseline: "pre", format: "badge" },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with format=badge"),
+    });
+  });
+
+  it("rejects format=codeclimate + group_by", () => {
+    const result = handleQuery(
+      {
+        sql: "SELECT file_path FROM symbols",
+        format: "codeclimate",
+        group_by: "directory",
+      },
+      projectRoot,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("cannot be combined with group_by"),
+    });
+  });
+
+  it("emits stderr warning for aggregate rows with format=codeclimate", () => {
+    const stderr = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = handleQuery(
+        {
+          sql: "SELECT COUNT(*) AS count FROM symbols",
+          format: "codeclimate",
+        },
+        projectRoot,
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.format !== "codeclimate") return;
+      expect(JSON.parse(result.payload)).toEqual([]);
+      expect(stderr.mock.calls[0]?.[0]).toContain("codeclimate");
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  it("handleQueryRecipe format=codeclimate uses recipe check_name", () => {
+    const result = handleQueryRecipe(
+      { recipe: "fan-in", format: "codeclimate" },
+      projectRoot,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.format !== "codeclimate") return;
+    const issues = JSON.parse(result.payload) as Array<{ check_name: string }>;
+    if (issues.length > 0) {
+      expect(issues[0]?.check_name).toBe("fan-in");
+    }
   });
 
   it("rejects baseline + group_by", () => {

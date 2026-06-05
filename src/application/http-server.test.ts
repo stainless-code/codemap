@@ -289,6 +289,56 @@ describe("http-server — POST /tool/query", () => {
     expect(doc.version).toBe("2.1.0");
   });
 
+  it("format=codeclimate returns application/json", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sql: "SELECT name, file_path, line_start FROM symbols WHERE name = 'bar'",
+        format: "codeclimate",
+      }),
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("application/json");
+    const issues = (await r.json()) as unknown[];
+    expect(Array.isArray(issues)).toBe(true);
+    expect(issues.length).toBeGreaterThan(0);
+  });
+
+  it("format=badge markdown returns text/plain", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sql: "SELECT name, file_path, line_start FROM symbols WHERE name = 'bar'",
+        format: "badge",
+      }),
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/plain");
+    expect(await r.text()).toBe("codemap: 1 issue");
+  });
+
+  it("format=badge badge_style=json returns application/json", async () => {
+    serverHandle = await startServer();
+    const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sql: "SELECT name, file_path, line_start FROM symbols WHERE name = 'bar'",
+        format: "badge",
+        badge_style: "json",
+      }),
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("application/json");
+    const doc = (await r.json()) as { schema: string; count: number };
+    expect(doc.schema).toBe("codemap-badge/v1");
+    expect(doc.count).toBe(1);
+  });
+
   it("format=annotations returns text/plain", async () => {
     serverHandle = await startServer();
     const r = await fetch(`http://127.0.0.1:${serverHandle.port}/tool/query`, {

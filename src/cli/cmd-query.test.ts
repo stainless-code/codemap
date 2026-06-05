@@ -23,6 +23,7 @@ describe("parseQueryRest", () => {
   it("parses SQL after query", () => {
     const r = parseQueryRest(["query", "SELECT", "1"]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT 1",
       json: false,
@@ -40,6 +41,7 @@ describe("parseQueryRest", () => {
   it("parses --json and SQL", () => {
     const r = parseQueryRest(["query", "--json", "SELECT", "1"]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT 1",
       json: true,
@@ -57,6 +59,7 @@ describe("parseQueryRest", () => {
   it("parses --summary and SQL", () => {
     const r = parseQueryRest(["query", "--summary", "SELECT", "1"]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT 1",
       json: false,
@@ -74,6 +77,7 @@ describe("parseQueryRest", () => {
   it("parses --json --summary and SQL", () => {
     const r = parseQueryRest(["query", "--json", "--summary", "SELECT", "1"]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT 1",
       json: true,
@@ -93,6 +97,7 @@ describe("parseQueryRest", () => {
     const sql = getQueryRecipeSql("fan-out");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: false,
@@ -115,6 +120,7 @@ describe("parseQueryRest", () => {
       "SELECT 1",
     ]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT 1",
       json: false,
@@ -141,6 +147,7 @@ describe("parseQueryRest", () => {
     const sql = getQueryRecipeSql("fan-out");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: true,
@@ -164,6 +171,7 @@ describe("parseQueryRest", () => {
       "SELECT * FROM symbols",
     ]);
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: "SELECT * FROM symbols",
       json: true,
@@ -183,6 +191,7 @@ describe("parseQueryRest", () => {
     const sql = getQueryRecipeSql("fan-in");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: false,
@@ -452,6 +461,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const sql = getQueryRecipeSql("fan-out-sample-json");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: false,
@@ -471,6 +481,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const sql = getQueryRecipeSql("fan-out");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: false,
@@ -537,6 +548,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const sql = getQueryRecipeSql("fan-out-sample");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: true,
@@ -556,6 +568,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const sql = getQueryRecipeSql("fan-out");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: true,
@@ -575,6 +588,7 @@ describe("parseQueryRest (continued — these were mis-nested in a prior PR)", (
     const sql = getQueryRecipeSql("fan-out");
     expect(sql).toBeDefined();
     expect(r).toEqual({
+      badgeStyle: "markdown",
       kind: "run",
       sql: sql!,
       json: true,
@@ -679,8 +693,15 @@ describe("parseQueryRest — --format flag", () => {
     expect(r.format).toBe("json");
   });
 
-  it("accepts --format text|json|sarif|annotations", () => {
-    for (const fmt of ["text", "json", "sarif", "annotations"] as const) {
+  it("accepts --format text|json|sarif|annotations|codeclimate|badge", () => {
+    for (const fmt of [
+      "text",
+      "json",
+      "sarif",
+      "annotations",
+      "codeclimate",
+      "badge",
+    ] as const) {
       const r = parseQueryRest(["query", "--format", fmt, "SELECT 1"]);
       if (r.kind !== "run") throw new Error(`expected run for ${fmt}`);
       expect(r.format).toBe(fmt);
@@ -848,6 +869,155 @@ describe("parseQueryRest — --format flag", () => {
       ]);
       expect(r.kind).toBe("run");
     });
+
+    it("rejects --format badge + --summary", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--summary",
+        "-r",
+        "boundary-violations",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("badge");
+        expect(r.message).toContain("--summary");
+      }
+    });
+
+    it("rejects --format badge + --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("badge");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
+    it("rejects --format codeclimate + --summary", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "codeclimate",
+        "--summary",
+        "-r",
+        "boundary-violations",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("codeclimate");
+        expect(r.message).toContain("--summary");
+      }
+    });
+
+    it("rejects --format codeclimate + --group-by", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "codeclimate",
+        "--group-by",
+        "directory",
+        "-r",
+        "fan-in",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("codeclimate");
+        expect(r.message).toContain("--group-by");
+      }
+    });
+
+    it("rejects --format codeclimate + --baseline=<name>", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "codeclimate",
+        "--baseline=base",
+        "SELECT 1",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") {
+        expect(r.message).toContain("codeclimate");
+        expect(r.message).toContain("--baseline");
+      }
+    });
+
+    it("rejects --format badge + --baseline on a recipe", () => {
+      const r = parseQueryRest([
+        "query",
+        "--format",
+        "badge",
+        "--baseline",
+        "-r",
+        "boundary-violations",
+      ]);
+      expect(r.kind).toBe("error");
+      if (r.kind === "error") expect(r.message).toContain("badge");
+    });
+  });
+
+  it("parses --badge-style json with --format badge", () => {
+    const r = parseQueryRest([
+      "query",
+      "--format",
+      "badge",
+      "--badge-style",
+      "json",
+      "-r",
+      "boundary-violations",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.format).toBe("badge");
+    expect(r.badgeStyle).toBe("json");
+  });
+
+  it("rejects unknown --badge-style", () => {
+    const r = parseQueryRest([
+      "query",
+      "--format",
+      "badge",
+      "--badge-style",
+      "xml",
+      "-r",
+      "boundary-violations",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("xml");
+  });
+
+  it("accepts --badge-style=json equals form", () => {
+    const r = parseQueryRest([
+      "query",
+      "--format=badge",
+      "--badge-style=json",
+      "-r",
+      "boundary-violations",
+    ]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.badgeStyle).toBe("json");
+  });
+
+  it("rejects --badge-style without --format badge", () => {
+    const r = parseQueryRest([
+      "query",
+      "--badge-style",
+      "json",
+      "-r",
+      "boundary-violations",
+    ]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.message).toContain("--badge-style");
+    }
   });
 });
 

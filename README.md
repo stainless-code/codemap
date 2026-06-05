@@ -131,17 +131,23 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # non-git projects get a clean `codemap audit: --base requires a git repository.` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
-# --format <text|json|sarif|annotations|mermaid|diff|diff-json> — pipe results into GitHub Code Scanning
-# (SARIF 2.1.0), surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg), or
-# render edge-shaped recipes as Mermaid `flowchart LR`, or preview edits as unified diffs. All
+# --format <text|json|sarif|annotations|mermaid|diff|diff-json|codeclimate|badge> — SARIF for GitHub
+# Code Scanning; annotations for GH Actions ::notice lines; codeclimate for GitLab Code Quality;
+# badge for issue-count summaries; mermaid/diff for graph and edit previews. All
 # formatted outputs require a flat row list
-# (no --summary / --group-by / baseline). SARIF / annotations auto-detect file_path /
-# path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc). Mermaid
+# (no --summary / --group-by / baseline). SARIF / annotations / codeclimate / badge
+# auto-detect file_path / path / to_path / from_path; rule.id is codemap.<recipe-id>
+# (or codemap.adhoc). codeclimate/badge skip aggregate-only rows. Mermaid
 # requires {from, to, label?, kind?} rows and rejects unbounded inputs (>50 edges) with a
 # scope-suggestion error — alias columns via SELECT col AS "from", col2 AS "to".
 codemap query --recipe deprecated-symbols --format sarif > findings.sarif
 codemap query --recipe deprecated-symbols --ci                    # CI shortcut: --format sarif + non-zero exit + quiet
 codemap query --recipe deprecated-symbols --format annotations    # one ::notice per row
+# GitLab Code Quality artifact (locatable rows only; flat minor severity):
+codemap query --recipe boundary-violations --format codeclimate > gl-code-quality-report.json
+# Badge summary for README paste or CI (counts locatable rows only):
+codemap query --recipe boundary-violations --format badge
+codemap query --recipe boundary-violations --format badge --badge-style json | jq -e '.status == "pass"'
 # Render any audit/SARIF output as a markdown PR-summary comment (for repos without
 # Code Scanning / aggregate audit deltas / bot-context seeding):
 codemap audit --base origin/main --json | codemap pr-comment - | gh pr comment <PR> -F -

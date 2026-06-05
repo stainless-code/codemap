@@ -30,8 +30,8 @@ export function printOutcomeAliasHelp(alias: OutcomeAlias): void {
   console.log(`Usage: codemap ${alias} [query flags...]
 
 Alias for \`codemap query --recipe ${recipeId}\` — every flag accepted by
-\`codemap query\` passes through (--json, --format sarif|annotations|mermaid|diff|diff-json,
---ci, --summary, --changed-since <ref>, --group-by owner|directory|package,
+\`codemap query\` passes through (--json, --format sarif|annotations|mermaid|diff|diff-json|codeclimate|badge,
+--badge-style markdown|json, --ci, --summary, --changed-since <ref>, --group-by owner|directory|package,
 --params key=value, --save-baseline[=name], --baseline[=name]).
 
 Run \`codemap query --help\` for the full flag reference, or

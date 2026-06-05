@@ -53,12 +53,17 @@ import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
 import { runIngestCoverageOnDb } from "./ingest-coverage-run";
+import type { BadgeStyle } from "./output-formatters";
 import {
   formatAnnotations,
+  formatBadge,
+  formatBadgeJson,
+  formatCodeClimate,
   formatDiff,
   formatDiffJson,
   formatMermaid,
   formatSarif,
+  noLocatableFindingsWarning,
 } from "./output-formatters";
 import {
   baselineQueryIncompatibility,
@@ -106,6 +111,8 @@ export type ToolResult =
   | { ok: true; format: "mermaid"; payload: string }
   | { ok: true; format: "diff"; payload: string }
   | { ok: true; format: "diff-json"; payload: string }
+  | { ok: true; format: "codeclimate"; payload: string }
+  | { ok: true; format: "badge"; payload: string; badgeStyle: BadgeStyle }
   | { ok: false; error: string; status?: 400 | 404 | 500 };
 
 const ok = (payload: unknown): ToolResult => ({
@@ -183,7 +190,11 @@ export const formatEnum = z.enum([
   "mermaid",
   "diff",
   "diff-json",
+  "codeclimate",
+  "badge",
 ]);
+
+export const badgeStyleEnum = z.enum(["markdown", "json"]);
 
 export const batchItemSchema = z.union([
   z.string().min(1, "sql must be a non-empty string"),
@@ -203,6 +214,7 @@ export const queryArgsSchema = {
   changed_since: z.string().optional(),
   group_by: groupByEnum.optional(),
   format: formatEnum.optional(),
+  badge_style: badgeStyleEnum.optional(),
   baseline: z.string().min(1).optional(),
 };
 
@@ -211,12 +223,24 @@ export interface QueryArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
+  format?:
+    | "json"
+    | "sarif"
+    | "annotations"
+    | "mermaid"
+    | "diff"
+    | "diff-json"
+    | "codeclimate"
+    | "badge";
+  badge_style?: BadgeStyle;
   baseline?: string;
 }
 
 export function handleQuery(args: QueryArgs, root: string): ToolResult {
   try {
+    const badgeIncompat = badgeStyleIncompatibility(args.format, args);
+    if (badgeIncompat !== undefined) return err(badgeIncompat);
+
     const baselineIncompat = baselineQueryIncompatibility(args);
     if (baselineIncompat !== undefined) return err(baselineIncompat);
 
@@ -235,13 +259,7 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
       if ("error" in payload) return baselineCompareErr(payload.error);
       return ok(payload);
     }
-    if (
-      args.format === "sarif" ||
-      args.format === "annotations" ||
-      args.format === "mermaid" ||
-      args.format === "diff" ||
-      args.format === "diff-json"
-    ) {
+    if (args.format !== undefined && args.format !== "json") {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       return runFormattedQuery({
@@ -250,6 +268,7 @@ export function handleQuery(args: QueryArgs, root: string): ToolResult {
         recipeActions: undefined,
         changedFiles: changed as Set<string> | undefined,
         format: args.format,
+        badgeStyle: args.badge_style,
         root,
       });
     }
@@ -275,6 +294,7 @@ export const queryRecipeArgsSchema = {
   changed_since: z.string().optional(),
   group_by: groupByEnum.optional(),
   format: formatEnum.optional(),
+  badge_style: badgeStyleEnum.optional(),
   baseline: z.string().min(1).optional(),
   params: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -286,7 +306,16 @@ export interface QueryRecipeArgs {
   summary?: boolean;
   changed_since?: string;
   group_by?: GroupByMode;
-  format?: "json" | "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
+  format?:
+    | "json"
+    | "sarif"
+    | "annotations"
+    | "mermaid"
+    | "diff"
+    | "diff-json"
+    | "codeclimate"
+    | "badge";
+  badge_style?: BadgeStyle;
   baseline?: string;
   params?: RecipeParamValues;
 }
@@ -296,6 +325,9 @@ export function handleQueryRecipe(
   root: string,
 ): ToolResult {
   try {
+    const badgeIncompat = badgeStyleIncompatibility(args.format, args);
+    if (badgeIncompat !== undefined) return err(badgeIncompat);
+
     const baselineIncompat = baselineQueryIncompatibility(args);
     if (baselineIncompat !== undefined) return err(baselineIncompat);
 
@@ -334,13 +366,7 @@ export function handleQueryRecipe(
       tryRecordRecipeRun(args.recipe);
       return ok(payload);
     }
-    if (
-      args.format === "sarif" ||
-      args.format === "annotations" ||
-      args.format === "mermaid" ||
-      args.format === "diff" ||
-      args.format === "diff-json"
-    ) {
+    if (args.format !== undefined && args.format !== "json") {
       const incompat = formatToolIncompatibility(args.format, args);
       if (incompat !== undefined) return err(incompat);
       const result = runFormattedQuery({
@@ -350,6 +376,7 @@ export function handleQueryRecipe(
         changedFiles: changed as Set<string> | undefined,
         bindValues: resolvedParams.values,
         format: args.format,
+        badgeStyle: args.badge_style,
         root,
       });
       // Successful runs only; failure-isolated inside the helper.
@@ -1252,8 +1279,28 @@ export async function handleIngestCoverage(
  * change the output shape away from a flat row list. Mirrors the CLI
  * parser's `formatIncompatibility` for the tool wrapper layer.
  */
+function badgeStyleIncompatibility(
+  fmt: QueryArgs["format"] | undefined,
+  args: { badge_style?: BadgeStyle },
+): string | undefined {
+  if (args.badge_style === undefined || args.badge_style === "markdown") {
+    return undefined;
+  }
+  if (fmt !== "badge") {
+    return "codemap: badge_style is only valid with format=badge.";
+  }
+  return undefined;
+}
+
 function formatToolIncompatibility(
-  fmt: "sarif" | "annotations" | "mermaid" | "diff" | "diff-json",
+  fmt:
+    | "sarif"
+    | "annotations"
+    | "mermaid"
+    | "diff"
+    | "diff-json"
+    | "codeclimate"
+    | "badge",
   args: { summary?: boolean; group_by?: GroupByMode },
 ): string | undefined {
   const offenders: string[] = [];
@@ -1269,7 +1316,15 @@ function runFormattedQuery(args: {
   recipeActions: ReadonlyArray<unknown> | undefined;
   changedFiles: Set<string> | undefined;
   bindValues?: RecipeParamValue[] | undefined;
-  format: "sarif" | "annotations" | "mermaid" | "diff" | "diff-json";
+  format:
+    | "sarif"
+    | "annotations"
+    | "mermaid"
+    | "diff"
+    | "diff-json"
+    | "codeclimate"
+    | "badge";
+  badgeStyle?: BadgeStyle | undefined;
   root: string;
 }): ToolResult {
   const payload = executeQuery({
@@ -1284,6 +1339,8 @@ function runFormattedQuery(args: {
     return err("codemap: internal — formatted output requires flat row list.");
   }
   const rows = payload as Record<string, unknown>[];
+  const locWarning = noLocatableFindingsWarning(args.format, rows);
+  if (locWarning !== undefined) console.error(locWarning);
   if (args.format === "sarif") {
     const catalog =
       args.recipeId !== undefined
@@ -1312,6 +1369,17 @@ function runFormattedQuery(args: {
   if (args.format === "diff-json") {
     const text = formatDiffJson({ rows, projectRoot: args.root });
     return { ok: true, format: "diff-json", payload: text };
+  }
+  if (args.format === "codeclimate") {
+    const text = formatCodeClimate({ rows, recipeId: args.recipeId });
+    return { ok: true, format: "codeclimate", payload: text };
+  }
+  if (args.format === "badge") {
+    const formatOpts = { rows, recipeId: args.recipeId };
+    const style = args.badgeStyle ?? "markdown";
+    const text =
+      style === "json" ? formatBadgeJson(formatOpts) : formatBadge(formatOpts);
+    return { ok: true, format: "badge", payload: text, badgeStyle: style };
   }
   const text = formatAnnotations({
     rows,

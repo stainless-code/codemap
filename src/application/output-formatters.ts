@@ -10,11 +10,14 @@
  * aggregates (`index-summary`, `markers-by-kind`), not findings. See
  * [`docs/architecture.md` § Output formatters](../../docs/architecture.md#cli-usage).
  *
- * Both formatters are pure: take rows + recipe metadata, return a string.
+ * Formatters are pure: take rows + recipe metadata, return a string.
  * No I/O, no DB access. Same engine wired into both the CLI (`cmd-query.ts`)
- * and the MCP `query` / `query_recipe` tools.
+ * and the MCP `query` / `query_recipe` tools. Also ships
+ * {@link formatCodeClimate} (GitLab Code Quality JSON) and
+ * {@link formatBadge} / {@link formatBadgeJson} (issue-count summary).
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -61,6 +64,21 @@ export function detectLocationColumn(
 export function hasLocatableRows(rows: Record<string, unknown>[]): boolean {
   if (rows.length === 0) return false;
   return rows.some((r) => detectLocationColumn(r) !== null);
+}
+
+/**
+ * Warning text when a formatted output skips aggregate rows (plan F.5). Returns
+ * `undefined` when no warning applies (mermaid, empty rows, or ≥1 locatable row).
+ */
+export function noLocatableFindingsWarning(
+  format: string,
+  rows: Record<string, unknown>[],
+  opts?: { ci?: boolean },
+): string | undefined {
+  if (opts?.ci === true) return undefined;
+  if (format === "mermaid") return undefined;
+  if (rows.length === 0 || hasLocatableRows(rows)) return undefined;
+  return `codemap: --format ${format}: recipe / SQL emitted ${rows.length} row(s) with no file_path / path / to_path / from_path column — these aren't findings, skipping. (Aggregate recipes like index-summary / markers-by-kind don't map to ${format} v1.)`;
 }
 
 /**
@@ -169,6 +187,111 @@ export function formatSarif(opts: FormatOpts): string {
     ],
   };
   return JSON.stringify(sarif, null, 2);
+}
+
+/** Rows with a detectable file-path column — same set Code Climate / badge count. */
+export function countLocatableFindings(
+  rows: Record<string, unknown>[],
+): number {
+  return rows.filter((row) => detectLocationColumn(row) !== null).length;
+}
+
+/**
+ * Stable GitLab Code Quality fingerprint from `(recipe_id, file_path,
+ * emitted line, check_name, row message)` — SHA-256 truncated to 16 hex chars.
+ * Emitted line matches `location.lines.begin` (defaults to `1` without `line_start`).
+ */
+export function buildCodeClimateFingerprint(
+  recipeId: string | undefined,
+  filePath: string,
+  lineStart: number | undefined,
+  checkName: string,
+  rowSignature: string,
+): string {
+  const begin = lineStart !== undefined && lineStart > 0 ? lineStart : 1;
+  const key = `${recipeId ?? "adhoc"}\0${filePath}\0${String(begin)}\0${checkName}\0${rowSignature}`;
+  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+}
+
+/**
+ * Format the row-set as a GitLab Code Quality JSON array (plan F.2 / F.7).
+ * Rows without a location column are skipped; empty input → `[]`.
+ */
+export function formatCodeClimate(opts: FormatOpts): string {
+  const checkName = opts.recipeId ?? "adhoc";
+  const issues = opts.rows.flatMap((row) => {
+    const locCol = detectLocationColumn(row);
+    if (locCol === null) return [];
+    const path = row[locCol] as string;
+    const lineStartRaw = row["line_start"];
+    const lineStart =
+      typeof lineStartRaw === "number" && lineStartRaw > 0
+        ? lineStartRaw
+        : undefined;
+    // GitLab requires location.lines.begin — file-level rows (e.g. boundary-violations)
+    // fall back to 1 when the recipe has no line_start column.
+    const begin = lineStart ?? 1;
+    const location: { path: string; lines: { begin: number } } = {
+      path,
+      lines: { begin },
+    };
+    const description = buildMessageText(row);
+    return [
+      {
+        description,
+        check_name: checkName,
+        fingerprint: buildCodeClimateFingerprint(
+          opts.recipeId,
+          path,
+          lineStart,
+          checkName,
+          description,
+        ),
+        severity: "minor" as const,
+        location,
+      },
+    ];
+  });
+  return JSON.stringify(issues, null, 2);
+}
+
+export type BadgeStyle = "markdown" | "json";
+
+export interface BadgeSummary {
+  label: "codemap";
+  message: string;
+  count: number;
+  status: "pass" | "fail";
+}
+
+export interface CodemapBadgeV1 extends BadgeSummary {
+  schema: "codemap-badge/v1";
+}
+
+/** Issue count from locatable rows only (plan F.4 / F.8). */
+export function buildBadgeSummary(opts: FormatOpts): BadgeSummary {
+  const count = countLocatableFindings(opts.rows);
+  const message =
+    count === 0 ? "clean" : count === 1 ? "1 issue" : `${count} issues`;
+  return {
+    label: "codemap",
+    message,
+    count,
+    status: count === 0 ? "pass" : "fail",
+  };
+}
+
+/** Single-line markdown badge: `codemap: N issues` / `codemap: clean`. */
+export function formatBadge(opts: FormatOpts): string {
+  const summary = buildBadgeSummary(opts);
+  return `codemap: ${summary.message}`;
+}
+
+/** `codemap-badge/v1` JSON document (plan F.8). */
+export function formatBadgeJson(opts: FormatOpts): string {
+  const summary = buildBadgeSummary(opts);
+  const doc: CodemapBadgeV1 = { schema: "codemap-badge/v1", ...summary };
+  return JSON.stringify(doc, null, 2);
 }
 
 /** Removed rows intentionally excluded — SARIF surfaces findings to act on, not cleanups. */

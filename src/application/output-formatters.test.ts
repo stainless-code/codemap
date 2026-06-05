@@ -10,11 +10,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  buildBadgeSummary,
+  buildCodeClimateFingerprint,
   buildMessageText,
   detectLocationColumn,
   escapeAnnotationData,
   escapeAnnotationProperty,
   formatAuditSarif,
+  formatBadge,
+  countLocatableFindings,
+  formatBadgeJson,
+  formatCodeClimate,
   formatDiff,
   formatDiffJson,
   formatAnnotations,
@@ -22,6 +28,7 @@ import {
   formatSarif,
   hasLocatableRows,
   MERMAID_MAX_EDGES,
+  noLocatableFindingsWarning,
 } from "./output-formatters";
 
 let workDir: string;
@@ -64,6 +71,32 @@ describe("detectLocationColumn", () => {
 
   it("returns null on empty string", () => {
     expect(detectLocationColumn({ file_path: "" })).toBeNull();
+  });
+});
+
+describe("noLocatableFindingsWarning", () => {
+  it("returns undefined for locatable rows", () => {
+    expect(
+      noLocatableFindingsWarning("badge", [{ file_path: "a.ts" }]),
+    ).toBeUndefined();
+  });
+
+  it("returns message for aggregate-only rows", () => {
+    expect(noLocatableFindingsWarning("codeclimate", [{ count: 5 }])).toContain(
+      "codeclimate",
+    );
+  });
+
+  it("skips mermaid", () => {
+    expect(
+      noLocatableFindingsWarning("mermaid", [{ count: 5 }]),
+    ).toBeUndefined();
+  });
+
+  it("suppresses warning when ci is true", () => {
+    expect(
+      noLocatableFindingsWarning("codeclimate", [{ count: 5 }], { ci: true }),
+    ).toBeUndefined();
   });
 });
 
@@ -236,6 +269,234 @@ describe("formatSarif", () => {
     const doc = JSON.parse(out);
     expect(doc.runs[0].tool.driver.rules[0].fullDescription).toEqual({
       text: "## Long form body",
+    });
+  });
+});
+
+describe("formatCodeClimate", () => {
+  it("emits [] for empty rows", () => {
+    expect(
+      formatCodeClimate({ rows: [], recipeId: "boundary-violations" }),
+    ).toBe("[]");
+  });
+
+  it("emits one issue per locatable row with flat minor severity", () => {
+    const out = formatCodeClimate({
+      rows: [
+        {
+          from_path: "src/ui/App.tsx",
+          line_start: 3,
+          rule_name: "ui-cant-touch-server",
+        },
+      ],
+      recipeId: "boundary-violations",
+    });
+    const issues = JSON.parse(out);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]).toMatchObject({
+      check_name: "boundary-violations",
+      severity: "minor",
+      location: {
+        path: "src/ui/App.tsx",
+        lines: { begin: 3 },
+      },
+      description: "rule_name=ui-cant-touch-server",
+    });
+    expect(issues[0].fingerprint).toBe(
+      buildCodeClimateFingerprint(
+        "boundary-violations",
+        "src/ui/App.tsx",
+        3,
+        "boundary-violations",
+        "rule_name=ui-cant-touch-server",
+      ),
+    );
+  });
+
+  it("skips rows without a location column", () => {
+    const out = formatCodeClimate({
+      rows: [
+        { kind: "TODO", count: 5 },
+        { file_path: "a.ts", name: "foo" },
+      ],
+      recipeId: "mixed",
+    });
+    expect(JSON.parse(out)).toHaveLength(1);
+  });
+
+  it("defaults location.lines.begin to 1 when line_start is absent", () => {
+    const out = formatCodeClimate({
+      rows: [{ file_path: "a.ts", fan_in: 17 }],
+      recipeId: "fan-in",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location).toEqual({
+      path: "a.ts",
+      lines: { begin: 1 },
+    });
+    expect(issues[0].fingerprint).toBe(
+      buildCodeClimateFingerprint(
+        "fan-in",
+        "a.ts",
+        undefined,
+        "fan-in",
+        issues[0].description,
+      ),
+    );
+  });
+
+  it("fingerprints differ when only line_start changes", () => {
+    const base = { file_path: "a.ts", name: "foo" };
+    const a = JSON.parse(
+      formatCodeClimate({
+        rows: [{ ...base, line_start: 1 }],
+        recipeId: "r",
+      }),
+    )[0].fingerprint;
+    const b = JSON.parse(
+      formatCodeClimate({
+        rows: [{ ...base, line_start: 2 }],
+        recipeId: "r",
+      }),
+    )[0].fingerprint;
+    expect(a).not.toBe(b);
+  });
+
+  it("treats line_start 0 as absent (begin and fingerprint use 1)", () => {
+    const out = formatCodeClimate({
+      rows: [{ file_path: "a.ts", line_start: 0, name: "foo" }],
+      recipeId: "r",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location.lines.begin).toBe(1);
+  });
+
+  it("emits begin for boundary-style rows without line_start", () => {
+    const out = formatCodeClimate({
+      rows: [
+        {
+          file_path: "src/ui/App.tsx",
+          to_path: "src/server/db.ts",
+          rule_name: "ui-cant-touch-server",
+        },
+      ],
+      recipeId: "boundary-violations",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location.lines.begin).toBe(1);
+  });
+
+  it("buildCodeClimateFingerprint uses adhoc when recipeId omitted", () => {
+    expect(
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"),
+    ).toHaveLength(16);
+    expect(
+      buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"),
+    ).toBe(buildCodeClimateFingerprint(undefined, "a.ts", 1, "adhoc", "msg"));
+  });
+
+  it("fingerprints differ for same-file boundary rows without line_start", () => {
+    const rowA = {
+      file_path: "src/ui/App.tsx",
+      to_path: "src/server/a.ts",
+      rule_name: "rule-a",
+    };
+    const rowB = {
+      file_path: "src/ui/App.tsx",
+      to_path: "src/server/b.ts",
+      rule_name: "rule-b",
+    };
+    const fpA = JSON.parse(
+      formatCodeClimate({ rows: [rowA], recipeId: "boundary-violations" }),
+    )[0].fingerprint;
+    const fpB = JSON.parse(
+      formatCodeClimate({ rows: [rowB], recipeId: "boundary-violations" }),
+    )[0].fingerprint;
+    expect(fpA).not.toBe(fpB);
+  });
+
+  it("fingerprints are stable across identical inputs", () => {
+    const row = { file_path: "a.ts", line_start: 1, name: "foo" };
+    const a = JSON.parse(
+      formatCodeClimate({ rows: [row], recipeId: "deprecated-symbols" }),
+    )[0].fingerprint;
+    const b = JSON.parse(
+      formatCodeClimate({ rows: [row], recipeId: "deprecated-symbols" }),
+    )[0].fingerprint;
+    expect(a).toBe(b);
+  });
+});
+
+describe("formatBadge", () => {
+  it("markdown clean when no locatable rows", () => {
+    expect(
+      formatBadge({ rows: [{ kind: "TODO" }], recipeId: "index-summary" }),
+    ).toBe("codemap: clean");
+  });
+
+  it("markdown pluralizes issue count from locatable rows only", () => {
+    expect(
+      formatBadge({
+        rows: [
+          { file_path: "a.ts", name: "foo" },
+          { kind: "noise" },
+          { file_path: "b.ts", name: "bar" },
+        ],
+        recipeId: "deprecated-symbols",
+      }),
+    ).toBe("codemap: 2 issues");
+  });
+
+  it("markdown singular for one issue", () => {
+    expect(
+      formatBadge({
+        rows: [{ file_path: "a.ts", name: "foo" }],
+        recipeId: "deprecated-symbols",
+      }),
+    ).toBe("codemap: 1 issue");
+  });
+
+  it("json emits codemap-badge/v1", () => {
+    const doc = JSON.parse(
+      formatBadgeJson({
+        rows: [{ file_path: "a.ts", name: "foo" }],
+        recipeId: "deprecated-symbols",
+      }),
+    );
+    expect(doc).toEqual({
+      schema: "codemap-badge/v1",
+      label: "codemap",
+      message: "1 issue",
+      count: 1,
+      status: "fail",
+    });
+  });
+
+  it("json clean when no locatable rows", () => {
+    const doc = JSON.parse(
+      formatBadgeJson({ rows: [], recipeId: "index-summary" }),
+    );
+    expect(doc).toMatchObject({
+      schema: "codemap-badge/v1",
+      count: 0,
+      status: "pass",
+      message: "clean",
+    });
+  });
+
+  it("countLocatableFindings matches locatable row semantics", () => {
+    const rows = [{ kind: "TODO" }, { file_path: "a.ts" }];
+    expect(countLocatableFindings(rows)).toBe(1);
+    expect(hasLocatableRows(rows)).toBe(true);
+  });
+
+  it("buildBadgeSummary matches markdown/json count", () => {
+    const rows = [{ file_path: "a.ts" }, { file_path: "b.ts" }];
+    const summary = buildBadgeSummary({ rows, recipeId: "fan-in" });
+    expect(summary).toMatchObject({
+      count: 2,
+      status: "fail",
+      message: "2 issues",
     });
   });
 });
