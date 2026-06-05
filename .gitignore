@@ -17,3 +17,7 @@ fixtures/qa/*.local.md
 fixtures/benchmark/*.local.json
 .agent-eval/
 .tmp/
+
+# Maintainer-local docs working notes (not committed; see docs/README.md § research/scratch)
+docs/research/scratch/**
+!docs/research/scratch/.gitkeep
