@@ -46,7 +46,7 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 **Read→apply (C.6):** `deprecated-symbols`, `find-symbol-references`, `find-symbol-definitions`, `find-jsx-usages`, `find-import-sites`, `markers-by-kind` frontmatter `actions[].command` → apply twins; `cmd-query.test.ts` rendered-command cases.
 
-**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. **`define_in`** homonym scope: golden `rename-preview-homonym-scoped` + `cmd-apply.test.ts`. MCP/HTTP: `apply` / `apply_rows` / `apply_diff_input` e2e in `mcp-server.test.ts` and `http-server.test.ts`; transport writes/consent/fixpoint in `tool-handlers.test.ts`.
+**Input modes:** recipe id (above); `--rows` JSON file; `--diff-input` / `--until-empty` / `--commit` — all e2e in `cmd-apply.test.ts`. **`define_in`** homonym scope: golden `rename-preview-homonym-scoped` + `cmd-apply.test.ts`; **`codemap rename`** alias: `rename-alias.test.ts` + homonym e2e in `cmd-apply.test.ts`. MCP/HTTP: `apply` / `apply_rows` / `apply_diff_input` e2e in `mcp-server.test.ts` and `http-server.test.ts`; transport writes/consent/fixpoint in `tool-handlers.test.ts`.
 
 ---
 

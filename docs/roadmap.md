@@ -61,7 +61,7 @@ Wave 1–2 shipped in [#126](https://github.com/stainless-code/codemap/pull/126)
 
 **Open (P1)**
 
-- [x] **Scoped rename (`define_in`)** — homonym-safe `rename-preview` (binding-scoped calls/JSX). Shipped [#165](https://github.com/stainless-code/codemap/pull/165). Optional alias still open: `codemap rename`.
+- [x] **Scoped rename (`define_in`)** — homonym-safe `rename-preview` (binding-scoped calls/JSX) + thin `codemap rename` alias → `apply rename-preview`. Shipped [#165](https://github.com/stainless-code/codemap/pull/165); alias in scoped-rename plan PR.
 
 **P2 — strategic (trigger-gated where noted)**
 

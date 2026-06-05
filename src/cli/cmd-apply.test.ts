@@ -558,6 +558,57 @@ export function staleOne(): number { return 2; }
     });
   });
 
+  describe("codemap rename alias", () => {
+    beforeEach(async () => {
+      mkdirSync(join(projectRoot, "src", "bench"), { recursive: true });
+      writeFileSync(
+        join(projectRoot, "src", "bench", "homonym-helper-a.ts"),
+        'export function helper(): string {\n  return "a";\n}\n',
+        "utf8",
+      );
+      writeFileSync(
+        join(projectRoot, "src", "bench", "homonym-helper-b.ts"),
+        'export function helper(): string {\n  return "b";\n}\n',
+        "utf8",
+      );
+      writeFileSync(
+        join(projectRoot, "src", "bench", "homonym-consumer-a.ts"),
+        'import { helper } from "./homonym-helper-a";\n\nexport function useHelperA(): string {\n  return helper();\n}\n',
+        "utf8",
+      );
+      writeFileSync(
+        join(projectRoot, "src", "bench", "homonym-consumer-b.ts"),
+        'import { helper } from "./homonym-helper-b";\n\nexport function useHelperB(): string {\n  return helper();\n}\n',
+        "utf8",
+      );
+      const idx = await runCli(["--full"], { CODEMAP_ROOT: projectRoot });
+      expect(idx.exitCode).toBe(0);
+    });
+
+    it("rewrites to apply rename-preview with homonym scope", async () => {
+      const r = await runCli(
+        [
+          "rename",
+          "helper",
+          "worker",
+          "--define-in",
+          "src/bench/homonym-helper-a.ts",
+          "--yes",
+          "--json",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(0);
+      const env = JSON.parse(r.out);
+      expect(env.applied).toBe(true);
+      expect(readFile("src/bench/homonym-helper-a.ts")).toContain("worker");
+      expect(readFile("src/bench/homonym-consumer-a.ts")).toContain("worker");
+      expect(readFile("src/bench/homonym-helper-b.ts")).toMatch(
+        /function helper\(\)/,
+      );
+    });
+  });
+
   describe("rename-preview member JSX", () => {
     beforeEach(async () => {
       mkdirSync(join(projectRoot, "src", "bench"), { recursive: true });

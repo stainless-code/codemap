@@ -58,6 +58,17 @@ export async function main(): Promise<void> {
     if (rewritten) rest.splice(0, rest.length, ...rewritten);
   }
 
+  if (rest[0] === "rename") {
+    const { printRenameAliasHelp, resolveRenameAlias } =
+      await import("./rename-alias.js");
+    if (rest.includes("--help") || rest.includes("-h")) {
+      printRenameAliasHelp();
+      return;
+    }
+    const rewritten = resolveRenameAlias(rest);
+    if (rewritten) rest.splice(0, rest.length, ...rewritten);
+  }
+
   if (rest[0] === "agents" && rest[1] === "init") {
     if (rest.includes("--help") || rest.includes("-h")) {
       console.log(`Usage: codemap agents init [--force] [--interactive|-i] [--mcp] [--targets <ids>] [--link-mode symlink|copy] [--git-hooks] [--no-git-hooks]
