@@ -227,10 +227,13 @@ export function formatCodeClimate(opts: FormatOpts): string {
       typeof lineStartRaw === "number" && lineStartRaw > 0
         ? lineStartRaw
         : undefined;
-    const location: { path: string; lines?: { begin: number } } = { path };
-    if (lineStart !== undefined) {
-      location.lines = { begin: lineStart };
-    }
+    // GitLab requires location.lines.begin — file-level rows (e.g. boundary-violations)
+    // fall back to 1 when the recipe has no line_start column.
+    const begin = lineStart ?? 1;
+    const location: { path: string; lines: { begin: number } } = {
+      path,
+      lines: { begin },
+    };
     return [
       {
         description: buildMessageText(row),

@@ -131,9 +131,9 @@ codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base wit
 # non-git projects get a clean `codemap audit: --base requires a git repository.` error.
 # Recipes that define per-row action templates append "actions" hints (kebab-case verb +
 # description) in --json output; ad-hoc SQL never carries actions. Inspect via --recipes-json.
-# --format <text|json|sarif|annotations|mermaid|diff|diff-json|codeclimate|badge> — pipe results into GitHub Code Scanning
-# (SARIF 2.1.0), surface findings inline on PRs (GH Actions ::notice file=…,line=…::msg), or
-# render edge-shaped recipes as Mermaid `flowchart LR`, or preview edits as unified diffs. All
+# --format <text|json|sarif|annotations|mermaid|diff|diff-json|codeclimate|badge> — SARIF for GitHub
+# Code Scanning; annotations for GH Actions ::notice lines; codeclimate for GitLab Code Quality;
+# badge for issue-count summaries; mermaid/diff for graph and edit previews. All
 # formatted outputs require a flat row list
 # (no --summary / --group-by / baseline). SARIF / annotations auto-detect file_path /
 # path / to_path / from_path; rule.id is codemap.<recipe-id> (or codemap.adhoc). Mermaid

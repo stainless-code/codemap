@@ -317,13 +317,31 @@ describe("formatCodeClimate", () => {
     expect(JSON.parse(out)).toHaveLength(1);
   });
 
-  it("omits location.lines when line_start is absent", () => {
+  it("defaults location.lines.begin to 1 when line_start is absent", () => {
     const out = formatCodeClimate({
       rows: [{ file_path: "a.ts", fan_in: 17 }],
       recipeId: "fan-in",
     });
     const issues = JSON.parse(out);
-    expect(issues[0].location).toEqual({ path: "a.ts" });
+    expect(issues[0].location).toEqual({
+      path: "a.ts",
+      lines: { begin: 1 },
+    });
+  });
+
+  it("emits begin for boundary-style rows without line_start", () => {
+    const out = formatCodeClimate({
+      rows: [
+        {
+          file_path: "src/ui/App.tsx",
+          to_path: "src/server/db.ts",
+          rule_name: "ui-cant-touch-server",
+        },
+      ],
+      recipeId: "boundary-violations",
+    });
+    const issues = JSON.parse(out);
+    expect(issues[0].location.lines.begin).toBe(1);
   });
 
   it("buildCodeClimateFingerprint uses adhoc when recipeId omitted", () => {
