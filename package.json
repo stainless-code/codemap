@@ -50,7 +50,7 @@
     "check-updates": "bun update -i --latest",
     "check:perf-baseline": "bun scripts/check-perf-baseline.ts",
     "check:perf-baseline:update": "bun scripts/check-perf-baseline.ts --update",
-    "clean": "git clean -xdf -e .env -e .codemap -e docs/research/scratch",
+    "clean": "git clean -xdf -e .env -e docs/research/scratch",
     "dev": "bun src/index.ts",
     "fix": "bun run lint:fix && bun run format",
     "format": "oxfmt",
