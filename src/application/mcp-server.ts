@@ -26,7 +26,7 @@ import {
   resolveMcpToolAllowlist,
 } from "./mcp-tool-allowlist";
 import type { McpToolName } from "./mcp-tool-allowlist";
-import { getMcpToolAnnotations } from "./mcp-tool-annotations";
+import { withToolAnnotations } from "./mcp-tool-annotations";
 import { listQueryRecipeCatalog } from "./query-recipes";
 import { readResource } from "./resource-handlers";
 import type { ResourcePayload } from "./resource-handlers";
@@ -142,20 +142,6 @@ function wrapToolResult(r: ToolResult) {
     return { content };
   }
   return { content: [{ type: "text" as const, text: r.payload }] };
-}
-
-interface RegisterToolConfig {
-  description: string;
-  inputSchema: unknown;
-}
-
-function withToolAnnotations<T extends RegisterToolConfig>(
-  name: McpToolName,
-  config: T,
-): T & { annotations?: ReturnType<typeof getMcpToolAnnotations> } {
-  const annotations = getMcpToolAnnotations(name);
-  if (annotations === undefined) return config;
-  return { ...config, annotations };
 }
 
 /**

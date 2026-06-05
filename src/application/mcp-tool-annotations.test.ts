@@ -5,6 +5,7 @@ import {
   MCP_TOOL_ANNOTATIONS,
   buildHttpToolCatalogEntry,
   getMcpToolAnnotations,
+  sdkSupportsMcpToolAnnotations,
 } from "./mcp-tool-annotations";
 
 describe("mcp-tool-annotations", () => {
@@ -25,14 +26,24 @@ describe("mcp-tool-annotations", () => {
     }
   });
 
-  it("query tools carry readOnlyHint", () => {
-    for (const name of ["query", "query_recipe", "query_batch"] as const) {
+  it("query and audit tools carry readOnlyHint", () => {
+    for (const name of [
+      "query",
+      "query_recipe",
+      "query_batch",
+      "audit",
+      "show",
+    ] as const) {
       expect(getMcpToolAnnotations(name)).toMatchObject({
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
       });
     }
+  });
+
+  it("sdkSupportsMcpToolAnnotations is true on pinned SDK", () => {
+    expect(sdkSupportsMcpToolAnnotations()).toBe(true);
   });
 
   it("index user-data mutators are not destructive", () => {

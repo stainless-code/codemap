@@ -89,7 +89,7 @@ bun src/index.ts apply <recipe> --dry-run
 - [ ] Edit file on disk after dry-run passes but before `--yes` apply → `file content changed`, zero files modified
 - [ ] Mixed-EOL fixture file → `mixed line endings`, no write
 - [ ] Happy path unchanged: valid apply still returns `applied: true`
-- [ ] `destructiveHint` apply tools document recheck behavior in tool description (synergy with [mcp-tool-annotations](./mcp-tool-annotations.md))
+- [ ] `destructiveHint` apply tools document recheck behavior in tool description (synergy with [architecture.md § MCP wiring](../architecture.md) ToolAnnotations)
 
 ---
 

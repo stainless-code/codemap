@@ -15,6 +15,8 @@ import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
 import { handleRequest } from "./http-server";
+import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
+import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 import { createManagedWatchSession } from "./session-lifecycle";
 import { _resetWatchStateForTests } from "./watcher";
 
@@ -153,6 +155,11 @@ describe("http-server — health + tools catalog", () => {
       destructiveHint: true,
       idempotentHint: false,
     });
+    expect(body.tools).toHaveLength(MCP_TOOL_NAMES.length);
+    for (const name of MCP_TOOL_NAMES) {
+      const entry = body.tools.find((t) => t.name === name);
+      expect(entry).toMatchObject(MCP_TOOL_ANNOTATIONS[name]);
+    }
   });
 
   it("404 for unknown route", async () => {
