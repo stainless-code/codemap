@@ -8,8 +8,20 @@ import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 
 import type { McpToolName } from "./mcp-tool-allowlist";
 
+let sdkSupportOverrideForTests: boolean | undefined;
+
+/** Test hook — restore with `undefined` in `afterEach`. */
+export function _setSdkSupportsMcpToolAnnotationsForTests(
+  value: boolean | undefined,
+): void {
+  sdkSupportOverrideForTests = value;
+}
+
 /** M.6 — skip MCP annotations when an older SDK lacks ToolAnnotations on registerTool. */
 export function sdkSupportsMcpToolAnnotations(): boolean {
+  if (sdkSupportOverrideForTests !== undefined) {
+    return sdkSupportOverrideForTests;
+  }
   const shape = ToolAnnotationsSchema?.shape;
   return (
     typeof shape === "object" &&
@@ -101,7 +113,7 @@ export function buildHttpToolCatalogEntry(name: McpToolName): {
   return { name, ...MCP_TOOL_ANNOTATIONS[name] };
 }
 
-export interface ToolRegisterConfig {
+interface ToolRegisterConfig {
   description: string;
   inputSchema: unknown;
 }

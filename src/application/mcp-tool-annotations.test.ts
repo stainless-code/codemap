@@ -3,9 +3,11 @@ import { describe, expect, it } from "bun:test";
 import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import {
   MCP_TOOL_ANNOTATIONS,
+  _setSdkSupportsMcpToolAnnotationsForTests,
   buildHttpToolCatalogEntry,
   getMcpToolAnnotations,
   sdkSupportsMcpToolAnnotations,
+  withToolAnnotations,
 } from "./mcp-tool-annotations";
 
 describe("mcp-tool-annotations", () => {
@@ -44,6 +46,21 @@ describe("mcp-tool-annotations", () => {
 
   it("sdkSupportsMcpToolAnnotations is true on pinned SDK", () => {
     expect(sdkSupportsMcpToolAnnotations()).toBe(true);
+  });
+
+  it("omits MCP annotations when M.6 guard is false", () => {
+    _setSdkSupportsMcpToolAnnotationsForTests(false);
+    try {
+      expect(getMcpToolAnnotations("apply")).toBeUndefined();
+      expect(
+        withToolAnnotations("apply", {
+          description: "test",
+          inputSchema: {},
+        }),
+      ).toEqual({ description: "test", inputSchema: {} });
+    } finally {
+      _setSdkSupportsMcpToolAnnotationsForTests(undefined);
+    }
   });
 
   it("index user-data mutators are not destructive", () => {
