@@ -314,7 +314,7 @@ Apply flags pass through: --dry-run, --yes, --force, --json, --until-empty,
 
 Examples:
   codemap rename usePermissions useAccess --kind function --dry-run
-  codemap rename helper worker --define-in src/bench/homonym-helper-a.ts --yes
+  codemap rename helper worker --define-in src/lib/helper-module.ts --yes
   codemap rename --params old=foo,new=bar,define_in=src/a.ts --dry-run
 
 Run \`codemap apply --help\` for executor details.`);

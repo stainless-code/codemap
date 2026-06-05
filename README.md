@@ -216,7 +216,7 @@ codemap affected --changed-since origin/main --json               # committed de
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --dry-run
 codemap apply rename-preview --params old=usePermissions,new=useAccess,kind=function --yes   # TTY prompts without --yes
 # Homonym-safe: add define_in=src/path/to/definition.ts (scopes target; in_file only filters output rows)
-# Alias: codemap rename helper worker --define-in src/bench/homonym-helper-a.ts --dry-run
+# Alias: codemap rename helper worker --define-in src/path/to/definition.ts --dry-run
 codemap apply migrate-import-source --params old_source=legacy,new_source=@app/core --dry-run
 codemap apply stale-imports --params in_file=src/widget --dry-run  # preview; writes need --force --yes
 codemap apply migrate-jsx-prop --params old_name=data-id,new_name=data-testid,component_name=ProductCard --dry-run --force
