@@ -151,11 +151,6 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
 
   const { positionals, applyTail } = splitPassthrough(passthrough);
 
-  if (positionals.length === 1) {
-    return renameError(
-      "codemap rename: requires <old> and <new> (or pass old=/new= via --params).",
-    );
-  }
   if (positionals.length > 2) {
     return renameError(
       `codemap rename: unexpected argument "${positionals[2]}".`,
@@ -173,6 +168,17 @@ export function resolveRenameAlias(rest: string[]): RenameAliasResult | null {
     params !== undefined &&
     params.old !== undefined &&
     params.new !== undefined;
+
+  if (positionals.length === 1) {
+    if (hasOldNew) {
+      return renameError(
+        `codemap rename: unexpected argument "${positionals[0]}".`,
+      );
+    }
+    return renameError(
+      "codemap rename: requires <old> and <new> (or pass old=/new= via --params).",
+    );
+  }
 
   if (!hasOldNew) {
     return renameError(
