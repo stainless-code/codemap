@@ -165,7 +165,7 @@ Format auto-detected from extension (`.json` → istanbul, `.info` → lcov, dir
 - `files-by-coverage` — files ranked ascending by statement coverage (replaces a deferred `file_coverage` rollup table; aggregates the symbol-level table via index-bounded `GROUP BY`).
 - `worst-covered-exports` — top-20 worst-covered exported functions.
 
-Engine: `application/coverage-engine.ts` — pure `upsertCoverageRows({db, projectRoot, rows, format, sourcePath})` core consumed by `ingestIstanbul`, `ingestLcov`, and `ingestV8`.
+Engine: `application/coverage-engine.ts` — pure `upsertCoverageRows({db, projectRoot, rows, format, sourcePath})` core consumed by `ingestIstanbul`, `ingestLcov`, and `ingestV8`. Transport orchestration (path resolution, artifact I/O, V8 directory merge) lives in `application/ingest-coverage-run.ts` (`runIngestCoverageOnDb`), shared by CLI, MCP `ingest_coverage`, and HTTP.
 
 ### `content_hash`
 
@@ -453,7 +453,7 @@ Any SQL run against `.codemap/index.db` — either a **recipe** (saved SQL by id
 
 ### query baseline
 
-A snapshot of a query result set saved by `codemap query --save-baseline[=<name>]` and replayed by `codemap query --baseline[=<name>]` for added/removed diffs. Stored in the `query_baselines` table inside `<state-dir>/index.db` (default `.codemap/index.db`; no parallel JSON files; survives `--full` and `SCHEMA_VERSION` rebuilds because the table is intentionally absent from `dropAll()`). Default name = `--recipe` id; ad-hoc SQL must pass an explicit name. Diff identity is per-row `JSON.stringify` equality — exact match, no fuzzy "changed" category in v1.
+A snapshot of a query result set saved by `codemap query --save-baseline[=<name>]` and replayed by `codemap query --baseline[=<name>]` for added/removed diffs. MCP/HTTP twin: optional `baseline` on `query` / `query_recipe` (explicit name string; incompatible with non-`json` `format` and `group_by`). Stored in the `query_baselines` table inside `<state-dir>/index.db` (default `.codemap/index.db`; no parallel JSON files; survives `--full` and `SCHEMA_VERSION` rebuilds because the table is intentionally absent from `dropAll()`). Default name = `--recipe` id; ad-hoc SQL must pass an explicit name. Diff identity is per-row `JSON.stringify` equality — exact match, no fuzzy "changed" category in v1.
 
 ### query recipe
 

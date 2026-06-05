@@ -86,10 +86,12 @@ launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
 Tools (20; snake_case — mirrors CLI verbs where a shell twin exists):
-  query                One read-only SQL statement (optional \`baseline\` for row diff).
+  query                One read-only SQL statement (optional \`baseline\` for row diff;
+                       incompatible with non-json \`format\` / \`group_by\`).
   query_batch          N statements in one round-trip (CLI: codemap query batch).
   query_recipe         Recipe by id (bundled or project-local); per-row \`actions\` hints;
-                       optional \`baseline\` for row diff (\`actions\` on \`added\` only).
+                       optional \`baseline\` for row diff (\`actions\` on \`added\` only;
+                       incompatible with non-json \`format\` / \`group_by\`).
   audit                Structural-drift audit ({head, deltas} envelope).
   save_baseline        Snapshot rows under a name (sql or recipe).
   list_baselines       Catalog of saved baselines.
