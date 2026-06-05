@@ -2,9 +2,9 @@
 
 > **Status:** open (tiers **7–8**, **13**) · tiers **1–6** shipped · tiers **9–12** partial — live tables and `SCHEMA_VERSION` in [`architecture.md § Schema`](../architecture.md#schema) / [`src/db.ts`](../../src/db.ts). Apply executor + eight diff-shape recipes shipped — [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy).
 >
-> **Per-tier ship status (fact-checked 2026-06; `SCHEMA_VERSION` 37):** Tiers **1–6** shipped. Tier headings carry the PR landing date for that slice; the remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **7–13** open.
+> **Per-tier ship status (fact-checked 2026-06; `SCHEMA_VERSION` 37):** Tiers **1–6** shipped. Tier headings carry the PR landing date for that slice; the remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}` + `function_params`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **9–12** partial; **7–8** + **13** open.
 >
-> **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Tiers **1–6** shipped: position-precise calls/imports/exports, `references` / `scopes` / `bindings`, JSX, behavioral facts, module-graph flags, and more — see [architecture § Schema](../architecture.md#schema). **Tiers 7–13** below still enumerate CSS rule depth, project meta, ORM/SQL tracking, and other AST surfaces we discard at parse time today. Each remaining tier ships as an independent tracer-bullet PR that compounds into a maximal substrate.
+> **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Tiers **1–6** shipped: position-precise calls/imports/exports, `references` / `scopes` / `bindings`, JSX, behavioral facts, module-graph flags, and more — see [architecture § Schema](../architecture.md#schema). **Open tiers 7–8 + 13** below enumerate CSS rule depth, project meta, ORM/SQL tracking, and other AST surfaces we discard at parse time today. Each remaining tier ships as an independent tracer-bullet PR that compounds into a maximal substrate.
 >
 > **Tier:** XL effort (~3-4 months) spread across ~13 sequential tracer-bullet PRs. No single PR is large; the value compounds. Each tier ships as its own vertical slice (parser → schema → migration → recipes → tests → docs) per [`tracer-bullets`](../../.cursor/rules/tracer-bullets.mdc).
 >
@@ -74,9 +74,9 @@ Each gets a "Resolution" subsection below as it crystallises (mirrors `lsp-diagn
 
 - **Q8 — Test-framework detection.** `describe` / `it` / `test` are global functions in test files. Detect by: (a) config glob (`test: ['**/*.test.ts', '**/*.spec.ts']`); (b) file extension match (`.test.`, `.spec.`); (c) import-presence check (`from 'vitest'` / `'@jest/globals'` / `'node:test'`). Bias toward (b) + (c) — file extension as cheap default; import-presence as strong signal.
 
-- **Q9 — Index size budget.** **RESOLVED empirically 2026-05-14 — promoted to [R.9](#pre-locked-decisions).** Four-fixture probe (one tier, references-only). DB grows ~4× at one tier; projected ~5-10× at full 13 tiers. No hard ceiling; per-tier opt-out (R.3) is the safety valve. Full table in § Operational considerations.
+- **Q9 — Index size budget.** **RESOLVED empirically 2026-05-14 — promoted to [R.9](#pre-locked-decisions).** Four-fixture probe (one tier, references-only). DB grows ~4× at one tier; projected ~5-10× at full 13 tiers. No hard ceiling; per-tier opt-out (R.3) is the safety valve. Summary in [§ Operational considerations](#operational-considerations); full tables in `git log --follow`.
 
-- **Q10 — Reindex performance regression.** **RESOLVED empirically 2026-05-14 — promoted to [R.10](#pre-locked-decisions).** Full reindex ~2-2.6× slower at one tier; targeted reindex stays flat (~10-30ms regardless of project size). Largest fixture measured: ~1.9s full / 15ms targeted. Full table in § Operational considerations.
+- **Q10 — Reindex performance regression.** **RESOLVED empirically 2026-05-14 — promoted to [R.10](#pre-locked-decisions).** Full reindex ~2-2.6× slower at one tier; targeted reindex stays flat (~10-30ms regardless of project size). Largest fixture measured: ~1.9s full / 15ms targeted. Summary in [§ Operational considerations](#operational-considerations); full tables in `git log --follow`.
 
 - **Q11 — Per-tier opt-out shape.** **RESOLVED 2026-05-14 — promoted to [R.15](#pre-locked-decisions).** Tier-level opt-out with capability-shaped names; Tier 1 always on; `orm` default-off; others default-on.
 
@@ -172,7 +172,7 @@ Per Q13: today's `parse-worker.ts` emits `ParsedFile`. Extend the message shape 
 
 ### Index sizing expectations (empirical projection from 2026-05-14 probe)
 
-One-tier projection (extrapolated from the references-only probe measured below in § Operational considerations) holds steady at ~4× DB growth. Multi-tier projection assumes additive cost across tiers — most other tiers extract substantially less data than `references` (positions on existing tables, scope graph, JSX attributes, etc. each add far fewer rows). Conservative multi-tier estimate: ~5-10× growth across all 13 tiers.
+One-tier projection (extrapolated from the references-only probe; see [§ Operational considerations](#operational-considerations)) holds steady at ~4× DB growth. Multi-tier projection assumes additive cost across tiers — most other tiers extract substantially less data than `references` (positions on existing tables, scope graph, JSX attributes, etc. each add far fewer rows). Conservative multi-tier estimate: ~5-10× growth across all 13 tiers.
 
 | Project size (measured)                | Pre-extraction DB | All-13-tier projected DB | Pre-extraction reindex | All-13-tier projected reindex |
 | -------------------------------------- | ----------------- | ------------------------ | ---------------------- | ----------------------------- |
@@ -217,7 +217,7 @@ Each tier is one tracer-bullet PR: parser visitor change + schema migration + 1-
 
 **Shipped:** `symbols.{return_type,is_async,is_generator}`.
 
-**Open (this tier):** `function_params` (shipped), `generic_params`, `type_predicates` — see full spec retained in git history or expand when a recipe demands UNION across param tables.
+**Shipped:** `function_params` child table. **Open:** `generic_params`, `type_predicates` — full spec in `git log --follow` if a recipe needs UNION across param tables.
 
 ### Tier 5 — Behavioral facts — **SHIPPED 2026-05-19**
 

@@ -369,7 +369,7 @@ MCP/HTTP tool and **`codemap query batch`** (`--stdin` / `--file`, optional `--s
 
 ### `file_metrics` (table)
 
-Per-file aggregate metrics (one row per indexed TS/JS file): `total_lines`, `code_lines`, `blank_lines`, `comment_lines`, plus symbol-kind counts (`function_count`, `class_count`, `interface_count`, `export_count`, `let_count`, `const_count`, `var_count`, `arrow_count`). Line classification is regex-light per [Tier 11 ship report](./plans/substrate-extraction.md#tier-11--metrics-expansion-per-symbol--per-file--partial-2026-05-15).
+Per-file aggregate metrics (one row per indexed TS/JS file): `total_lines`, `code_lines`, `blank_lines`, `comment_lines`, plus symbol-kind counts (`function_count`, `class_count`, `interface_count`, `export_count`, `let_count`, `const_count`, `var_count`, `arrow_count`). Line classification is regex-light per [Tier 11 ship report](./plans/substrate-extraction.md#tier-11--metrics-expansion--partial-2026-05-15).
 
 ### `function_params` (table)
 
