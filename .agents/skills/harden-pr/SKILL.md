@@ -53,16 +53,16 @@ Default to **lite** when invoked immediately after a slice commit. Default to **
 
 Reviewers optimize for this bar on in-scope files. **Full** mode applies it to the entire `origin/main...HEAD` diff; **lite** to the slice diff.
 
-| Area            | Pristine =                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Correctness** | No known bugs or unhandled edge cases in changed paths; behavior matches intent anchor                             |
-| **Tests**       | Changed behavior covered; affected tests pass                                                                      |
-| **Checks**      | Format, lint, typecheck clean on touched files ([`verify-after-each-step`](../../rules/verify-after-each-step.md)) |
-| **Docs**        | User-visible changes reflected in docs, changesets, help text — no drift                                           |
-| **Surfaces**    | No maintainer leaks into consumer surfaces ([`consumer-surfaces`](../../rules/consumer-surfaces.md))               |
-| **Structure**   | No boundary violations or barrel bypasses in the diff                                                              |
-| **Hygiene**     | No dead code, TODO slop, or sloppy naming in touched files; errors actionable                                      |
-| **Ship shape**  | A reviewer could merge without "fix before ship" notes (except deferred out-of-scope nits)                         |
+| Area            | Pristine =                                                                                                                                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Correctness** | No known bugs or unhandled edge cases in changed paths; behavior matches intent anchor                                                                                                                            |
+| **Tests**       | Changed behavior covered; affected tests pass                                                                                                                                                                     |
+| **Checks**      | Format, lint, typecheck clean on touched files ([`verify-after-each-step`](../../rules/verify-after-each-step.md))                                                                                                |
+| **Docs**        | User-visible changes reflected in docs, changesets, help text — no drift; **shipped `docs/plans/<topic>.md` deleted + lifted** in the same PR ([`docs-governance`](../docs-governance/SKILL.md) § Closing a plan) |
+| **Surfaces**    | No maintainer leaks into consumer surfaces ([`consumer-surfaces`](../../rules/consumer-surfaces.md))                                                                                                              |
+| **Structure**   | No boundary violations or barrel bypasses in the diff                                                                                                                                                             |
+| **Hygiene**     | No dead code, TODO slop, or sloppy naming in touched files; errors actionable                                                                                                                                     |
+| **Ship shape**  | A reviewer could merge without "fix before ship" notes (except deferred out-of-scope nits)                                                                                                                        |
 
 If a finding moves the bar toward pristine and stays in-bounds → **fix it**, including nits in touched files.
 
@@ -89,7 +89,7 @@ Spawn applicable reviewers **in parallel** via subagents in **one batch per pass
 ### Core (always)
 
 1. **Correctness** — gaps vs production bar; bugs, edge cases, missing tests in changed paths
-2. **Ship-readiness** — gaps vs production bar; docs, changesets, consumer-surface leaks, error messages; run [`verify-after-each-step`](../../rules/verify-after-each-step.md) checks on touched files
+2. **Ship-readiness** — gaps vs production bar; docs, changesets, consumer-surface leaks, error messages; **grep inbound refs → delete shipped plan file → lift to `golden-queries.md` / `architecture.md` / `roadmap.md`**; run [`verify-after-each-step`](../../rules/verify-after-each-step.md) checks on touched files
 3. **Structure (lite)** — gaps vs production bar; boundary smells on the diff (imports across declared layers, barrel bypasses); query codemap per [`codemap`](../codemap/SKILL.md)
 
 ### Extended (adaptive — spawn when diff triggers match)

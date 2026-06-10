@@ -68,7 +68,7 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 ### Evidence columns (high-judgment recipes)
 
-Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (TEXT, JSON array) columns on each row — factual detection path for agents, not engine verdicts. See [plans/evidence-chains-on-recipe-rows.md](./plans/evidence-chains-on-recipe-rows.md). Goldens assert these columns when the recipe ships evidence (`boundary-violations`, `deprecated-symbols`, `unimported-exports`).
+Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (TEXT, JSON array) columns on each row — factual detection path for agents, not engine verdicts (Moat A — not pass/fail verdicts). Bounded subqueries cap evidence at three hops; list caps append `{"truncated":true}`. Goldens assert these columns when the recipe ships evidence (`boundary-violations`, `deprecated-symbols`, `unimported-exports`).
 
 ### Coverage columns (CRAP / enrichment recipes)
 

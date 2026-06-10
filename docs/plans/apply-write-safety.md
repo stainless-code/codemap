@@ -106,4 +106,4 @@ bun src/index.ts apply <recipe> --dry-run
 ## Dependencies
 
 - Shipped: `apply-engine.ts`, `apply-run.ts`, `hashContent`, apply confirmation gates (`--yes`)
-- Synergy: [evidence-chains-on-recipe-rows](./evidence-chains-on-recipe-rows.md) (agents should dry-run then apply with safety net)
+- Synergy: [golden-queries.md § Evidence columns](../golden-queries.md#evidence-columns-high-judgment-recipes) (agents parse `reason` / `evidence_json` before `apply`)
