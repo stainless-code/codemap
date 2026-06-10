@@ -15,7 +15,7 @@ const SPIKE_SQL = readFileSync(
 );
 
 describe("spike-crap-reachability (fixtures/minimal)", () => {
-  it("assigns 85/40/0% tiers to 1/4/39 function-shaped symbols", async () => {
+  it("assigns 85/40/0% tiers to 1/4/41 function-shaped symbols", async () => {
     const result =
       await $`bun src/index.ts query --json ${SPIKE_SQL} --root fixtures/minimal`
         .cwd(REPO_ROOT)
@@ -27,6 +27,6 @@ describe("spike-crap-reachability (fixtures/minimal)", () => {
     );
     expect(byTier[85]).toBe(1);
     expect(byTier[40]).toBe(4);
-    expect(byTier[0]).toBe(39);
+    expect(byTier[0]).toBe(41);
   });
 });

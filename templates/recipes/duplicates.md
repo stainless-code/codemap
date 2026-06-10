@@ -27,8 +27,8 @@ Symbols whose **`body_hash`** collides — structurally identical function bodie
 
 ```bash
 codemap query --recipe duplicates
-codemap query --recipe duplicates --params path_prefix=src/bench/
+codemap query --recipe duplicates --params path_prefix=src/lib/
 codemap query --recipe duplicates --params min_body_lines=3
 ```
 
-False positives are possible when unrelated functions share the same control-flow skeleton — use `codemap snippet` before refactoring.
+False positives are possible when unrelated functions share the same control-flow skeleton, or when sync vs async / generator flags differ but the block body matches — use `codemap snippet` before refactoring. Results cap at 50 rows per query (no truncation marker).

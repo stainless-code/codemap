@@ -108,6 +108,42 @@ describe("canonicalizeBody", () => {
     expect(voidZero).not.toBe(voidCall);
   });
 
+  it("does not nullish-normalize outside return position", () => {
+    const nullCheck = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "IfStatement",
+          test: {
+            type: "BinaryExpression",
+            operator: "===",
+            left: { type: "Identifier", name: "x" },
+            right: { type: "Literal", value: null },
+          },
+          consequent: { type: "BlockStatement", body: [] },
+        },
+      ],
+    });
+    const undefCheck = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "IfStatement",
+          test: {
+            type: "BinaryExpression",
+            operator: "===",
+            left: { type: "Identifier", name: "x" },
+            right: { type: "Identifier", name: "undefined" },
+          },
+          consequent: { type: "BlockStatement", body: [] },
+        },
+      ],
+    });
+    expect(nullCheck).not.toBe(undefCheck);
+    expect(nullCheck).toContain("Literal:null");
+    expect(undefCheck).toContain("$id");
+  });
+
   it("normalizes literal values to kind only", () => {
     const a = canonicalizeBody({
       type: "BlockStatement",
@@ -313,6 +349,31 @@ describe("body_hash extraction", () => {
     );
     const b = extractFileData("/proj/b.ts", bSrc, "b.ts").symbols.find(
       (s) => s.name === "val" && s.kind === "getter",
+    );
+    expect(a?.body_hash).toBeTruthy();
+    expect(a?.body_hash).toBe(b?.body_hash);
+  });
+
+  it("isomorphic class setters share body_hash", () => {
+    const aSrc = `class A {
+  set val(x: number) {
+    if (x > 0) this.x = x;
+    else this.x = 0;
+  }
+}
+`;
+    const bSrc = `class B {
+  set val(y: number) {
+    if (y > 0) this.y = y;
+    else this.y = 0;
+  }
+}
+`;
+    const a = extractFileData("/proj/a.ts", aSrc, "a.ts").symbols.find(
+      (s) => s.name === "val" && s.kind === "setter",
+    );
+    const b = extractFileData("/proj/b.ts", bSrc, "b.ts").symbols.find(
+      (s) => s.name === "val" && s.kind === "setter",
     );
     expect(a?.body_hash).toBeTruthy();
     expect(a?.body_hash).toBe(b?.body_hash);
