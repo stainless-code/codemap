@@ -1,4 +1,5 @@
 import {
+  collapseAuditEnvelopeForSummary,
   makeWorktreeReindex,
   resolveAuditBaselines,
   runAudit,
@@ -288,7 +289,8 @@ Other flags:
                       when any delta has additions. Mutually exclusive with --json
                       and --format <other>. Recommended in GitHub Actions / GitLab
                       CI to fail the runner step on structural drift.
-  --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N}.
+  --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N};
+                      with --base also added_introduced / added_inherited per delta.
                       With --format text: a single line "drift: files +1/-0, dependencies +3/-2, ...".
                       No-op with --format sarif (results are per-row).
   --no-index          Skip the auto-incremental-index prelude. Default: re-index first
@@ -432,22 +434,7 @@ function renderAudit(
 
   if (opts.format === "json") {
     if (opts.summary) {
-      const counts: Record<
-        string,
-        {
-          base: AuditEnvelope["deltas"][string]["base"];
-          added: number;
-          removed: number;
-        }
-      > = {};
-      for (const [key, delta] of Object.entries(envelope.deltas)) {
-        counts[key] = {
-          base: delta.base,
-          added: delta.added.length,
-          removed: delta.removed.length,
-        };
-      }
-      console.log(JSON.stringify({ head: envelope.head, deltas: counts }));
+      console.log(JSON.stringify(collapseAuditEnvelopeForSummary(envelope)));
     } else {
       console.log(JSON.stringify(envelope));
     }

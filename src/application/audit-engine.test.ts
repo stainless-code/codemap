@@ -4,7 +4,16 @@ import { createTables, insertFile, upsertQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
 import { diffRows } from "../diff-rows";
 import { openCodemapDatabase } from "../sqlite-db";
-import { computeDelta, findingKey, runAudit, V1_DELTAS } from "./audit-engine";
+import {
+  buildFindingKeySet,
+  collapseAuditEnvelopeForSummary,
+  computeDelta,
+  findingKey,
+  runAudit,
+  tagAddedWithAttribution,
+  V1_DELTAS,
+} from "./audit-engine";
+import type { AuditEnvelope } from "./audit-engine";
 
 function freshDb(): CodemapDatabase {
   const db = openCodemapDatabase(":memory:");
@@ -120,6 +129,86 @@ describe("findingKey", () => {
       ),
     ]);
     expect(keys.size).toBe(3);
+  });
+});
+
+describe("tagAddedWithAttribution", () => {
+  it("tags introduced when key absent from base set", () => {
+    const baseKeySet = buildFindingKeySet([{ path: "src/a.ts" }], filesSpec);
+    const tagged = tagAddedWithAttribution(
+      [{ path: "src/b.ts" }],
+      baseKeySet,
+      filesSpec,
+    );
+    expect(tagged).toEqual([{ path: "src/b.ts", attribution: "introduced" }]);
+  });
+
+  it("tags inherited when key present at merge base (multiset surplus)", () => {
+    const row = { path: "src/a.ts" };
+    const baseKeySet = buildFindingKeySet([row], filesSpec);
+    const tagged = tagAddedWithAttribution([row], baseKeySet, filesSpec);
+    expect(tagged).toEqual([{ path: "src/a.ts", attribution: "inherited" }]);
+  });
+
+  it("strips extra columns from tagged rows", () => {
+    const baseKeySet = buildFindingKeySet([], filesSpec);
+    const tagged = tagAddedWithAttribution(
+      [{ path: "src/x.ts", content_hash: "noise" }],
+      baseKeySet,
+      filesSpec,
+    );
+    expect(tagged[0]).toEqual({
+      path: "src/x.ts",
+      attribution: "introduced",
+    });
+    expect(tagged[0]).not.toHaveProperty("content_hash");
+  });
+});
+
+describe("collapseAuditEnvelopeForSummary", () => {
+  it("includes attribution breakdown for ref-sourced deltas only", () => {
+    const envelope: AuditEnvelope = {
+      head: { sha: "head", indexed_at: 1 },
+      deltas: {
+        files: {
+          base: {
+            source: "ref",
+            ref: "HEAD~1",
+            sha: "base",
+            indexed_at: 0,
+          },
+          added: [
+            { path: "src/b.ts", attribution: "introduced" },
+            { path: "src/c.ts", attribution: "inherited" },
+          ],
+          removed: [{ path: "src/a.ts" }],
+        },
+        deprecated: {
+          base: {
+            source: "baseline",
+            name: "snap",
+            sha: null,
+            indexed_at: 1,
+          },
+          added: [{ name: "old", kind: "function", file_path: "src/x.ts" }],
+          removed: [],
+        },
+      },
+    };
+    const collapsed = collapseAuditEnvelopeForSummary(envelope);
+    expect(collapsed.deltas.files).toEqual({
+      base: envelope.deltas.files!.base,
+      added: 2,
+      removed: 1,
+      added_introduced: 1,
+      added_inherited: 1,
+    });
+    expect(collapsed.deltas.deprecated).toEqual({
+      base: envelope.deltas.deprecated!.base,
+      added: 1,
+      removed: 0,
+    });
+    expect(collapsed.deltas.deprecated).not.toHaveProperty("added_introduced");
   });
 });
 

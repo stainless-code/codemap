@@ -340,7 +340,9 @@ describe("runAuditFromRef — end-to-end against a fixture repo", () => {
       sha: baseSha,
     });
     // a.ts in base, b.ts in head → added: b.ts, removed: a.ts.
-    expect(env.deltas.files!.added).toEqual([{ path: "src/b.ts" }]);
+    expect(env.deltas.files!.added).toEqual([
+      { path: "src/b.ts", attribution: "introduced" },
+    ]);
     expect(env.deltas.files!.removed).toEqual([{ path: "src/a.ts" }]);
   });
 
@@ -416,5 +418,122 @@ describe("runAuditFromRef — end-to-end against a fixture repo", () => {
     // dependencies + deprecated still resolve via the worktree (source: ref).
     expect(env.deltas.dependencies?.base.source).toBe("ref");
     expect(env.deltas.deprecated?.base.source).toBe("ref");
+  });
+});
+
+describe("runAuditFromRef — deprecated attribution", () => {
+  let depProjectRoot: string;
+
+  function insertDeprecated(
+    db: CodemapDatabase,
+    name: string,
+    filePath: string,
+  ): void {
+    db.run(
+      `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+       VALUES (?, ?, 'function', 1, 1, ?, '@deprecated')`,
+      [filePath, name, `function ${name}()`],
+    );
+  }
+
+  async function seedDeprecatedReindex(worktreePath: string): Promise<void> {
+    const dbPath = join(worktreePath, ".codemap", "index.db");
+    const db = openCodemapDatabase(dbPath);
+    try {
+      createTables(db);
+      db.run(
+        `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+         VALUES ('src/a.ts', 'h', 0, 1, 'ts', 0, 0)`,
+      );
+      insertDeprecated(db, "legacyFn", "src/a.ts");
+    } finally {
+      db.close();
+    }
+  }
+
+  let liveDb: CodemapDatabase | undefined;
+
+  beforeEach(() => {
+    depProjectRoot = mkdtempSync(join(tmpdir(), "audit-dep-"));
+    projectRoot = depProjectRoot;
+    git(["init", "-q", "-b", "main"]);
+    git(["config", "user.email", "test@example.com"]);
+    git(["config", "user.name", "Test"]);
+    git(["config", "commit.gpgsign", "false"]);
+
+    commitFiles("base", {
+      "src/a.ts": "/** @deprecated */\nexport function legacyFn() {}\n",
+    });
+    commitFiles("head", {
+      "src/b.ts": "/** @deprecated */\nexport function newFn() {}\n",
+    });
+
+    liveDb = openCodemapDatabase(":memory:");
+    createTables(liveDb);
+    liveDb.run(
+      `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
+       VALUES ('src/a.ts', 'h', 0, 1, 'ts', 0, 0), ('src/b.ts', 'h', 0, 1, 'ts', 0, 0)`,
+    );
+    insertDeprecated(liveDb, "legacyFn", "src/a.ts");
+    insertDeprecated(liveDb, "newFn", "src/b.ts");
+  });
+
+  afterEach(() => {
+    liveDb?.close();
+    liveDb = undefined;
+    _wipeCacheForTests(depProjectRoot);
+    rmSync(depProjectRoot, { recursive: true, force: true });
+  });
+
+  function db(): CodemapDatabase {
+    if (!liveDb) throw new Error("liveDb not initialized");
+    return liveDb;
+  }
+
+  it("tags branch-only deprecated symbols as introduced", async () => {
+    const env = await runAuditFromRef({
+      db: db(),
+      ref: "HEAD~1",
+      projectRoot: depProjectRoot,
+      reindex: seedDeprecatedReindex,
+    });
+    expect("error" in env).toBe(false);
+    if ("error" in env) return;
+    expect(env.deltas.deprecated!.added).toEqual([
+      {
+        name: "newFn",
+        kind: "function",
+        file_path: "src/b.ts",
+        attribution: "introduced",
+      },
+    ]);
+    expect(env.deltas.deprecated!.removed).toEqual([]);
+  });
+
+  it("second run against same sha returns identical attribution (cache hit)", async () => {
+    let reindexCalls = 0;
+    const countingReindex = async (wp: string) => {
+      reindexCalls += 1;
+      await seedDeprecatedReindex(wp);
+    };
+    const first = await runAuditFromRef({
+      db: db(),
+      ref: "HEAD~1",
+      projectRoot: depProjectRoot,
+      reindex: countingReindex,
+    });
+    const second = await runAuditFromRef({
+      db: db(),
+      ref: "HEAD~1",
+      projectRoot: depProjectRoot,
+      reindex: countingReindex,
+    });
+    expect(reindexCalls).toBe(1);
+    expect("error" in first || "error" in second).toBe(false);
+    if ("error" in first || "error" in second) return;
+    expect(second.deltas.deprecated!.added).toEqual(
+      first.deltas.deprecated!.added,
+    );
+    expect(second.deltas.files!.added).toEqual(first.deltas.files!.added);
   });
 });
