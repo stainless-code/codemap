@@ -91,4 +91,4 @@ Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
 
 ## Current slice
 
-**Active:** Plan 1 slice **1.2** — `deprecated-symbols` caller evidence (in progress on `feat/evidence-chains-boundary`).
+**Active:** Plan 1 slice **1.3** — `unimported-exports` re-export evidence (next on `feat/evidence-chains-boundary`).
