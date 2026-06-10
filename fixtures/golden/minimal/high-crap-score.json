@@ -1,0 +1,13 @@
+[
+  {
+    "name": "labyrinth",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 22,
+    "line_end": 83,
+    "complexity": 19,
+    "effective_coverage_pct": 85,
+    "coverage_source": "estimated",
+    "crap_score": 20.22
+  }
+]

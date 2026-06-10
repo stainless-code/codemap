@@ -22,6 +22,10 @@ McCabe formula: `1 + (decision points)`. Branching nodes counted by Codemap's pa
 
 Each row also includes **SonarSource cognitive complexity** for the same symbol (nesting-heavy control flow scores higher than flat branch chains). The recipe **filter** still uses cyclomatic `>= 10`; use `high-cognitive-complexity` when cognitive score alone is the gate.
 
+## Without `ingest-coverage`
+
+`COALESCE(coverage_pct, 0)` treats missing coverage as **0%**, so every high-complexity symbol appears undertested. Prefer **`high-crap-score`** when coverage is not ingested — it uses graph-estimated tiers (85/40/0%) from test reachability instead of assuming zero coverage.
+
 ## Why the joint signal
 
 - High complexity alone surfaces too many false positives — a heavily-branched config-loader or visitor pattern is fine if it's well-tested.

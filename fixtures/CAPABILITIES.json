@@ -158,12 +158,18 @@
     {
       "id": "coverage.recipes",
       "description": "coverage ingest and killer / risk recipes",
-      "fixtureFiles": ["coverage/coverage-final.json", "src/orphan.ts"],
+      "fixtureFiles": [
+        "coverage/coverage-final.json",
+        "src/lib/alias-blind-spot.ts",
+        "src/lib/complexity-fixture.ts",
+        "src/orphan.ts"
+      ],
       "goldenScenarios": [
         "coverage-rows-after-ingest",
         "untested-and-dead",
         "refactor-risk-ranking",
-        "files-by-coverage"
+        "files-by-coverage",
+        "high-crap-score"
       ],
       "setup": ["ingest-coverage"]
     },

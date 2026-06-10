@@ -1,52 +1,29 @@
-# Agent enrichment wave — tracer workflow (plans 1–4)
+# Agent enrichment wave — tracer workflow (plans 3–4)
 
-> **Status:** in-flight · **Scope:** four P2 plans ranked by consumer/agent ROI
+> **Status:** in-flight · **Scope:** remaining P2 plans ranked by consumer/agent ROI
 >
 > **Goal:** Ship tracer bullets that cut agent round-trips, improve answer trust, and sharpen PR/CI deltas — all Moat-A (predicate columns, no verdict primitives).
 >
-> **Plans (execution order):** [evidence-chains](./evidence-chains-on-recipe-rows.md) → [graph-estimated-crap](./graph-estimated-crap.md) → [coverage-deletion-confidence](./coverage-deletion-confidence.md) → [audit-delta-attribution](./audit-delta-attribution.md)
+> **Shipped (plans retired):** Evidence chains ([#174](https://github.com/stainless-code/codemap/pull/174)) · Graph-estimated CRAP ([#175](https://github.com/stainless-code/codemap/pull/175)) — durable contract in `golden-queries.md` + `architecture.md`; plan files deleted per [docs-governance](../../.agents/skills/docs-governance/SKILL.md) § Closing a plan.
+>
+> **Remaining:** [coverage-deletion-confidence](./coverage-deletion-confidence.md) → [audit-delta-attribution](./audit-delta-attribution.md)
 
 ---
 
 ## Shared conventions (locked)
 
-| Convention                                                                            | Applies to |
-| ------------------------------------------------------------------------------------- | ---------- |
-| **Moat A** — no `pass`/`fail` engine verdict; extra columns only                      | All four   |
-| **`reason` TEXT** — machine code + short clause where useful                          | #1, #3     |
-| **`evidence_json` TEXT** — bounded JSON array (≤3 hops)                               | #1         |
-| **`confidence` / `coverage_source` / `attribution`** — recipe-specific enums          | #2, #3, #4 |
-| **Golden update per slice** — `fixtures/golden/minimal/*.json` + `scenarios.json`     | All        |
-| **`/harden-pr lite`** after each tracer commit; **`/harden-pr full`** before PR merge | All        |
+| Convention                                                                                                                                                                                            | Applies to |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **Moat A** — no `pass`/`fail` engine verdict; extra columns only                                                                                                                                      | All        |
+| **`reason` TEXT** — machine code + short clause where useful                                                                                                                                          | #3         |
+| **`evidence_json` TEXT** — bounded JSON array (≤3 hops)                                                                                                                                               | shipped #1 |
+| **`confidence` / `coverage_source` / `attribution`** — recipe-specific enums                                                                                                                          | #3, #4     |
+| **Golden update per slice** — `fixtures/golden/minimal/*.json` + `scenarios.json`                                                                                                                     | All        |
+| **`/harden-pr lite`** after each tracer commit; **`/harden-pr full`** before PR merge                                                                                                                 | All        |
+| **Retire plan on merge** — delete `docs/plans/<topic>.md` + lift to reference docs/roadmap in the **same PR** (never leave shipped plans as leftovers)                                                | All        |
+| **No deferring complements** — agent surfaces (rule/skill/MCP), glossary, golden/script tests, and plan acceptance items ship **in the same PR** unless explicitly listed under plan **Out of scope** | All        |
 
-**Cross-plan synergy:** #1 `reason` on recipes complements #4 `attribution` on audit `added` rows (optional merge in evidence plan v2). #2 and #3 both touch coverage semantics — ship #2 before #3 so agents have CRAP tiers before deletion-confidence narrows rows.
-
----
-
-## Plan 1 — Evidence chains (`evidence-chains-on-recipe-rows.md`)
-
-| Slice                         | Deliverable                                                        | Verify                |
-| ----------------------------- | ------------------------------------------------------------------ | --------------------- |
-| **1.0 contract**              | `docs/golden-queries.md` § evidence columns; one architecture line | doc review            |
-| **1.1 `boundary-violations`** | `reason` + `evidence_json` in SQL; `.md` + golden                  | `bun run test:golden` |
-| **1.2 `deprecated-symbols`**  | caller hops in `evidence_json`                                     | golden + matrix       |
-| **1.3 `unimported-exports`**  | `re_export_chains` LEFT JOIN; `reason` variants                    | golden                |
-| **1.4 agent surface**         | `templates/agent-content/rule/00-full.md` one-liner                | consumer check        |
-
-**Open decisions (locked for v1):** E.2 `evidence_json` only (not typed columns); E.1 SQL-only (no query-engine post-processor).
-
----
-
-## Plan 2 — Graph-estimated CRAP (`graph-estimated-crap.md`)
-
-| Slice                     | Deliverable                                                     | Verify            |
-| ------------------------- | --------------------------------------------------------------- | ----------------- |
-| **2.0 spike**             | Reachability CTE on `fixtures/minimal` (script or ad-hoc query) | manual row counts |
-| **2.1 recipe**            | `high-crap-score.sql` + `.md`; `scenarios.json`                 | `test:golden`     |
-| **2.2 measured override** | golden with `ingest-coverage` setup                             | golden matrix     |
-| **2.3 cross-link**        | `high-complexity-untested.md` points at CRAP when no ingest     | doc               |
-
-**Grill before 2.1 if spike ambiguous:** Q1 type-only imports in walk (default: value edges only); Q2 recipe id `high-crap-score`.
+**Cross-plan synergy:** shipped evidence `reason` complements #4 `attribution` on audit `added` rows. CRAP `coverage_source` (#175) ships before #3 so deletion-confidence can narrow rows with coverage semantics.
 
 ---
 
@@ -77,18 +54,15 @@
 
 ## PR cadence
 
-| PR                         | Contents                             | Changeset |
-| -------------------------- | ------------------------------------ | --------- |
-| **#A Evidence wave 1**     | Slices 1.0–1.1 (boundary-violations) | patch     |
-| **#B Evidence wave 2**     | Slices 1.2–1.4                       | patch     |
-| **#C CRAP recipe**         | Plan 2 complete                      | patch     |
-| **#D Deletion confidence** | Plan 3 complete                      | patch     |
-| **#E Audit attribution**   | Plan 4 complete                      | patch     |
+| PR                         | Contents        | Changeset | Retire plan on merge              |
+| -------------------------- | --------------- | --------- | --------------------------------- |
+| **#D Deletion confidence** | Plan 3 complete | patch     | `coverage-deletion-confidence.md` |
+| **#E Audit attribution**   | Plan 4 complete | patch     | `audit-delta-attribution.md`      |
 
-Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
+Each PR: `harden-pr full` (includes plan retirement) → merge. Do not batch plans 3–4 into one PR.
 
 ---
 
 ## Current slice
 
-**Active:** Plan 1 shipped in [**PR #174**](https://github.com/stainless-code/codemap/pull/174) (awaiting merge) — next: Plan 2 spike **2.0** (`graph-estimated-crap.md`).
+**Active:** Plan 3 slice **3.1** on `feat/high-crap-score` or fresh branch from `main` after **#175** merges — `coverage-confirmed-dead` recipe fork.

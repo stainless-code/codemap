@@ -212,8 +212,8 @@
     "file_path": "src/orphan.ts",
     "is_default": 0,
     "re_export_source": null,
-    "reason": "no_direct_import",
-    "evidence_json": "[]"
+    "reason": "unresolved_import_blind_spot",
+    "evidence_json": "[{\"kind\":\"unresolved_import\",\"file_path\":\"src/lib/alias-blind-spot.ts\",\"source\":\"@codemap-fixture/unresolved-orphan\",\"specifier\":\"orphanHelper\"}]"
   },
   {
     "name": "ImportedMammal",
