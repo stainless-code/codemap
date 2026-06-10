@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { resolveCodemapConfig } from "../config";
 import {
   closeDb,
   createSchema,
@@ -13,6 +14,7 @@ import {
   META_CHURN_INDEXED_COMMIT,
   setMeta,
 } from "../db";
+import { initCodemap } from "../runtime";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   computeChurnTrend,
@@ -236,6 +238,7 @@ describe("ingestFileChurnFromGit", () => {
 describe("refreshFileChurn", () => {
   beforeEach(() => {
     projectRoot = mkdtempSync(join(tmpdir(), "codemap-churn-refresh-"));
+    initCodemap(resolveCodemapConfig(projectRoot, undefined));
     git(["init", "-q", "-b", "main"]);
     git(["config", "user.email", "t@example.com"]);
     git(["config", "user.name", "T"]);
@@ -281,6 +284,54 @@ describe("refreshFileChurn", () => {
       expect(result.reason).not.toBe("skipped: HEAD unchanged");
       expect(result.ok).toBe(true);
       expect(result.rowCount).toBeGreaterThan(0);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("skips git when config churn.file is set", () => {
+    writeFileSync(
+      join(projectRoot, "churn.json"),
+      JSON.stringify([
+        {
+          file_path: "src/a.ts",
+          commit_count: 99,
+          weighted_commits: 88,
+          lines_added: 1,
+          lines_removed: 0,
+          last_commit_at: "2026-06-01T00:00:00Z",
+          churn_trend: "stable",
+          computed_at: "2026-06-10T00:00:00Z",
+        },
+      ]),
+    );
+    initCodemap(
+      resolveCodemapConfig(projectRoot, { churn: { file: "churn.json" } }),
+    );
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "a",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      const result = refreshFileChurn(db, {
+        projectRoot,
+        quiet: true,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.reason).toBe("config churn.file");
+      const row = db
+        .query<{ commit_count: number }>(
+          "SELECT commit_count FROM file_churn WHERE file_path = 'src/a.ts'",
+        )
+        .get();
+      expect(row?.commit_count).toBe(99);
     } finally {
       closeDb(db);
     }

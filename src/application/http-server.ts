@@ -43,6 +43,7 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleIngestChurn,
   handleIngestCoverage,
   handleExplore,
   handleImpact,
@@ -57,6 +58,7 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  ingestChurnArgsSchema,
   ingestCoverageArgsSchema,
   nodeArgsSchema,
   traceArgsSchema,
@@ -598,6 +600,12 @@ async function dispatchTool(
       result = await handleIngestCoverage(r.value, opts.root);
       break;
     }
+    case "ingest_churn": {
+      const r = validate(ingestChurnArgsSchema, args, "ingest_churn");
+      if (!r.ok) return writeJson(res, 400, { error: r.error }, opts.version);
+      result = handleIngestChurn(r.value, opts.root);
+      break;
+    }
     default: {
       // Reachable only if MCP_TOOL_NAMES gains an entry without a switch arm —
       // the route guard above catches user-typed unknown names.
@@ -648,7 +656,7 @@ function validate<T extends ZodRawShape>(
  * The browser sends the request (CORS only blocks the *response* from
  * being read by JS — the request itself reaches us and any side effect
  * executes). For state-changing tools (`save_baseline`, `drop_baseline`,
- * `ingest_coverage`) this lets a malicious page mutate the developer's
+ * `ingest_coverage`, `ingest_churn`) this lets a malicious page mutate the developer's
  * `.codemap/index.db`.
  *
  * DNS rebinding extends the same attack: `evil.com` resolves to

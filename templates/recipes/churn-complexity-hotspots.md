@@ -19,6 +19,11 @@ params:
     required: false
     default: false
     description: When true, one row per symbol; default false ranks files (max complexity in-file)
+  - name: path_prefix
+    type: string
+    required: false
+    default: ""
+    description: Limit to files under this path prefix (e.g. src/lib/)
 ---
 
 # churn-complexity-hotspots
@@ -31,11 +36,14 @@ Populated on every index pass from git history (config `churn.halfLifeDays`, `ch
 codemap query --recipe churn-complexity-hotspots
 codemap query --recipe churn-complexity-hotspots --params min_complexity=10,row_limit=10
 codemap query --recipe churn-complexity-hotspots --params by_symbol=true
+codemap query --recipe churn-complexity-hotspots --params path_prefix=src/lib/
 codemap ingest-churn churn-metrics.json
 ```
 
 `hotspot_score` = `weighted_commits × complexity`. `hotspot_score_normalized` is 0–100 vs the corpus max in the result set.
 
-**Output columns:** file grain — `file_path`, `max_complexity`, `weighted_commits`, `commit_count`, `churn_trend`, scores. Symbol grain (`by_symbol=true`) — per-symbol `name`, `kind`, `line_start`, `cyclomatic_complexity`, plus file churn fields. `churn_trend` is `accelerating`, `stable`, or `cooling` when enough history exists.
+**Output columns:** shared — `file_path`, `weighted_commits`, `commit_count`, `churn_trend`, `hotspot_score`, `hotspot_score_normalized`. File grain (`by_symbol=false`, default) — `symbol_name`/`symbol_kind`/`line_start` null; `max_complexity`, `avg_complexity`. Symbol grain (`by_symbol=true`) — `symbol_name`, `symbol_kind`, `line_start`; `max_complexity` = symbol complexity. `churn_trend` is `accelerating`, `stable`, or `cooling` when enough history exists.
+
+**Ingest JSON** (`ingest-churn` / `ingest_churn` / `churn.file`): array of `{file_path, commit_count, weighted_commits, lines_added?, lines_removed?, last_commit_at?, churn_trend?, computed_at?}` — indexed paths only.
 
 Triage with `snippet` before large refactors.

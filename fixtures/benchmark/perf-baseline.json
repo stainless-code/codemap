@@ -8,6 +8,7 @@
     "index_create_ms": 149,
     "bindings_ms": 174,
     "churn_ms": 182,
+    "churn_idle_ms": 7,
     "total_ms": 1194
   },
   "regression_pct": 25,

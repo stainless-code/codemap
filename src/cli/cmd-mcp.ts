@@ -85,7 +85,7 @@ Spawns an MCP (Model Context Protocol) server on stdio. Designed to be
 launched by an agent host (Claude Code, Cursor, Codex, generic MCP
 clients) — JSON-RPC on stdin/stdout, logs on stderr.
 
-Tools (20; snake_case — mirrors CLI verbs where a shell twin exists):
+Tools (21; snake_case — mirrors CLI verbs where a shell twin exists):
   query                One read-only SQL statement (optional \`baseline\` for row diff;
                        incompatible with non-json \`format\` / \`group_by\`).
   query_batch          N statements in one round-trip (CLI: codemap query batch).
@@ -97,6 +97,7 @@ Tools (20; snake_case — mirrors CLI verbs where a shell twin exists):
   list_baselines       Catalog of saved baselines.
   drop_baseline        Delete a baseline.
   ingest_coverage      Load Istanbul/LCOV/V8 coverage into the index.
+  ingest_churn         Load precomputed file_churn JSON into the index.
   context              Project bootstrap envelope.
   validate             On-disk hash vs indexed hash.
   show                 Symbol metadata: file:line + signature.
@@ -129,7 +130,7 @@ Resources:
                                  codemap symbols <name>.
 
 Output shape matches each tool's CLI JSON payload (always JSON for
-query batch, trace, explore, node, file, schema, symbols, context, ingest_coverage;
+query batch, trace, explore, node, file, schema, symbols, context, ingest_coverage, ingest_churn;
 optional \`--json\` on query/show/snippet/impact/affected/validate). MCP wraps payloads
 in \`{content: [{type: "text", text: …}]}\`; HTTP returns raw JSON. Run
 \`codemap skill\` or fetch \`codemap://skill\` for query examples.

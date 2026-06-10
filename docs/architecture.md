@@ -498,7 +498,7 @@ One row per leaf parameter binding, ordered by `position`. Pattern params (`func
 
 ### `file_churn` — Git churn metrics per indexed file (`STRICT`)
 
-One row per indexed file with git history in scope. Populated on **every index pass** by `refreshFileChurn` → `ingestFileChurnFromGit` (`git log --numstat` scoped to the project root pathspec). Tunable via config `churn.halfLifeDays` (default 90) and optional `churn.since` / CLI `--churn-since <ref>`. Non-git repos skip ingest (empty table; recipe returns no rows). `churn_trend` is `accelerating` \| `stable` \| `cooling` when enough history exists, else NULL.
+One row per indexed file with git history in scope. Populated on **every index pass** by `refreshFileChurn` — git repos via `ingestFileChurnFromGit` (`git log --numstat` scoped to the project root pathspec); when config **`churn.file`** is set, JSON ingest runs instead and **skips** git log. Tunable via `churn.halfLifeDays` (default 90) and optional `churn.since` / CLI `--churn-since <ref>`. Non-git repos skip automatic git ingest (table empty until seeded). `churn_trend` is `accelerating` \| `stable` \| `cooling` when enough history exists, else NULL.
 
 | Column           | Type    | Description                                                                |
 | ---------------- | ------- | -------------------------------------------------------------------------- |
@@ -511,7 +511,7 @@ One row per indexed file with git history in scope. Populated on **every index p
 | churn_trend      | TEXT    | `"accelerating"` \| `"stable"` \| `"cooling"` — nullable in v1             |
 | computed_at      | TEXT    | ISO timestamp when ingest last ran                                         |
 
-Powers **`churn-complexity-hotspots`** recipe (`hotspot_score`, `hotspot_score_normalized`; file or symbol grain via `by_symbol`). Non-git: **`codemap ingest-churn`** or config **`churn.file`**. Distinct from outcome alias **`hotspots`** → `fan-in`.
+Powers **`churn-complexity-hotspots`** recipe (`hotspot_score`, `hotspot_score_normalized`; file or symbol grain via `by_symbol`). Non-git / fixtures: **`codemap ingest-churn`**, MCP/HTTP **`ingest_churn`**, or config **`churn.file`**. Distinct from outcome alias **`hotspots`** → `fan-in`.
 
 ### `file_metrics` — Per-file aggregate metrics (`STRICT`)
 

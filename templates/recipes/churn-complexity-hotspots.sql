@@ -1,5 +1,5 @@
-WITH params(row_limit, min_complexity, by_symbol) AS (
-  SELECT ?, ?, ?
+WITH params(row_limit, min_complexity, by_symbol, path_prefix) AS (
+  SELECT ?, ?, ?, ?
 ),
 base AS (
   SELECT
@@ -14,8 +14,10 @@ base AS (
     ROUND(fc.weighted_commits * s.complexity, 2) AS hotspot_score
   FROM file_churn fc
   JOIN symbols s ON s.file_path = fc.file_path
+  CROSS JOIN params p
   WHERE s.complexity IS NOT NULL
-    AND s.complexity >= (SELECT min_complexity FROM params)
+    AND s.complexity >= p.min_complexity
+    AND (p.path_prefix = '' OR fc.file_path LIKE p.path_prefix || '%')
 ),
 file_rows AS (
   SELECT

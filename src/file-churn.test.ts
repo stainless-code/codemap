@@ -70,7 +70,7 @@ describe("file_churn + churn-complexity-hotspots recipe", () => {
         join(REPO_ROOT, "templates/recipes/churn-complexity-hotspots.sql"),
         "utf-8",
       );
-      const rows = db.query(sql).all(20, 1, 0) as Array<{
+      const rows = db.query(sql).all(20, 1, 0, "") as Array<{
         file_path: string;
         hotspot_score: number;
         hotspot_score_normalized: number;

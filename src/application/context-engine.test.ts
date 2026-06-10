@@ -260,6 +260,20 @@ describe("composeStartHere", () => {
     });
   });
 
+  it("sets churn_hint when file_churn is empty", () => {
+    withSeededDb((db) => {
+      const start = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        composeOpts(),
+      );
+      expect(start.index_summary.file_churn).toBe(0);
+      expect(start.churn_hint).toContain("file_churn is empty");
+      expect(start.churn_hint).toContain("ingest_churn");
+      expect(start.churn_hint).toContain("churn-complexity-hotspots");
+    });
+  });
+
   it("uses explore defaults when no intent is supplied at envelope build time", () => {
     withSeededDb((db) => {
       const start = composeStartHere(

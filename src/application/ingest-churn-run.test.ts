@@ -69,4 +69,40 @@ describe("ingestChurnFromJsonFile", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("rejects empty JSON without wiping file_churn", () => {
+    const root = mkdtempSync(join(tmpdir(), "codemap-ingest-churn-empty-"));
+    try {
+      const jsonPath = join(root, "empty.json");
+      writeFileSync(jsonPath, "[]");
+      const db = openCodemapDatabase(":memory:");
+      try {
+        createSchema(db);
+        insertFile(db, {
+          path: "src/a.ts",
+          content_hash: "a",
+          size: 10,
+          line_count: 1,
+          language: "typescript",
+          last_modified: 1,
+          indexed_at: 1,
+        });
+        const result = ingestChurnFromJsonFile(db, {
+          projectRoot: root,
+          path: "empty.json",
+        });
+        expect(result.ok).toBe(false);
+        if (result.ok) return;
+        expect(result.error).toContain("at least one row");
+        const n = db
+          .query<{ c: number }>("SELECT COUNT(*) AS c FROM file_churn")
+          .get()?.c;
+        expect(n).toBe(0);
+      } finally {
+        closeDb(db);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

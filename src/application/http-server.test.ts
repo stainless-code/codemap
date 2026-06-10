@@ -888,6 +888,44 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.error).toContain("corrupt rows_json");
   });
 
+  it("ingest_churn returns 400 when path is missing", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "ingest_churn", {
+      path: "no-such/churn.json",
+    });
+    expect(r.status).toBe(400);
+    expect(r.json.error).toContain("churn file not found");
+  });
+
+  it("ingest_churn ingests churn JSON successfully", async () => {
+    const churnDir = join(benchDir, "fixtures");
+    mkdirSync(churnDir);
+    writeFileSync(
+      join(churnDir, "churn.json"),
+      JSON.stringify([
+        {
+          file_path: "src/a.ts",
+          commit_count: 5,
+          weighted_commits: 4,
+          lines_added: 10,
+          lines_removed: 2,
+          last_commit_at: "2026-06-01T00:00:00Z",
+          churn_trend: "stable",
+          computed_at: "2026-06-10T00:00:00Z",
+        },
+      ]),
+    );
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "ingest_churn", {
+      path: "fixtures/churn.json",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({
+      ingested: 1,
+      skipped_unindexed: 0,
+    });
+  });
+
   it("ingest_coverage ingests istanbul artifact successfully", async () => {
     const db = openDb();
     try {

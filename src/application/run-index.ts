@@ -88,8 +88,17 @@ function emptyStats(): IndexTableStats {
 function patchPerformanceJsonWithChurn(churnMs: number): void {
   const perfJsonPath = process.env.CODEMAP_PERFORMANCE_JSON;
   if (perfJsonPath === undefined || perfJsonPath === "") return;
-  if (!existsSync(perfJsonPath)) return;
   try {
+    if (!existsSync(perfJsonPath)) {
+      writeFileSync(
+        perfJsonPath,
+        JSON.stringify({ churn_ms: churnMs } satisfies Pick<
+          IndexPerformanceReport,
+          "churn_ms"
+        >),
+      );
+      return;
+    }
     const perf = JSON.parse(
       readFileSync(perfJsonPath, "utf-8"),
     ) as IndexPerformanceReport;

@@ -1121,6 +1121,70 @@ describe("MCP server — ingest_coverage tool", () => {
   });
 });
 
+describe("MCP server — ingest_churn tool", () => {
+  it("lists ingest_churn in tools/list", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const tools = await client.listTools();
+      const names = tools.tools.map((t) => t.name);
+      expect(names).toContain("ingest_churn");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("ingests churn JSON and returns ingest envelope", async () => {
+    const churnDir = join(benchDir, "fixtures");
+    mkdirSync(churnDir);
+    writeFileSync(
+      join(churnDir, "churn.json"),
+      JSON.stringify([
+        {
+          file_path: "src/a.ts",
+          commit_count: 5,
+          weighted_commits: 4,
+          lines_added: 10,
+          lines_removed: 2,
+          last_commit_at: "2026-06-01T00:00:00Z",
+          churn_trend: "stable",
+          computed_at: "2026-06-10T00:00:00Z",
+        },
+      ]),
+    );
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "ingest_churn",
+        arguments: { path: "fixtures/churn.json" },
+      });
+      expect((r as { isError?: boolean }).isError).toBeUndefined();
+      expect(readJson(r)).toMatchObject({
+        ingested: 1,
+        skipped_unindexed: 0,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("returns isError when path is missing", async () => {
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "ingest_churn",
+        arguments: { path: "no-such/churn.json" },
+      });
+      expect((r as { isError?: boolean }).isError).toBe(true);
+      expect(readJson(r)).toMatchObject({
+        error: expect.stringContaining("churn file not found"),
+      });
+    } finally {
+      await server.close();
+    }
+  });
+});
+
 describe("MCP server — query baseline compare", () => {
   it("query with missing baseline returns isError", async () => {
     const { client, server } = await makeClient();

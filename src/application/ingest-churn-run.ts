@@ -118,6 +118,16 @@ export function ingestChurnFromJsonFile(
     kept.push(row);
   }
 
+  if (kept.length === 0) {
+    return {
+      ok: false,
+      error:
+        rows.length === 0
+          ? "churn JSON must contain at least one row"
+          : `churn JSON has no rows for indexed files (${skipped} skipped)`,
+    };
+  }
+
   replaceFileChurn(db, kept);
   pruneFileChurnOrphans(db);
   const headResult = spawnSync("git", ["rev-parse", "HEAD"], {

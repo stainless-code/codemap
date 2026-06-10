@@ -68,6 +68,7 @@ describe("mcp-tool-annotations", () => {
       "save_baseline",
       "drop_baseline",
       "ingest_coverage",
+      "ingest_churn",
     ] as const) {
       expect(getMcpToolAnnotations(name)).toMatchObject({
         readOnlyHint: false,

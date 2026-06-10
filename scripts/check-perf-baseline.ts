@@ -23,7 +23,8 @@ const TMP_JSON = join(REPO_ROOT, ".perf-run.json");
 
 const UPDATE_MODE = process.argv.includes("--update");
 
-type Phase =
+type ReportPhase = keyof Pick<
+  IndexPerformanceReport,
   | "collect_ms"
   | "parse_ms"
   | "insert_ms"
@@ -32,15 +33,20 @@ type Phase =
   | "module_cycles_ms"
   | "re_export_chains_ms"
   | "churn_ms"
-  | "total_ms";
+  | "total_ms"
+>;
 
-const GATED_PHASES: Phase[] = [
+/** Baseline-gated phases — `churn_idle_ms` is idle incremental `churn_ms`, not full-rebuild. */
+type GatedPhase = ReportPhase | "churn_idle_ms";
+
+const GATED_PHASES: GatedPhase[] = [
   "collect_ms",
   "parse_ms",
   "insert_ms",
   "index_create_ms",
   "bindings_ms",
   "churn_ms",
+  "churn_idle_ms",
   "total_ms",
 ];
 
@@ -59,7 +65,7 @@ function median(values: number[]): number {
     : sorted[mid]!;
 }
 
-async function runOnce(): Promise<IndexPerformanceReport> {
+async function runFullOnce(): Promise<IndexPerformanceReport> {
   if (existsSync(TMP_JSON)) rmSync(TMP_JSON);
   const proc = Bun.spawn(["bun", INDEXER, "--full", "--performance"], {
     cwd: REPO_ROOT,
@@ -78,20 +84,60 @@ async function runOnce(): Promise<IndexPerformanceReport> {
   return JSON.parse(readFileSync(TMP_JSON, "utf-8")) as IndexPerformanceReport;
 }
 
-async function collectStats(): Promise<Record<Phase, PhaseStats>> {
+async function runIdleChurnOnce(): Promise<number> {
+  if (existsSync(TMP_JSON)) rmSync(TMP_JSON);
+  const proc = Bun.spawn(["bun", INDEXER, "--performance"], {
+    cwd: REPO_ROOT,
+    env: { ...process.env, CODEMAP_PERFORMANCE_JSON: TMP_JSON },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`idle indexer failed (exit ${exitCode}): ${stderr}`);
+  }
+  if (!existsSync(TMP_JSON)) {
+    throw new Error(`idle indexer did not write ${TMP_JSON}`);
+  }
+  const report = JSON.parse(
+    readFileSync(TMP_JSON, "utf-8"),
+  ) as IndexPerformanceReport;
+  return report.churn_ms;
+}
+
+async function collectStats(): Promise<Record<GatedPhase, PhaseStats>> {
   console.error(`Running indexer ${RUNS}× to collect per-phase medians…`);
   const reports: IndexPerformanceReport[] = [];
   for (let i = 0; i < RUNS; i++) {
-    const r = await runOnce();
+    const r = await runFullOnce();
     reports.push(r);
     console.error(
-      `  run ${i + 1}/${RUNS}: total_ms=${r.total_ms} bindings_ms=${r.bindings_ms}`,
+      `  run ${i + 1}/${RUNS}: total_ms=${r.total_ms} bindings_ms=${r.bindings_ms} churn_ms=${r.churn_ms}`,
     );
   }
+
+  console.error(`Running idle incremental ${RUNS}× for churn_idle_ms…`);
+  const idleRuns: number[] = [];
+  for (let i = 0; i < RUNS; i++) {
+    const churnMs = await runIdleChurnOnce();
+    idleRuns.push(churnMs);
+    console.error(`  idle ${i + 1}/${RUNS}: churn_ms=${churnMs}`);
+  }
+
   if (existsSync(TMP_JSON)) rmSync(TMP_JSON);
 
-  const out = {} as Record<Phase, PhaseStats>;
+  const out = {} as Record<GatedPhase, PhaseStats>;
   for (const phase of GATED_PHASES) {
+    if (phase === "churn_idle_ms") {
+      out[phase] = {
+        median: median(idleRuns),
+        min: Math.min(...idleRuns),
+        max: Math.max(...idleRuns),
+        runs: idleRuns,
+      };
+      continue;
+    }
     const runs = reports.map((r) => r[phase]);
     out[phase] = {
       median: median(runs),
@@ -106,7 +152,7 @@ async function collectStats(): Promise<Record<Phase, PhaseStats>> {
 interface BaselineFile {
   captured_at: string;
   commit: string;
-  phases: Record<Phase, number>;
+  phases: Record<GatedPhase, number>;
   /** Percent above baseline median that triggers a regression. */
   regression_pct: number;
   /** Phases under this median (ms) skip gating — jitter dominates. */
@@ -145,7 +191,7 @@ async function main() {
       commit: gitHead(),
       phases: Object.fromEntries(
         GATED_PHASES.map((p) => [p, stats[p].median]),
-      ) as Record<Phase, number>,
+      ) as Record<GatedPhase, number>,
       regression_pct: REGRESSION_PCT,
       noise_floor_ms: NOISE_FLOOR_MS,
     };

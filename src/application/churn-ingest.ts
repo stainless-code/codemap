@@ -418,6 +418,42 @@ export function refreshFileChurn(
   const projectRoot = options?.projectRoot ?? getProjectRoot();
   const halfLifeDays = options?.halfLifeDays ?? getChurnHalfLifeDays();
   const since = options?.since !== undefined ? options.since : getChurnSince();
+
+  let configChurnFile: string | null = null;
+  try {
+    configChurnFile = getChurnFilePath();
+  } catch {
+    configChurnFile = null;
+  }
+  if (configChurnFile) {
+    const loaded = ingestChurnFromConfigPath(db, {
+      projectRoot,
+      churnFile: configChurnFile,
+    });
+    const rowCount = countFileChurn(db);
+    if (!loaded?.ok) {
+      const reason = loaded?.error ?? "config churn.file ingest failed";
+      if (!quiet) console.error(`[churn] ${reason}`);
+      return {
+        ok: false,
+        rowCount,
+        elapsedMs: Math.round(performance.now() - t0),
+        reason,
+      };
+    }
+    if (!quiet) {
+      console.error(
+        `[churn] file_churn loaded from config churn.file: ${loaded.ingested} files`,
+      );
+    }
+    return {
+      ok: true,
+      rowCount: loaded.ingested,
+      elapsedMs: Math.round(performance.now() - t0),
+      reason: "config churn.file",
+    };
+  }
+
   const head = resolveGitHead(projectRoot);
   const prevHead = getMeta(db, META_CHURN_INDEXED_COMMIT) ?? null;
 
