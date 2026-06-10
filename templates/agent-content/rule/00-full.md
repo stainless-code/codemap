@@ -87,6 +87,7 @@ If the question matches any of these, use the index instead of grepping:
 | Deprecated symbols        | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                           |
 | Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                          |
 | Untested + dead exports   | `codemap query --json --recipe untested-and-dead`                                                                            |
+| Coverage-confirmed dead   | `codemap query --json --recipe coverage-confirmed-dead` (sort by `confidence`)                                               |
 
 ## When Grep / Read IS appropriate
 
