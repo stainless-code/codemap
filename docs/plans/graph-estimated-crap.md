@@ -32,9 +32,21 @@ recipe high-crap-score (SQL only)
   → CRAP formula → rows + coverage_source column
 ```
 
-### Tracer bullet (slice 1)
+### Spike results (slice 2.0, `fixtures/minimal`)
 
-Recipe SQL + `.md` on fixture index without coverage ingest (tiers only). Golden row asserting `coverage_source: estimated`. Second golden with `ingest-coverage` → `measured` overrides.
+`scripts/spike-crap-reachability.sql` + `scripts/spike-crap-reachability.test.mjs` lock tier counts on function-shaped symbols:
+
+| Tier | Count | Example                                                                  |
+| ---- | ----- | ------------------------------------------------------------------------ |
+| 85%  | 1     | `labyrinth` — direct `bindings` ref from `smoke.test.ts`                 |
+| 40%  | 4     | `deeplyNested`, `relay`, … — `complexity-fixture.ts` reachable from test |
+| 0%   | 39    | `createClient`, `get`, … — not dependency-reachable from tests           |
+
+Reachability walk: `test_suites` + `*.test.*` / `*.spec.*` globs → recursive `dependencies` fan-out (value edges only).
+
+### Tracer bullet (slice 2.1)
+
+Recipe SQL + `.md` on fixture index without coverage ingest (tiers only). Golden row asserting `coverage_source: estimated`. `scripts/high-crap-score-measured.test.mjs` asserts `ingest-coverage` → `measured` overrides.
 
 ### Out of scope (v1)
 
@@ -105,10 +117,10 @@ bun test scripts/query-golden-coverage-matrix.test.mjs   # after golden scenario
 
 ## Acceptance
 
-- [ ] Without coverage ingest: symbols in files imported by tests get tier 40/85; isolated files get 0%
-- [ ] With coverage ingest: `coverage_source = measured` and CRAP uses real `coverage_pct`
-- [ ] `codemap query --recipe high-crap-score --json` works; SARIF compatible via `--format sarif`
-- [ ] No new pass/fail primitive
+- [x] Without coverage ingest: symbols in files imported by tests get tier 40/85; isolated files get 0%
+- [x] With coverage ingest: `coverage_source = measured` and CRAP uses real `coverage_pct`
+- [x] `codemap query --recipe high-crap-score --json` works; SARIF compatible via `--format sarif`
+- [x] No new pass/fail primitive
 
 ---
 

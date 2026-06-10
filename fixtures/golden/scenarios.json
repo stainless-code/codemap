@@ -594,6 +594,12 @@
       "recipe": "high-complexity-untested"
     },
     {
+      "id": "high-crap-score",
+      "prompt": "High CRAP score with graph-estimated coverage tiers (min_crap=15)",
+      "recipe": "high-crap-score",
+      "params": { "min_crap": 15 }
+    },
+    {
       "id": "text-in-deprecated-functions",
       "prompt": "FTS TODO/FIXME/HACK in @deprecated functions with low coverage (requires fts5)",
       "recipe": "text-in-deprecated-functions"
