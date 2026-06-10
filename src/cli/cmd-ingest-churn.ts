@@ -16,8 +16,8 @@ export function printIngestChurnCmdHelp(): void {
 Import precomputed git churn metrics into \`file_churn\` for non-git
 repositories or CI fixtures. JSON must be an array of objects with
 \`file_path\`, \`commit_count\`, \`weighted_commits\`, \`lines_added\`,
-\`lines_removed\`, optional \`last_commit_at\` / \`churn_trend\`, and
-\`computed_at\`. Run \`codemap\` (index) first — only indexed paths are
+\`lines_removed\`, optional \`last_commit_at\` / \`churn_trend\` /
+\`computed_at\` (defaults to current time). Run \`codemap\` (index) first — only indexed paths are
 kept; unindexed paths are skipped.
 
 Args:

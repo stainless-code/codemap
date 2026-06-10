@@ -135,6 +135,13 @@ describe("resolveCodemapConfig", () => {
     expect(r.churn.since).toBe("abc123");
   });
 
+  it("resolves churn.file to absolute path", () => {
+    const r = resolveCodemapConfig(dir, {
+      churn: { file: "churn-data.json" },
+    });
+    expect(r.churn.file).toBe(join(dir, "churn-data.json"));
+  });
+
   it("defaults boundaries to []", () => {
     const r = resolveCodemapConfig(dir, undefined);
     expect(r.boundaries).toEqual([]);

@@ -79,6 +79,7 @@ describe("golden coverage matrix", () => {
     expect(scenarioIds.has("index-table-stats")).toBe(true);
     const scenario = scenarios.find((s) => s.id === "index-table-stats");
     expect(scenario?.sql).toContain("FROM file_metrics");
+    expect(scenario?.sql).toContain("FROM file_churn");
     expect(scenario?.sql).toContain("FROM unresolved_calls");
     expect(scenario?.sql).toContain('FROM "references"');
   });

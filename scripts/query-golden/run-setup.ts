@@ -5,6 +5,7 @@ import {
   ingestIstanbul,
   ingestLcov,
 } from "../../src/application/coverage-engine";
+import { parseChurnJsonPayload } from "../../src/application/ingest-churn-run";
 import { closeDb, openDb, replaceFileChurn } from "../../src/db";
 import type { FileChurnRow } from "../../src/db";
 import type { GoldenSetupStep } from "./schema";
@@ -42,9 +43,17 @@ export function runGoldenSetup(
             `query-golden setup: missing file-churn seed ${absPath}`,
           );
         }
-        const rows = JSON.parse(
-          readFileSync(absPath, "utf-8"),
-        ) as FileChurnRow[];
+        let rows: FileChurnRow[];
+        try {
+          rows = parseChurnJsonPayload(
+            JSON.parse(readFileSync(absPath, "utf-8")) as unknown,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `query-golden setup: invalid file-churn seed ${absPath}: ${msg}`,
+          );
+        }
         replaceFileChurn(db, rows);
         continue;
       }

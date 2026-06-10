@@ -36,7 +36,7 @@ function gitSpawnEnv(): NodeJS.ProcessEnv {
   return e;
 }
 
-function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
+export function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
   if (!Array.isArray(raw)) {
     throw new TypeError("churn JSON must be an array of file_churn rows");
   }
