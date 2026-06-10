@@ -62,7 +62,7 @@ We **do not** commit another product’s source tree, paths, business strings, o
 
 ## Scenario shape (implemented)
 
-Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). The file may be a **bare array** of scenarios (legacy) or an object `{ "setup": [...], "scenarios": [...] }`. Optional top-level **`setup`** runs once after index, before scenarios — today only **`{ "kind": "ingest-coverage", "path": "<relative-to-fixture>" }`** (see [run-setup.ts](../scripts/query-golden/run-setup.ts)); missing coverage files are skipped with a warning. Each scenario has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
+Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). The file may be a **bare array** of scenarios (legacy) or an object `{ "setup": [...], "scenarios": [...] }`. Optional top-level **`setup`** runs once after index, before scenarios — today **`ingest-coverage`** and **`clear-coverage`** (see [run-setup.ts](../scripts/query-golden/run-setup.ts)); missing coverage files are skipped with a warning. Per-scenario **`preSetup`** runs after global setup (global setup restores after the scenario when `preSetup` mutates the index). Each scenario has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`, `everyRowFieldEquals`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
 
 **Prompts** in JSON are **intent labels**, not pasted chat logs — pair with queries whose literals come from **fixture-owned** data (see [fixtures/qa/prompts.external.template.md](../fixtures/qa/prompts.external.template.md) for optional chat QA).
 
@@ -73,6 +73,10 @@ Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (T
 ### Coverage columns (CRAP / enrichment recipes)
 
 `high-crap-score` adds **`coverage_source`** (`measured` \| `estimated`) and **`effective_coverage_pct`** on each row — measured when `coverage` has a matching symbol row after `ingest-coverage`; otherwise graph-estimated tiers from test reachability. Goldens assert `coverage_source` when the recipe ships coverage semantics (`high-crap-score`); measured override is covered by `scripts/high-crap-score-measured.test.mjs`.
+
+### Confidence columns (deletion-confidence recipes)
+
+`coverage-confirmed-dead` adds **`confidence`** (`high` \| `medium`) on each row — **`high`** when static dead and ingested `coverage_pct = 0`; **`medium`** when static dead but the symbol has no ingested coverage row. Also **`reason`**, **`caller_count`**. Goldens: `coverage-confirmed-dead` (post-ingest mix) and `coverage-confirmed-dead-no-ingest` (`preSetup: clear-coverage`, `everyRowFieldEquals` on `confidence: medium`).
 
 ---
 

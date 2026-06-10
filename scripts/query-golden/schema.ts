@@ -13,13 +13,37 @@ const matchEveryRowContainsSchema = z.object({
   includes: z.string(),
 });
 
+const matchEveryRowFieldEqualsSchema = z.object({
+  kind: z.literal("everyRowFieldEquals"),
+  field: z.string(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+});
+
 export const matchSchema = z.union([
   matchExactSchema,
   matchMinRowsSchema,
   matchEveryRowContainsSchema,
+  matchEveryRowFieldEqualsSchema,
 ]);
 
 export type GoldenMatch = z.infer<typeof matchSchema>;
+
+/**
+ * One-time or per-scenario setup step. Extend the union as more one-shot
+ * ingest / reset verbs land.
+ */
+export const setupStepSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("ingest-coverage"),
+    /** Path relative to the fixture root (e.g. `coverage/coverage-final.json`). */
+    path: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("clear-coverage"),
+  }),
+]);
+
+export type GoldenSetupStep = z.infer<typeof setupStepSchema>;
 
 export const scenarioSchema = z
   .object({
@@ -31,6 +55,8 @@ export const scenarioSchema = z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional(),
     match: matchSchema.optional(),
+    /** Runs after global `setup` and before this scenario's query (e.g. clear coverage). */
+    preSetup: z.array(setupStepSchema).optional(),
     budgetMs: z.number().positive().optional(),
   })
   .refine(
@@ -58,19 +84,6 @@ export const scenarioSchema = z
   );
 
 export type GoldenScenario = z.infer<typeof scenarioSchema>;
-
-/**
- * One-time setup step run after `cm.index()` and before the first scenario.
- * Currently only `ingest-coverage` (Istanbul / LCOV); extend the union as
- * other one-shot ingest verbs land.
- */
-export const setupStepSchema = z.object({
-  kind: z.literal("ingest-coverage"),
-  /** Path relative to the fixture root (e.g. `coverage/coverage-final.json`). */
-  path: z.string().min(1),
-});
-
-export type GoldenSetupStep = z.infer<typeof setupStepSchema>;
 
 const legacyArraySchema = z.array(scenarioSchema);
 const objectShapeSchema = z.object({

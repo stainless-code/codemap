@@ -167,6 +167,8 @@
       "goldenScenarios": [
         "coverage-rows-after-ingest",
         "untested-and-dead",
+        "coverage-confirmed-dead",
+        "coverage-confirmed-dead-no-ingest",
         "refactor-risk-ranking",
         "files-by-coverage",
         "high-crap-score"

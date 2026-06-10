@@ -24,6 +24,8 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 **Coverage columns:** `high-crap-score` rows add **`coverage_source`** (`measured` \| `estimated`) and **`effective_coverage_pct`** — measured when `ingest-coverage` has a symbol row; else graph tiers 85/40/0% from test reachability (heuristic, not execution).
 
+**Confidence columns:** `coverage-confirmed-dead` rows add **`confidence`** (`high` \| `medium`) — `high` when static dead and ingested `coverage_pct = 0`; `medium` when dead but unmeasured. Parse before deletion.
+
 ## Trigger patterns
 
 If the question matches any of these, use the index instead of grepping:
@@ -58,6 +60,7 @@ If the question matches any of these, use the index instead of grepping:
 | "What's the nesting depth of X?"                             | `symbols.nesting_depth`                                                                                                                              |
 | "Is symbol X tested?" / "What's the coverage of file Y?"     | `coverage` (after `codemap ingest-coverage`)                                                                                                         |
 | "What's structurally dead AND untested?"                     | `--recipe untested-and-dead`                                                                                                                         |
+| "Dead exports with ingested zero coverage?"                  | `--recipe coverage-confirmed-dead` (check `confidence`: `high` vs `medium`)                                                                          |
 | "Worst-covered exported functions"                           | `--recipe worst-covered-exports`                                                                                                                     |
 | "Which exports has nobody imported?"                         | `--recipe unimported-exports`                                                                                                                        |
 | "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                                                                                                            |
@@ -84,6 +87,7 @@ If the question matches any of these, use the index instead of grepping:
 | Deprecated symbols        | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                           |
 | Symbol coverage           | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                          |
 | Untested + dead exports   | `codemap query --json --recipe untested-and-dead`                                                                            |
+| Coverage-confirmed dead   | `codemap query --json --recipe coverage-confirmed-dead` (sort by `confidence`)                                               |
 
 ## When Grep / Read IS appropriate
 

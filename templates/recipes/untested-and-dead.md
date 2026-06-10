@@ -5,7 +5,7 @@ actions:
     description: "Exported function with zero callers AND zero test coverage — strong dead-code candidate. Verify against framework convention exports (Next.js page.tsx default exports, Storybook stories, vite.config.ts) before deleting; codemap doesn't model framework entry-points yet."
 ---
 
-Exported functions that look structurally dead AND aren't covered by tests — the high-confidence "dead code" predicate.
+Exported functions that look structurally dead AND aren't covered by tests — the high-confidence "dead code" predicate. For explicit **`confidence: high`** vs **`medium`** after ingest, use **`coverage-confirmed-dead`** (same static core).
 
 Combines two evidence axes:
 

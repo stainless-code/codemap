@@ -170,6 +170,7 @@ Statement coverage ingested from Istanbul JSON, LCOV, or V8 runtime (`NODE_V8_CO
 Format auto-detected from extension (`.json` → istanbul, `.info` → lcov, directory → probe both, error if ambiguous); `--runtime` opts into V8 directory mode. Each statement projects onto the **innermost** enclosing symbol via JS-side `(line_end - line_start) ASC` tie-break — required because nested symbols (class methods inside classes, closures inside functions) would otherwise inflate `total_statements`. Statements that fall outside every symbol range (top-level expressions, side-effect imports) increment `skipped.statements_no_symbol` for observability. Three bundled recipes consume the table at first-class agent surface (no agent ever has to hand-compose the JOIN):
 
 - `untested-and-dead` — exported functions with no callers AND zero coverage (the killer recipe; ships with a name-collision mitigation guide in the recipe `.md`).
+- `coverage-confirmed-dead` — same static dead predicate as `untested-and-dead` with explicit **`confidence`** (`high` when ingested `coverage_pct = 0`, `medium` when unmeasured) plus **`reason`** and **`caller_count`** — Moat A predicate columns for deletion triage after `ingest-coverage`.
 - `files-by-coverage` — files ranked ascending by statement coverage (replaces a deferred `file_coverage` rollup table; aggregates the symbol-level table via index-bounded `GROUP BY`).
 - `worst-covered-exports` — top-20 worst-covered exported functions.
 

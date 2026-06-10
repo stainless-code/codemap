@@ -168,6 +168,21 @@ export function classifyIntent(intent: string): {
       hint: "Markers (TODO/FIXME) and deprecated-symbols often hint at known gotchas; fan-in shows the blast radius of a change.",
     };
   }
+  if (
+    /delete dead|dead code|coverage confirmed|confirmed dead|remove unused/.test(
+      t,
+    )
+  ) {
+    return {
+      classified_as: "cleanup",
+      matched_recipes: [
+        "coverage-confirmed-dead",
+        "untested-and-dead",
+        "unimported-exports",
+      ],
+      hint: "coverage-confirmed-dead splits high (ingested 0%) vs medium (unmeasured); run ingest-coverage before treating rows as measurement-confirmed.",
+    };
+  }
   if (/test|coverage|spec|mock/.test(t)) {
     return {
       classified_as: "test",

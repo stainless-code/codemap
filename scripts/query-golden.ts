@@ -121,6 +121,25 @@ function evaluateMatch(
     }
     return { ok: true, detail: "" };
   }
+  if (match.kind === "everyRowFieldEquals") {
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (r === null || typeof r !== "object") {
+        return {
+          ok: false,
+          detail: `everyRowFieldEquals: row ${i} is not an object`,
+        };
+      }
+      const o = r as Record<string, unknown>;
+      if (o[match.field] !== match.value) {
+        return {
+          ok: false,
+          detail: `everyRowFieldEquals: row ${i} field ${JSON.stringify(match.field)} expected ${JSON.stringify(match.value)}, got ${JSON.stringify(o[match.field])}`,
+        };
+      }
+    }
+    return { ok: true, detail: "" };
+  }
   return { ok: false, detail: "unknown match kind" };
 }
 
@@ -174,6 +193,10 @@ async function main(): Promise<void> {
   let budgetFailures = 0;
 
   for (const s of scenarios) {
+    const hadPreSetup = s.preSetup !== undefined && s.preSetup.length > 0;
+    if (hadPreSetup) {
+      runGoldenSetup(s.preSetup!, fixtureRoot);
+    }
     const { sql, bindValues } = resolveGoldenQuery(s);
     const t0 = performance.now();
     const rows = queryRows(sql, bindValues) as unknown[];
@@ -195,6 +218,9 @@ async function main(): Promise<void> {
     if (UPDATE) {
       writeFileSync(goldenPath, `${JSON.stringify(rows, null, 2)}\n`, "utf-8");
       console.log(`  updated ${goldenPath}`);
+      if (hadPreSetup && setup.length > 0) {
+        runGoldenSetup(setup, fixtureRoot);
+      }
       continue;
     }
 
@@ -215,6 +241,9 @@ async function main(): Promise<void> {
       } else {
         console.log(`  ok ${s.id}`);
       }
+      if (hadPreSetup && setup.length > 0) {
+        runGoldenSetup(setup, fixtureRoot);
+      }
       continue;
     }
 
@@ -225,6 +254,11 @@ async function main(): Promise<void> {
       failed++;
     } else {
       console.log(`  ok ${s.id} (${match.kind})`);
+    }
+
+    // preSetup mutations (e.g. clear-coverage) persist — restore global setup.
+    if (hadPreSetup && setup.length > 0) {
+      runGoldenSetup(setup, fixtureRoot);
     }
   }
 

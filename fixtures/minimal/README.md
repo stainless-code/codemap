@@ -50,9 +50,10 @@ bun run test:golden -- --update
 # Benchmark
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun run benchmark
 
-# Coverage ingest + killer recipe
+# Coverage ingest + killer recipes
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts ingest-coverage coverage/coverage-final.json
 CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts query --recipe untested-and-dead --json
+CODEMAP_ROOT="$(pwd)/fixtures/minimal" bun src/index.ts query --recipe coverage-confirmed-dead --json
 ```
 
 **Editor / `tsc`:** run `bun install` here so `react` + `@types/react` resolve `react/jsx-runtime` for `.tsx` (`jsx: "react-jsx"` in `tsconfig.json`).

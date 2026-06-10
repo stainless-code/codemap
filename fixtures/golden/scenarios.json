@@ -524,6 +524,22 @@
       "recipe": "untested-and-dead"
     },
     {
+      "id": "coverage-confirmed-dead-no-ingest",
+      "prompt": "Static dead exports — all confidence medium when coverage table empty",
+      "recipe": "coverage-confirmed-dead",
+      "preSetup": [{ "kind": "clear-coverage" }],
+      "match": {
+        "kind": "everyRowFieldEquals",
+        "field": "confidence",
+        "value": "medium"
+      }
+    },
+    {
+      "id": "coverage-confirmed-dead",
+      "prompt": "Dead exports with confidence high (ingested 0%) and medium (unmeasured)",
+      "recipe": "coverage-confirmed-dead"
+    },
+    {
       "id": "files-by-coverage",
       "prompt": "Files ranked ascending by statement coverage",
       "recipe": "files-by-coverage"
