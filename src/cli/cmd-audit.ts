@@ -268,7 +268,9 @@ Snapshot sources (one of these must resolve; --base and --baseline are mutually 
                                artifact), reindex into a cached \`.codemap/index.db\` at that sha, then diff. <ref> = any
                                committish (origin/main, HEAD~5, sha, tag, …). Cache hit
                                on second run against same sha is sub-100ms. Requires a
-                               git repository.
+                               git repository. With --format json, each added row includes
+                               attribution: introduced (branch-new) | inherited (pre-existing
+                               at merge base).
 
   --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
                                <prefix>-dependencies, <prefix>-deprecated in

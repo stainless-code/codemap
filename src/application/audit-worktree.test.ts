@@ -311,6 +311,9 @@ describe("runAuditFromRef — end-to-end against a fixture repo", () => {
       `INSERT INTO files (path, content_hash, size, line_count, language, last_modified, indexed_at)
        VALUES ('src/b.ts', 'h', 0, 1, 'ts', 0, 0)`,
     );
+    db().run(
+      `INSERT INTO dependencies (from_path, to_path) VALUES ('src/b.ts', 'src/lib.ts')`,
+    );
   });
 
   afterEach(() => {
@@ -344,6 +347,13 @@ describe("runAuditFromRef — end-to-end against a fixture repo", () => {
       { path: "src/b.ts", attribution: "introduced" },
     ]);
     expect(env.deltas.files!.removed).toEqual([{ path: "src/a.ts" }]);
+    expect(env.deltas.dependencies!.added).toEqual([
+      {
+        from_path: "src/b.ts",
+        to_path: "src/lib.ts",
+        attribution: "introduced",
+      },
+    ]);
   });
 
   it("non-git project errors cleanly", async () => {
@@ -415,6 +425,10 @@ describe("runAuditFromRef — end-to-end against a fixture repo", () => {
       source: "baseline",
       name: "pr-files",
     });
+    expect(env.deltas.files!.added).toEqual([{ path: "src/b.ts" }]);
+    for (const row of env.deltas.files!.added) {
+      expect(row).not.toHaveProperty("attribution");
+    }
     // dependencies + deprecated still resolve via the worktree (source: ref).
     expect(env.deltas.dependencies?.base.source).toBe("ref");
     expect(env.deltas.deprecated?.base.source).toBe("ref");
@@ -489,6 +503,35 @@ describe("runAuditFromRef — deprecated attribution", () => {
     if (!liveDb) throw new Error("liveDb not initialized");
     return liveDb;
   }
+
+  it("tags inherited surplus rows when finding key existed at merge base", async () => {
+    insertDeprecated(liveDb!, "legacyFn", "src/a.ts");
+    const env = await runAuditFromRef({
+      db: db(),
+      ref: "HEAD~1",
+      projectRoot: depProjectRoot,
+      reindex: seedDeprecatedReindex,
+    });
+    expect("error" in env).toBe(false);
+    if ("error" in env) return;
+    expect(env.deltas.deprecated!.added).toEqual(
+      expect.arrayContaining([
+        {
+          name: "newFn",
+          kind: "function",
+          file_path: "src/b.ts",
+          attribution: "introduced",
+        },
+        {
+          name: "legacyFn",
+          kind: "function",
+          file_path: "src/a.ts",
+          attribution: "inherited",
+        },
+      ]),
+    );
+    expect(env.deltas.deprecated!.added).toHaveLength(2);
+  });
 
   it("tags branch-only deprecated symbols as introduced", async () => {
     const env = await runAuditFromRef({
