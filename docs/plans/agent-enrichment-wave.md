@@ -91,4 +91,4 @@ Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
 
 ## Current slice
 
-**Active:** Plan 1 **complete** (slices 1.0–1.4 on `feat/evidence-chains-boundary`) — open **PR #B**, then Plan 2 spike **2.0**.
+**Active:** Plan 1 shipped in [**PR #174**](https://github.com/stainless-code/codemap/pull/174) (awaiting merge) — next: Plan 2 spike **2.0** (`graph-estimated-crap.md`).

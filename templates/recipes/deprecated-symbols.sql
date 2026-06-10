@@ -20,7 +20,7 @@ SELECT
       SELECT
         CASE
           WHEN caller_total > 3
-          THEN json_insert(caller_hops, '$[#]', json_object('truncated', 1))
+          THEN json_insert(caller_hops, '$[#]', json_object('truncated', json('true')))
           ELSE caller_hops
         END
       FROM (

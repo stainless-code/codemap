@@ -2,7 +2,7 @@
 actions:
   - type: review-for-deletion
     auto_fixable: false
-    description: "Export with no detectable import — candidate for deletion. VERIFY against the v1 caveats below before deleting; codemap's import-resolution doesn't follow re-export chains or `tsconfig.json` path aliases that the resolver can't resolve."
+    description: "Export with no detectable direct import — candidate for deletion. Check row `reason` / `evidence_json` for barrel false positives; read v1 caveats (unresolved imports, default exports) before deleting."
 ---
 
 Exports that have no row in `imports` referencing their file AND name. Surfaces the **direct-use-only** subset of "unused exports" — useful as a starting candidate list, but **NEVER as a "safe to delete" list** without manual verification.

@@ -1,8 +1,8 @@
 [
   {
     "file_path": "src/components/shop/ProductCard.tsx",
-    "line_start": 15,
-    "line_end": 15,
+    "line_start": 16,
+    "line_end": 16,
     "before_pattern": "data-id=",
     "after_pattern": "data-testid=",
     "location_kind": "jsx_attribute",

@@ -115,9 +115,9 @@
   },
   {
     "path": "src/components/shop/ProductCard.tsx",
-    "content_hash": "27b25a905655574a3002adc140b36e91b95f8f1a5db0758ba172115595134122",
+    "content_hash": "130e72381a5b03071f22f161e178d2800c48124d1bbc33359520218ad48e3a1e",
     "language": "tsx",
-    "line_count": 23
+    "line_count": 24
   },
   {
     "path": "src/components/shop/ShopButton.default.ts",

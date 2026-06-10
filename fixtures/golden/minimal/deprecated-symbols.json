@@ -17,7 +17,7 @@
     "signature": "now(): number",
     "doc_comment": "@deprecated Use `Date.now()` directly. Kept as a fixture for the\n`deprecated-symbols` recipe golden test.",
     "reason": "has_callers",
-    "evidence_json": "[{\"kind\":\"caller\",\"name\":\"ShopButton\",\"file_path\":\"src/components/shop/ShopButton.tsx\",\"line_start\":10},{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":27},{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":30}]"
+    "evidence_json": "[{\"kind\":\"caller\",\"name\":\"ProductCard\",\"file_path\":\"src/components/shop/ProductCard.tsx\",\"line_start\":12},{\"kind\":\"caller\",\"name\":\"ShopButton\",\"file_path\":\"src/components/shop/ShopButton.tsx\",\"line_start\":10},{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":27},{\"truncated\":true}]"
   },
   {
     "name": "epochMs",

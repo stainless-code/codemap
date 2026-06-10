@@ -2,8 +2,15 @@
   {
     "file_path": "src/components/shop/ProductCard.tsx",
     "name": "ProductCard",
-    "hit_statements": 3,
-    "total_statements": 3,
+    "hit_statements": 2,
+    "total_statements": 2,
+    "coverage_pct": 100
+  },
+  {
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "name": "spread",
+    "hit_statements": 1,
+    "total_statements": 1,
     "coverage_pct": 100
   },
   {
