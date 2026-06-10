@@ -8,6 +8,8 @@ actions:
 
 Surfaces resolved import edges from `dependencies` that match a `deny` rule declared under `boundaries:` in `.codemap/config.ts`. Each row is one violation: a `from_path` file (matching `rule_from_glob`) imports a `to_path` file (matching `rule_to_glob`).
 
+Rows include **`reason`** (`boundary_deny_match`) and **`evidence_json`** (JSON array with the matched rule tuple) so agents can cite why the edge fired without re-querying `boundary_rules`.
+
 ## Configure
 
 `.codemap/config.ts`:

@@ -4,6 +4,8 @@
     "to_path": "src/api/client.ts",
     "rule_name": "ui-no-api",
     "rule_from_glob": "src/components/**",
-    "rule_to_glob": "src/api/**"
+    "rule_to_glob": "src/api/**",
+    "reason": "boundary_deny_match",
+    "evidence_json": "[{\"rule_name\":\"ui-no-api\",\"from_glob\":\"src/components/**\",\"to_glob\":\"src/api/**\"}]"
   }
 ]

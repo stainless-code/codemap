@@ -35,7 +35,7 @@ Evidence is **in-SQL**, not a post-processor — same Moat-A path as the recipe.
 
 ### Tracer bullet (slice 1)
 
-`boundary-violations`: add `reason` constant + `evidence_json` with rule tuple; one golden query. Ship before touching `unimported-exports` re-export subquery.
+`boundary-violations`: add `reason` constant + `evidence_json` with rule tuple; one golden query. Ship before touching `unimported-exports` re-export subquery. **Orchestration:** [agent-enrichment-wave.md](./agent-enrichment-wave.md) § Plan 1 slice 1.1 — **shipped in working tree** (await commit).
 
 ### Out of scope (v1)
 
@@ -108,11 +108,11 @@ Ship one recipe per wave; verify before moving to the next.
 
 ## Open decisions (impl PR)
 
-| #   | Question                                                                                          |
-| --- | ------------------------------------------------------------------------------------------------- |
-| Q1  | Single `evidence_json` vs separate typed columns (`reexport_hops`, `caller_count`)?               |
-| Q2  | Post-query enrichment in `query-engine` for recipes that opt in via frontmatter `evidence: true`? |
-| Q3  | Include `binding_kind` from `bindings` for rename-preview synergy in v1 or v2?                    |
+| #   | Question                                                                                          | Lock (wave 2026-06)                                               |
+| --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Q1  | Single `evidence_json` vs separate typed columns (`reexport_hops`, `caller_count`)?               | **`evidence_json` only** (E.2) — one JSON contract per recipe row |
+| Q2  | Post-query enrichment in `query-engine` for recipes that opt in via frontmatter `evidence: true`? | **SQL-only** (E.1) — no post-processor in v1                      |
+| Q3  | Include `binding_kind` from `bindings` for rename-preview synergy in v1 or v2?                    | **v2**                                                            |
 
 ---
 
