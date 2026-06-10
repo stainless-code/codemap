@@ -39,14 +39,15 @@
 
 ## Plan 2 — Graph-estimated CRAP (`graph-estimated-crap.md`)
 
-| Slice                     | Deliverable                                                     | Verify            |
-| ------------------------- | --------------------------------------------------------------- | ----------------- |
-| **2.0 spike**             | Reachability CTE on `fixtures/minimal` (script or ad-hoc query) | manual row counts |
-| **2.1 recipe**            | `high-crap-score.sql` + `.md`; `scenarios.json`                 | `test:golden`     |
-| **2.2 measured override** | golden with `ingest-coverage` setup                             | golden matrix     |
-| **2.3 cross-link**        | `high-complexity-untested.md` points at CRAP when no ingest     | doc               |
+| Slice                     | Deliverable                                                     | Verify                 |
+| ------------------------- | --------------------------------------------------------------- | ---------------------- |
+| **2.0 spike**             | Reachability CTE on `fixtures/minimal` (script or ad-hoc query) | manual row counts      |
+| **2.1 recipe**            | `high-crap-score.sql` + `.md`; `scenarios.json`                 | `test:golden`          |
+| **2.2 measured override** | `scripts/high-crap-score-measured.test.mjs`                     | `bun run test:scripts` |
+| **2.3 cross-link**        | `high-complexity-untested.md` points at CRAP when no ingest     | doc                    |
+| **2.4 agent surface**     | `rule/00-full.md` + `skill/10-recipes-context.md` one-liners    | consumer check         |
 
-**Grill before 2.1 if spike ambiguous:** Q1 type-only imports in walk (default: value edges only); Q2 recipe id `high-crap-score`.
+**Locked:** Q1 value edges only (`dependencies` — type-only omitted at index); Q2 recipe id `high-crap-score`.
 
 ---
 
@@ -91,4 +92,4 @@ Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
 
 ## Current slice
 
-**Active:** Plan 2 **in flight** on `feat/high-crap-score` — slices **2.0–2.3** (`graph-estimated-crap.md`); PR **#C** when complete.
+**Active:** Plan 2 complete on `feat/high-crap-score` — open **PR #C**, then Plan 3 slice **3.1** (`coverage-deletion-confidence.md`).

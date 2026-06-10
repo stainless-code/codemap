@@ -15,7 +15,7 @@ actions:
 
 Ranks symbols by **CRAP score** — `CC² × (1 - effective_coverage/100)³ + CC` where `CC = symbols.complexity`.
 
-**Coverage precedence:** ingested `coverage` rows win (`coverage_source: measured`). Otherwise graph-estimated tiers (`coverage_source: estimated`):
+**Coverage precedence:** ingested `coverage` rows win (`coverage_source: measured`) — including **0% measured**, which overrides graph tiers even when tests reference the symbol. Otherwise graph-estimated tiers (`coverage_source: estimated`) via value-only `dependencies` fan-out (type-only imports are excluded at index time):
 
 | Tier    | When                                                                                          |
 | ------- | --------------------------------------------------------------------------------------------- |

@@ -70,6 +70,10 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (TEXT, JSON array) columns on each row — factual detection path for agents, not engine verdicts. See [plans/evidence-chains-on-recipe-rows.md](./plans/evidence-chains-on-recipe-rows.md). Goldens assert these columns when the recipe ships evidence (`boundary-violations`, `deprecated-symbols`, `unimported-exports`).
 
+### Coverage columns (CRAP / enrichment recipes)
+
+`high-crap-score` adds **`coverage_source`** (`measured` \| `estimated`) and **`effective_coverage_pct`** on each row — measured when `coverage` has a matching symbol row after `ingest-coverage`; otherwise graph-estimated tiers from test reachability. Goldens assert `coverage_source` when the recipe ships coverage semantics (`high-crap-score`); measured override is covered by `scripts/high-crap-score-measured.test.mjs`.
+
 ---
 
 ## Status

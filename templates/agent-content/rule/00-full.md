@@ -22,6 +22,8 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 **Evidence columns:** Some recipe rows (e.g. `boundary-violations`, `deprecated-symbols`, `unimported-exports`) add **`reason`** and **`evidence_json`** — factual detection path for agents, not pass/fail verdicts.
 
+**Coverage columns:** `high-crap-score` rows add **`coverage_source`** (`measured` \| `estimated`) and **`effective_coverage_pct`** — measured when `ingest-coverage` has a symbol row; else graph tiers 85/40/0% from test reachability (heuristic, not execution).
+
 ## Trigger patterns
 
 If the question matches any of these, use the index instead of grepping:
@@ -60,7 +62,8 @@ If the question matches any of these, use the index instead of grepping:
 | "Which exports has nobody imported?"                         | `--recipe unimported-exports`                                                                                                                        |
 | "Which components touch deprecated APIs?"                    | `--recipe components-touching-deprecated`                                                                                                            |
 | "What's risky to refactor right now?"                        | `--recipe refactor-risk-ranking`                                                                                                                     |
-| "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested`                                                                                                                  |
+| "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested` (needs `ingest-coverage`; without ingest prefer `high-crap-score`)                                               |
+| "Complex + undertested without coverage ingest?"             | `--recipe high-crap-score` (graph-estimated tiers; `coverage_source: estimated`)                                                                     |
 | "What's cognitively complex (nesting-heavy)?"                | `--recipe high-cognitive-complexity` (default `min_score=15`; `--params min_score=20` to tighten)                                                    |
 
 ## Quick reference queries

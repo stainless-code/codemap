@@ -1,6 +1,6 @@
 # Graph-estimated CRAP score — plan
 
-> **Status:** open · **Priority:** P2 · **Effort:** M (~2 weeks)
+> **Status:** shipped (PR #C) · **Priority:** P2 · **Effort:** M (~2 weeks)
 >
 > **Motivator:** CRAP ranks **complex and undertested** functions. Codemap has `symbols.complexity` + ingested `coverage`, but `high-complexity-untested` is **misleading without ingest** (`COALESCE(coverage_pct, 0)` treats missing as 0%). Graph-estimated tiers (85/40/0%) from test reachability when measured coverage is absent.
 >
@@ -42,7 +42,7 @@ recipe high-crap-score (SQL only)
 | 40%  | 4     | `deeplyNested`, `relay`, … — `complexity-fixture.ts` reachable from test |
 | 0%   | 39    | `createClient`, `get`, … — not dependency-reachable from tests           |
 
-Reachability walk: `test_suites` + `*.test.*` / `*.spec.*` globs → recursive `dependencies` fan-out (value edges only).
+Reachability walk: `test_suites` + `*.test.*` / `*.spec.*` globs → recursive `dependencies` fan-out (value edges only — type-only imports never enter `dependencies` at index time).
 
 ### Tracer bullet (slice 2.1)
 
@@ -126,11 +126,11 @@ bun test scripts/query-golden-coverage-matrix.test.mjs   # after golden scenario
 
 ## Open decisions (impl PR)
 
-| #   | Question                                                                                         |
-| --- | ------------------------------------------------------------------------------------------------ |
-| Q1  | Include type-only imports in reachability walk? (default: value edges only, mirror import graph) |
-| Q2  | Recipe id: `high-crap-score` vs `crap-score`?                                                    |
-| Q3  | Materialised column at index time vs recipe-only — measure CTE cost on self-index first.         |
+| #   | Question                                                                                         | Lock (wave 2026-06)                   |
+| --- | ------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| Q1  | Include type-only imports in reachability walk? (default: value edges only, mirror import graph) | **Value edges** — `dependencies` only |
+| Q2  | Recipe id: `high-crap-score` vs `crap-score`?                                                    | **`high-crap-score`**                 |
+| Q3  | Materialised column at index time vs recipe-only — measure CTE cost on self-index first.         | **Recipe-only** (defer v2)            |
 
 ---
 
