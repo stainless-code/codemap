@@ -5,7 +5,10 @@ import { join } from "node:path";
 
 import { closeDb, createSchema, insertFile } from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
-import { ingestChurnFromJsonFile } from "./ingest-churn-run";
+import {
+  ingestChurnFromJsonFile,
+  parseChurnJsonPayload,
+} from "./ingest-churn-run";
 
 describe("ingestChurnFromJsonFile", () => {
   it("loads indexed paths and skips unindexed rows", () => {
@@ -68,6 +71,19 @@ describe("ingestChurnFromJsonFile", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("rejects invalid churn_trend values", () => {
+    expect(() =>
+      parseChurnJsonPayload([
+        {
+          file_path: "src/a.ts",
+          commit_count: 1,
+          weighted_commits: 1,
+          churn_trend: "spiking",
+        },
+      ]),
+    ).toThrow(/churn_trend must be accelerating/);
   });
 
   it("rejects empty JSON without wiping file_churn", () => {

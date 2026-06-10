@@ -1744,8 +1744,11 @@ export function insertFileChurn(db: CodemapDatabase, rows: FileChurnRow[]) {
 
 /** Replace all churn rows (full-rebuild git ingest or golden seed-file-churn). */
 export function replaceFileChurn(db: CodemapDatabase, rows: FileChurnRow[]) {
-  db.run("DELETE FROM file_churn");
-  insertFileChurn(db, rows);
+  const persist = db.transaction(() => {
+    db.run("DELETE FROM file_churn");
+    insertFileChurn(db, rows);
+  });
+  persist();
 }
 
 /** `meta` key: last `HEAD` when `file_churn` was refreshed (idle skip). */
@@ -1759,10 +1762,13 @@ export function mergeFileChurnForPaths(
   rows: FileChurnRow[],
   scopePaths: Iterable<string>,
 ) {
-  for (const p of scopePaths) {
-    db.run("DELETE FROM file_churn WHERE file_path = ?", [p]);
-  }
-  insertFileChurn(db, rows);
+  const persist = db.transaction(() => {
+    for (const p of scopePaths) {
+      db.run("DELETE FROM file_churn WHERE file_path = ?", [p]);
+    }
+    insertFileChurn(db, rows);
+  });
+  persist();
 }
 
 /** Drop churn rows whose `file_path` is no longer indexed. */

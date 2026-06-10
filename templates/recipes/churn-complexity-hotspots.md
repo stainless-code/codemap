@@ -30,7 +30,7 @@ params:
 
 Files or symbols ranked by **git churn × cyclomatic complexity**. Distinct from the outcome alias `codemap hotspots` (import **fan-in** via `fan-in` recipe).
 
-Populated on every index pass from git history (config `churn.halfLifeDays`, `churn.since` / `--churn-since`). Non-git repos: `codemap ingest-churn <file.json>` or config `churn.file`.
+Default: git refresh every index (`churn.halfLifeDays`, `churn.since` / `--churn-since`). When config `churn.file` is set, that JSON loads on every index and **skips** git log (including in git repos). Manual twin: `codemap ingest-churn <file.json>` for non-git repos and CI fixtures.
 
 ```bash
 codemap query --recipe churn-complexity-hotspots

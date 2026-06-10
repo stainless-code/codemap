@@ -54,6 +54,8 @@ codemap validate --json                                      # detect stale / mi
 codemap context --compact --for "refactor auth"              # JSON envelope + intent-matched recipes
 codemap ingest-coverage coverage/coverage-final.json --json  # Istanbul / LCOV (auto-detected) → coverage table; joins with symbols
 NODE_V8_COVERAGE=.cov bun test && codemap ingest-coverage .cov --runtime --json  # V8 protocol (per-process dumps); local-only
+codemap ingest-churn metrics/churn.json --json               # precomputed file_churn → churn-complexity-hotspots (non-git / CI)
+codemap query --json --recipe churn-complexity-hotspots      # change-frequency × complexity (not the hotspots alias)
 codemap agents init                                          # scaffold .agents/ rules + skills
 codemap agents init --mcp                                    # PM-aware project MCP config (see docs/agents.md)
 codemap apply rename-preview --params old=foo,new=bar --dry-run  # preview recipe-driven edits (substrate executor)
@@ -86,7 +88,7 @@ codemap query --json --recipe fan-out-sample
 codemap dead-code --json                                     # → query --recipe untested-and-dead
 codemap deprecated --ci                                      # → query --recipe deprecated-symbols --ci
 codemap boundaries --format sarif > boundary-findings.sarif  # → query --recipe boundary-violations --format sarif
-codemap hotspots --json --group-by directory                 # → query --recipe fan-in --json --group-by directory
+codemap hotspots --json --group-by directory                 # → query --recipe fan-in (import hubs — not churn×complexity)
 codemap coverage-gaps --json --summary                       # → query --recipe worst-covered-exports --json --summary
 # Parametrised recipes validate params from <id>.md frontmatter before SQL binding.
 codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%

@@ -36,6 +36,23 @@ function gitSpawnEnv(): NodeJS.ProcessEnv {
   return e;
 }
 
+const CHURN_TREND_VALUES = new Set(["accelerating", "stable", "cooling"]);
+
+function parseChurnTrendField(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new TypeError(
+      "churn_trend must be accelerating, stable, cooling, or null",
+    );
+  }
+  if (!CHURN_TREND_VALUES.has(value)) {
+    throw new TypeError(
+      `churn_trend must be accelerating, stable, or cooling (got ${value})`,
+    );
+  }
+  return value;
+}
+
 export function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
   if (!Array.isArray(raw)) {
     throw new TypeError("churn JSON must be an array of file_churn rows");
@@ -63,10 +80,7 @@ export function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
         r.last_commit_at === null || r.last_commit_at === undefined
           ? null
           : String(r.last_commit_at),
-      churn_trend:
-        r.churn_trend === null || r.churn_trend === undefined
-          ? null
-          : String(r.churn_trend),
+      churn_trend: parseChurnTrendField(r.churn_trend),
       computed_at:
         typeof r.computed_at === "string"
           ? r.computed_at

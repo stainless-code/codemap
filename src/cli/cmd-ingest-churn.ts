@@ -14,11 +14,14 @@ export function printIngestChurnCmdHelp(): void {
   console.log(`Usage: codemap ingest-churn <path> [--json]
 
 Import precomputed git churn metrics into \`file_churn\` for non-git
-repositories or CI fixtures. JSON must be an array of objects with
-\`file_path\`, \`commit_count\`, \`weighted_commits\`, \`lines_added\`,
-\`lines_removed\`, optional \`last_commit_at\` / \`churn_trend\` /
-\`computed_at\` (defaults to current time). Run \`codemap\` (index) first — only indexed paths are
-kept; unindexed paths are skipped.
+repositories or CI fixtures (same JSON shape as config \`churn.file\`).
+Replaces all \`file_churn\` rows — include every indexed path you want
+retained. Enables \`churn-complexity-hotspots\`. JSON must be an array of
+objects with \`file_path\`, \`commit_count\`, \`weighted_commits\`, optional
+\`lines_added\` / \`lines_removed\` (default 0), \`last_commit_at\` /
+\`churn_trend\` (\`accelerating\` \| \`stable\` \| \`cooling\`) /
+\`computed_at\` (defaults to current time). Run \`codemap\` (index) first —
+only indexed paths are kept; unindexed paths are skipped.
 
 Args:
   <path>          Path to JSON file (relative to project root or absolute)
