@@ -7,6 +7,8 @@ actions:
 
 Exports that have no row in `imports` referencing their file AND name. Surfaces the **direct-use-only** subset of "unused exports" — useful as a starting candidate list, but **NEVER as a "safe to delete" list** without manual verification.
 
+Rows include **`reason`** (`no_direct_import` \| `reexport_chain_possible`) and **`evidence_json`** (barrel hops from `re_export_chains` when a re-export path may explain the false positive).
+
 ## V1 limitations (false-positive classes)
 
 The recipe ships intentionally simple. Three known classes of false positive:
