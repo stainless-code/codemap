@@ -71,6 +71,7 @@ If the question matches any of these, use the index instead of grepping:
 | "Complex + undertested without coverage ingest?"             | `--recipe high-crap-score` (graph-estimated tiers; `coverage_source: estimated`)                                                                     |
 | "What's cognitively complex (nesting-heavy)?"                | `--recipe high-cognitive-complexity` (default `min_score=15`; `--params min_score=20` to tighten)                                                    |
 | "Structurally duplicate function bodies?"                    | `--recipe duplicates` (rename-insensitive `body_hash`; triage with `snippet` before refactor)                                                        |
+| "What files churn often AND are complex?"                    | `--recipe churn-complexity-hotspots` (or `--params by_symbol=true`; non-git: `ingest-churn` / `churn.file`; alias `hotspots` → `fan-in`)             |
 
 ## Quick reference queries
 

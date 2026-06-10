@@ -29,6 +29,7 @@ export interface IndexTableStats extends Record<string, number> {
   module_cycles: number;
   dynamic_imports: number;
   file_metrics: number;
+  file_churn: number;
 }
 
 /**
@@ -53,6 +54,8 @@ export interface IndexPerformanceReport {
   re_export_chains_ms: number;
   /** `resolveTypeHeritage` + persist wall. */
   heritage_ms: number;
+  /** `refreshFileChurn` wall (every index pass). */
+  churn_ms: number;
   /**
    * `indexFiles` wall-clock — `parse + insert + index_create + DDL + bindings
    * + module_cycles + re_export_chains + heritage_ms`. Does **not** include

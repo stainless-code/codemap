@@ -149,16 +149,33 @@ export function classifyIntent(intent: string): {
   hint: string;
 } {
   const t = intent.toLowerCase();
+  if (
+    /hotspot|churn|refactor priority|risky to refactor|high.?churn|change.?often/.test(
+      t,
+    )
+  ) {
+    return {
+      classified_as: "refactor-priority",
+      matched_recipes: [
+        "churn-complexity-hotspots",
+        "refactor-risk-ranking",
+        "high-complexity-untested",
+        "fan-in",
+      ],
+      hint: "churn-complexity-hotspots ranks files by git churn × complexity (distinct from `hotspots` alias → fan-in); pair with refactor-risk-ranking and snippet before large edits.",
+    };
+  }
   if (/refactor|rename|restructur|extract|move\b/.test(t)) {
     return {
       classified_as: "refactor",
       matched_recipes: [
+        "churn-complexity-hotspots",
         "fan-in",
         "fan-out",
         "barrel-files",
         "deprecated-symbols",
       ],
-      hint: "Inspect fan-in / fan-out before moving symbols; barrel-files surfaces public-API hubs; deprecated-symbols flags risky callers.",
+      hint: "churn-complexity-hotspots surfaces high-churn × high-complexity files; inspect fan-in / fan-out before moving symbols.",
     };
   }
   if (/bug|fix|debug|error|crash|broken|regress/.test(t)) {

@@ -91,6 +91,9 @@ Options:
   --state-dir DIR State directory for codemap-managed files (default .codemap/ under root)
   --performance   Print per-phase timing breakdown + top-10 slowest files
                   (full rebuild only)
+  --churn-since REF
+                  Only count git commits after REF for file_churn ingest
+                  (overrides config churn.since)
   --help, -h      Show this help
 `);
 }
@@ -171,6 +174,14 @@ export function validateIndexModeArgs(rest: string[]): void {
       i++;
       continue;
     }
+    if (a === "--churn-since") {
+      if (i + 1 >= rest.length || rest[i + 1].startsWith("-")) {
+        console.error("codemap: --churn-since requires a git revision");
+        process.exit(1);
+      }
+      i += 2;
+      continue;
+    }
     if (a === "--files") {
       i++;
       const start = i;
@@ -199,6 +210,7 @@ export function parseBootstrapArgs(argv: string[]) {
   let configFile: string | undefined;
   let stateDir: string | undefined;
   let fts5Cli: boolean | undefined;
+  let churnSinceCli: string | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -221,10 +233,15 @@ export function parseBootstrapArgs(argv: string[]) {
       rest.push(a);
       continue;
     }
+    if (a === "--churn-since" && argv[i + 1]) {
+      churnSinceCli = argv[++i];
+      rest.push("--churn-since", churnSinceCli);
+      continue;
+    }
     rest.push(a);
   }
   if (!root) root = process.cwd();
   // --state-dir wins over CODEMAP_STATE_DIR (precedence per plan §D7).
   if (!stateDir) stateDir = process.env.CODEMAP_STATE_DIR;
-  return { root, configFile, stateDir, fts5Cli, rest };
+  return { root, configFile, stateDir, fts5Cli, churnSinceCli, rest };
 }

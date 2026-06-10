@@ -41,6 +41,11 @@ export const setupStepSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("clear-coverage"),
   }),
+  z.object({
+    kind: z.literal("seed-file-churn"),
+    /** Path relative to fixture root (JSON array of FileChurnRow). */
+    path: z.string().min(1),
+  }),
 ]);
 
 export type GoldenSetupStep = z.infer<typeof setupStepSchema>;

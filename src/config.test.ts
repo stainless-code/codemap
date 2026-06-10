@@ -118,6 +118,23 @@ describe("resolveCodemapConfig", () => {
     expect(r.excludeDirNames).not.toEqual(DEFAULT_EXCLUDE_DIR_NAMES);
   });
 
+  it("defaults churn halfLifeDays and null since/file", () => {
+    const r = resolveCodemapConfig(dir, undefined);
+    expect(r.churn.halfLifeDays).toBe(90);
+    expect(r.churn.since).toBeNull();
+    expect(r.churn.file).toBeNull();
+  });
+
+  it("resolves churn config and CLI since override", () => {
+    const r = resolveCodemapConfig(
+      dir,
+      { churn: { halfLifeDays: 30, since: "v1.0.0" } },
+      { churnSinceCli: "abc123" },
+    );
+    expect(r.churn.halfLifeDays).toBe(30);
+    expect(r.churn.since).toBe("abc123");
+  });
+
   it("defaults boundaries to []", () => {
     const r = resolveCodemapConfig(dir, undefined);
     expect(r.boundaries).toEqual([]);

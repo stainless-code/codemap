@@ -260,6 +260,10 @@ Number of edges _into_ a file in the `dependencies` table — `COUNT(*) FROM dep
 
 Number of edges _out of_ a file — `COUNT(*) FROM dependencies WHERE from_path = ?`. Surfaces as the `fan-out` recipe.
 
+### `file_churn` (table)
+
+Per-file git churn metrics refreshed on **every index pass** (incremental scoped recompute; idle HEAD cache). Git via `ingestFileChurnFromGit`; non-git via **`codemap ingest-churn`** or config **`churn.file`**. Config: `churn.halfLifeDays`, `churn.since` / `--churn-since`. Powers **`churn-complexity-hotspots`** (file or symbol grain, normalized score) — distinct from outcome alias **`hotspots`** → `fan-in`.
+
 ### `files` (table)
 
 Header row for every indexed file. `path` is the primary key; all other tables FK to it with `ON DELETE CASCADE`. Flags: `is_barrel` (100% re-exports, no local value symbols) and `has_side_effects` (module-level call/assignment seen at parse time). See `FileRow`.
@@ -410,7 +414,7 @@ Key-value metadata table. Holds `schema_version`, `last_indexed_commit`, `indexe
 
 ### outcome aliases (`dead-code` / `deprecated` / `boundaries` / `hotspots` / `coverage-gaps`)
 
-Top-level CLI verbs that thin-wrap `query --recipe <id>`: `dead-code` → `untested-and-dead`, `deprecated` → `deprecated-symbols`, `boundaries` → `boundary-violations`, `hotspots` → `fan-in`, `coverage-gaps` → `worst-covered-exports`. Every `query` flag passes through (`--json`, `--format`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Mapping lives in `src/cli/aliases.ts` (`OUTCOME_ALIASES`). Capped at 5 to avoid alias-sprawl — promote a sixth only when the recipe becomes a headline outcome. Moat-A clean: the alias is a one-line rewrite, not a new primitive; the recipe IS the SQL. **Write alias (distinct):** `codemap rename` thin-wraps `apply rename-preview` (not `query --recipe`) — mapping in `src/cli/rename-alias.ts`; same Moat-A rule (no new write semantics).
+Top-level CLI verbs that thin-wrap `query --recipe <id>`: `dead-code` → `untested-and-dead`, `deprecated` → `deprecated-symbols`, `boundaries` → `boundary-violations`, `hotspots` → `fan-in`, `coverage-gaps` → `worst-covered-exports`. For **change-frequency × complexity** refactor targets use recipe **`churn-complexity-hotspots`** (not the `hotspots` alias). Every `query` flag passes through (`--json`, `--format`, `--ci`, `--summary`, `--changed-since`, `--group-by`, `--params`, `--save-baseline`, `--baseline`). Mapping lives in `src/cli/aliases.ts` (`OUTCOME_ALIASES`). Capped at 5 to avoid alias-sprawl — promote a sixth only when the recipe becomes a headline outcome. Moat-A clean: the alias is a one-line rewrite, not a new primitive; the recipe IS the SQL. **Write alias (distinct):** `codemap rename` thin-wraps `apply rename-preview` (not `query --recipe`) — mapping in `src/cli/rename-alias.ts`; same Moat-A rule (no new write semantics).
 
 ### oxc-parser
 

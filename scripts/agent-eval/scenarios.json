@@ -171,6 +171,15 @@
         "regex": "export\\s+function\\s+\\w+",
         "mode": "files"
       }
+    },
+    {
+      "id": "churn-complexity-hotspots-recipe",
+      "goldenId": "churn-complexity-hotspots",
+      "traditional": {
+        "globs": ["src/lib/**/*.ts", "src/api/**/*.ts"],
+        "regex": "export\\s+(function|const)\\s+\\w+",
+        "mode": "files"
+      }
     }
   ]
 }

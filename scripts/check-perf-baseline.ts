@@ -31,6 +31,7 @@ type Phase =
   | "bindings_ms"
   | "module_cycles_ms"
   | "re_export_chains_ms"
+  | "churn_ms"
   | "total_ms";
 
 const GATED_PHASES: Phase[] = [
@@ -39,6 +40,7 @@ const GATED_PHASES: Phase[] = [
   "insert_ms",
   "index_create_ms",
   "bindings_ms",
+  "churn_ms",
   "total_ms",
 ];
 

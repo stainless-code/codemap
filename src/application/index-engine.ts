@@ -417,7 +417,8 @@ export function fetchTableStats(db: CodemapDatabase): IndexTableStats {
         (SELECT COUNT(*) FROM re_export_chains) as re_export_chains,
         (SELECT COUNT(*) FROM module_cycles) as module_cycles,
         (SELECT COUNT(*) FROM dynamic_imports) as dynamic_imports,
-        (SELECT COUNT(*) FROM file_metrics) as file_metrics`,
+        (SELECT COUNT(*) FROM file_metrics) as file_metrics,
+        (SELECT COUNT(*) FROM file_churn) as file_churn`,
     )
     .get()!;
   return row as IndexTableStats;
@@ -636,6 +637,7 @@ export async function indexFiles(
       module_cycles_ms: Math.round(moduleCyclesMs),
       re_export_chains_ms: Math.round(reExportChainsMs),
       heritage_ms: Math.round(heritageMs),
+      churn_ms: 0,
       total_ms: elapsed,
       slowest_files: slowest,
     };

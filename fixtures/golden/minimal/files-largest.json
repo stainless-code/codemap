@@ -24,6 +24,12 @@
     "language": "ts"
   },
   {
+    "path": "file-churn-seed.json",
+    "line_count": 33,
+    "size": 819,
+    "language": "json"
+  },
+  {
     "path": "src/utils/date.ts",
     "line_count": 29,
     "size": 684,
@@ -112,11 +118,5 @@
     "line_count": 11,
     "size": 418,
     "language": "md"
-  },
-  {
-    "path": "src/bench/jsx-synthesis/PageShell.tsx",
-    "line_count": 10,
-    "size": 153,
-    "language": "tsx"
   }
 ]

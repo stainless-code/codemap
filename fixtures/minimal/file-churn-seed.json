@@ -1,0 +1,32 @@
+[
+  {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "commit_count": 28,
+    "weighted_commits": 22.5,
+    "lines_added": 520,
+    "lines_removed": 180,
+    "last_commit_at": "2026-06-08T12:00:00Z",
+    "churn_trend": "accelerating",
+    "computed_at": "2026-06-10T00:00:00Z"
+  },
+  {
+    "file_path": "src/lib/cache.ts",
+    "commit_count": 9,
+    "weighted_commits": 4.2,
+    "lines_added": 95,
+    "lines_removed": 40,
+    "last_commit_at": "2026-05-15T09:00:00Z",
+    "churn_trend": "stable",
+    "computed_at": "2026-06-10T00:00:00Z"
+  },
+  {
+    "file_path": "src/api/client.ts",
+    "commit_count": 14,
+    "weighted_commits": 8.0,
+    "lines_added": 210,
+    "lines_removed": 90,
+    "last_commit_at": "2026-06-01T00:00:00Z",
+    "churn_trend": "cooling",
+    "computed_at": "2026-06-10T00:00:00Z"
+  }
+]

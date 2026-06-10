@@ -18,6 +18,12 @@
     "line_count": 60
   },
   {
+    "path": "file-churn-seed.json",
+    "content_hash": "9f5241c6e2dc081b0398228178dd10dd6e37f9efc0ef2157e7d417a81b7ffd0b",
+    "language": "json",
+    "line_count": 33
+  },
+  {
     "path": "package.json",
     "content_hash": "a8e79efc943697cee4d4435360de9150bd7261376abe9e2c34c0c7238177c7de",
     "language": "json",

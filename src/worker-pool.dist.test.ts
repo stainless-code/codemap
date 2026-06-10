@@ -4,7 +4,8 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { globSync } from "./glob-sync";
@@ -42,14 +43,23 @@ describe("node dist --full exit delay", () => {
       const files = globSync(["**/*.ts", "**/*.tsx", "**/*.css"], minimalRoot);
       expect(files.length).toBeGreaterThan(WORKER_POOL_INLINE_PARSE_MAX);
 
-      await expectSubprocessExits(() =>
-        Bun.spawn(["node", distEntry, "--full"], {
-          cwd: repoRoot,
-          env: { ...process.env, CODEMAP_ROOT: minimalRoot },
-          stdout: "ignore",
-          stderr: "pipe",
-        }),
-      );
+      const stateDir = mkdtempSync(join(tmpdir(), "codemap-dist-full-"));
+      try {
+        await expectSubprocessExits(() =>
+          Bun.spawn(["node", distEntry, "--full"], {
+            cwd: repoRoot,
+            env: {
+              ...process.env,
+              CODEMAP_ROOT: minimalRoot,
+              CODEMAP_STATE_DIR: stateDir,
+            },
+            stdout: "ignore",
+            stderr: "pipe",
+          }),
+        );
+      } finally {
+        rmSync(stateDir, { recursive: true, force: true });
+      }
     },
     8_000,
   );

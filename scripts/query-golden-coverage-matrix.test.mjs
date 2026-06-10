@@ -15,6 +15,7 @@ const GOLDEN_DIR = join(REPO_ROOT, "fixtures/golden/minimal");
 /** Tables that must have a dedicated SQL pin-down scenario (not recipe-only). */
 const SUBSTRATE_SCENARIO_BY_TABLE = {
   file_metrics: "file-metrics-complexity-fixture",
+  file_churn: "churn-complexity-hotspots",
   scopes: "scopes-product-card",
   references: "references-product-card-perms",
   bindings: "bindings-createClient",

@@ -496,6 +496,23 @@ One row per leaf parameter binding, ordered by `position`. Pattern params (`func
 | column_start | INTEGER    | 0-based column of the binding token                            |
 | column_end   | INTEGER    | One-past-last column                                           |
 
+### `file_churn` — Git churn metrics per indexed file (`STRICT`)
+
+One row per indexed file with git history in scope. Populated on **every index pass** by `refreshFileChurn` → `ingestFileChurnFromGit` (`git log --numstat` scoped to the project root pathspec). Tunable via config `churn.halfLifeDays` (default 90) and optional `churn.since` / CLI `--churn-since <ref>`. Non-git repos skip ingest (empty table; recipe returns no rows). `churn_trend` is `accelerating` \| `stable` \| `cooling` when enough history exists, else NULL.
+
+| Column           | Type    | Description                                                                |
+| ---------------- | ------- | -------------------------------------------------------------------------- |
+| file_path        | TEXT PK | FK → `files(path)` CASCADE                                                 |
+| commit_count     | INTEGER | Distinct commits touching the file in scope                                |
+| weighted_commits | REAL    | Recency-weighted commit count (default 90-day half-life exponential decay) |
+| lines_added      | INTEGER | Sum of added lines from numstat                                            |
+| lines_removed    | INTEGER | Sum of removed lines from numstat                                          |
+| last_commit_at   | TEXT    | ISO timestamp of most recent commit touching the file                      |
+| churn_trend      | TEXT    | `"accelerating"` \| `"stable"` \| `"cooling"` — nullable in v1             |
+| computed_at      | TEXT    | ISO timestamp when ingest last ran                                         |
+
+Powers **`churn-complexity-hotspots`** recipe (`hotspot_score`, `hotspot_score_normalized`; file or symbol grain via `by_symbol`). Non-git: **`codemap ingest-churn`** or config **`churn.file`**. Distinct from outcome alias **`hotspots`** → `fan-in`.
+
 ### `file_metrics` — Per-file aggregate metrics (`STRICT`)
 
 One row per indexed TS/JS file. Line classification is regex-light (blank if `/^\s*$/`; comment if line starts with `//`, `/*`, `*`, `*/`).

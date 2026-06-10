@@ -13,6 +13,7 @@ export async function runIndexCmd(opts: {
   configFile: string | undefined;
   stateDir?: string | undefined;
   fts5Cli?: boolean | undefined;
+  churnSinceCli?: string | undefined;
   rest: string[];
 }): Promise<void> {
   await bootstrapCodemap(opts);

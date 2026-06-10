@@ -463,6 +463,23 @@
       "recipe": "duplicates"
     },
     {
+      "id": "churn-complexity-hotspots",
+      "prompt": "Files ranked by git churn × cyclomatic complexity (hotspot_score).",
+      "recipe": "churn-complexity-hotspots",
+      "preSetup": [
+        { "kind": "seed-file-churn", "path": "file-churn-seed.json" }
+      ]
+    },
+    {
+      "id": "churn-complexity-hotspots-by-symbol",
+      "prompt": "Symbols ranked by file churn × per-symbol complexity.",
+      "recipe": "churn-complexity-hotspots",
+      "params": { "by_symbol": true, "row_limit": 10 },
+      "preSetup": [
+        { "kind": "seed-file-churn", "path": "file-churn-seed.json" }
+      ]
+    },
+    {
       "id": "circular-imports",
       "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
       "recipe": "circular-imports"
@@ -653,7 +670,7 @@
     {
       "id": "index-table-stats",
       "prompt": "Row counts for all indexed substrate tables (mirrors fetchTableStats + post-pass tables)",
-      "sql": "SELECT (SELECT COUNT(*) FROM files) AS files, (SELECT COUNT(*) FROM symbols) AS symbols, (SELECT COUNT(*) FROM imports) AS imports, (SELECT COUNT(*) FROM exports) AS exports, (SELECT COUNT(*) FROM components) AS components, (SELECT COUNT(*) FROM dependencies) AS dependencies, (SELECT COUNT(*) FROM markers) AS markers, (SELECT COUNT(*) FROM type_members) AS type_members, (SELECT COUNT(*) FROM type_heritage) AS type_heritage, (SELECT COUNT(*) FROM calls) AS calls, (SELECT COUNT(*) FROM css_variables) AS css_vars, (SELECT COUNT(*) FROM css_classes) AS css_classes, (SELECT COUNT(*) FROM css_keyframes) AS css_keyframes, (SELECT COUNT(*) FROM scopes) AS scopes, (SELECT COUNT(*) FROM \"references\") AS ref_count, (SELECT COUNT(*) FROM bindings) AS bindings, (SELECT COUNT(*) FROM import_specifiers) AS import_specifiers, (SELECT COUNT(*) FROM function_params) AS function_params, (SELECT COUNT(*) FROM runtime_markers) AS runtime_markers, (SELECT COUNT(*) FROM test_suites) AS test_suites, (SELECT COUNT(*) FROM re_export_chains) AS re_export_chains, (SELECT COUNT(*) FROM module_cycles) AS module_cycles, (SELECT COUNT(*) FROM dynamic_imports) AS dynamic_imports, (SELECT COUNT(*) FROM file_metrics) AS file_metrics, (SELECT COUNT(*) FROM unresolved_calls) AS unresolved_calls, (SELECT COUNT(*) FROM jsx_elements) AS jsx_elements, (SELECT COUNT(*) FROM async_calls) AS async_calls, (SELECT COUNT(*) FROM decorators) AS decorators, (SELECT COUNT(*) FROM try_catch) AS try_catch, (SELECT COUNT(*) FROM jsdoc_tags) AS jsdoc_tags, (SELECT COUNT(*) FROM jsx_attributes) AS jsx_attributes, (SELECT COUNT(*) FROM boundary_rules) AS boundary_rules, (SELECT COUNT(*) FROM suppressions) AS suppressions"
+      "sql": "SELECT (SELECT COUNT(*) FROM files) AS files, (SELECT COUNT(*) FROM symbols) AS symbols, (SELECT COUNT(*) FROM imports) AS imports, (SELECT COUNT(*) FROM exports) AS exports, (SELECT COUNT(*) FROM components) AS components, (SELECT COUNT(*) FROM dependencies) AS dependencies, (SELECT COUNT(*) FROM markers) AS markers, (SELECT COUNT(*) FROM type_members) AS type_members, (SELECT COUNT(*) FROM type_heritage) AS type_heritage, (SELECT COUNT(*) FROM calls) AS calls, (SELECT COUNT(*) FROM css_variables) AS css_vars, (SELECT COUNT(*) FROM css_classes) AS css_classes, (SELECT COUNT(*) FROM css_keyframes) AS css_keyframes, (SELECT COUNT(*) FROM scopes) AS scopes, (SELECT COUNT(*) FROM \"references\") AS ref_count, (SELECT COUNT(*) FROM bindings) AS bindings, (SELECT COUNT(*) FROM import_specifiers) AS import_specifiers, (SELECT COUNT(*) FROM function_params) AS function_params, (SELECT COUNT(*) FROM runtime_markers) AS runtime_markers, (SELECT COUNT(*) FROM test_suites) AS test_suites, (SELECT COUNT(*) FROM re_export_chains) AS re_export_chains, (SELECT COUNT(*) FROM module_cycles) AS module_cycles, (SELECT COUNT(*) FROM dynamic_imports) AS dynamic_imports, (SELECT COUNT(*) FROM file_metrics) AS file_metrics, (SELECT COUNT(*) FROM unresolved_calls) AS unresolved_calls, (SELECT COUNT(*) FROM jsx_elements) AS jsx_elements, (SELECT COUNT(*) FROM async_calls) AS async_calls, (SELECT COUNT(*) FROM decorators) AS decorators, (SELECT COUNT(*) FROM try_catch) AS try_catch, (SELECT COUNT(*) FROM jsdoc_tags) AS jsdoc_tags, (SELECT COUNT(*) FROM jsx_attributes) AS jsx_attributes, (SELECT COUNT(*) FROM boundary_rules) AS boundary_rules, (SELECT COUNT(*) FROM suppressions) AS suppressions, (SELECT COUNT(*) FROM file_churn) AS file_churn"
     },
     {
       "id": "meta-fts5-enabled",

@@ -1,6 +1,6 @@
 [
   {
-    "files": 45,
+    "files": 46,
     "symbols": 110,
     "imports": 26,
     "exports": 64,
@@ -32,6 +32,7 @@
     "jsdoc_tags": 10,
     "jsx_attributes": 10,
     "boundary_rules": 1,
-    "suppressions": 1
+    "suppressions": 1,
+    "file_churn": 3
   }
 ]
