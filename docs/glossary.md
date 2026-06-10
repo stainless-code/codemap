@@ -149,7 +149,7 @@ SonarSource-inspired cognitive complexity (INTEGER on `symbols`) for the same fu
 
 ### `symbols.body_hash` / structural duplicate bodies
 
-SHA-256 hex of a canonicalized function **body** AST (not raw source). Normalization (v1): every identifier → `$id`; literals → kind only (`Literal:string`, …); template literals walked structurally. Populated for function-shaped symbols (`function`, `method`, `getter`, `setter`) when `body_line_count >= 2`; NULL for trivial one-liners and non-functions. Recipe **`duplicates`** groups rows sharing a hash. Distinct from token-level suffix-array / copy-paste clone detectors — catches rename-insensitive structural twins; may false-positive on shared control-flow skeletons (triage with `snippet`).
+SHA-256 hex of a canonicalized function **body** AST (not raw source). Normalization (v1): every identifier → `$id`; literals → kind only (`Literal:string`, …); absent returns (`null`, `undefined`, `void 0`, bare `return`) → `Literal:nullish`; template literals walked structurally. Populated for function-shaped symbols (`function`, `method`, `getter`, `setter`) when `body_line_count >= 2`; NULL for trivial one-liners and non-functions. Recipe **`duplicates`** groups rows sharing a hash. Distinct from token-level suffix-array / copy-paste clone detectors — catches rename-insensitive structural twins; may false-positive on shared control-flow skeletons (triage with `snippet`).
 
 ### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
 

@@ -55,10 +55,10 @@ export interface ComponentDetector {
  * `symbolIndex = -1` = anonymous (callbacks, IIFEs) — counted but
  * never persisted so branches don't bleed into the outer scope.
  *
- * `markArrowSymbol(node, idx)` / `getArrowSymbol(node)` bridge the
- * two-visit gap for arrow inits: symbol row pushed at
- * `VariableDeclaration`, complexity counter pushed at
- * `ArrowFunctionExpression`. WeakMap keyed by the init AST node.
+ * `markArrowSymbol(node, idx)` / `getArrowSymbol(node)` O(1) symbol index
+ * by function-shaped AST node (WeakMap). Arrows: row at `VariableDeclaration`,
+ * counter at `ArrowFunctionExpression`. `FunctionDeclaration`: row at enter,
+ * hash at exit — same map after `pushParams` would make `length - 1` wrong.
  */
 export interface ComplexityTracker {
   pushFor(symbolIndex: number): void;

@@ -27,6 +27,87 @@ describe("canonicalizeBody", () => {
     expect(a).toContain("$id");
   });
 
+  it("normalizes absent returns to Literal:nullish", () => {
+    const nullRet = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "ReturnStatement",
+          argument: { type: "Literal", value: null },
+        },
+      ],
+    });
+    const undefRet = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "ReturnStatement",
+          argument: { type: "Identifier", name: "undefined" },
+        },
+      ],
+    });
+    const voidRet = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "ReturnStatement",
+          argument: {
+            type: "UnaryExpression",
+            operator: "void",
+            prefix: true,
+            argument: { type: "Literal", value: 0 },
+          },
+        },
+      ],
+    });
+    const bareRet = canonicalizeBody({
+      type: "BlockStatement",
+      body: [{ type: "ReturnStatement" }],
+    });
+    expect(nullRet).toBe(undefRet);
+    expect(nullRet).toBe(voidRet);
+    expect(nullRet).toBe(bareRet);
+    expect(nullRet).toContain("Literal:nullish");
+  });
+
+  it("void 0 is nullish but void call is not", () => {
+    const voidZero = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "ReturnStatement",
+          argument: {
+            type: "UnaryExpression",
+            operator: "void",
+            prefix: true,
+            argument: { type: "Literal", value: 0 },
+          },
+        },
+      ],
+    });
+    const voidCall = canonicalizeBody({
+      type: "BlockStatement",
+      body: [
+        {
+          type: "ReturnStatement",
+          argument: {
+            type: "UnaryExpression",
+            operator: "void",
+            prefix: true,
+            argument: {
+              type: "CallExpression",
+              callee: { type: "Identifier", name: "sideEffect" },
+              arguments: [],
+            },
+          },
+        },
+      ],
+    });
+    expect(voidZero).toContain("Literal:nullish");
+    expect(voidCall).not.toContain("Literal:nullish");
+    expect(voidZero).not.toBe(voidCall);
+  });
+
   it("normalizes literal values to kind only", () => {
     const a = canonicalizeBody({
       type: "BlockStatement",
@@ -52,6 +133,56 @@ describe("canonicalizeBody", () => {
 });
 
 describe("body_hash extraction", () => {
+  it("null/undefined/void0/bare return variants share body_hash", () => {
+    const mk = (ret: string) => `export function fn(): unknown {
+  const n = 1;
+  ${ret}
+}
+`;
+    const nullFn = extractFileData(
+      "/proj/a.ts",
+      mk("return null;"),
+      "a.ts",
+    ).symbols.find((s) => s.name === "fn");
+    const undefFn = extractFileData(
+      "/proj/b.ts",
+      mk("return undefined;"),
+      "b.ts",
+    ).symbols.find((s) => s.name === "fn");
+    const voidFn = extractFileData(
+      "/proj/c.ts",
+      mk("return void 0;"),
+      "c.ts",
+    ).symbols.find((s) => s.name === "fn");
+    const bareFn = extractFileData(
+      "/proj/d.ts",
+      mk("return;"),
+      "d.ts",
+    ).symbols.find((s) => s.name === "fn");
+    expect(nullFn?.body_hash).toBeTruthy();
+    expect(nullFn?.body_hash).toBe(undefFn?.body_hash);
+    expect(nullFn?.body_hash).toBe(voidFn?.body_hash);
+    expect(nullFn?.body_hash).toBe(bareFn?.body_hash);
+  });
+
+  it("FunctionDeclaration body_hash lands on function row not param rows", () => {
+    const src = `export function fn(a: number, b: string): void {
+  const x = a;
+  return;
+}
+`;
+    const data = extractFileData("/proj/x.ts", src, "x.ts");
+    const fn = data.symbols.find(
+      (s) => s.name === "fn" && s.kind === "function",
+    );
+    const params = data.symbols.filter((s) => s.kind === "param");
+    expect(fn?.body_hash).toBeTruthy();
+    expect(params.length).toBeGreaterThan(0);
+    for (const p of params) {
+      expect(p.body_hash ?? null).toBeNull();
+    }
+  });
+
   it("isomorphic FunctionDeclaration bodies share body_hash", () => {
     const aSrc = `export function alpha(x: number): number {
   if (x > 0) {

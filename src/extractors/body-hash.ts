@@ -1,13 +1,14 @@
 /**
  * Structural body fingerprint for function-shaped symbols. Canonical AST walk
- * per plan B.7–B.8/B.11 on `FunctionDeclaration`, named arrow/const inits,
- * and class methods (via `complexity.markArrowSymbol` bridge).
+ * on function bodies; symbol index via `complexity.markArrowSymbol` / `getArrowSymbol`.
  */
 
 import type { SymbolRow } from "../db";
 import { hashContent } from "../hash";
-import { offsetToLine } from "./offsets";
-import type { ExtractContext, TierExtractor } from "./types";
+import type { TierExtractor } from "./types";
+
+/** Return-position absent values (`null` / `undefined` / `void 0` / bare `return`) → this token. */
+const NULLISH_LITERAL = "Literal:nullish";
 
 const SKIP_KEYS = new Set([
   "loc",
@@ -35,7 +36,7 @@ export function canonicalizeBody(body: unknown): string {
   return parts.join("");
 }
 
-/** SHA-256 hex of canonical body; NULL when body missing or trivial (B.13). */
+/** SHA-256 hex of canonical body; NULL when body missing or `body_line_count < 2`. */
 export function hashFunctionBody(
   body: unknown,
   bodyLineCount: number | null | undefined,
@@ -44,12 +45,12 @@ export function hashFunctionBody(
   return hashContent(canonicalizeBody(body));
 }
 
-function walk(node: unknown, parts: string[]): void {
+function walk(node: unknown, parts: string[], normalizeNullish = false): void {
   if (node == null) return;
 
   if (Array.isArray(node)) {
     parts.push("[");
-    for (const item of node) walk(item, parts);
+    for (const item of node) walk(item, parts, normalizeNullish);
     parts.push("]");
     return;
   }
@@ -59,7 +60,37 @@ function walk(node: unknown, parts: string[]): void {
   const n = node as { type?: string };
 
   if (n.type === "Identifier" || n.type === "BindingIdentifier") {
+    if (normalizeNullish && (node as { name?: string }).name === "undefined") {
+      parts.push(NULLISH_LITERAL);
+      return;
+    }
     parts.push("$id");
+    return;
+  }
+
+  if (
+    normalizeNullish &&
+    n.type === "UnaryExpression" &&
+    (node as { operator?: string; prefix?: boolean }).operator === "void" &&
+    (node as { prefix?: boolean }).prefix
+  ) {
+    const voidArg = (node as { argument?: { type?: string; value?: unknown } })
+      .argument;
+    if (voidArg?.type === "Literal" && voidArg.value === 0) {
+      parts.push(NULLISH_LITERAL);
+      return;
+    }
+  }
+
+  if (n.type === "ReturnStatement") {
+    parts.push(n.type);
+    const arg = (node as { argument?: unknown }).argument;
+    parts.push("argument");
+    if (arg == null) {
+      parts.push(NULLISH_LITERAL);
+    } else {
+      walk(arg, parts, true);
+    }
     return;
   }
 
@@ -69,9 +100,14 @@ function walk(node: unknown, parts: string[]): void {
   }
 
   if (n.type === "Literal") {
-    parts.push(
-      `Literal:${literalKind(node as { value?: unknown; bigint?: string; regex?: unknown })}`,
+    const kind = literalKind(
+      node as { value?: unknown; bigint?: string; regex?: unknown },
     );
+    if (normalizeNullish && kind === "nullish") {
+      parts.push(NULLISH_LITERAL);
+    } else {
+      parts.push(`Literal:${kind}`);
+    }
     return;
   }
 
@@ -83,8 +119,8 @@ function walk(node: unknown, parts: string[]): void {
   if (n.type === "TemplateLiteral") {
     const tl = node as { quasis?: unknown[]; expressions?: unknown[] };
     parts.push("TemplateLiteral");
-    walk(tl.quasis, parts);
-    walk(tl.expressions, parts);
+    walk(tl.quasis, parts, normalizeNullish);
+    walk(tl.expressions, parts, normalizeNullish);
     return;
   }
 
@@ -97,7 +133,7 @@ function walk(node: unknown, parts: string[]): void {
     .sort();
   for (const key of keys) {
     parts.push(key);
-    walk(record[key], parts);
+    walk(record[key], parts, normalizeNullish);
   }
 }
 
@@ -108,7 +144,7 @@ function literalKind(node: {
 }): string {
   if (node.regex != null) return "regexp";
   if (node.bigint != null) return "bigint";
-  if (node.value === null) return "null";
+  if (node.value === null) return "nullish";
   return typeof node.value;
 }
 
@@ -130,28 +166,10 @@ function assignBodyHashForSymbolIndex(
   sym.body_hash = hashFunctionBody(body, sym.body_line_count);
 }
 
-function assignBodyHashForNamedFunction(
-  ctx: ExtractContext,
-  node: { id?: { name?: string }; body?: unknown; start?: number },
-): void {
-  const name = node.id?.name;
-  if (!name || node.start === undefined) return;
-  const lineStart = offsetToLine(ctx.lineMap, node.start);
-  const sym = ctx.symbols.find(
-    (s) =>
-      s.name === name &&
-      s.kind === "function" &&
-      s.file_path === ctx.relPath &&
-      s.line_start === lineStart,
-  );
-  if (!sym) return;
-  sym.body_hash = hashFunctionBody(node.body, sym.body_line_count);
-}
-
 export const bodyHashExtractor: TierExtractor = {
   tierId: "body-hash",
   register(visitor, ctx) {
-    const onFnExprExit = (node: { body?: unknown }) => {
+    const onFnExit = (node: { body?: unknown }) => {
       assignBodyHashForSymbolIndex(
         ctx.symbols,
         ctx.complexity.getArrowSymbol(node),
@@ -160,15 +178,9 @@ export const bodyHashExtractor: TierExtractor = {
     };
 
     Object.assign(visitor, {
-      "FunctionDeclaration:exit"(node: {
-        id?: { name?: string };
-        body?: unknown;
-        start?: number;
-      }) {
-        assignBodyHashForNamedFunction(ctx, node);
-      },
-      "ArrowFunctionExpression:exit": onFnExprExit,
-      "FunctionExpression:exit": onFnExprExit,
+      "FunctionDeclaration:exit": onFnExit,
+      "ArrowFunctionExpression:exit": onFnExit,
+      "FunctionExpression:exit": onFnExit,
     });
   },
 };

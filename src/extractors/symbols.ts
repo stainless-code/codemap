@@ -106,6 +106,7 @@ function registerSymbolHandlers(
         ...functionShapeColumns(node),
       });
       complexity.pushFor(symbolIndex);
+      complexity.markArrowSymbol(node, symbolIndex);
 
       scopes.push(name, "function", lineStart, lineEnd);
       ctx.claimedScopeNodes.add(node);
