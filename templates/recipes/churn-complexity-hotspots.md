@@ -1,4 +1,8 @@
 ---
+actions:
+  - type: review-churn-hotspot
+    auto_fixable: false
+    description: "High git churn × cyclomatic complexity — read source with snippet; check fan-in before refactor. Not the codemap hotspots alias (import fan-in)."
 params:
   - name: row_limit
     type: number

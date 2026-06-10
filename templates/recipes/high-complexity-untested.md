@@ -32,6 +32,8 @@ Each row also includes **SonarSource cognitive complexity** for the same symbol 
 - Low coverage alone surfaces too many false positives — a one-line getter with 0% coverage is barely worth testing.
 - The intersection is the actionable list: _complex code that nobody's exercising = bug magnet_.
 
+**Compose with [`churn-complexity-hotspots`](./churn-complexity-hotspots.md)** when recent edit frequency matters — complexity + coverage alone miss frequently touched complexity magnets.
+
 ## Tuning axes for project-local overrides
 
 `<state-dir>/recipes/high-complexity-untested.sql` (default `.codemap/recipes/`):

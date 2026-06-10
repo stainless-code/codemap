@@ -24,6 +24,8 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 **Coverage columns:** `high-crap-score` rows add **`coverage_source`** (`measured` \| `estimated`) and **`effective_coverage_pct`** — measured when `ingest-coverage` has a symbol row; else graph tiers 85/40/0% from test reachability (heuristic, not execution).
 
+**Churn / hotspot columns:** `churn-complexity-hotspots` rows add **`hotspot_score`**, **`hotspot_score_normalized`**, **`churn_trend`** — distinct from outcome alias **`hotspots`** → `fan-in`. Non-git: `ingest-churn` / `churn.file`.
+
 **Confidence columns:** `coverage-confirmed-dead` rows add **`confidence`** (`high` \| `medium`) — `high` when static dead and ingested `coverage_pct = 0`; `medium` when dead but unmeasured. Parse before deletion.
 
 **Audit attribution:** `codemap audit --base <ref>` (and MCP/HTTP `audit` with `base`) tags each `added` row with **`attribution: introduced | inherited`** — branch-new vs pre-existing at merge base. Filter actionable PR deltas with `jq '.deltas.deprecated.added[] | select(.attribution == "introduced")'`.
