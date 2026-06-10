@@ -43,6 +43,7 @@ import {
   runApplyUntilEmpty,
 } from "./apply-run";
 import {
+  collapseAuditEnvelopeForSummary,
   makeWorktreeReindex,
   resolveAuditBaselines,
   runAudit,
@@ -548,22 +549,7 @@ export async function handleAudit(args: AuditArgs): Promise<ToolResult> {
         return err(result.error);
       }
       if (args.summary) {
-        const counts: Record<
-          string,
-          {
-            base: (typeof result.deltas)[string]["base"];
-            added: number;
-            removed: number;
-          }
-        > = {};
-        for (const [key, delta] of Object.entries(result.deltas)) {
-          counts[key] = {
-            base: delta.base,
-            added: delta.added.length,
-            removed: delta.removed.length,
-          };
-        }
-        return ok({ head: result.head, deltas: counts });
+        return ok(collapseAuditEnvelopeForSummary(result));
       }
       return ok(result);
     } finally {

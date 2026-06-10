@@ -122,7 +122,7 @@ codemap audit --json --summary --baseline base                  # counts-only �
 codemap audit --files-baseline base-files                       # explicit per-delta — runs only the slots provided
 codemap audit --baseline base --files-baseline hotfix-files     # mixed — auto-resolve deps + deprecated; override files
 codemap audit --baseline base --no-index                        # skip the auto-incremental-index prelude (frozen-DB CI)
-codemap audit --base origin/main --json                         # ad-hoc — archive+reindex against any committish; no --save-baseline needed
+codemap audit --base origin/main --json                         # ad-hoc — added[].attribution; --summary adds added_introduced/inherited
 codemap audit --base origin/main --format sarif                 # emit SARIF 2.1.0 directly (Code Scanning); also: --ci alias
 codemap audit --base origin/main --ci                           # CI shortcut: --format sarif + non-zero exit on additions
 codemap audit --base v1.0.0 --files-baseline pre-release-files  # mix --base with per-delta override

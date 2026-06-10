@@ -2,8 +2,18 @@ import { describe, expect, it } from "bun:test";
 
 import { createTables, insertFile, upsertQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
+import { diffRows } from "../diff-rows";
 import { openCodemapDatabase } from "../sqlite-db";
-import { computeDelta, runAudit, V1_DELTAS } from "./audit-engine";
+import {
+  buildFindingKeySet,
+  collapseAuditEnvelopeForSummary,
+  computeDelta,
+  findingKey,
+  runAudit,
+  tagAddedWithAttribution,
+  V1_DELTAS,
+} from "./audit-engine";
+import type { AuditEnvelope } from "./audit-engine";
 
 function freshDb(): CodemapDatabase {
   const db = openCodemapDatabase(":memory:");
@@ -42,6 +52,165 @@ function saveFilesBaseline(
 }
 
 const filesSpec = V1_DELTAS.find((d) => d.key === "files")!;
+const dependenciesSpec = V1_DELTAS.find((d) => d.key === "dependencies")!;
+const deprecatedSpec = V1_DELTAS.find((d) => d.key === "deprecated")!;
+
+describe("findingKey", () => {
+  it("matches diffRows identity on projected rows (extra columns stripped)", () => {
+    const rowA = { path: "src/a.ts", content_hash: "x" };
+    const rowB = { path: "src/a.ts", language: "ts" };
+    const key = findingKey(rowA, filesSpec);
+    expect(key).toBe(findingKey(rowB, filesSpec));
+    expect(key).toBe(JSON.stringify({ path: "src/a.ts" }));
+    const projected = JSON.parse(key) as { path: string };
+    expect(diffRows([projected], [projected]).added).toEqual([]);
+  });
+
+  it("separates files rows that differ on required columns", () => {
+    const k1 = findingKey({ path: "src/a.ts" }, filesSpec);
+    const k2 = findingKey({ path: "src/b.ts" }, filesSpec);
+    expect(k1).not.toBe(k2);
+  });
+
+  it("orders dependencies keys by from_path then to_path columns", () => {
+    const edge = { from_path: "src/a.ts", to_path: "src/b.ts" };
+    expect(findingKey(edge, dependenciesSpec)).toBe(
+      JSON.stringify({ from_path: "src/a.ts", to_path: "src/b.ts" }),
+    );
+    expect(
+      findingKey(
+        { from_path: "src/a.ts", to_path: "src/b.ts" },
+        dependenciesSpec,
+      ),
+    ).not.toBe(
+      findingKey(
+        { from_path: "src/b.ts", to_path: "src/a.ts" },
+        dependenciesSpec,
+      ),
+    );
+  });
+
+  it("separates deprecated homonyms across files", () => {
+    const shared = { name: "now", kind: "function" };
+    const k1 = findingKey(
+      { ...shared, file_path: "src/utils/date.ts" },
+      deprecatedSpec,
+    );
+    const k2 = findingKey(
+      { ...shared, file_path: "src/utils/format.ts" },
+      deprecatedSpec,
+    );
+    expect(k1).not.toBe(k2);
+  });
+
+  it("collides only when all requiredColumns match for deprecated delta", () => {
+    const base = {
+      name: "legacyClient",
+      kind: "function",
+      file_path: "src/api/client.ts",
+      line_start: 46,
+    };
+    const withExtra = { ...base, doc_comment: "@deprecated" };
+    expect(findingKey(base, deprecatedSpec)).toBe(
+      findingKey(withExtra, deprecatedSpec),
+    );
+  });
+
+  it("produces distinct keys across v1 delta specs for representative rows", () => {
+    const keys = new Set([
+      findingKey({ path: "src/a.ts" }, filesSpec),
+      findingKey(
+        { from_path: "src/a.ts", to_path: "src/b.ts" },
+        dependenciesSpec,
+      ),
+      findingKey(
+        { name: "foo", kind: "function", file_path: "src/a.ts" },
+        deprecatedSpec,
+      ),
+    ]);
+    expect(keys.size).toBe(3);
+  });
+});
+
+describe("tagAddedWithAttribution", () => {
+  it("tags introduced when key absent from base set", () => {
+    const baseKeySet = buildFindingKeySet([{ path: "src/a.ts" }], filesSpec);
+    const tagged = tagAddedWithAttribution(
+      [{ path: "src/b.ts" }],
+      baseKeySet,
+      filesSpec,
+    );
+    expect(tagged).toEqual([{ path: "src/b.ts", attribution: "introduced" }]);
+  });
+
+  it("tags inherited when key present at merge base (multiset surplus)", () => {
+    const row = { path: "src/a.ts" };
+    const baseKeySet = buildFindingKeySet([row], filesSpec);
+    const tagged = tagAddedWithAttribution([row], baseKeySet, filesSpec);
+    expect(tagged).toEqual([{ path: "src/a.ts", attribution: "inherited" }]);
+  });
+
+  it("strips extra columns from tagged rows", () => {
+    const baseKeySet = buildFindingKeySet([], filesSpec);
+    const tagged = tagAddedWithAttribution(
+      [{ path: "src/x.ts", content_hash: "noise" }],
+      baseKeySet,
+      filesSpec,
+    );
+    expect(tagged[0]).toEqual({
+      path: "src/x.ts",
+      attribution: "introduced",
+    });
+    expect(tagged[0]).not.toHaveProperty("content_hash");
+  });
+});
+
+describe("collapseAuditEnvelopeForSummary", () => {
+  it("includes attribution breakdown for ref-sourced deltas only", () => {
+    const envelope: AuditEnvelope = {
+      head: { sha: "head", indexed_at: 1 },
+      deltas: {
+        files: {
+          base: {
+            source: "ref",
+            ref: "HEAD~1",
+            sha: "base",
+            indexed_at: 0,
+          },
+          added: [
+            { path: "src/b.ts", attribution: "introduced" },
+            { path: "src/c.ts", attribution: "inherited" },
+          ],
+          removed: [{ path: "src/a.ts" }],
+        },
+        deprecated: {
+          base: {
+            source: "baseline",
+            name: "snap",
+            sha: null,
+            indexed_at: 1,
+          },
+          added: [{ name: "old", kind: "function", file_path: "src/x.ts" }],
+          removed: [],
+        },
+      },
+    };
+    const collapsed = collapseAuditEnvelopeForSummary(envelope);
+    expect(collapsed.deltas.files).toEqual({
+      base: envelope.deltas.files!.base,
+      added: 2,
+      removed: 1,
+      added_introduced: 1,
+      added_inherited: 1,
+    });
+    expect(collapsed.deltas.deprecated).toEqual({
+      base: envelope.deltas.deprecated!.base,
+      added: 1,
+      removed: 0,
+    });
+    expect(collapsed.deltas.deprecated).not.toHaveProperty("added_introduced");
+  });
+});
 
 describe("runAudit (engine)", () => {
   it("returns an error envelope when the baselines map is empty", () => {

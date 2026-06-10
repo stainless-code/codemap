@@ -26,6 +26,8 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 **Confidence columns:** `coverage-confirmed-dead` rows add **`confidence`** (`high` \| `medium`) — `high` when static dead and ingested `coverage_pct = 0`; `medium` when dead but unmeasured. Parse before deletion.
 
+**Audit attribution:** `codemap audit --base <ref>` (and MCP/HTTP `audit` with `base`) tags each `added` row with **`attribution: introduced | inherited`** — branch-new vs pre-existing at merge base. Filter actionable PR deltas with `jq '.deltas.deprecated.added[] | select(.attribution == "introduced")'`.
+
 ## Trigger patterns
 
 If the question matches any of these, use the index instead of grepping:

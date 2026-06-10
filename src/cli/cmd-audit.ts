@@ -1,4 +1,5 @@
 import {
+  collapseAuditEnvelopeForSummary,
   makeWorktreeReindex,
   resolveAuditBaselines,
   runAudit,
@@ -267,7 +268,9 @@ Snapshot sources (one of these must resolve; --base and --baseline are mutually 
                                artifact), reindex into a cached \`.codemap/index.db\` at that sha, then diff. <ref> = any
                                committish (origin/main, HEAD~5, sha, tag, …). Cache hit
                                on second run against same sha is sub-100ms. Requires a
-                               git repository.
+                               git repository. With --format json, each added row includes
+                               attribution: introduced (branch-new) | inherited (pre-existing
+                               at merge base).
 
   --baseline <prefix>          Auto-resolve sugar — looks up <prefix>-files,
                                <prefix>-dependencies, <prefix>-deprecated in
@@ -288,7 +291,8 @@ Other flags:
                       when any delta has additions. Mutually exclusive with --json
                       and --format <other>. Recommended in GitHub Actions / GitLab
                       CI to fail the runner step on structural drift.
-  --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N}.
+  --summary           Collapse rows to counts. With --format json: deltas.<key>.{added: N, removed: N};
+                      with --base also added_introduced / added_inherited per delta.
                       With --format text: a single line "drift: files +1/-0, dependencies +3/-2, ...".
                       No-op with --format sarif (results are per-row).
   --no-index          Skip the auto-incremental-index prelude. Default: re-index first
@@ -432,22 +436,7 @@ function renderAudit(
 
   if (opts.format === "json") {
     if (opts.summary) {
-      const counts: Record<
-        string,
-        {
-          base: AuditEnvelope["deltas"][string]["base"];
-          added: number;
-          removed: number;
-        }
-      > = {};
-      for (const [key, delta] of Object.entries(envelope.deltas)) {
-        counts[key] = {
-          base: delta.base,
-          added: delta.added.length,
-          removed: delta.removed.length,
-        };
-      }
-      console.log(JSON.stringify({ head: envelope.head, deltas: counts }));
+      console.log(JSON.stringify(collapseAuditEnvelopeForSummary(envelope)));
     } else {
       console.log(JSON.stringify(envelope));
     }

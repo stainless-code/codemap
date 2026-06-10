@@ -141,6 +141,103 @@ export const V1_DELTAS: readonly AuditDeltaSpec[] = [
 ] as const;
 
 /**
+ * Deterministic finding key for audit delta attribution — projects `row` to
+ * `spec.requiredColumns` (canonical order) then `JSON.stringify`, matching
+ * {@link diffRows} multiset identity on projected rows.
+ */
+export function findingKey(row: unknown, spec: AuditDeltaSpec): string {
+  return JSON.stringify(projectRow(row, spec.requiredColumns));
+}
+
+/** Row metadata on `added[]` when `base.source` is `"ref"` (`audit --base`). */
+export type AuditAttribution = "introduced" | "inherited";
+
+/**
+ * Key set from projected base rows — membership drives introduced vs inherited
+ * on each `added` row after multiset diff.
+ */
+export function buildFindingKeySet(
+  rows: unknown[],
+  spec: AuditDeltaSpec,
+): Set<string> {
+  const set = new Set<string>();
+  for (const row of rows) {
+    set.add(findingKey(row, spec));
+  }
+  return set;
+}
+
+/**
+ * Tag each `added` row with `attribution` by key membership in the base set.
+ * `introduced` = key absent at merge base; `inherited` = key present (e.g.
+ * multiset surplus on a pre-existing finding).
+ */
+export function tagAddedWithAttribution(
+  added: unknown[],
+  baseKeySet: Set<string>,
+  spec: AuditDeltaSpec,
+): Array<Record<string, unknown> & { attribution: AuditAttribution }> {
+  return added.map((row) => {
+    const projected = projectRow(row, spec.requiredColumns) as Record<
+      string,
+      unknown
+    >;
+    const key = findingKey(row, spec);
+    return {
+      ...projected,
+      attribution: baseKeySet.has(key) ? "inherited" : "introduced",
+    };
+  });
+}
+
+/** Per-delta summary counts; attribution breakdown only for ref-sourced audits. */
+export function summarizeAttributedDelta(delta: AuditDelta): {
+  base: AuditDelta["base"];
+  added: number;
+  removed: number;
+  added_introduced?: number;
+  added_inherited?: number;
+} {
+  const removed = delta.removed.length;
+  const added = delta.added.length;
+  const base = delta.base;
+  if (base.source !== "ref") {
+    return { base, added, removed };
+  }
+  let introduced = 0;
+  let inherited = 0;
+  for (const row of delta.added) {
+    if (typeof row === "object" && row !== null && "attribution" in row) {
+      const a = (row as { attribution?: string }).attribution;
+      if (a === "introduced") introduced++;
+      else if (a === "inherited") inherited++;
+    }
+  }
+  return {
+    base,
+    added,
+    removed,
+    added_introduced: introduced,
+    added_inherited: inherited,
+  };
+}
+
+/** Shared `--summary` collapse for CLI / MCP / HTTP audit transports. */
+export function collapseAuditEnvelopeForSummary(envelope: AuditEnvelope): {
+  head: AuditHead;
+  deltas: Record<string, ReturnType<typeof summarizeAttributedDelta>>;
+} {
+  const deltas: Record<
+    string,
+    ReturnType<typeof summarizeAttributedDelta>
+  > = {};
+  for (const [key, delta] of Object.entries(envelope.deltas)) {
+    deltas[key] = summarizeAttributedDelta(delta);
+  }
+  return { head: envelope.head, deltas };
+}
+
+/**
  * Map of delta key → baseline name. Caller assembles this from CLI flags:
  * explicit `--<delta>-baseline <name>` and/or auto-resolved `--baseline <prefix>`
  * (which probes `<prefix>-<delta-key>` for each known delta). Deltas absent
@@ -452,6 +549,7 @@ export async function runAuditFromRef(
         projectRow(row, spec.requiredColumns),
       );
       const diff = diffRows(projectedBase, projectedHead);
+      const baseKeySet = buildFindingKeySet(projectedBase, spec);
 
       deltas[spec.key] = {
         base: {
@@ -460,7 +558,8 @@ export async function runAuditFromRef(
           sha,
           indexed_at: entry.indexedAt,
         },
-        ...diff,
+        added: tagAddedWithAttribution(diff.added, baseKeySet, spec),
+        removed: diff.removed,
       };
     }
 
