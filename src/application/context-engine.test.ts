@@ -224,6 +224,14 @@ describe("readRecipeSqlLimit", () => {
   });
 });
 
+describe("classifyIntent", () => {
+  it("maps hotspot/churn intents to refactor-priority recipe cards", () => {
+    const c = classifyIntent("which files churn often and are complex");
+    expect(c.classified_as).toBe("refactor-priority");
+    expect(c.matched_recipes[0]).toBe("churn-complexity-hotspots");
+  });
+});
+
 describe("composeStartHere", () => {
   it("includes intent-ranked recipe cards and hub leaders with signatures", () => {
     withSeededDb((db) => {
@@ -234,10 +242,10 @@ describe("composeStartHere", () => {
       );
       expect(start.classified_as).toBe("refactor");
       expect(start.recipes.map((r) => r.id)).toEqual([
+        "churn-complexity-hotspots",
         "fan-in",
         "fan-out",
         "barrel-files",
-        "deprecated-symbols",
       ]);
       expect(start.index_summary.files).toBe(3);
       expect(start.recipes[0]?.tool).toBe("query_recipe");
@@ -249,6 +257,20 @@ describe("composeStartHere", () => {
         name: "hubFn",
         kind: "function",
       });
+    });
+  });
+
+  it("sets churn_hint when file_churn is empty", () => {
+    withSeededDb((db) => {
+      const start = composeStartHere(
+        db,
+        defaultStartHereClassification(),
+        composeOpts(),
+      );
+      expect(start.index_summary.file_churn).toBe(0);
+      expect(start.churn_hint).toContain("file_churn is empty");
+      expect(start.churn_hint).toContain("ingest_churn");
+      expect(start.churn_hint).toContain("churn-complexity-hotspots");
     });
   });
 
@@ -491,10 +513,10 @@ describe("buildContextEnvelope", () => {
         });
         expect(envelope.start_here?.classified_as).toBe("refactor");
         expect(envelope.start_here?.recipes.map((r) => r.id)).toEqual([
+          "churn-complexity-hotspots",
           "fan-in",
           "fan-out",
           "barrel-files",
-          "deprecated-symbols",
         ]);
         expect(envelope.intent?.classified_as).toBe("refactor");
       });

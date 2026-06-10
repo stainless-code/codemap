@@ -103,7 +103,7 @@ SELECT DISTINCT callee_name FROM calls
 WHERE caller_name = 'processUser'
   AND (provenance IS NULL OR provenance = 'ast');
 
--- Most-called functions (hotspots)
+-- Most-called functions (import/call fan-in — not churn×complexity; use recipe churn-complexity-hotspots for that)
 SELECT callee_name, COUNT(*) as fan_in FROM calls
 WHERE (provenance IS NULL OR provenance = 'ast')
 GROUP BY callee_name ORDER BY fan_in DESC LIMIT 10;
@@ -146,7 +146,7 @@ SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%format-date%';
 -- Direct dependencies (what does this file import?)
 SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%OrderRow%';
 
--- Most-imported files (hotspots)
+-- Most-imported files (dependency fan-in — not churn×complexity; use recipe churn-complexity-hotspots for that)
 SELECT to_path, COUNT(*) as importers
 FROM dependencies GROUP BY to_path ORDER BY importers DESC LIMIT 15;
 

@@ -62,7 +62,7 @@ We **do not** commit another product’s source tree, paths, business strings, o
 
 ## Scenario shape (implemented)
 
-Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). The file may be a **bare array** of scenarios (legacy) or an object `{ "setup": [...], "scenarios": [...] }`. Optional top-level **`setup`** runs once after index, before scenarios — today **`ingest-coverage`** and **`clear-coverage`** (see [run-setup.ts](../scripts/query-golden/run-setup.ts)); missing coverage files are skipped with a warning. Per-scenario **`preSetup`** runs after global setup (global setup restores after the scenario when `preSetup` mutates the index). Each scenario has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`, `everyRowFieldEquals`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
+Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`scenarios.external.json`** / **example** (Tier B). The file may be a **bare array** of scenarios (legacy) or an object `{ "setup": [...], "scenarios": [...] }`. Optional top-level **`setup`** runs once after index, before scenarios — today **`ingest-coverage`**, **`clear-coverage`**, and **`seed-file-churn`** (see [run-setup.ts](../scripts/query-golden/run-setup.ts)); missing coverage files are skipped with a warning. Per-scenario **`preSetup`** runs after global setup (global setup restores after the scenario when `preSetup` mutates the index). Each scenario has **`id`**, **`sql` or `recipe`**, optional **`match`** (`exact`, `minRows`, `everyRowContains`, `everyRowFieldEquals`), optional **`budgetMs`**. Goldens: **`fixtures/golden/minimal/*.json`** etc. Refresh: **`bun scripts/query-golden.ts --update`**.
 
 **Prompts** in JSON are **intent labels**, not pasted chat logs — pair with queries whose literals come from **fixture-owned** data (see [fixtures/qa/prompts.external.template.md](../fixtures/qa/prompts.external.template.md) for optional chat QA).
 
@@ -77,6 +77,10 @@ Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (T
 ### Confidence columns (deletion-confidence recipes)
 
 `coverage-confirmed-dead` adds **`confidence`** (`high` \| `medium`) on each row — **`high`** when static dead and ingested `coverage_pct = 0`; **`medium`** when static dead but the symbol has no ingested coverage row. Also **`reason`**, **`caller_count`**. Goldens: `coverage-confirmed-dead` (post-ingest mix) and `coverage-confirmed-dead-no-ingest` (`preSetup: clear-coverage`, `everyRowFieldEquals` on `confidence: medium`).
+
+### Churn / hotspot columns (`churn-complexity-hotspots` recipe)
+
+`churn-complexity-hotspots` ranks indexed files or symbols by git churn × cyclomatic complexity. File grain (default): **`file_path`**, null **`symbol_name`** / **`symbol_kind`** / **`line_start`**, **`max_complexity`**, **`avg_complexity`**, churn fields, scores. Symbol grain (`by_symbol=true`): **`symbol_name`**, **`symbol_kind`**, **`line_start`**, **`max_complexity`**. Optional **`path_prefix`** scopes to a subtree. Goldens: `churn-complexity-hotspots`, `churn-complexity-hotspots-by-symbol`, `churn-complexity-hotspots-path-prefix` (fixture churn seeded via **`seed-file-churn`**).
 
 ### Duplication columns (`duplicates` recipe)
 

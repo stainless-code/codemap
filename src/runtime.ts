@@ -63,6 +63,18 @@ export function getApplyAutoApplyRecipes(): readonly string[] | undefined {
   return getCodemapConfig().applyAutoApplyRecipes;
 }
 
+export function getChurnHalfLifeDays(): number {
+  return getCodemapConfig().churn.halfLifeDays;
+}
+
+export function getChurnSince(): string | null {
+  return getCodemapConfig().churn.since;
+}
+
+export function getChurnFilePath(): string | null {
+  return getCodemapConfig().churn.file;
+}
+
 /** True if any path segment matches an excluded directory name (e.g. `node_modules`). */
 export function isPathExcluded(relPath: string): boolean {
   const set = getExcludeDirNames();

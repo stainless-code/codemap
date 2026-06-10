@@ -15,6 +15,7 @@ const GOLDEN_DIR = join(REPO_ROOT, "fixtures/golden/minimal");
 /** Tables that must have a dedicated SQL pin-down scenario (not recipe-only). */
 const SUBSTRATE_SCENARIO_BY_TABLE = {
   file_metrics: "file-metrics-complexity-fixture",
+  file_churn: "churn-complexity-hotspots",
   scopes: "scopes-product-card",
   references: "references-product-card-perms",
   bindings: "bindings-createClient",
@@ -78,6 +79,7 @@ describe("golden coverage matrix", () => {
     expect(scenarioIds.has("index-table-stats")).toBe(true);
     const scenario = scenarios.find((s) => s.id === "index-table-stats");
     expect(scenario?.sql).toContain("FROM file_metrics");
+    expect(scenario?.sql).toContain("FROM file_churn");
     expect(scenario?.sql).toContain("FROM unresolved_calls");
     expect(scenario?.sql).toContain('FROM "references"');
   });

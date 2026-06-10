@@ -20,6 +20,7 @@ import { z } from "zod";
 
 import {
   closeDb,
+  createSchema,
   deleteQueryBaseline,
   listQueryBaselines,
   openDb,
@@ -53,6 +54,7 @@ import { buildContextEnvelope } from "./context-engine";
 import { findImpact } from "./impact-engine";
 import type { ImpactBackend, ImpactDirection } from "./impact-engine";
 import { getCurrentCommit } from "./index-engine";
+import { ingestChurnFromJsonFile } from "./ingest-churn-run";
 import { runIngestCoverageOnDb } from "./ingest-coverage-run";
 import type { BadgeStyle } from "./output-formatters";
 import {
@@ -1253,6 +1255,50 @@ export async function handleIngestCoverage(
     }
     if (!outcome.ok) return err(outcome.error);
     return ok(outcome.result);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : String(e), 500);
+  }
+}
+
+// === ingest_churn ===========================================================
+
+export const ingestChurnArgsSchema = {
+  path: z.string().min(1, "path must be a non-empty string"),
+};
+
+export interface IngestChurnArgs {
+  path: string;
+}
+
+export function handleIngestChurn(
+  args: IngestChurnArgs,
+  root: string,
+): ToolResult {
+  try {
+    const db = openDb();
+    try {
+      createSchema(db);
+      const indexedCount =
+        db.query<{ n: number }>("SELECT COUNT(*) AS n FROM files").get()?.n ??
+        0;
+      if (indexedCount === 0) {
+        return err(
+          "codemap ingest-churn: no indexed files — run `codemap` or `codemap --full` first",
+        );
+      }
+      const outcome = ingestChurnFromJsonFile(db, {
+        projectRoot: root,
+        path: args.path,
+      });
+      if (!outcome.ok) return err(outcome.error);
+      return ok({
+        ingested: outcome.ingested,
+        skipped_unindexed: outcome.skipped_unindexed,
+        sourcePath: outcome.sourcePath,
+      });
+    } finally {
+      closeDb(db);
+    }
   } catch (e) {
     return err(e instanceof Error ? e.message : String(e), 500);
   }

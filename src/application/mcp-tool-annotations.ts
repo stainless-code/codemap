@@ -82,6 +82,11 @@ export const MCP_TOOL_ANNOTATIONS = {
     destructiveHint: false,
     idempotentHint: false,
   },
+  ingest_churn: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+  },
   apply: {
     readOnlyHint: false,
     destructiveHint: true,

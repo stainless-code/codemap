@@ -100,6 +100,35 @@ export const codemapUserConfigSchema = z
       .describe(
         "Track per-recipe `last_run_at` + `run_count` in the `recipe_recency` table; surfaces inline on `--recipes-json` for agent-host ranking. Default `true` (opt-out). Set `false` to short-circuit every write — no rows ever land. Local-only — no upload primitive. See `docs/architecture.md` § `recipe_recency`.",
       ),
+    churn: z
+      .object({
+        halfLifeDays: z
+          .number()
+          .positive()
+          .optional()
+          .describe(
+            "Exponential half-life (days) for `file_churn.weighted_commits`. Default `90`.",
+          ),
+        since: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Git revision (commit/tag/branch) — only commits after this ref contribute to churn. CLI `--churn-since` overrides.",
+          ),
+        file: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "JSON array of `file_churn` rows (relative to project root). Used when git churn is unavailable; also loadable via `codemap ingest-churn`.",
+          ),
+      })
+      .strict()
+      .optional()
+      .describe(
+        "Git churn ingest for `file_churn` (runs after every index pass).",
+      ),
     synthesis: z
       .object({
         heuristicCalls: z
@@ -225,6 +254,14 @@ export interface ResolvedCodemapConfig {
     readonly to_glob: string;
     readonly action: "deny" | "allow";
   }>;
+  /** Git churn ingest tuning for `file_churn`. */
+  readonly churn: {
+    readonly halfLifeDays: number;
+    /** When set, only commits after this git ref are counted. */
+    readonly since: string | null;
+    /** Optional JSON churn import when git is unavailable. */
+    readonly file: string | null;
+  };
   /** When `heuristicCalls` is true, runs callback-synthesis after `resolveCalls`. */
   readonly synthesis: {
     readonly heuristicCalls: boolean;
@@ -273,6 +310,8 @@ export interface ResolveCodemapConfigOpts {
    * parsing in the bootstrap layer.
    */
   fts5Cli?: boolean | undefined;
+  /** CLI `--churn-since <ref>` — overrides config `churn.since`. */
+  churnSinceCli?: string | undefined;
 }
 
 /**
@@ -339,6 +378,20 @@ export function resolveCodemapConfig(
 
   const heuristicCalls = parsed?.synthesis?.heuristicCalls === true;
 
+  const churnHalfLifeDays = parsed?.churn?.halfLifeDays ?? 90;
+  const churnFile = parsed?.churn?.file
+    ? resolve(absRoot, parsed.churn.file)
+    : null;
+  let churnSince: string | null = parsed?.churn?.since ?? null;
+  if (opts.churnSinceCli !== undefined && opts.churnSinceCli !== "") {
+    churnSince = opts.churnSinceCli;
+    if (parsed?.churn?.since && parsed.churn.since !== opts.churnSinceCli) {
+      console.error(
+        `[churn] CLI override: --churn-since ${opts.churnSinceCli} (config churn.since ignored)`,
+      );
+    }
+  }
+
   const autoApply = parsed?.apply?.autoApplyRecipes;
   const applyAutoApplyRecipes =
     autoApply !== undefined && autoApply.length > 0
@@ -355,6 +408,11 @@ export function resolveCodemapConfig(
     fts5,
     boundaries,
     recipeRecency,
+    churn: {
+      halfLifeDays: churnHalfLifeDays,
+      since: churnSince,
+      file: churnFile,
+    },
     synthesis: { heuristicCalls },
     applyAutoApplyRecipes,
   };

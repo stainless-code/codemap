@@ -50,6 +50,7 @@ import {
   handleAffected,
   handleContext,
   handleDropBaseline,
+  handleIngestChurn,
   handleIngestCoverage,
   exploreArgsSchema,
   handleExplore,
@@ -67,6 +68,7 @@ import {
   handleSnippet,
   handleValidate,
   impactArgsSchema,
+  ingestChurnArgsSchema,
   ingestCoverageArgsSchema,
   listBaselinesArgsSchema,
   queryArgsSchema,
@@ -89,7 +91,7 @@ import {
  * MCP server engine — owns the tool / resource registry. CLI shell
  * (`src/cli/cmd-mcp.ts`) handles argv + lifecycle only; this module is
  * the thin wrapper around `@modelcontextprotocol/sdk` that registers
- * 20 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
+ * 21 JSON-RPC tools (CLI mirrors plus MCP/HTTP resource URIs) and MCP resources
  * (static + templates). Tool bodies are pure handlers in
  * `application/tool-handlers.ts` — same handlers `codemap serve` (HTTP)
  * dispatches. See [`docs/architecture.md` § MCP wiring].
@@ -181,6 +183,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
   maybeRegister("ingest_coverage", () =>
     registerIngestCoverageTool(server, opts),
   );
+  maybeRegister("ingest_churn", () => registerIngestChurnTool(server, opts));
   maybeRegister("show", () => registerShowTool(server, opts));
   maybeRegister("snippet", () => registerSnippetTool(server, opts));
   maybeRegister("impact", () => registerImpactTool(server));
@@ -304,6 +307,18 @@ function registerIngestCoverageTool(server: McpServer, opts: ServerOpts): void {
       inputSchema: ingestCoverageArgsSchema,
     }),
     async (args) => wrapToolResult(await handleIngestCoverage(args, opts.root)),
+  );
+}
+
+function registerIngestChurnTool(server: McpServer, opts: ServerOpts): void {
+  server.registerTool(
+    "ingest_churn",
+    withToolAnnotations("ingest_churn", {
+      description:
+        "Import precomputed git churn metrics into `file_churn` for non-git repos or CI fixtures. Same JSON envelope as `codemap ingest-churn` (no `--json` flag on MCP — payload is always JSON). Requires a prior index. Enables `churn-complexity-hotspots`. Args: `path` (required, relative to project root or absolute).",
+      inputSchema: ingestChurnArgsSchema,
+    }),
+    (args) => wrapToolResult(handleIngestChurn(args, opts.root)),
   );
 }
 

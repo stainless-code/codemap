@@ -185,6 +185,21 @@
       "goldenScenarios": ["duplicates"]
     },
     {
+      "id": "churn.file-churn",
+      "description": "file_churn git metrics and churn-complexity-hotspots recipe",
+      "fixtureFiles": [
+        "src/lib/complexity-fixture.ts",
+        "src/lib/cache.ts",
+        "src/api/client.ts",
+        "file-churn-seed.json"
+      ],
+      "goldenScenarios": [
+        "churn-complexity-hotspots",
+        "churn-complexity-hotspots-by-symbol",
+        "churn-complexity-hotspots-path-prefix"
+      ]
+    },
+    {
       "id": "boundaries.suppressions",
       "description": "boundary_rules, suppressions, config-driven violations",
       "fixtureFiles": [

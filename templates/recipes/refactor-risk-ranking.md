@@ -29,3 +29,5 @@ Suggested tuning axes for project-local overrides:
 - **LOC weight** scale by file `line_count` (already on the `files` table).
 
 **Per-symbol vs per-file:** the original design specified per-symbol ranking; empirical testing showed per-symbol output got dominated by long-tail symbols from a single hot file all tied at the same score (file-level `fan_in` inherited). v1 ships file-level aggregation as the more useful default; per-symbol via `calls` is one of the documented tuning axes above.
+
+**Compose with [`churn-complexity-hotspots`](./churn-complexity-hotspots.md)** when edit frequency matters — fan-in and coverage alone miss files that change every sprint but still carry structural risk.

@@ -24,6 +24,7 @@ export const MCP_TOOL_NAMES = [
   "apply_rows",
   "apply_diff_input",
   "ingest_coverage",
+  "ingest_churn",
 ] as const;
 
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];

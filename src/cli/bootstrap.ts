@@ -41,7 +41,7 @@ PR comment renderer (audit/SARIF → markdown summary):
   codemap pr-comment <file> [--shape audit|sarif] [--json]   # - for stdin
 
 MCP server (Model Context Protocol — for agent hosts):
-  codemap mcp                                        # stdio JSON-RPC (20 tools; watcher default-ON)
+  codemap mcp                                        # stdio JSON-RPC (21 tools; watcher default-ON)
   # CLI parity: query batch, trace, explore, node, file, schema, symbols, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
@@ -79,6 +79,9 @@ Apply (substrate-shaped fix executor; diff-json row contract):
 Coverage ingest (Istanbul JSON or LCOV from any test runner):
   codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected
 
+Churn ingest (precomputed file_churn JSON for non-git repos or fixtures):
+  codemap ingest-churn <path> [--json]
+
 Other:
   codemap unlock [--force]     Remove stale cross-process index lock
   codemap version
@@ -91,6 +94,9 @@ Options:
   --state-dir DIR State directory for codemap-managed files (default .codemap/ under root)
   --performance   Print per-phase timing breakdown + top-10 slowest files
                   (full rebuild only)
+  --churn-since REF
+                  Only count git commits after REF for file_churn ingest
+                  (overrides config churn.since)
   --help, -h      Show this help
 `);
 }
@@ -147,6 +153,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "affected") return;
   if (rest[0] === "apply") return;
   if (rest[0] === "ingest-coverage") return;
+  if (rest[0] === "ingest-churn") return;
   if (rest[0] === "pr-comment") return;
   if (rest[0] === "trace") return;
   if (rest[0] === "explore") return;
@@ -169,6 +176,14 @@ export function validateIndexModeArgs(rest: string[]): void {
     const a = rest[i];
     if (a === "--full" || a === "--performance" || a === "--with-fts") {
       i++;
+      continue;
+    }
+    if (a === "--churn-since") {
+      if (i + 1 >= rest.length || rest[i + 1].startsWith("-")) {
+        console.error("codemap: --churn-since requires a git revision");
+        process.exit(1);
+      }
+      i += 2;
       continue;
     }
     if (a === "--files") {
@@ -199,6 +214,7 @@ export function parseBootstrapArgs(argv: string[]) {
   let configFile: string | undefined;
   let stateDir: string | undefined;
   let fts5Cli: boolean | undefined;
+  let churnSinceCli: string | undefined;
   const rest: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -221,10 +237,15 @@ export function parseBootstrapArgs(argv: string[]) {
       rest.push(a);
       continue;
     }
+    if (a === "--churn-since" && argv[i + 1]) {
+      churnSinceCli = argv[++i];
+      rest.push("--churn-since", churnSinceCli);
+      continue;
+    }
     rest.push(a);
   }
   if (!root) root = process.cwd();
   // --state-dir wins over CODEMAP_STATE_DIR (precedence per plan §D7).
   if (!stateDir) stateDir = process.env.CODEMAP_STATE_DIR;
-  return { root, configFile, stateDir, fts5Cli, rest };
+  return { root, configFile, stateDir, fts5Cli, churnSinceCli, rest };
 }

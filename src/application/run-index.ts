@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+
 import {
   createSchema,
   getMeta,
@@ -8,6 +10,8 @@ import {
 import type { CodemapDatabase } from "../db";
 import { getBoundaryRules, getFts5Enabled } from "../runtime";
 import { getStateDir } from "../runtime";
+import { refreshFileChurn } from "./churn-ingest";
+import type { ChurnRefreshMode } from "./churn-ingest";
 import { expandHeritageResolveScope } from "./heritage-resolver";
 import {
   collectFiles,
@@ -20,7 +24,11 @@ import {
   targetedReindex,
 } from "./index-engine";
 import { acquireIndexLock } from "./index-lock";
-import type { IndexResult, IndexTableStats } from "./types";
+import type {
+  IndexPerformanceReport,
+  IndexResult,
+  IndexTableStats,
+} from "./types";
 
 /**
  * Returns `true` when the persisted `meta.fts5_enabled` differs from the
@@ -73,7 +81,36 @@ function emptyStats(): IndexTableStats {
     module_cycles: 0,
     dynamic_imports: 0,
     file_metrics: 0,
+    file_churn: 0,
   };
+}
+
+function patchPerformanceJsonWithChurn(churnMs: number): void {
+  const perfJsonPath = process.env.CODEMAP_PERFORMANCE_JSON;
+  if (perfJsonPath === undefined || perfJsonPath === "") return;
+  try {
+    if (!existsSync(perfJsonPath)) {
+      writeFileSync(
+        perfJsonPath,
+        JSON.stringify({ churn_ms: churnMs } satisfies Pick<
+          IndexPerformanceReport,
+          "churn_ms"
+        >),
+      );
+      return;
+    }
+    const perf = JSON.parse(
+      readFileSync(perfJsonPath, "utf-8"),
+    ) as IndexPerformanceReport;
+    writeFileSync(
+      perfJsonPath,
+      JSON.stringify({ ...perf, churn_ms: churnMs }, null, 2),
+    );
+  } catch (err) {
+    console.error(
+      `[churn] failed to patch performance JSON: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 }
 
 /**
@@ -163,8 +200,12 @@ async function runCodemapIndexBody(
   // `finally` because full rebuild calls `dropAll` inside `indexFiles` which
   // wipes `boundary_rules` (config-derived); reconciling AFTER the index
   // pipeline returns survives that drop on every code path.
+  let result: IndexResult;
+  let churnMode: ChurnRefreshMode = "full";
+  let churnChangedPaths: string[] | undefined;
   try {
     if (mode === "full") {
+      churnMode = "full";
       if (!quiet) console.log("  Full rebuild requested...");
       const collectStart = performance.now();
       const files = collectFiles();
@@ -175,19 +216,18 @@ async function runCodemapIndexBody(
         collectMs,
         commit: options.commit,
       });
-      return {
+      result = {
         mode: "full",
         indexed: run.indexed,
         skipped: run.skipped,
         elapsedMs: run.elapsedMs,
         stats: run.stats,
       };
-    }
-
-    if (mode === "files") {
+    } else if (mode === "files") {
       const targetFiles = options.files ?? [];
       if (targetFiles.length === 0) {
-        return {
+        churnMode = "idle";
+        result = {
           mode: "files",
           indexed: 0,
           skipped: 0,
@@ -195,91 +235,110 @@ async function runCodemapIndexBody(
           stats: emptyStats(),
           idle: true,
         };
-      }
-      const run = await targetedReindex(db, targetFiles, quiet);
-      return {
-        mode: "files",
-        indexed: run.indexed,
-        skipped: run.skipped,
-        elapsedMs: run.elapsedMs,
-        stats: run.stats,
-      };
-    }
-
-    // getChangedFiles reads `meta`; the up-front createSchema above (before the toggle check) covers it.
-    const diff = getChangedFiles(db);
-    if (diff) {
-      if (!quiet) {
-        console.log(
-          `  Incremental: ${diff.changed.length} changed, ${diff.deleted.length} deleted`,
-        );
-      }
-      if (diff.changed.length > 0) {
-        const indexedPaths = diff.existingPaths;
-        for (const f of diff.changed) indexedPaths.add(f);
-        const run = await indexFiles(db, diff.changed, false, indexedPaths, {
-          quiet,
-          sourceCache: diff.sourceCache,
-          existingHashes: diff.existingHashes,
-          deletedPaths: diff.deleted,
-        });
-        return {
-          mode: "incremental",
+      } else {
+        churnMode = "incremental";
+        churnChangedPaths = targetFiles;
+        const run = await targetedReindex(db, targetFiles, quiet);
+        result = {
+          mode: "files",
           indexed: run.indexed,
           skipped: run.skipped,
           elapsedMs: run.elapsedMs,
           stats: run.stats,
         };
       }
-      if (diff.deleted.length > 0) {
-        deleteFilesFromIndex(db, diff.deleted, quiet);
-        const callScope = expandHeritageResolveScope(db, diff.deleted);
-        if (callScope.length > 0) {
-          runCallResolveAndSynthesis(db, callScope);
+    } else {
+      // getChangedFiles reads `meta`; the up-front createSchema above covers it.
+      const diff = getChangedFiles(db);
+      if (diff) {
+        if (!quiet) {
+          console.log(
+            `  Incremental: ${diff.changed.length} changed, ${diff.deleted.length} deleted`,
+          );
         }
-        setMeta(db, "last_indexed_commit", getCurrentCommit());
-        if (!quiet) console.log("  Index updated (deletions only)");
-        return {
-          mode: "incremental",
-          indexed: 0,
-          skipped: 0,
-          elapsedMs: 0,
-          stats: fetchTableStats(db),
-          idle: true,
+        if (diff.changed.length > 0) {
+          churnMode = "incremental";
+          churnChangedPaths = diff.changed;
+          const indexedPaths = diff.existingPaths;
+          for (const f of diff.changed) indexedPaths.add(f);
+          const run = await indexFiles(db, diff.changed, false, indexedPaths, {
+            quiet,
+            sourceCache: diff.sourceCache,
+            existingHashes: diff.existingHashes,
+            deletedPaths: diff.deleted,
+          });
+          result = {
+            mode: "incremental",
+            indexed: run.indexed,
+            skipped: run.skipped,
+            elapsedMs: run.elapsedMs,
+            stats: run.stats,
+          };
+        } else if (diff.deleted.length > 0) {
+          churnMode = "deletions";
+          deleteFilesFromIndex(db, diff.deleted, quiet);
+          const callScope = expandHeritageResolveScope(db, diff.deleted);
+          if (callScope.length > 0) {
+            runCallResolveAndSynthesis(db, callScope);
+          }
+          setMeta(db, "last_indexed_commit", getCurrentCommit());
+          if (!quiet) console.log("  Index updated (deletions only)");
+          result = {
+            mode: "incremental",
+            indexed: 0,
+            skipped: 0,
+            elapsedMs: 0,
+            stats: fetchTableStats(db),
+            idle: true,
+          };
+        } else {
+          churnMode = "idle";
+          if (!quiet) console.log("  Index is up to date");
+          result = {
+            mode: "incremental",
+            indexed: 0,
+            skipped: 0,
+            elapsedMs: 0,
+            stats: fetchTableStats(db),
+            idle: true,
+          };
+        }
+      } else {
+        churnMode = "full";
+        if (!quiet) {
+          console.log(
+            "  No previous index or incompatible history, doing full rebuild...",
+          );
+        }
+        const fallbackCollectStart = performance.now();
+        const files = collectFiles();
+        const fallbackCollectMs = performance.now() - fallbackCollectStart;
+        const run = await indexFiles(db, files, true, undefined, {
+          quiet,
+          performance: wantPerformance,
+          collectMs: fallbackCollectMs,
+        });
+        result = {
+          mode: "full",
+          indexed: run.indexed,
+          skipped: run.skipped,
+          elapsedMs: run.elapsedMs,
+          stats: run.stats,
         };
       }
-      if (!quiet) console.log("  Index is up to date");
-      return {
-        mode: "incremental",
-        indexed: 0,
-        skipped: 0,
-        elapsedMs: 0,
-        stats: fetchTableStats(db),
-        idle: true,
-      };
     }
-
-    if (!quiet) {
-      console.log(
-        "  No previous index or incompatible history, doing full rebuild...",
-      );
-    }
-    const fallbackCollectStart = performance.now();
-    const files = collectFiles();
-    const fallbackCollectMs = performance.now() - fallbackCollectStart;
-    const run = await indexFiles(db, files, true, undefined, {
-      quiet,
-      performance: wantPerformance,
-      collectMs: fallbackCollectMs,
-    });
-    return {
-      mode: "full",
-      indexed: run.indexed,
-      skipped: run.skipped,
-      elapsedMs: run.elapsedMs,
-      stats: run.stats,
-    };
   } finally {
     reconcileBoundaryRules(db, getBoundaryRules());
   }
+
+  const churn = refreshFileChurn(db, {
+    quiet,
+    mode: churnMode,
+    changedPaths: churnChangedPaths,
+  });
+  patchPerformanceJsonWithChurn(churn.elapsedMs);
+  if (wantPerformance && !quiet && churn.elapsedMs > 0) {
+    console.error(`[churn] ingest: ${churn.elapsedMs}ms`);
+  }
+  return { ...result, stats: fetchTableStats(db) };
 }

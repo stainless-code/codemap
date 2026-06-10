@@ -121,6 +121,7 @@ export interface ContextIndexSummary {
   imports: number;
   components: number;
   dependencies: number;
+  file_churn: number;
 }
 
 export interface ContextStartHere {
@@ -130,6 +131,8 @@ export interface ContextStartHere {
   index_summary: ContextIndexSummary;
   recipes: ContextRecipeStarter[];
   hub_leaders: ContextHubLeader[];
+  /** Set when `file_churn` is empty — nudges git index or `ingest-churn` / `churn.file`. */
+  churn_hint?: string;
 }
 
 export interface BuildContextEnvelopeOpts {
@@ -149,16 +152,33 @@ export function classifyIntent(intent: string): {
   hint: string;
 } {
   const t = intent.toLowerCase();
+  if (
+    /hotspot|churn|refactor priority|risky to refactor|high.?churn|change.?often/.test(
+      t,
+    )
+  ) {
+    return {
+      classified_as: "refactor-priority",
+      matched_recipes: [
+        "churn-complexity-hotspots",
+        "refactor-risk-ranking",
+        "high-complexity-untested",
+        "fan-in",
+      ],
+      hint: "churn-complexity-hotspots ranks files by git churn × complexity (distinct from `hotspots` alias → fan-in); pair with refactor-risk-ranking and snippet before large edits.",
+    };
+  }
   if (/refactor|rename|restructur|extract|move\b/.test(t)) {
     return {
       classified_as: "refactor",
       matched_recipes: [
+        "churn-complexity-hotspots",
         "fan-in",
         "fan-out",
         "barrel-files",
         "deprecated-symbols",
       ],
-      hint: "Inspect fan-in / fan-out before moving symbols; barrel-files surfaces public-API hubs; deprecated-symbols flags risky callers.",
+      hint: "churn-complexity-hotspots surfaces high-churn × high-complexity files; inspect fan-in / fan-out before moving symbols.",
     };
   }
   if (/bug|fix|debug|error|crash|broken|regress/.test(t)) {
@@ -325,10 +345,11 @@ export function composeStartHere(
 ): ContextStartHere {
   const budget = resolveContextBudget(opts.fileCount);
   const fanInRows = opts.fanInRows ?? readFanInHubs(db, budget.hub_limit);
-  return {
+  const index_summary = readIndexSummary(db);
+  const start: ContextStartHere = {
     classified_as: classification.classified_as,
     hint: classification.hint,
-    index_summary: readIndexSummary(db),
+    index_summary,
     recipes: composeRecipeStarters(classification.matched_recipes),
     hub_leaders: composeHubLeadersFromRows(db, fanInRows, {
       projectRoot: opts.projectRoot,
@@ -337,6 +358,11 @@ export function composeStartHere(
       signaturesPerHub: budget.signatures_per_hub,
     }),
   };
+  if (index_summary.file_churn === 0) {
+    start.churn_hint =
+      "file_churn is empty — run `codemap` (git history) or `ingest_churn` / `codemap ingest-churn <json>` / config `churn.file` before `churn-complexity-hotspots`.";
+  }
+  return start;
 }
 
 export interface FanInHubRow {
@@ -391,14 +417,18 @@ function stripTrailingSqlLineComments(sql: string): string {
 
 function readIndexSummary(db: CodemapDatabase): ContextIndexSummary {
   const row = db.query(QUERY_RECIPES["index-summary"]!.sql).get() as
-    | ContextIndexSummary
+    | Omit<ContextIndexSummary, "file_churn">
     | undefined;
+  const file_churn =
+    db.query<{ n: number }>("SELECT COUNT(*) AS n FROM file_churn").get()?.n ??
+    0;
   return {
     files: row?.files ?? 0,
     symbols: row?.symbols ?? 0,
     imports: row?.imports ?? 0,
     components: row?.components ?? 0,
     dependencies: row?.dependencies ?? 0,
+    file_churn,
   };
 }
 

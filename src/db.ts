@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 39;
+export const SCHEMA_VERSION = 40;
 
 /** Moat-A: default call-graph surfaces exclude callback-synthesis edges. */
 export const CALLS_AST_ONLY_SQL = "(provenance IS NULL OR provenance = 'ast')";
@@ -91,6 +91,18 @@ export function createTables(db: CodemapDatabase) {
       class_count INTEGER NOT NULL DEFAULT 0,
       interface_count INTEGER NOT NULL DEFAULT 0,
       export_count INTEGER NOT NULL DEFAULT 0
+    ) STRICT;
+
+    -- Git churn metrics per indexed file (populated each index pass via churn-ingest, golden uses seed-file-churn).
+    CREATE TABLE IF NOT EXISTS file_churn (
+      file_path TEXT PRIMARY KEY REFERENCES files(path) ON DELETE CASCADE,
+      commit_count INTEGER NOT NULL,
+      weighted_commits REAL NOT NULL,
+      lines_added INTEGER NOT NULL,
+      lines_removed INTEGER NOT NULL,
+      last_commit_at TEXT,
+      churn_trend TEXT,
+      computed_at TEXT NOT NULL
     ) STRICT;
 
     CREATE TABLE IF NOT EXISTS imports (
@@ -763,6 +775,7 @@ export function dropAll(db: CodemapDatabase) {
     DROP TABLE IF EXISTS runtime_markers;
     DROP TABLE IF EXISTS test_suites;
     DROP TABLE IF EXISTS file_metrics;
+    DROP TABLE IF EXISTS file_churn;
     DROP TABLE IF EXISTS unresolved_calls;
     DROP TABLE IF EXISTS bindings;
     DROP TABLE IF EXISTS "references";
@@ -1694,6 +1707,74 @@ export function insertFileMetrics(db: CodemapDatabase, rows: FileMetricsRow[]) {
         r.interface_count,
         r.export_count,
       ),
+  );
+}
+
+/** One row per indexed file with git churn metrics (see `file_churn` table). */
+export interface FileChurnRow {
+  file_path: string;
+  commit_count: number;
+  weighted_commits: number;
+  lines_added: number;
+  lines_removed: number;
+  last_commit_at: string | null;
+  churn_trend: string | null;
+  computed_at: string;
+}
+
+export function insertFileChurn(db: CodemapDatabase, rows: FileChurnRow[]) {
+  batchInsert(
+    db,
+    rows,
+    "INSERT INTO file_churn (file_path, commit_count, weighted_commits, lines_added, lines_removed, last_commit_at, churn_trend, computed_at)",
+    "(?,?,?,?,?,?,?,?)",
+    (r, v) =>
+      v.push(
+        r.file_path,
+        r.commit_count,
+        r.weighted_commits,
+        r.lines_added,
+        r.lines_removed,
+        r.last_commit_at,
+        r.churn_trend,
+        r.computed_at,
+      ),
+  );
+}
+
+/** Replace all churn rows (full-rebuild git ingest or golden seed-file-churn). */
+export function replaceFileChurn(db: CodemapDatabase, rows: FileChurnRow[]) {
+  const persist = db.transaction(() => {
+    db.run("DELETE FROM file_churn");
+    insertFileChurn(db, rows);
+  });
+  persist();
+}
+
+/** `meta` key: last `HEAD` when `file_churn` was refreshed (idle skip). */
+export const META_CHURN_INDEXED_COMMIT = "churn_indexed_commit";
+/** `meta` key: `halfLifeDays|since` fingerprint for idle skip after config changes. */
+export const META_CHURN_CONFIG_FINGERPRINT = "churn_config_fingerprint";
+
+/** Replace churn rows for `scopePaths` only; other paths are left unchanged. */
+export function mergeFileChurnForPaths(
+  db: CodemapDatabase,
+  rows: FileChurnRow[],
+  scopePaths: Iterable<string>,
+) {
+  const persist = db.transaction(() => {
+    for (const p of scopePaths) {
+      db.run("DELETE FROM file_churn WHERE file_path = ?", [p]);
+    }
+    insertFileChurn(db, rows);
+  });
+  persist();
+}
+
+/** Drop churn rows whose `file_path` is no longer indexed. */
+export function pruneFileChurnOrphans(db: CodemapDatabase) {
+  db.run(
+    "DELETE FROM file_churn WHERE file_path NOT IN (SELECT path FROM files)",
   );
 }
 

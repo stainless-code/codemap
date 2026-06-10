@@ -393,7 +393,7 @@ New recipe candidates: `strict-mode-audit`; `missing-types-fields`; `monorepo-pa
 
 ### Tier 11 — Metrics expansion — **PARTIAL (2026-05-15)**
 
-**Shipped:** `file_metrics` + per-symbol metric columns (see [`glossary.md`](../glossary.md)). **Open:** churn/git metrics → [`churn-complexity-hotspots.md`](./churn-complexity-hotspots.md).
+**Shipped:** `file_metrics` + per-symbol metric columns (see [`glossary.md`](../glossary.md)). **Shipped:** `file_churn` + **`churn-complexity-hotspots`** recipe (see [architecture § `file_churn`](../architecture.md#file_churn--git-churn-metrics-per-indexed-file-strict)).
 
 ### Tier 12 — Module-graph topology — **PARTIAL (2026-05-15)**
 

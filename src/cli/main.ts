@@ -18,7 +18,7 @@ import { emitJsonError } from "./emit-tool-result.js";
  */
 export async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const { root, configFile, stateDir, fts5Cli, rest } =
+  const { root, configFile, stateDir, fts5Cli, churnSinceCli, rest } =
     parseBootstrapArgs(argv);
 
   if (rest[0] === "--help" || rest[0] === "-h") {
@@ -430,6 +430,28 @@ Copies bundled agent templates into .agents/ under the project root.
     return;
   }
 
+  if (rest[0] === "ingest-churn") {
+    const { parseIngestChurnRest, printIngestChurnCmdHelp, runIngestChurnCmd } =
+      await import("./cmd-ingest-churn.js");
+    const parsed = parseIngestChurnRest(rest);
+    if (parsed.kind === "help") {
+      printIngestChurnCmdHelp();
+      return;
+    }
+    if (parsed.kind === "error") {
+      console.error(parsed.message);
+      process.exit(1);
+    }
+    await runIngestChurnCmd({
+      root,
+      configFile,
+      stateDir,
+      path: parsed.path,
+      json: parsed.json,
+    });
+    return;
+  }
+
   if (rest[0] === "ingest-coverage") {
     const {
       parseIngestCoverageRest,
@@ -710,5 +732,12 @@ Copies bundled agent templates into .agents/ under the project root.
   }
 
   const { runIndexCmd } = await import("./cmd-index.js");
-  await runIndexCmd({ root, configFile, stateDir, fts5Cli, rest });
+  await runIndexCmd({
+    root,
+    configFile,
+    stateDir,
+    fts5Cli,
+    churnSinceCli,
+    rest,
+  });
 }
