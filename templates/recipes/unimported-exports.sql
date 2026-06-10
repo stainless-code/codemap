@@ -52,7 +52,7 @@ SELECT
       FROM imports i
       CROSS JOIN json_each(i.specifiers) j
       WHERE i.resolved_path IS NULL
-        AND (j.value = u.name OR j.value = '*')
+        AND j.value = u.name
     )
     THEN 'unresolved_import_blind_spot'
     ELSE 'no_direct_import'
@@ -116,7 +116,7 @@ SELECT
       FROM imports i
       CROSS JOIN json_each(i.specifiers) j
       WHERE i.resolved_path IS NULL
-        AND (j.value = u.name OR j.value = '*')
+        AND j.value = u.name
     )
     THEN COALESCE(
       (
@@ -133,7 +133,7 @@ SELECT
               FROM imports i
               CROSS JOIN json_each(i.specifiers) j
               WHERE i.resolved_path IS NULL
-                AND (j.value = u.name OR j.value = '*')
+                AND j.value = u.name
             ) AS hop_total,
             COALESCE(
               (
@@ -154,7 +154,7 @@ SELECT
                   FROM imports i
                   CROSS JOIN json_each(i.specifiers) j
                   WHERE i.resolved_path IS NULL
-                    AND (j.value = u.name OR j.value = '*')
+                    AND j.value = u.name
                   ORDER BY i.file_path, i.source
                   LIMIT 3
                 )
