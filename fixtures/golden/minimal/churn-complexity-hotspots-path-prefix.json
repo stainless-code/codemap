@@ -1,0 +1,28 @@
+[
+  {
+    "file_path": "src/lib/complexity-fixture.ts",
+    "symbol_name": null,
+    "symbol_kind": null,
+    "line_start": null,
+    "weighted_commits": 22.5,
+    "commit_count": 28,
+    "churn_trend": "accelerating",
+    "max_complexity": 19,
+    "avg_complexity": 5.8,
+    "hotspot_score": 427.5,
+    "hotspot_score_normalized": 100
+  },
+  {
+    "file_path": "src/lib/cache.ts",
+    "symbol_name": null,
+    "symbol_kind": null,
+    "line_start": null,
+    "weighted_commits": 4.2,
+    "commit_count": 9,
+    "churn_trend": "stable",
+    "max_complexity": 3,
+    "avg_complexity": 3,
+    "hotspot_score": 12.6,
+    "hotspot_score_normalized": 2.9
+  }
+]

@@ -22,6 +22,10 @@ const BASELINE = join(REPO_ROOT, "fixtures/benchmark/perf-baseline.json");
 const TMP_JSON = join(REPO_ROOT, ".perf-run.json");
 
 const UPDATE_MODE = process.argv.includes("--update");
+/** Idle skip should stay well under full git churn; catches fallback to git log. */
+const IDLE_CHURN_MAX_MS = Number(
+  process.env.CODEMAP_PERF_IDLE_CHURN_MAX_MS ?? 50,
+);
 
 type ReportPhase = keyof Pick<
   IndexPerformanceReport,
@@ -49,6 +53,11 @@ const GATED_PHASES: GatedPhase[] = [
   "churn_idle_ms",
   "total_ms",
 ];
+
+/** Per-phase noise floors — `churn_idle_ms` is meta + rev-parse only, often < global floor. */
+const PHASE_NOISE_FLOOR_MS: Partial<Record<GatedPhase, number>> = {
+  churn_idle_ms: 5,
+};
 
 interface PhaseStats {
   median: number;
@@ -103,7 +112,16 @@ async function runIdleChurnOnce(): Promise<number> {
   const report = JSON.parse(
     readFileSync(TMP_JSON, "utf-8"),
   ) as IndexPerformanceReport;
+  if (report.churn_ms > IDLE_CHURN_MAX_MS) {
+    throw new Error(
+      `idle churn_ms=${report.churn_ms} exceeds ${IDLE_CHURN_MAX_MS} — idle skip may have failed (full git churn path?)`,
+    );
+  }
   return report.churn_ms;
+}
+
+function noiseFloorFor(phase: GatedPhase, baseline: BaselineFile): number {
+  return PHASE_NOISE_FLOOR_MS[phase] ?? baseline.noise_floor_ms;
 }
 
 async function collectStats(): Promise<Record<GatedPhase, PhaseStats>> {
@@ -229,7 +247,7 @@ async function main() {
   for (const phase of GATED_PHASES) {
     const base = baseline.phases[phase];
     const cur = stats[phase].median;
-    const gated = base >= baseline.noise_floor_ms;
+    const gated = base >= noiseFloorFor(phase, baseline);
     const overBudget = gated && cur > base * (1 + regressionPct / 100);
     if (overBudget) regressed = true;
     const flag = gated ? (overBudget ? "REGRESS" : "ok") : "skip(noise)";

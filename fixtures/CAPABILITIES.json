@@ -195,7 +195,8 @@
       ],
       "goldenScenarios": [
         "churn-complexity-hotspots",
-        "churn-complexity-hotspots-by-symbol"
+        "churn-complexity-hotspots-by-symbol",
+        "churn-complexity-hotspots-path-prefix"
       ]
     },
     {

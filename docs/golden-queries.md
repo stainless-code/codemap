@@ -80,7 +80,7 @@ Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (T
 
 ### Churn / hotspot columns (`churn-complexity-hotspots` recipe)
 
-`churn-complexity-hotspots` ranks indexed files or symbols by git churn × cyclomatic complexity. File grain (default): **`file_path`**, **`max_complexity`**, **`weighted_commits`**, **`commit_count`**, **`churn_trend`**, **`hotspot_score`**, **`hotspot_score_normalized`**. Symbol grain (`by_symbol=true`): per-symbol **`name`**, **`kind`**, **`line_start`**, **`cyclomatic_complexity`** plus file churn fields. Goldens: `churn-complexity-hotspots`, `churn-complexity-hotspots-by-symbol` (fixture churn seeded via setup step **`seed-file-churn`**).
+`churn-complexity-hotspots` ranks indexed files or symbols by git churn × cyclomatic complexity. File grain (default): **`file_path`**, null **`symbol_name`** / **`symbol_kind`** / **`line_start`**, **`max_complexity`**, **`avg_complexity`**, churn fields, scores. Symbol grain (`by_symbol=true`): **`symbol_name`**, **`symbol_kind`**, **`line_start`**, **`max_complexity`**. Optional **`path_prefix`** scopes to a subtree. Goldens: `churn-complexity-hotspots`, `churn-complexity-hotspots-by-symbol`, `churn-complexity-hotspots-path-prefix` (fixture churn seeded via **`seed-file-churn`**).
 
 ### Duplication columns (`duplicates` recipe)
 

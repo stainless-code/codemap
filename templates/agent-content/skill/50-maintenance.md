@@ -23,4 +23,4 @@ codemap validate --json
 
 Same flags as **`npx @stainless-code/codemap`**, **`pnpm dlx @stainless-code/codemap`**, etc. **`codemap --root /path/to/project`** indexes another working tree.
 
-**Full-text search (opt-in):** pass **`--with-fts`** on index runs, or set **`fts5: true`** in `.codemap/config.ts` — populates the `source_fts` virtual table for `show --query` / `snippet --query` / MCP `show` / `snippet` when `with_fts: true`. Default OFF until measurement closes [FTS default-on evaluation](../../docs/plans/fts-default-on-evaluation.md).
+**Full-text search (opt-in):** pass **`--with-fts`** on index runs, or set **`fts5: true`** in `.codemap/config.ts` — populates the `source_fts` virtual table for `show --query` / `snippet --query` / MCP `show` / `snippet` when `with_fts: true`. Default OFF on index runs; enable when you need FTS-backed field search.

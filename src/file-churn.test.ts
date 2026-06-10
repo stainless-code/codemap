@@ -89,6 +89,64 @@ describe("file_churn + churn-complexity-hotspots recipe", () => {
     }
   });
 
+  it("path_prefix limits results to a subtree", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      for (const path of ["src/lib/hot.ts", "src/other/cold.ts"]) {
+        insertFile(db, {
+          path,
+          content_hash: path,
+          size: 50,
+          line_count: 5,
+          language: "typescript",
+          last_modified: 1,
+          indexed_at: 1,
+        });
+      }
+      replaceFileChurn(db, [
+        {
+          file_path: "src/lib/hot.ts",
+          commit_count: 10,
+          weighted_commits: 8,
+          lines_added: 50,
+          lines_removed: 10,
+          last_commit_at: "2026-06-01T00:00:00Z",
+          churn_trend: "stable",
+          computed_at: "2026-06-10T00:00:00Z",
+        },
+        {
+          file_path: "src/other/cold.ts",
+          commit_count: 2,
+          weighted_commits: 20,
+          lines_added: 5,
+          lines_removed: 1,
+          last_commit_at: "2026-01-01T00:00:00Z",
+          churn_trend: "cooling",
+          computed_at: "2026-06-10T00:00:00Z",
+        },
+      ]);
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, complexity)
+         VALUES ('src/lib/hot.ts', 'hotFn', 'function', 1, 3, 'hotFn()', 1, 0, NULL, NULL, NULL, NULL, NULL, 1, 4, 0, 3, 0, 5),
+                ('src/other/cold.ts', 'coldFn', 'function', 1, 3, 'coldFn()', 1, 0, NULL, NULL, NULL, NULL, NULL, 1, 5, 0, 3, 0, 50)`,
+      );
+
+      const sql = readFileSync(
+        join(REPO_ROOT, "templates/recipes/churn-complexity-hotspots.sql"),
+        "utf-8",
+      );
+      const rows = db.query(sql).all(20, 1, 0, "src/lib/") as Array<{
+        file_path: string;
+        hotspot_score: number;
+      }>;
+      expect(rows.map((r) => r.file_path)).toEqual(["src/lib/hot.ts"]);
+      expect(rows[0]?.hotspot_score).toBe(40);
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("replaceFileChurn clears prior rows", () => {
     const db = openCodemapDatabase(":memory:");
     try {

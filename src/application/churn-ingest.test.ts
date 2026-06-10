@@ -88,6 +88,16 @@ describe("computeChurnTrend", () => {
       }),
     ).toBe("cooling");
   });
+
+  it("classifies stable when recent and older mass are balanced", () => {
+    expect(
+      computeChurnTrend({
+        commit_count: 8,
+        recent_weighted: 5,
+        older_weighted: 5,
+      }),
+    ).toBe("stable");
+  });
 });
 
 describe("ingestFileChurnFromGit", () => {
@@ -360,6 +370,60 @@ describe("refreshFileChurn", () => {
       });
       expect(result.reason).toBe("skipped: HEAD unchanged");
       expect(result.elapsedMs).toBeLessThan(50);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("incremental scope merges churn for changed paths only", () => {
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/a.ts"), "export const a = 1;\n");
+    writeFileSync(join(projectRoot, "src/b.ts"), "export const b = 1;\n");
+    commitAll("seed both");
+    writeFileSync(join(projectRoot, "src/a.ts"), "export const a = 2;\n");
+    commitAll("edit a once");
+
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      for (const path of ["src/a.ts", "src/b.ts"]) {
+        insertFile(db, {
+          path,
+          content_hash: path,
+          size: 10,
+          line_count: 1,
+          language: "typescript",
+          last_modified: 1,
+          indexed_at: 1,
+        });
+      }
+      ingestFileChurnFromGit(db, { projectRoot, quiet: true });
+      const bBefore = db
+        .query<{ commit_count: number }>(
+          "SELECT commit_count FROM file_churn WHERE file_path = 'src/b.ts'",
+        )
+        .get()?.commit_count;
+
+      writeFileSync(join(projectRoot, "src/a.ts"), "export const a = 3;\n");
+      commitAll("edit a again");
+      const scoped = ingestFileChurnFromGit(db, {
+        projectRoot,
+        scopePaths: ["src/a.ts"],
+        quiet: true,
+      });
+      expect(scoped.ok).toBe(true);
+      const aAfter = db
+        .query<{ commit_count: number }>(
+          "SELECT commit_count FROM file_churn WHERE file_path = 'src/a.ts'",
+        )
+        .get()?.commit_count;
+      const bAfter = db
+        .query<{ commit_count: number }>(
+          "SELECT commit_count FROM file_churn WHERE file_path = 'src/b.ts'",
+        )
+        .get()?.commit_count;
+      expect(aAfter).toBe(3);
+      expect(bAfter).toBe(bBefore);
     } finally {
       closeDb(db);
     }

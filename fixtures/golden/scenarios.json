@@ -480,6 +480,15 @@
       ]
     },
     {
+      "id": "churn-complexity-hotspots-path-prefix",
+      "prompt": "Churn hotspots scoped to src/lib/ via path_prefix.",
+      "recipe": "churn-complexity-hotspots",
+      "params": { "path_prefix": "src/lib/" },
+      "preSetup": [
+        { "kind": "seed-file-churn", "path": "file-churn-seed.json" }
+      ]
+    },
+    {
       "id": "circular-imports",
       "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
       "recipe": "circular-imports"
