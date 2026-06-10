@@ -35,7 +35,7 @@ Evidence is **in-SQL**, not a post-processor — same Moat-A path as the recipe.
 
 ### Tracer bullet (slice 1)
 
-`boundary-violations`: add `reason` constant + `evidence_json` with rule tuple; one golden query. Ship before touching `unimported-exports` re-export subquery. **Orchestration:** [agent-enrichment-wave.md](./agent-enrichment-wave.md) § Plan 1 slice 1.1 — **shipped in working tree** (await commit).
+`boundary-violations`: add `reason` constant + `evidence_json` with rule tuple; one golden query. Ship before touching `unimported-exports` re-export subquery. **Orchestration:** [agent-enrichment-wave.md](./agent-enrichment-wave.md) § Plan 1 slice 1.1 — shipped `edeee68`.
 
 ### Out of scope (v1)
 

@@ -15,7 +15,9 @@ actions:
 
 # deprecated-symbols
 
-Symbols whose JSDoc contains @deprecated (caller-warning candidates).
+Symbols whose JSDoc contains @deprecated (caller-warning candidates). Rows include **`reason`** (`has_callers` \| `no_callers`) and **`evidence_json`** (up to three caller hops from `calls`) so agents can gauge blast radius without a separate `find-call-sites` round-trip.
+
+**Name-only caller match** (same as `untested-and-dead`): `callee_name = s.name` without `file_path` — homonyms like `now()` may list callers of other symbols named `now`. Narrow with `file_path` in ad-hoc SQL when needed.
 
 ```bash
 codemap query --recipe deprecated-symbols --format json

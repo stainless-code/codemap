@@ -91,4 +91,4 @@ Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
 
 ## Current slice
 
-**Active:** Plan 1 slice **1.1** — `boundary-violations` `reason` + `evidence_json`.
+**Active:** Plan 1 slice **1.2** — `deprecated-symbols` caller evidence (in progress on `feat/evidence-chains-boundary`).

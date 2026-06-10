@@ -5,7 +5,9 @@
     "file_path": "src/api/client.ts",
     "line_start": 46,
     "signature": "legacyClient()",
-    "doc_comment": "@deprecated Use `createClient({ baseUrl })` directly. Kept as a fixture for\n`deprecated-symbols` + `--format sarif` / `--format annotations` recipes."
+    "doc_comment": "@deprecated Use `createClient({ baseUrl })` directly. Kept as a fixture for\n`deprecated-symbols` + `--format sarif` / `--format annotations` recipes.",
+    "reason": "no_callers",
+    "evidence_json": "[]"
   },
   {
     "name": "now",
@@ -13,7 +15,9 @@
     "file_path": "src/utils/date.ts",
     "line_start": 5,
     "signature": "now(): number",
-    "doc_comment": "@deprecated Use `Date.now()` directly. Kept as a fixture for the\n`deprecated-symbols` recipe golden test."
+    "doc_comment": "@deprecated Use `Date.now()` directly. Kept as a fixture for the\n`deprecated-symbols` recipe golden test.",
+    "reason": "has_callers",
+    "evidence_json": "[{\"kind\":\"caller\",\"name\":\"ShopButton\",\"file_path\":\"src/components/shop/ShopButton.tsx\",\"line_start\":10},{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":27},{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":30}]"
   },
   {
     "name": "epochMs",
@@ -21,6 +25,8 @@
     "file_path": "src/utils/format.ts",
     "line_start": 5,
     "signature": "epochMs(): number",
-    "doc_comment": "@deprecated Drift detector for the SARIF / GH-annotations golden output.\nPair with `now()` in `./date.ts` to give recipes >1 row to render."
+    "doc_comment": "@deprecated Drift detector for the SARIF / GH-annotations golden output.\nPair with `now()` in `./date.ts` to give recipes >1 row to render.",
+    "reason": "has_callers",
+    "evidence_json": "[{\"kind\":\"caller\",\"name\":\"run\",\"file_path\":\"src/consumer.ts\",\"line_start\":30}]"
   }
 ]
