@@ -21,7 +21,7 @@ params:
 
 Files or symbols ranked by **git churn × cyclomatic complexity**. Distinct from the outcome alias `codemap hotspots` (import **fan-in** via `fan-in` recipe).
 
-Populated on every index pass from `git log --numstat` (config `churn.halfLifeDays`, `churn.since` / `--churn-since`). Non-git repos: `codemap ingest-churn <file.json>` or config `churn.file`.
+Populated on every index pass from git history (config `churn.halfLifeDays`, `churn.since` / `--churn-since`). Non-git repos: `codemap ingest-churn <file.json>` or config `churn.file`.
 
 ```bash
 codemap query --recipe churn-complexity-hotspots
@@ -30,4 +30,8 @@ codemap query --recipe churn-complexity-hotspots --params by_symbol=true
 codemap ingest-churn churn-metrics.json
 ```
 
-`hotspot_score` = `weighted_commits × complexity`. `hotspot_score_normalized` is 0–100 vs the corpus max in the result set. Triage with `snippet` before large refactors.
+`hotspot_score` = `weighted_commits × complexity`. `hotspot_score_normalized` is 0–100 vs the corpus max in the result set.
+
+**Output columns:** file grain — `file_path`, `max_complexity`, `weighted_commits`, `commit_count`, `churn_trend`, scores. Symbol grain (`by_symbol=true`) — per-symbol `name`, `kind`, `line_start`, `cyclomatic_complexity`, plus file churn fields. `churn_trend` is `accelerating`, `stable`, or `cooling` when enough history exists.
+
+Triage with `snippet` before large refactors.

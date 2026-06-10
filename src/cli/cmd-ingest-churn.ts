@@ -1,5 +1,5 @@
 import { ingestChurnFromJsonFile } from "../application/ingest-churn-run";
-import { closeDb, openDb } from "../db";
+import { closeDb, createSchema, openDb } from "../db";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface IngestChurnOpts {
@@ -14,9 +14,11 @@ export function printIngestChurnCmdHelp(): void {
   console.log(`Usage: codemap ingest-churn <path> [--json]
 
 Import precomputed git churn metrics into \`file_churn\` for non-git
-repositories or CI fixtures. JSON must be an array of rows matching the
-\`file_churn\` schema (see docs/architecture.md). Only paths present in
-the index are kept; unindexed paths are skipped.
+repositories or CI fixtures. JSON must be an array of objects with
+\`file_path\`, \`commit_count\`, \`weighted_commits\`, \`lines_added\`,
+\`lines_removed\`, optional \`last_commit_at\` / \`churn_trend\`, and
+\`computed_at\`. Run \`codemap\` (index) first — only indexed paths are
+kept; unindexed paths are skipped.
 
 Args:
   <path>          Path to JSON file (relative to project root or absolute)
@@ -79,6 +81,15 @@ export async function runIngestChurnCmd(opts: IngestChurnOpts): Promise<void> {
   await bootstrapCodemap(opts);
   const db = openDb();
   try {
+    createSchema(db);
+    const indexedCount =
+      db.query<{ n: number }>("SELECT COUNT(*) AS n FROM files").get()?.n ?? 0;
+    if (indexedCount === 0) {
+      console.error(
+        "codemap ingest-churn: no indexed files — run `codemap` or `codemap --full` first",
+      );
+      process.exit(1);
+    }
     const result = ingestChurnFromJsonFile(db, {
       projectRoot: opts.root,
       path: opts.path,

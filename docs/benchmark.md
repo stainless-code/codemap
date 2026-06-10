@@ -207,9 +207,9 @@ Independent of the consumer-facing scenarios above, the repo carries a **per-pha
 
 ### Mechanism
 
-1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `heritage_ms` / `total_ms`.
+1. `bun src/index.ts --full --performance` populates [`IndexPerformanceReport`](../src/application/types.ts) with `collect_ms` / `parse_ms` / `insert_ms` / `index_create_ms` / `bindings_ms` / `module_cycles_ms` / `re_export_chains_ms` / `heritage_ms` / `total_ms`, plus post-index **`churn_ms`** (git churn ingest; patched after `indexFiles` completes).
 2. Setting `CODEMAP_PERFORMANCE_JSON=<path>` dumps that report as JSON to `<path>` after the run (no CLI flag added; env-var only).
-3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares **`collect_ms`**, **`parse_ms`**, **`insert_ms`**, **`index_create_ms`**, **`bindings_ms`**, and **`total_ms`** to `fixtures/benchmark/perf-baseline.json`. Other `IndexPerformanceReport` fields (`module_cycles_ms`, `re_export_chains_ms`, `heritage_ms`, …) appear in `--performance` JSON only — not baseline-gated.
+3. [`scripts/check-perf-baseline.ts`](../scripts/check-perf-baseline.ts) (alias `bun run check:perf-baseline`) runs the indexer 3× on this repo, takes per-phase **medians**, and compares **`collect_ms`**, **`parse_ms`**, **`insert_ms`**, **`index_create_ms`**, **`bindings_ms`**, **`churn_ms`**, and **`total_ms`** to `fixtures/benchmark/perf-baseline.json`. Other `IndexPerformanceReport` fields (`module_cycles_ms`, `re_export_chains_ms`, `heritage_ms`, …) appear in `--performance` JSON only — not baseline-gated.
 4. **Local / scheduled only** — run before perf-sensitive PRs; [`.github/workflows/perf-baseline.yml`](../.github/workflows/perf-baseline.yml) fires weekly + `workflow_dispatch` for drift visibility. **Not** on the PR CI path (6 min × 3 runs + bimodal GHA runners → flaky merge gate).
 
 ### Why this is separate from `src/benchmark.ts`

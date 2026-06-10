@@ -79,6 +79,9 @@ Apply (substrate-shaped fix executor; diff-json row contract):
 Coverage ingest (Istanbul JSON or LCOV from any test runner):
   codemap ingest-coverage <path> [--json]      # path = file or dir; format auto-detected
 
+Churn ingest (precomputed file_churn JSON for non-git repos or fixtures):
+  codemap ingest-churn <path> [--json]
+
 Other:
   codemap unlock [--force]     Remove stale cross-process index lock
   codemap version
@@ -150,6 +153,7 @@ export function validateIndexModeArgs(rest: string[]): void {
   if (rest[0] === "affected") return;
   if (rest[0] === "apply") return;
   if (rest[0] === "ingest-coverage") return;
+  if (rest[0] === "ingest-churn") return;
   if (rest[0] === "pr-comment") return;
   if (rest[0] === "trace") return;
   if (rest[0] === "explore") return;

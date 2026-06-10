@@ -266,8 +266,7 @@ async function runCodemapIndexBody(
             stats: run.stats,
           };
         } else if (diff.deleted.length > 0) {
-          churnMode = "incremental";
-          churnChangedPaths = diff.deleted;
+          churnMode = "deletions";
           deleteFilesFromIndex(db, diff.deleted, quiet);
           const callScope = expandHeritageResolveScope(db, diff.deleted);
           if (callScope.length > 0) {

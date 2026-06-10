@@ -262,7 +262,7 @@ Number of edges _out of_ a file — `COUNT(*) FROM dependencies WHERE from_path 
 
 ### `file_churn` (table)
 
-Per-file git churn metrics refreshed on **every index pass** (incremental scoped recompute; idle HEAD cache). Git via `ingestFileChurnFromGit`; non-git via **`codemap ingest-churn`** or config **`churn.file`**. Config: `churn.halfLifeDays`, `churn.since` / `--churn-since`. Powers **`churn-complexity-hotspots`** (file or symbol grain, normalized score) — distinct from outcome alias **`hotspots`** → `fan-in`.
+Per-file git churn metrics refreshed on **every index pass** (incremental scoped recompute; idle HEAD cache). Git via `ingestFileChurnFromGit`; non-git via **`codemap ingest-churn`** or config **`churn.file`**. Config: `churn.halfLifeDays`, `churn.since` / `--churn-since`. Column **`churn_trend`**: `accelerating` \| `stable` \| `cooling` when enough history exists. Powers **`churn-complexity-hotspots`** (file or symbol grain, normalized score) — distinct from outcome alias **`hotspots`** → `fan-in`.
 
 ### `files` (table)
 

@@ -5,6 +5,7 @@ import { relative, resolve } from "node:path";
 import {
   getMeta,
   mergeFileChurnForPaths,
+  META_CHURN_CONFIG_FINGERPRINT,
   META_CHURN_INDEXED_COMMIT,
   pruneFileChurnOrphans,
   replaceFileChurn,
@@ -75,7 +76,7 @@ function indexedToGitPath(filePath: string, projectPrefix: string): string {
 
 export type ChurnTrend = "accelerating" | "stable" | "cooling";
 
-export type ChurnRefreshMode = "full" | "incremental" | "idle";
+export type ChurnRefreshMode = "full" | "incremental" | "idle" | "deletions";
 
 export interface ChurnIngestResult {
   ok: boolean;
@@ -216,9 +217,39 @@ function resolveGitHead(projectRoot: string): string | null {
   return head.length > 0 ? head : null;
 }
 
-function stampChurnCommit(db: CodemapDatabase, projectRoot: string): void {
+function churnConfigFingerprint(
+  halfLifeDays: number,
+  since: string | null,
+): string {
+  return `${halfLifeDays}|${since ?? ""}`;
+}
+
+function stampChurnMeta(
+  db: CodemapDatabase,
+  projectRoot: string,
+  halfLifeDays: number,
+  since: string | null,
+): void {
   const head = resolveGitHead(projectRoot);
   if (head) setMeta(db, META_CHURN_INDEXED_COMMIT, head);
+  setMeta(
+    db,
+    META_CHURN_CONFIG_FINGERPRINT,
+    churnConfigFingerprint(halfLifeDays, since),
+  );
+}
+
+function canIdleSkipChurn(
+  db: CodemapDatabase,
+  head: string | null,
+  prevHead: string | null,
+  halfLifeDays: number,
+  since: string | null,
+): boolean {
+  if (!head || !prevHead || head !== prevHead) return false;
+  if (countFileChurn(db) === 0) return false;
+  const fp = churnConfigFingerprint(halfLifeDays, since);
+  return getMeta(db, META_CHURN_CONFIG_FINGERPRINT) === fp;
 }
 
 function tryConfigChurnFallback(
@@ -365,7 +396,7 @@ export function ingestFileChurnFromGit(
       `[churn] file_churn ${merge ? "merged" : "populated"}: ${rows.length} files (${rowCount} total)`,
     );
   }
-  stampChurnCommit(db, projectRoot);
+  stampChurnMeta(db, projectRoot, halfLife, since);
   return finish({ ok: true, rowCount });
 }
 
@@ -385,10 +416,15 @@ export function refreshFileChurn(
   const quiet = options?.quiet ?? false;
   const mode = options?.mode ?? "full";
   const projectRoot = options?.projectRoot ?? getProjectRoot();
+  const halfLifeDays = options?.halfLifeDays ?? getChurnHalfLifeDays();
+  const since = options?.since !== undefined ? options.since : getChurnSince();
   const head = resolveGitHead(projectRoot);
-  const prevHead = getMeta(db, META_CHURN_INDEXED_COMMIT);
+  const prevHead = getMeta(db, META_CHURN_INDEXED_COMMIT) ?? null;
 
-  if (mode === "idle" && head && prevHead && head === prevHead) {
+  if (
+    mode === "idle" &&
+    canIdleSkipChurn(db, head, prevHead, halfLifeDays, since ?? null)
+  ) {
     const rowCount = countFileChurn(db);
     return {
       ok: true,
@@ -398,10 +434,21 @@ export function refreshFileChurn(
     };
   }
 
+  if (mode === "deletions") {
+    const rowCount = countFileChurn(db);
+    stampChurnMeta(db, projectRoot, halfLifeDays, since ?? null);
+    return {
+      ok: true,
+      rowCount,
+      elapsedMs: Math.round(performance.now() - t0),
+      reason: "deletions: churn pruned via CASCADE",
+    };
+  }
+
   const base = {
     projectRoot,
-    halfLifeDays: options?.halfLifeDays ?? getChurnHalfLifeDays(),
-    since: options?.since !== undefined ? options.since : getChurnSince(),
+    halfLifeDays,
+    since: since ?? null,
     quiet,
   };
 

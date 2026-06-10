@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 import {
+  META_CHURN_CONFIG_FINGERPRINT,
   META_CHURN_INDEXED_COMMIT,
   pruneFileChurnOrphans,
   replaceFileChurn,
@@ -25,6 +26,16 @@ export interface IngestChurnRunError {
 
 export type IngestChurnRunResult = IngestChurnRunOk | IngestChurnRunError;
 
+/** Strip inherited GIT_* so subprocess targets the project repo. */
+function gitSpawnEnv(): NodeJS.ProcessEnv {
+  const e: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k.startsWith("GIT_")) continue;
+    e[k] = v;
+  }
+  return e;
+}
+
 function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
   if (!Array.isArray(raw)) {
     throw new TypeError("churn JSON must be an array of file_churn rows");
@@ -38,6 +49,9 @@ function parseChurnJsonPayload(raw: unknown): FileChurnRow[] {
     const file_path = r.file_path;
     if (typeof file_path !== "string" || file_path.length === 0) {
       throw new TypeError("file_path must be a non-empty string");
+    }
+    if (rows.some((existing) => existing.file_path === file_path)) {
+      throw new TypeError(`duplicate file_path in churn JSON: ${file_path}`);
     }
     rows.push({
       file_path,
@@ -108,10 +122,15 @@ export function ingestChurnFromJsonFile(
   pruneFileChurnOrphans(db);
   const headResult = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: options.projectRoot,
+    env: gitSpawnEnv(),
   });
   if (headResult.status === 0) {
     const head = headResult.stdout.toString().trim();
-    if (head) setMeta(db, META_CHURN_INDEXED_COMMIT, head);
+    if (head) {
+      setMeta(db, META_CHURN_INDEXED_COMMIT, head);
+      // JSON ingest has no half-life/since knobs — fingerprint marks manual import.
+      setMeta(db, META_CHURN_CONFIG_FINGERPRINT, "json|");
+    }
   }
 
   return {

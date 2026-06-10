@@ -52,6 +52,8 @@ describe("node dist --full exit delay", () => {
               ...process.env,
               CODEMAP_ROOT: minimalRoot,
               CODEMAP_STATE_DIR: stateDir,
+              // Prevent git from walking above the fixture (parent monorepo history).
+              GIT_CEILING_DIRECTORIES: minimalRoot,
             },
             stdout: "ignore",
             stderr: "pipe",

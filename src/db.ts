@@ -1750,6 +1750,8 @@ export function replaceFileChurn(db: CodemapDatabase, rows: FileChurnRow[]) {
 
 /** `meta` key: last `HEAD` when `file_churn` was refreshed (idle skip). */
 export const META_CHURN_INDEXED_COMMIT = "churn_indexed_commit";
+/** `meta` key: `halfLifeDays|since` fingerprint for idle skip after config changes. */
+export const META_CHURN_CONFIG_FINGERPRINT = "churn_config_fingerprint";
 
 /** Replace churn rows for `scopePaths` only; other paths are left unchanged. */
 export function mergeFileChurnForPaths(

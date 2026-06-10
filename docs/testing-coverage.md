@@ -54,30 +54,31 @@ Every `templates/recipes/<id>.sql` has **≥1** scenario in `fixtures/golden/sce
 
 Recipe goldens prove query _behavior_; these scenarios pin **persisted rows** on the minimal corpus. Pin-down ids enforced in CI: `SUBSTRATE_SCENARIO_BY_TABLE` in `scripts/query-golden-coverage-matrix.test.mjs` (plus every bundled recipe id). `index-table-stats` and `call-resolution-stats` are additional aggregate/residual scenarios on the same corpus.
 
-| Table                                 | Scenario id                                             |
-| ------------------------------------- | ------------------------------------------------------- |
-| Aggregate counts (all indexed tables) | `index-table-stats`                                     |
-| `meta`                                | `meta-fts5-enabled`, `call-resolution-stats` (residual) |
-| `source_fts`                          | `source-fts-row-count`                                  |
-| `file_metrics`                        | `file-metrics-complexity-fixture`                       |
-| `scopes`                              | `scopes-product-card`                                   |
-| `references`                          | `references-product-card-perms`                         |
-| `bindings`                            | `bindings-createClient`                                 |
-| `import_specifiers`                   | `import-specifiers-consumer`                            |
-| `async_calls`                         | `async-calls-prefetch`                                  |
-| `decorators`                          | `decorators-sealed`                                     |
-| `dynamic_imports`                     | `dynamic-imports-prefetch`                              |
-| `module_cycles`                       | `module-cycles-cache-store`                             |
-| `re_export_chains`                    | `re-export-chains-product-card`                         |
-| `runtime_markers`                     | `runtime-markers-env`                                   |
-| `function_params`                     | `function-params-createClient`                          |
-| `boundary_rules`                      | `boundary-rules-ui-no-api`                              |
-| `unresolved_calls`                    | `unresolved-call-sites`                                 |
-| `calls` (resolution)                  | `calls-createClient-resolved`                           |
-| `try_catch`                           | `try-catch-rethrow-heuristics`                          |
-| `jsdoc_tags`                          | `jsdoc-tags-createClient`                               |
-| `suppressions`                        | `suppressions-orphan`                                   |
-| `coverage`                            | `coverage-rows-after-ingest` (+ killer recipes)         |
+| Table                                 | Scenario id                                              |
+| ------------------------------------- | -------------------------------------------------------- |
+| Aggregate counts (all indexed tables) | `index-table-stats`                                      |
+| `meta`                                | `meta-fts5-enabled`, `call-resolution-stats` (residual)  |
+| `source_fts`                          | `source-fts-row-count`                                   |
+| `file_metrics`                        | `file-metrics-complexity-fixture`                        |
+| `file_churn`                          | `churn-complexity-hotspots` (seed via `seed-file-churn`) |
+| `scopes`                              | `scopes-product-card`                                    |
+| `references`                          | `references-product-card-perms`                          |
+| `bindings`                            | `bindings-createClient`                                  |
+| `import_specifiers`                   | `import-specifiers-consumer`                             |
+| `async_calls`                         | `async-calls-prefetch`                                   |
+| `decorators`                          | `decorators-sealed`                                      |
+| `dynamic_imports`                     | `dynamic-imports-prefetch`                               |
+| `module_cycles`                       | `module-cycles-cache-store`                              |
+| `re_export_chains`                    | `re-export-chains-product-card`                          |
+| `runtime_markers`                     | `runtime-markers-env`                                    |
+| `function_params`                     | `function-params-createClient`                           |
+| `boundary_rules`                      | `boundary-rules-ui-no-api`                               |
+| `unresolved_calls`                    | `unresolved-call-sites`                                  |
+| `calls` (resolution)                  | `calls-createClient-resolved`                            |
+| `try_catch`                           | `try-catch-rethrow-heuristics`                           |
+| `jsdoc_tags`                          | `jsdoc-tags-createClient`                                |
+| `suppressions`                        | `suppressions-orphan`                                    |
+| `coverage`                            | `coverage-rows-after-ingest` (+ killer recipes)          |
 
 Core graph tables (`files`, `symbols`, `imports`, …) are covered by many existing SQL/recipe scenarios — see `fixtures/golden/scenarios.json`.
 

@@ -4,9 +4,21 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { closeDb, createSchema, insertFile } from "../db";
+import {
+  closeDb,
+  createSchema,
+  getMeta,
+  insertFile,
+  META_CHURN_CONFIG_FINGERPRINT,
+  META_CHURN_INDEXED_COMMIT,
+  setMeta,
+} from "../db";
 import { openCodemapDatabase } from "../sqlite-db";
-import { computeChurnTrend, ingestFileChurnFromGit } from "./churn-ingest";
+import {
+  computeChurnTrend,
+  ingestFileChurnFromGit,
+  refreshFileChurn,
+} from "./churn-ingest";
 
 let projectRoot: string;
 
@@ -217,6 +229,116 @@ describe("ingestFileChurnFromGit", () => {
       }
     } finally {
       rmSync(noGit, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("refreshFileChurn", () => {
+  beforeEach(() => {
+    projectRoot = mkdtempSync(join(tmpdir(), "codemap-churn-refresh-"));
+    git(["init", "-q", "-b", "main"]);
+    git(["config", "user.email", "t@example.com"]);
+    git(["config", "user.name", "T"]);
+    git(["config", "commit.gpgsign", "false"]);
+    mkdirSync(join(projectRoot, "src"), { recursive: true });
+    writeFileSync(join(projectRoot, "src/a.ts"), "export const a = 1;\n");
+    commitAll("seed");
+  });
+
+  afterEach(() => {
+    rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it("idle skip requires populated file_churn even when HEAD meta matches", () => {
+    const head = spawnSync("git", ["rev-parse", "HEAD"], {
+      cwd: projectRoot,
+      encoding: "utf-8",
+    })
+      .stdout.toString()
+      .trim();
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "a",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      setMeta(db, META_CHURN_INDEXED_COMMIT, head);
+      setMeta(db, META_CHURN_CONFIG_FINGERPRINT, "90|");
+
+      const result = refreshFileChurn(db, {
+        projectRoot,
+        mode: "idle",
+        halfLifeDays: 90,
+        since: null,
+        quiet: true,
+      });
+      expect(result.reason).not.toBe("skipped: HEAD unchanged");
+      expect(result.ok).toBe(true);
+      expect(result.rowCount).toBeGreaterThan(0);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("idle skip when HEAD, rows, and config fingerprint match", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "a",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      ingestFileChurnFromGit(db, { projectRoot, quiet: true });
+      const result = refreshFileChurn(db, {
+        projectRoot,
+        mode: "idle",
+        halfLifeDays: 90,
+        since: null,
+        quiet: true,
+      });
+      expect(result.reason).toBe("skipped: HEAD unchanged");
+      expect(result.elapsedMs).toBeLessThan(50);
+    } finally {
+      closeDb(db);
+    }
+  });
+
+  it("deletions mode stamps meta without running git log", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "a",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      ingestFileChurnFromGit(db, { projectRoot, quiet: true });
+      const result = refreshFileChurn(db, {
+        projectRoot,
+        mode: "deletions",
+        halfLifeDays: 90,
+        since: null,
+        quiet: true,
+      });
+      expect(result.reason).toBe("deletions: churn pruned via CASCADE");
+      expect(getMeta(db, META_CHURN_INDEXED_COMMIT)).toBeTruthy();
+    } finally {
+      closeDb(db);
     }
   });
 });

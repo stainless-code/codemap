@@ -2,4 +2,4 @@
 "@stainless-code/codemap": minor
 ---
 
-Add churn × complexity hotspot ranking: `file_churn` from git on every index (incremental scoped refresh, idle HEAD cache), `codemap ingest-churn` + `churn.file` for non-git, bundled `churn-complexity-hotspots` recipe with file/symbol grain (`by_symbol`), raw + 0–100 normalized scores, and `churn_trend`. Outcome alias `hotspots` still maps to fan-in.
+Add churn × complexity hotspot ranking: `file_churn` refreshed on every index from git history, with `codemap ingest-churn` and config `churn.file` for non-git repos. New `churn-complexity-hotspots` recipe ranks files or symbols (`by_symbol`) by change frequency × complexity with normalized 0–100 scores and `churn_trend`. Outcome alias `hotspots` still maps to fan-in.
