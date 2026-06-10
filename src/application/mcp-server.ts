@@ -300,7 +300,7 @@ function registerIngestCoverageTool(server: McpServer, opts: ServerOpts): void {
     "ingest_coverage",
     withToolAnnotations("ingest_coverage", {
       description:
-        "Ingest a coverage artifact (Istanbul JSON, LCOV, or NODE_V8_COVERAGE directory with `runtime: true`) into the index `coverage` table. Same JSON envelope as `codemap ingest-coverage --json`. Enables coverage-aware recipes (`worst-covered-exports`, `files-by-coverage`, `untested-and-dead`). Args: `path` (required), `runtime` (optional).",
+        "Ingest a coverage artifact (Istanbul JSON, LCOV, or NODE_V8_COVERAGE directory with `runtime: true`) into the index `coverage` table. Same JSON envelope as `codemap ingest-coverage --json`. Enables coverage-aware recipes (`worst-covered-exports`, `files-by-coverage`, `untested-and-dead`, `coverage-confirmed-dead`). Args: `path` (required), `runtime` (optional).",
       inputSchema: ingestCoverageArgsSchema,
     }),
     async (args) => wrapToolResult(await handleIngestCoverage(args, opts.root)),

@@ -94,6 +94,12 @@ describe("classifyIntent", () => {
     expect(classifyIntent("debug regression").classified_as).toBe("debug");
   });
 
+  it("classifies cleanup / dead-code intent", () => {
+    const r = classifyIntent("delete dead code with coverage confirmed");
+    expect(r.classified_as).toBe("cleanup");
+    expect(r.matched_recipes).toContain("coverage-confirmed-dead");
+  });
+
   it("classifies test intent", () => {
     expect(classifyIntent("add coverage for parser").classified_as).toBe(
       "test",

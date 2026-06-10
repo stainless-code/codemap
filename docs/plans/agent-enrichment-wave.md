@@ -65,4 +65,4 @@ Each PR: `harden-pr full` (includes plan retirement) → merge. Do not batch pla
 
 ## Current slice
 
-**Active:** Plan 3 slice **3.4** (optional classifier) or PR harden — agent surfaces + changeset on `feat/coverage-confirmed-dead`.
+**Active:** Plan 3 complete on `feat/coverage-confirmed-dead` — run **`/harden-pr full`** → PR **#D** → retire `coverage-deletion-confidence.md` on merge.
