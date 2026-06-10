@@ -4,272 +4,350 @@
     "kind": "type",
     "file_path": "src/api/client.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "handshake",
     "kind": "value",
     "file_path": "src/api/client.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "legacyClient",
     "kind": "value",
     "file_path": "src/api/client.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "openSocket",
     "kind": "value",
     "file_path": "src/api/client.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "setupTransport",
     "kind": "value",
     "file_path": "src/api/client.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "useHelperA",
     "kind": "value",
     "file_path": "src/bench/homonym-consumer-a.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "useHelperB",
     "kind": "value",
     "file_path": "src/bench/homonym-consumer-b.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "MemberHost",
     "kind": "value",
     "file_path": "src/bench/jsx-member-gap.tsx",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "PageShell",
     "kind": "value",
     "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "UiPanel",
     "kind": "value",
     "file_path": "src/bench/jsx-ui-namespace.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "PingService",
     "kind": "value",
     "file_path": "src/bench/method-call-sites.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "staleMultiOut",
     "kind": "value",
     "file_path": "src/bench/stale-multi-import.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "ApiBridge",
     "kind": "value",
     "file_path": "src/components/shop/ApiBridge.tsx",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "ProductCard",
     "kind": "value",
     "file_path": "src/components/shop/ProductCard.tsx",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "reexport_chain_possible",
+    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ProductCard.tsx\",\"hops\":1,\"truncated\":0}]"
   },
   {
     "name": "FormatPrice",
     "kind": "value",
     "file_path": "src/components/shop/ShopButton.tsx",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "reexport_chain_possible",
+    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ShopButton.tsx\",\"hops\":1,\"truncated\":0}]"
   },
   {
     "name": "prefetch",
     "kind": "value",
     "file_path": "src/consumer.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "run",
     "kind": "value",
     "file_path": "src/consumer.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "fixtureApiKey",
     "kind": "value",
     "file_path": "src/env.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "nodeEnv",
     "kind": "value",
     "file_path": "src/env.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "catchDirectRethrow",
     "kind": "value",
     "file_path": "src/lib/complexity-fixture.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "catchInnerArrowRethrow",
     "kind": "value",
     "file_path": "src/lib/complexity-fixture.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "deeplyNested",
     "kind": "value",
     "file_path": "src/lib/complexity-fixture.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "ignoredExport",
     "kind": "value",
     "file_path": "src/orphan.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "orphanHelper",
     "kind": "value",
     "file_path": "src/orphan.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "ImportedMammal",
     "kind": "type",
     "file_path": "src/types/heritage-qualified.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "QualifiedChild",
     "kind": "type",
     "file_path": "src/types/heritage-qualified.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "Both",
     "kind": "type",
     "file_path": "src/types/hierarchy.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "Dog",
     "kind": "value",
     "file_path": "src/types/hierarchy.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "GenericBoth",
     "kind": "type",
     "file_path": "src/types/hierarchy.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "Mammal",
     "kind": "type",
     "file_path": "src/types/hierarchy.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "Pet",
     "kind": "type",
     "file_path": "src/types/hierarchy.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "Mammal",
     "kind": "type",
     "file_path": "src/types/homonym-mammal.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "OrderStatus",
     "kind": "value",
     "file_path": "src/types/status.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "CycleA",
     "kind": "type",
     "file_path": "src/types/type-cycle.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "CycleB",
     "kind": "type",
     "file_path": "src/types/type-cycle.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "_epochSeconds",
     "kind": "value",
     "file_path": "src/utils/date.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "_hiResEpoch",
     "kind": "value",
     "file_path": "src/utils/date.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "nanoseconds",
     "kind": "value",
     "file_path": "src/utils/date.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   },
   {
     "name": "nowIso",
     "kind": "value",
     "file_path": "src/utils/format.ts",
     "is_default": 0,
-    "re_export_source": null
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
   }
 ]

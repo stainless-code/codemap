@@ -9,6 +9,7 @@ interface ProductCardProps {
 // React component fixture — JSX substrate (fragments, attrs, nesting, lowercase tags).
 export function ProductCard(props: ProductCardProps) {
   const perms = usePermissions();
+  const _truncationFixture = now(); // fourth AST call site — deprecated-symbols E.3 golden
   const spread = { className: "card" };
   return (
     <>

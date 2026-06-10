@@ -2,7 +2,7 @@
   {
     "file_path": "src/components/shop/ProductCard.tsx",
     "line_start": 10,
-    "line_end": 22,
+    "line_end": 23,
     "before_pattern": "ProductCard",
     "after_pattern": "ProductCardNext",
     "location_kind": "definition",

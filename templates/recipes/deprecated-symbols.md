@@ -1,7 +1,7 @@
 ---
 actions:
   - type: flag-caller
-    description: "Warn before suggesting changes that depend on this symbol; check callers via the calls table."
+    description: "Warn before suggesting changes that depend on this symbol; row `evidence_json` lists up to three AST caller hops (see `reason`)."
   - type: apply-migrate-deprecated
     description: "Rewrite call/import sites — replace SYMBOL with row `name`, REPLACEMENT with the new identifier."
     command: codemap apply migrate-deprecated --params symbol=SYMBOL,replacement=REPLACEMENT --dry-run
@@ -15,7 +15,9 @@ actions:
 
 # deprecated-symbols
 
-Symbols whose JSDoc contains @deprecated (caller-warning candidates).
+Symbols whose JSDoc contains @deprecated (caller-warning candidates). Rows include **`reason`** (`has_callers` \| `no_callers`) and **`evidence_json`** (up to three AST caller hops from `calls`; appends `{"truncated":true}` when more callers exist) so agents can gauge blast radius without a separate `find-call-sites` round-trip.
+
+**Name-only caller match** (same as `untested-and-dead`): `callee_name = s.name` without `file_path` — homonyms like `now()` may list callers of other symbols named `now`. Narrow with `file_path` in ad-hoc SQL when needed.
 
 ```bash
 codemap query --recipe deprecated-symbols --format json

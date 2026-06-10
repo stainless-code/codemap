@@ -66,6 +66,10 @@ Scenarios live in **`fixtures/golden/scenarios.json`** (Tier A) or optional **`s
 
 **Prompts** in JSON are **intent labels**, not pasted chat logs — pair with queries whose literals come from **fixture-owned** data (see [fixtures/qa/prompts.external.template.md](../fixtures/qa/prompts.external.template.md) for optional chat QA).
 
+### Evidence columns (high-judgment recipes)
+
+Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (TEXT, JSON array) columns on each row — factual detection path for agents, not engine verdicts. See [plans/evidence-chains-on-recipe-rows.md](./plans/evidence-chains-on-recipe-rows.md). Goldens assert these columns when the recipe ships evidence (`boundary-violations`, `deprecated-symbols`, `unimported-exports`).
+
 ---
 
 ## Status
