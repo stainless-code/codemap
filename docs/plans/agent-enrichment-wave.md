@@ -65,4 +65,4 @@ Each PR: `harden-pr full` (includes plan retirement) → merge. Do not batch pla
 
 ## Current slice
 
-**Active:** Plan 3 slice **3.2** on `feat/coverage-confirmed-dead` — golden no-ingest (`confidence: medium`).
+**Active:** Plan 3 slice **3.4** (optional classifier) or PR harden — agent surfaces + changeset on `feat/coverage-confirmed-dead`.

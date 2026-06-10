@@ -1,0 +1,232 @@
+[
+  {
+    "name": "legacyClient",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 46,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "useHelperA",
+    "kind": "function",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "line_start": 3,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "useHelperB",
+    "kind": "function",
+    "file_path": "src/bench/homonym-consumer-b.ts",
+    "line_start": 3,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "MemberHost",
+    "kind": "function",
+    "file_path": "src/bench/jsx-member-gap.tsx",
+    "line_start": 3,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "ChildCard",
+    "kind": "function",
+    "file_path": "src/bench/jsx-synthesis/ChildCard.tsx",
+    "line_start": 5,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "PageShell",
+    "kind": "function",
+    "file_path": "src/bench/jsx-synthesis/PageShell.tsx",
+    "line_start": 3,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "UiPanel",
+    "kind": "function",
+    "file_path": "src/bench/jsx-ui-namespace.ts",
+    "line_start": 1,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "keepMe",
+    "kind": "function",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 1,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "dropMe",
+    "kind": "function",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 5,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "ApiBridge",
+    "kind": "function",
+    "file_path": "src/components/shop/ApiBridge.tsx",
+    "line_start": 4,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "ProductCard",
+    "kind": "function",
+    "file_path": "src/components/shop/ProductCard.tsx",
+    "line_start": 10,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "FormatPrice",
+    "kind": "function",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 4,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "ShopButton",
+    "kind": "function",
+    "file_path": "src/components/shop/ShopButton.tsx",
+    "line_start": 8,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "prefetch",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 15,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "run",
+    "kind": "function",
+    "file_path": "src/consumer.ts",
+    "line_start": 22,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "catchInnerArrowRethrow",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 86,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "catchDirectRethrow",
+    "kind": "function",
+    "file_path": "src/lib/complexity-fixture.ts",
+    "line_start": 98,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "ignoredExport",
+    "kind": "function",
+    "file_path": "src/orphan.ts",
+    "line_start": 2,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "orphanHelper",
+    "kind": "function",
+    "file_path": "src/orphan.ts",
+    "line_start": 7,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "_epochSeconds",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 12,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "nanoseconds",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 19,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "_hiResEpoch",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 26,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "nowIso",
+    "kind": "function",
+    "file_path": "src/utils/format.ts",
+    "line_start": 14,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  }
+]

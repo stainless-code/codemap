@@ -22,6 +22,10 @@ export function runGoldenSetup(
   const db = openDb();
   try {
     for (const step of steps) {
+      if (step.kind === "clear-coverage") {
+        db.run("DELETE FROM coverage");
+        continue;
+      }
       if (step.kind !== "ingest-coverage") continue;
       const absPath = resolve(fixtureRoot, step.path);
       if (
