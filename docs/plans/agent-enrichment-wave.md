@@ -4,7 +4,7 @@
 >
 > **Goal:** Ship tracer bullets that cut agent round-trips, improve answer trust, and sharpen PR/CI deltas — all Moat-A (predicate columns, no verdict primitives).
 >
-> **Shipped (plans retired):** Evidence chains ([#174](https://github.com/stainless-code/codemap/pull/174)) · Graph-estimated CRAP ([#175](https://github.com/stainless-code/codemap/pull/175)) · Coverage deletion confidence ([#176](https://github.com/stainless-code/codemap/pull/176)) · Audit delta attribution (PR **#E**) — durable contracts in `golden-queries.md` + `architecture.md` + `glossary.md`; plan files deleted per [docs-governance](../../.agents/skills/docs-governance/SKILL.md) § Closing a plan.
+> **Shipped (plans retired):** Evidence chains ([#174](https://github.com/stainless-code/codemap/pull/174)) · Graph-estimated CRAP ([#175](https://github.com/stainless-code/codemap/pull/175)) · Coverage deletion confidence ([#176](https://github.com/stainless-code/codemap/pull/176)) · Audit delta attribution (PR **#E**) — durable contracts in `architecture.md` + `glossary.md`; plan files deleted per [docs-governance](../../.agents/skills/docs-governance/SKILL.md) § Closing a plan.
 
 ---
 
