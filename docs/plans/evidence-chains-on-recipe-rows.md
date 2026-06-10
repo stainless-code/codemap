@@ -98,11 +98,11 @@ Ship one recipe per wave; verify before moving to the next.
 
 ## Acceptance
 
-- [ ] `codemap query --recipe unimported-exports --json` rows include `reason`; re-export false-positive class includes non-empty `evidence_json` when chain exists
-- [ ] `boundary-violations` rows include stable `reason: boundary_deny_match`
-- [ ] `deprecated-symbols` rows with callers include `evidence_json` caller hops
-- [ ] Golden queries updated; no new CLI verb
-- [ ] SARIF / annotations unchanged (extra columns ignored by formatters unless future mapping added)
+- [x] `codemap query --recipe unimported-exports --json` rows include `reason`; re-export false-positive class includes non-empty `evidence_json` when chain exists
+- [x] `boundary-violations` rows include stable `reason: boundary_deny_match`
+- [x] `deprecated-symbols` rows with callers include `evidence_json` caller hops
+- [x] Golden queries updated; no new CLI verb
+- [x] SARIF / annotations unchanged (extra columns ignored by formatters unless future mapping added)
 
 ---
 

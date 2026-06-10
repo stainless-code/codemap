@@ -54,25 +54,47 @@ SELECT
   END AS reason,
   COALESCE(
     (
-      SELECT json_group_array(
-        json_object(
-          'kind',
-          'reexport',
-          'from_file',
-          from_file,
-          'to_file',
-          to_file,
-          'hops',
-          hops
-        )
-      )
+      SELECT
+        CASE
+          WHEN chain_total > 3
+          THEN json_insert(chain_hops, '$[#]', json_object('truncated', 1))
+          ELSE chain_hops
+        END
       FROM (
-        SELECT r.from_file, r.to_file, r.hops
-        FROM re_export_chains r
-        WHERE r.to_file = u.file_path
-          AND r.to_name = u.name
-        ORDER BY r.from_file, r.hops
-        LIMIT 3
+        SELECT
+          (
+            SELECT COUNT(*)
+            FROM re_export_chains r
+            WHERE r.to_file = u.file_path
+              AND r.to_name = u.name
+          ) AS chain_total,
+          COALESCE(
+            (
+              SELECT json_group_array(
+                json_object(
+                  'kind',
+                  'reexport',
+                  'from_file',
+                  from_file,
+                  'to_file',
+                  to_file,
+                  'hops',
+                  hops,
+                  'truncated',
+                  truncated
+                )
+              )
+              FROM (
+                SELECT r.from_file, r.to_file, r.hops, r.truncated
+                FROM re_export_chains r
+                WHERE r.to_file = u.file_path
+                  AND r.to_name = u.name
+                ORDER BY r.from_file, r.hops
+                LIMIT 3
+              )
+            ),
+            '[]'
+          ) AS chain_hops
       )
     ),
     '[]'

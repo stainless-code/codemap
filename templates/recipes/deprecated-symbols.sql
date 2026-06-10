@@ -10,30 +10,52 @@ SELECT
       SELECT 1
       FROM calls c
       WHERE c.callee_name = s.name
+        AND (c.provenance IS NULL OR c.provenance = 'ast')
     )
     THEN 'has_callers'
     ELSE 'no_callers'
   END AS reason,
   COALESCE(
     (
-      SELECT json_group_array(
-        json_object(
-          'kind',
-          'caller',
-          'name',
-          caller_name,
-          'file_path',
-          file_path,
-          'line_start',
-          line_start
-        )
-      )
+      SELECT
+        CASE
+          WHEN caller_total > 3
+          THEN json_insert(caller_hops, '$[#]', json_object('truncated', 1))
+          ELSE caller_hops
+        END
       FROM (
-        SELECT c.caller_name, c.file_path, c.line_start
-        FROM calls c
-        WHERE c.callee_name = s.name
-        ORDER BY c.file_path, c.line_start
-        LIMIT 3
+        SELECT
+          (
+            SELECT COUNT(*)
+            FROM calls c
+            WHERE c.callee_name = s.name
+              AND (c.provenance IS NULL OR c.provenance = 'ast')
+          ) AS caller_total,
+          COALESCE(
+            (
+              SELECT json_group_array(
+                json_object(
+                  'kind',
+                  'caller',
+                  'name',
+                  caller_name,
+                  'file_path',
+                  file_path,
+                  'line_start',
+                  line_start
+                )
+              )
+              FROM (
+                SELECT c.caller_name, c.file_path, c.line_start
+                FROM calls c
+                WHERE c.callee_name = s.name
+                  AND (c.provenance IS NULL OR c.provenance = 'ast')
+                ORDER BY c.file_path, c.line_start
+                LIMIT 3
+              )
+            ),
+            '[]'
+          ) AS caller_hops
       )
     ),
     '[]'

@@ -1,7 +1,7 @@
 ---
 actions:
   - type: flag-caller
-    description: "Warn before suggesting changes that depend on this symbol; check callers via the calls table."
+    description: "Warn before suggesting changes that depend on this symbol; row `evidence_json` lists up to three AST caller hops (see `reason`)."
   - type: apply-migrate-deprecated
     description: "Rewrite call/import sites — replace SYMBOL with row `name`, REPLACEMENT with the new identifier."
     command: codemap apply migrate-deprecated --params symbol=SYMBOL,replacement=REPLACEMENT --dry-run

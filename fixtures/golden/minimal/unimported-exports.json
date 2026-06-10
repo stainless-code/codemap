@@ -123,7 +123,7 @@
     "is_default": 0,
     "re_export_source": null,
     "reason": "reexport_chain_possible",
-    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ProductCard.tsx\",\"hops\":1}]"
+    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ProductCard.tsx\",\"hops\":1,\"truncated\":0}]"
   },
   {
     "name": "FormatPrice",
@@ -132,7 +132,7 @@
     "is_default": 0,
     "re_export_source": null,
     "reason": "reexport_chain_possible",
-    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ShopButton.tsx\",\"hops\":1}]"
+    "evidence_json": "[{\"kind\":\"reexport\",\"from_file\":\"src/components/shop/index.ts\",\"to_file\":\"src/components/shop/ShopButton.tsx\",\"hops\":1,\"truncated\":0}]"
   },
   {
     "name": "prefetch",
