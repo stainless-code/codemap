@@ -91,4 +91,4 @@ Each PR: `harden-pr full` → merge. Do not batch plans 1–4 into one PR.
 
 ## Current slice
 
-**Active:** Plan 1 slice **1.3** — `unimported-exports` re-export evidence (next on `feat/evidence-chains-boundary`).
+**Active:** Plan 1 **complete** (slices 1.0–1.4 on `feat/evidence-chains-boundary`) — open **PR #B**, then Plan 2 spike **2.0**.

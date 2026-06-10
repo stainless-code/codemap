@@ -20,6 +20,8 @@ codemap query --recipes-json               # canonical list of every bundled + p
 
 **Row count:** no cap; add `LIMIT` and `ORDER BY` when you need bounded output. On failure, stdout is `{"error": "..."}` and the process exits 1.
 
+**Evidence columns:** Some recipe rows (e.g. `boundary-violations`, `deprecated-symbols`, `unimported-exports`) add **`reason`** and **`evidence_json`** — factual detection path for agents, not pass/fail verdicts.
+
 ## Trigger patterns
 
 If the question matches any of these, use the index instead of grepping:
