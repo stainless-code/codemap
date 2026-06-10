@@ -367,7 +367,6 @@ export function ingestFileChurnFromGit(
     maxBuffer: 64 * 1024 * 1024,
   });
   if (log.status !== 0) {
-    if (!merge) replaceFileChurn(db, []);
     const reason = `skipped: git log failed (${log.stderr?.toString().trim() || "unknown"})`;
     if (!quiet) console.error(`[churn] ${reason}`);
     const fallback = tryConfigChurnFallback(db, projectRoot, quiet, finish);
@@ -488,10 +487,13 @@ export function refreshFileChurn(
     quiet,
   };
 
+  const fp = churnConfigFingerprint(halfLifeDays, since ?? null);
+  const storedFp = getMeta(db, META_CHURN_CONFIG_FINGERPRINT) ?? null;
   if (
     mode === "incremental" &&
     options?.changedPaths &&
-    options.changedPaths.length > 0
+    options.changedPaths.length > 0 &&
+    storedFp === fp
   ) {
     return ingestFileChurnFromGit(db, {
       ...base,

@@ -429,6 +429,43 @@ describe("refreshFileChurn", () => {
     }
   });
 
+  it("incremental scope falls back to full refresh when config fingerprint drifts", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createSchema(db);
+      insertFile(db, {
+        path: "src/a.ts",
+        content_hash: "a",
+        size: 10,
+        line_count: 1,
+        language: "typescript",
+        last_modified: 1,
+        indexed_at: 1,
+      });
+      setMeta(db, META_CHURN_CONFIG_FINGERPRINT, "30|v1.0.0");
+      ingestFileChurnFromGit(db, { projectRoot, quiet: true });
+      const fullCount = db
+        .query<{ c: number }>("SELECT COUNT(*) AS c FROM file_churn")
+        .get()?.c;
+      const scoped = refreshFileChurn(db, {
+        projectRoot,
+        mode: "incremental",
+        changedPaths: ["src/a.ts"],
+        halfLifeDays: 90,
+        since: null,
+        quiet: true,
+      });
+      expect(scoped.ok).toBe(true);
+      const afterCount = db
+        .query<{ c: number }>("SELECT COUNT(*) AS c FROM file_churn")
+        .get()?.c;
+      expect(afterCount).toBe(fullCount);
+      expect(getMeta(db, META_CHURN_CONFIG_FINGERPRINT)).toBe("90|");
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("deletions mode stamps meta without running git log", () => {
     const db = openCodemapDatabase(":memory:");
     try {
