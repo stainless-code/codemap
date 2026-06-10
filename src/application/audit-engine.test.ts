@@ -2,8 +2,9 @@ import { describe, expect, it } from "bun:test";
 
 import { createTables, insertFile, upsertQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
+import { diffRows } from "../diff-rows";
 import { openCodemapDatabase } from "../sqlite-db";
-import { computeDelta, runAudit, V1_DELTAS } from "./audit-engine";
+import { computeDelta, findingKey, runAudit, V1_DELTAS } from "./audit-engine";
 
 function freshDb(): CodemapDatabase {
   const db = openCodemapDatabase(":memory:");
@@ -42,6 +43,85 @@ function saveFilesBaseline(
 }
 
 const filesSpec = V1_DELTAS.find((d) => d.key === "files")!;
+const dependenciesSpec = V1_DELTAS.find((d) => d.key === "dependencies")!;
+const deprecatedSpec = V1_DELTAS.find((d) => d.key === "deprecated")!;
+
+describe("findingKey", () => {
+  it("matches diffRows identity on projected rows (extra columns stripped)", () => {
+    const rowA = { path: "src/a.ts", content_hash: "x" };
+    const rowB = { path: "src/a.ts", language: "ts" };
+    const key = findingKey(rowA, filesSpec);
+    expect(key).toBe(findingKey(rowB, filesSpec));
+    expect(key).toBe(JSON.stringify({ path: "src/a.ts" }));
+    const projected = JSON.parse(key) as { path: string };
+    expect(diffRows([projected], [projected]).added).toEqual([]);
+  });
+
+  it("separates files rows that differ on required columns", () => {
+    const k1 = findingKey({ path: "src/a.ts" }, filesSpec);
+    const k2 = findingKey({ path: "src/b.ts" }, filesSpec);
+    expect(k1).not.toBe(k2);
+  });
+
+  it("orders dependencies keys by from_path then to_path columns", () => {
+    const edge = { from_path: "src/a.ts", to_path: "src/b.ts" };
+    expect(findingKey(edge, dependenciesSpec)).toBe(
+      JSON.stringify({ from_path: "src/a.ts", to_path: "src/b.ts" }),
+    );
+    expect(
+      findingKey(
+        { from_path: "src/a.ts", to_path: "src/b.ts" },
+        dependenciesSpec,
+      ),
+    ).not.toBe(
+      findingKey(
+        { from_path: "src/b.ts", to_path: "src/a.ts" },
+        dependenciesSpec,
+      ),
+    );
+  });
+
+  it("separates deprecated homonyms across files", () => {
+    const shared = { name: "now", kind: "function" };
+    const k1 = findingKey(
+      { ...shared, file_path: "src/utils/date.ts" },
+      deprecatedSpec,
+    );
+    const k2 = findingKey(
+      { ...shared, file_path: "src/utils/format.ts" },
+      deprecatedSpec,
+    );
+    expect(k1).not.toBe(k2);
+  });
+
+  it("collides only when all requiredColumns match for deprecated delta", () => {
+    const base = {
+      name: "legacyClient",
+      kind: "function",
+      file_path: "src/api/client.ts",
+      line_start: 46,
+    };
+    const withExtra = { ...base, doc_comment: "@deprecated" };
+    expect(findingKey(base, deprecatedSpec)).toBe(
+      findingKey(withExtra, deprecatedSpec),
+    );
+  });
+
+  it("produces distinct keys across v1 delta specs for representative rows", () => {
+    const keys = new Set([
+      findingKey({ path: "src/a.ts" }, filesSpec),
+      findingKey(
+        { from_path: "src/a.ts", to_path: "src/b.ts" },
+        dependenciesSpec,
+      ),
+      findingKey(
+        { name: "foo", kind: "function", file_path: "src/a.ts" },
+        deprecatedSpec,
+      ),
+    ]);
+    expect(keys.size).toBe(3);
+  });
+});
 
 describe("runAudit (engine)", () => {
   it("returns an error envelope when the baselines map is empty", () => {

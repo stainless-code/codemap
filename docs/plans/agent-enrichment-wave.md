@@ -51,4 +51,4 @@ Each PR: `harden-pr full` (includes plan retirement) → merge.
 
 ## Current slice
 
-**Active:** Plan 4 slice **4.1** on fresh branch from `main` after **#D** merges — `findingKey()` helper + unit tests.
+**Active:** Plan 4 slice **4.2** on `feat/audit-delta-attribution` — `attribution` on `deprecated` delta for `--base`.

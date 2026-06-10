@@ -141,6 +141,15 @@ export const V1_DELTAS: readonly AuditDeltaSpec[] = [
 ] as const;
 
 /**
+ * Deterministic finding key for audit delta attribution — projects `row` to
+ * `spec.requiredColumns` (canonical order) then `JSON.stringify`, matching
+ * {@link diffRows} multiset identity on projected rows.
+ */
+export function findingKey(row: unknown, spec: AuditDeltaSpec): string {
+  return JSON.stringify(projectRow(row, spec.requiredColumns));
+}
+
+/**
  * Map of delta key → baseline name. Caller assembles this from CLI flags:
  * explicit `--<delta>-baseline <name>` and/or auto-resolved `--baseline <prefix>`
  * (which probes `<prefix>-<delta-key>` for each known delta). Deltas absent
