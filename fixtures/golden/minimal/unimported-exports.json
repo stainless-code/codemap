@@ -45,6 +45,24 @@
     "evidence_json": "[]"
   },
   {
+    "name": "duplicateAlpha",
+    "kind": "value",
+    "file_path": "src/bench/duplicate-body-a.ts",
+    "is_default": 0,
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
+  },
+  {
+    "name": "duplicateBeta",
+    "kind": "value",
+    "file_path": "src/bench/duplicate-body-b.ts",
+    "is_default": 0,
+    "re_export_source": null,
+    "reason": "no_direct_import",
+    "evidence_json": "[]"
+  },
+  {
     "name": "useHelperA",
     "kind": "value",
     "file_path": "src/bench/homonym-consumer-a.ts",

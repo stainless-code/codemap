@@ -6,6 +6,18 @@
     "coverage_pct": 0
   },
   {
+    "name": "duplicateAlpha",
+    "file_path": "src/bench/duplicate-body-a.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "duplicateBeta",
+    "file_path": "src/bench/duplicate-body-b.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
     "name": "useHelperA",
     "file_path": "src/bench/homonym-consumer-a.ts",
     "line_start": 3,

@@ -3,7 +3,7 @@ import type { CodemapDatabase, BindValues } from "./sqlite-db";
 
 /** Bump only on rebuild-forcing DDL changes (NOT on additive tables/columns).
  *  See `docs/architecture.md` § Schema Versioning. */
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 39;
 
 /** Moat-A: default call-graph surfaces exclude callback-synthesis edges. */
 export const CALLS_AST_ONLY_SQL = "(provenance IS NULL OR provenance = 'ast')";
@@ -71,7 +71,8 @@ export function createTables(db: CodemapDatabase) {
       nesting_depth INTEGER,
       return_type TEXT,
       is_async INTEGER NOT NULL DEFAULT 0,
-      is_generator INTEGER NOT NULL DEFAULT 0
+      is_generator INTEGER NOT NULL DEFAULT 0,
+      body_hash TEXT
     ) STRICT;
 
     -- One row per indexed file. Pure counters from the AST walk.
@@ -601,6 +602,8 @@ export function createIndexes(db: CodemapDatabase) {
       WHERE visibility IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_symbols_async ON symbols(file_path, name, return_type)
       WHERE is_async = 1;
+    CREATE INDEX IF NOT EXISTS idx_symbols_body_hash ON symbols(body_hash)
+      WHERE body_hash IS NOT NULL;
 
     CREATE INDEX IF NOT EXISTS idx_imports_source ON imports(source, file_path);
     CREATE INDEX IF NOT EXISTS idx_imports_resolved ON imports(resolved_path, file_path);
@@ -932,6 +935,12 @@ export interface SymbolRow {
   return_type?: string | null;
   is_async?: number;
   is_generator?: number;
+  /**
+   * SHA-256 of canonicalized function body AST for function-shaped symbols
+   * (`function`, `method`, `getter`, `setter`). NULL for non-functions and
+   * trivial bodies (`body_line_count < 2`).
+   */
+  body_hash?: string | null;
 }
 
 // SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 12.x both ship
@@ -1006,8 +1015,8 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
   batchInsert(
     db,
     symbols,
-    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, cognitive_complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator)",
-    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    "INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export, members, doc_comment, value, parent_name, visibility, complexity, cognitive_complexity, name_column_start, name_column_end, scope_local_id, body_line_count, param_count, nesting_depth, return_type, is_async, is_generator, body_hash)",
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
     (s, v) =>
       v.push(
         s.file_path,
@@ -1034,6 +1043,7 @@ export function insertSymbols(db: CodemapDatabase, symbols: SymbolRow[]) {
         s.return_type ?? null,
         s.is_async ?? 0,
         s.is_generator ?? 0,
+        s.body_hash ?? null,
       ),
   );
 }

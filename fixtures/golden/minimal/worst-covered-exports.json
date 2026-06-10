@@ -30,6 +30,18 @@
     "coverage_pct": 0
   },
   {
+    "name": "duplicateAlpha",
+    "file_path": "src/bench/duplicate-body-a.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
+    "name": "duplicateBeta",
+    "file_path": "src/bench/duplicate-body-b.ts",
+    "line_start": 1,
+    "coverage_pct": 0
+  },
+  {
     "name": "useHelperA",
     "file_path": "src/bench/homonym-consumer-a.ts",
     "line_start": 3,
@@ -105,18 +117,6 @@
     "name": "ShopButton",
     "file_path": "src/components/shop/ShopButton.tsx",
     "line_start": 8,
-    "coverage_pct": 0
-  },
-  {
-    "name": "prefetch",
-    "file_path": "src/consumer.ts",
-    "line_start": 15,
-    "coverage_pct": 0
-  },
-  {
-    "name": "run",
-    "file_path": "src/consumer.ts",
-    "line_start": 22,
     "coverage_pct": 0
   }
 ]

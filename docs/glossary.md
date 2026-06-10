@@ -147,6 +147,10 @@ Per-function decision-point count (REAL column on `symbols`). Computed by the pa
 
 SonarSource-inspired cognitive complexity (INTEGER on `symbols`) for the same function-shaped symbols as cyclomatic `complexity`. Penalizes nested control flow; computed in the same parser walk as McCabe. Recipes: `high-cognitive-complexity` (`min_score` default 15, Sonar rule threshold); `high-complexity-untested` includes the column while filtering on cyclomatic `complexity`.
 
+### `symbols.body_hash` / structural duplicate bodies
+
+SHA-256 hex of a canonicalized function **body** AST (not raw source). Normalization (v1): every identifier → `$id`; literals → kind only (`Literal:string`, …); template literals walked structurally. Populated for function-shaped symbols (`function`, `method`, `getter`, `setter`) when `body_line_count >= 2`; NULL for trivial one-liners and non-functions. Recipe **`duplicates`** groups rows sharing a hash. Distinct from token-level suffix-array / copy-paste clone detectors — catches rename-insensitive structural twins; may false-positive on shared control-flow skeletons (triage with `snippet`).
+
 ### `source_fts` (FTS5 virtual table) / `--with-fts` / opt-in full-text
 
 Opt-in FTS5 virtual table over file content (`tokenize='porter unicode61'`). Always created (near-zero space when empty); populated only when the resolved config has FTS5 enabled (`.codemap/config.ts` `fts5: true` OR `--with-fts` CLI flag at index time; CLI wins, logs stderr override). Demonstrates the FTS5 ⨯ `symbols` ⨯ `coverage` JOIN composability that ripgrep can't match — bundled recipe `text-in-deprecated-functions` exemplifies the JOIN. Toggle change auto-detects via `meta.fts5_enabled` and forces a full rebuild so `source_fts` is consistently populated. Stderr telemetry `[fts5] source_fts populated: <N> files / <X> KB` on first populate. Distinct from `coverage` — `source_fts` is an FTS5 **virtual** table; `coverage` is a regular `STRICT, WITHOUT ROWID` table. Default OFF preserves `.codemap/index.db` size for non-users (~30–50% growth on text-heavy projects).

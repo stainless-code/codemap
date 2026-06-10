@@ -28,6 +28,7 @@ import type {
   DynamicImportRow,
 } from "./db";
 import { behavioralExtractor } from "./extractors/behavioral";
+import { bodyHashExtractor } from "./extractors/body-hash";
 import { callsExtractor } from "./extractors/calls";
 import {
   complexityExtractor,
@@ -117,6 +118,7 @@ const EXTRACTORS: readonly TierExtractor[] = [
   symbolsExtractor,
   scopesExtractor,
   complexityExtractor,
+  bodyHashExtractor,
   callsExtractor,
   componentsExtractor,
   referencesExtractor,
