@@ -1,0 +1,172 @@
+[
+  {
+    "name": "helper",
+    "kind": "function",
+    "file_path": "src/bench/homonym-helper-a.ts",
+    "line_start": 1,
+    "line_end": 3,
+    "body_hash": "e8d16be3d228ad8e8c6031f8519bdcebd650b1f8b98d74cc237d0fb06693e44c",
+    "body_line_count": 3,
+    "duplicate_count": 4
+  },
+  {
+    "name": "helper",
+    "kind": "function",
+    "file_path": "src/bench/homonym-helper-b.ts",
+    "line_start": 1,
+    "line_end": 3,
+    "body_hash": "e8d16be3d228ad8e8c6031f8519bdcebd650b1f8b98d74cc237d0fb06693e44c",
+    "body_line_count": 3,
+    "duplicate_count": 4
+  },
+  {
+    "name": "ignoredExport",
+    "kind": "function",
+    "file_path": "src/orphan.ts",
+    "line_start": 2,
+    "line_end": 4,
+    "body_hash": "e8d16be3d228ad8e8c6031f8519bdcebd650b1f8b98d74cc237d0fb06693e44c",
+    "body_line_count": 3,
+    "duplicate_count": 4
+  },
+  {
+    "name": "orphanHelper",
+    "kind": "function",
+    "file_path": "src/orphan.ts",
+    "line_start": 7,
+    "line_end": 9,
+    "body_hash": "e8d16be3d228ad8e8c6031f8519bdcebd650b1f8b98d74cc237d0fb06693e44c",
+    "body_line_count": 3,
+    "duplicate_count": 4
+  },
+  {
+    "name": "legacyClient",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 46,
+    "line_end": 48,
+    "body_hash": "4a40f1a28d1725db9acbb5e8dc3ff8a19e8d4a89d55d5468076797f1732e17d2",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "useHelperA",
+    "kind": "function",
+    "file_path": "src/bench/homonym-consumer-a.ts",
+    "line_start": 3,
+    "line_end": 5,
+    "body_hash": "4a40f1a28d1725db9acbb5e8dc3ff8a19e8d4a89d55d5468076797f1732e17d2",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "useHelperB",
+    "kind": "function",
+    "file_path": "src/bench/homonym-consumer-b.ts",
+    "line_start": 3,
+    "line_end": 5,
+    "body_hash": "4a40f1a28d1725db9acbb5e8dc3ff8a19e8d4a89d55d5468076797f1732e17d2",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "ping",
+    "kind": "method",
+    "file_path": "src/bench/method-call-sites.ts",
+    "line_start": 3,
+    "line_end": 5,
+    "body_hash": "9f55d2e87401c5a13848194ee9cb869a9c56340a0ea5452f75bc1052d15e0941",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "dropMe",
+    "kind": "function",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 5,
+    "line_end": 7,
+    "body_hash": "9f55d2e87401c5a13848194ee9cb869a9c56340a0ea5452f75bc1052d15e0941",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "keepMe",
+    "kind": "function",
+    "file_path": "src/bench/stale-multi-helpers.ts",
+    "line_start": 1,
+    "line_end": 3,
+    "body_hash": "9f55d2e87401c5a13848194ee9cb869a9c56340a0ea5452f75bc1052d15e0941",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "_hiResEpoch",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 26,
+    "line_end": 28,
+    "body_hash": "ead8bca8e91caab31f4deb71f88930b2a9075b5d61624b7ee1a7907fe70482f6",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "now",
+    "kind": "function",
+    "file_path": "src/utils/date.ts",
+    "line_start": 5,
+    "line_end": 7,
+    "body_hash": "ead8bca8e91caab31f4deb71f88930b2a9075b5d61624b7ee1a7907fe70482f6",
+    "body_line_count": 3,
+    "duplicate_count": 3
+  },
+  {
+    "name": "epochMs",
+    "kind": "function",
+    "file_path": "src/utils/format.ts",
+    "line_start": 5,
+    "line_end": 8,
+    "body_hash": "ead8bca8e91caab31f4deb71f88930b2a9075b5d61624b7ee1a7907fe70482f6",
+    "body_line_count": 4,
+    "duplicate_count": 3
+  },
+  {
+    "name": "handshake",
+    "kind": "function",
+    "file_path": "src/api/client.ts",
+    "line_start": 37,
+    "line_end": 40,
+    "body_hash": "fa2629b5493dec080e79ebc18a614bd18cf3de043aaf1ab266d9b8932e7c51af",
+    "body_line_count": 4,
+    "duplicate_count": 2
+  },
+  {
+    "name": "duplicateAlpha",
+    "kind": "function",
+    "file_path": "src/bench/duplicate-body-a.ts",
+    "line_start": 1,
+    "line_end": 6,
+    "body_hash": "82eac87bd797830b98f82147a6d1deec2d2cc45241694705827b475c449941b2",
+    "body_line_count": 6,
+    "duplicate_count": 2
+  },
+  {
+    "name": "duplicateBeta",
+    "kind": "function",
+    "file_path": "src/bench/duplicate-body-b.ts",
+    "line_start": 1,
+    "line_end": 6,
+    "body_hash": "82eac87bd797830b98f82147a6d1deec2d2cc45241694705827b475c449941b2",
+    "body_line_count": 6,
+    "duplicate_count": 2
+  },
+  {
+    "name": "UiPanel",
+    "kind": "function",
+    "file_path": "src/bench/jsx-ui-namespace.ts",
+    "line_start": 1,
+    "line_end": 3,
+    "body_hash": "fa2629b5493dec080e79ebc18a614bd18cf3de043aaf1ab266d9b8932e7c51af",
+    "body_line_count": 3,
+    "duplicate_count": 2
+  }
+]

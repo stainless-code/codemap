@@ -70,6 +70,7 @@ If the question matches any of these, use the index instead of grepping:
 | "What's high-complexity AND undertested?"                    | `--recipe high-complexity-untested` (needs `ingest-coverage`; without ingest prefer `high-crap-score`)                                               |
 | "Complex + undertested without coverage ingest?"             | `--recipe high-crap-score` (graph-estimated tiers; `coverage_source: estimated`)                                                                     |
 | "What's cognitively complex (nesting-heavy)?"                | `--recipe high-cognitive-complexity` (default `min_score=15`; `--params min_score=20` to tighten)                                                    |
+| "Structurally duplicate function bodies?"                    | `--recipe duplicates` (rename-insensitive `body_hash`; triage with `snippet` before refactor)                                                        |
 
 ## Quick reference queries
 

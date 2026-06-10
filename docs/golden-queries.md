@@ -78,6 +78,10 @@ Some bundled recipes add optional **`reason`** (TEXT) and **`evidence_json`** (T
 
 `coverage-confirmed-dead` adds **`confidence`** (`high` \| `medium`) on each row — **`high`** when static dead and ingested `coverage_pct = 0`; **`medium`** when static dead but the symbol has no ingested coverage row. Also **`reason`**, **`caller_count`**. Goldens: `coverage-confirmed-dead` (post-ingest mix) and `coverage-confirmed-dead-no-ingest` (`preSetup: clear-coverage`, `everyRowFieldEquals` on `confidence: medium`).
 
+### Duplication columns (`duplicates` recipe)
+
+`duplicates` returns one row per function-shaped symbol in a **`body_hash`** collision group: **`name`**, **`kind`**, **`file_path`**, **`line_start`**, **`line_end`**, **`body_hash`**, **`body_line_count`**, **`duplicate_count`** (in-scope group size after `path_prefix` / `min_body_lines`). Substrate column **`symbols.body_hash`** is populated at index for function-shaped symbols (`function`, `method`, `getter`, `setter`) when `body_line_count >= 2`. Goldens: `duplicates` (includes `src/bench/duplicate-body-{a,b}.ts` pair). False positives possible when unrelated functions share control-flow skeleton or sync vs async/generator bodies match — triage with `snippet`. Recipe caps at **50 rows** (no truncation marker).
+
 ---
 
 ## Status

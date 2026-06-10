@@ -176,6 +176,15 @@
       "setup": ["ingest-coverage"]
     },
     {
+      "id": "duplication.body-hash",
+      "description": "symbols.body_hash structural fingerprint and duplicates recipe",
+      "fixtureFiles": [
+        "src/bench/duplicate-body-a.ts",
+        "src/bench/duplicate-body-b.ts"
+      ],
+      "goldenScenarios": ["duplicates"]
+    },
+    {
       "id": "boundaries.suppressions",
       "description": "boundary_rules, suppressions, config-driven violations",
       "fixtureFiles": [

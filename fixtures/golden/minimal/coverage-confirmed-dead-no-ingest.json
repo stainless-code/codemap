@@ -10,6 +10,26 @@
     "reason": "no_callers_and_coverage_unmeasured"
   },
   {
+    "name": "duplicateAlpha",
+    "kind": "function",
+    "file_path": "src/bench/duplicate-body-a.ts",
+    "line_start": 1,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
+    "name": "duplicateBeta",
+    "kind": "function",
+    "file_path": "src/bench/duplicate-body-b.ts",
+    "line_start": 1,
+    "coverage_pct": 0,
+    "caller_count": 0,
+    "confidence": "medium",
+    "reason": "no_callers_and_coverage_unmeasured"
+  },
+  {
     "name": "useHelperA",
     "kind": "function",
     "file_path": "src/bench/homonym-consumer-a.ts",

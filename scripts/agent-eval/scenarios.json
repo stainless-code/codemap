@@ -162,6 +162,15 @@
         "regex": "export\\s+function\\s+\\w+",
         "mode": "matches"
       }
+    },
+    {
+      "id": "duplicates-recipe",
+      "goldenId": "duplicates",
+      "traditional": {
+        "globs": ["**/*.{ts,tsx}"],
+        "regex": "export\\s+function\\s+\\w+",
+        "mode": "files"
+      }
     }
   ]
 }

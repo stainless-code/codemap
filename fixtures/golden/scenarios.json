@@ -458,6 +458,11 @@
       "recipe": "high-cognitive-complexity"
     },
     {
+      "id": "duplicates",
+      "prompt": "Function-shaped symbols with identical structural body_hash across files.",
+      "recipe": "duplicates"
+    },
+    {
       "id": "circular-imports",
       "prompt": "Files in import cycles (SCCs of size >= 2) via Tarjan.",
       "recipe": "circular-imports"

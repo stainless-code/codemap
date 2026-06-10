@@ -42,6 +42,18 @@
     "line_count": 5
   },
   {
+    "path": "src/bench/duplicate-body-a.ts",
+    "content_hash": "4cb1486e1d487fecbc40344655d815604d9b7c5da792b9871c967ebff5a14c76",
+    "language": "ts",
+    "line_count": 7
+  },
+  {
+    "path": "src/bench/duplicate-body-b.ts",
+    "content_hash": "b0844c34fae42b69fc37a90754e27b700ec9701e0e32fb64170101bab81385cc",
+    "language": "ts",
+    "line_count": 7
+  },
+  {
     "path": "src/bench/homonym-consumer-a.ts",
     "content_hash": "8b1e408d2dee9f4e02afa3a9c3a7b8cc67a348eb8a828c1c3f88b0b2cc504f35",
     "language": "ts",
