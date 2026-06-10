@@ -80,7 +80,9 @@ Reviewers treat the anchor as contract. Findings that would violate it → **rep
 
 **Fix:** bugs, missing tests, docs/changeset drift, lint/type/format, error-handling gaps, edge cases, **behavior-preserving refactors in touched files**, in-scope nits (naming, comment hygiene, cheap lint fixes).
 
-**Report only:** redesign, new capabilities, semantic API changes, nits outside the diff, refactors unrelated to a flagged issue.
+**Report only:** redesign, semantic API changes, nits outside the diff, refactors unrelated to a flagged issue.
+
+**Do not defer complements:** agent-surface parity (rule/skill/MCP), glossary/architecture/golden-queries contracts, script/golden tests for acceptance criteria, and cross-links named in the plan ship in the **same PR** — not "optional v2" or post-merge unless the plan **Out of scope** section explicitly excludes them.
 
 ## Reviewer roster
 
@@ -122,7 +124,7 @@ loop:
   pass += 1
   goto loop
 capped:
-  emit deferred-nits list
+  emit deferred-nits list (each nit must cite plan Out of scope or cross-PR blocker — not "optional")
 done:
   if uncommitted fixes → git commit -m "harden: …"
   emit final report (include babysit one-liner if full mode)

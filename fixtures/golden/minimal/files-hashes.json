@@ -150,6 +150,12 @@
     "line_count": 4
   },
   {
+    "path": "src/lib/alias-blind-spot.ts",
+    "content_hash": "34f2847180126455a500387ae3b2f49f67cc4e13290cc677c3e148827a6564ff",
+    "language": "ts",
+    "line_count": 6
+  },
+  {
     "path": "src/lib/cache.ts",
     "content_hash": "964f6d3ddb8a7782b1273a38ed0bbde8cd886eb672c1f20466f0aa88ff49205f",
     "language": "ts",

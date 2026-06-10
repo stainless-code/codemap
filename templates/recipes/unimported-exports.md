@@ -7,14 +7,14 @@ actions:
 
 Exports that have no row in `imports` referencing their file AND name. Surfaces the **direct-use-only** subset of "unused exports" — useful as a starting candidate list, but **NEVER as a "safe to delete" list** without manual verification.
 
-Rows include **`reason`** (`no_direct_import` \| `reexport_chain_possible`) and **`evidence_json`** (barrel hops from `re_export_chains` when a re-export path may explain the false positive).
+Rows include **`reason`** (`no_direct_import` \| `reexport_chain_possible` \| `unresolved_import_blind_spot`) and **`evidence_json`** (barrel hops or unresolved-import hints when a false positive may be explained).
 
 ## V1 limitations (false-positive classes)
 
 The recipe ships intentionally simple. Three known classes of false positive:
 
 1. **Re-export chains** — the recipe still matches **direct** `imports` → `exports` only; it does not walk consumers through barrels. If `src/index.ts` re-exports `bar` from `src/bar.ts`, and consumers import `bar` from the barrel, `bar` in `src/bar.ts` can still appear as unimported. Rows with a matching `re_export_chains` hop get **`reason=reexport_chain_possible`** and barrel hops in **`evidence_json`** — triage those before deletion; they are not exclusions from the result set.
-2. **Unresolved imports** — when `imports.resolved_path IS NULL` (e.g. `tsconfig.json` path aliases codemap's resolver can't resolve, or external-package imports), those rows are ignored. If the unresolved import actually targets the export, it's a false positive. Codemap's resolver covers most TS / JS shapes; this is a corner case for unusual config.
+2. **Unresolved imports** — when `imports.resolved_path IS NULL` but specifiers name the export, rows get **`reason=unresolved_import_blind_spot`** and importer hops in **`evidence_json`** (`kind: unresolved_import`). External packages and unresolvable aliases both qualify — triage before deletion; not proof of use.
 3. **Default exports skipped** — `is_default = 0` filter. Default exports are commonly framework entry points (Next.js `page.tsx`, Storybook stories, `vite.config.ts`) that codemap doesn't model; flagging them produces high false-positive noise. To include them, drop the `AND e.is_default = 0` clause in a project-local override.
 
 ## What's NOT covered (orthogonal recipes)
