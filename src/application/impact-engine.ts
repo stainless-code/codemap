@@ -1,4 +1,5 @@
 import type { CodemapDatabase } from "../db";
+import { looksLikeDirectory } from "./show-engine";
 
 /** Walk direction. `up` = callers/dependents, `down` = callees/dependencies. */
 export type ImpactDirection = "up" | "down" | "both";
@@ -65,6 +66,11 @@ export interface ImpactResult {
     backend: "dependencies" | "calls" | "imports";
     reason: string;
   }>;
+  /**
+   * Set when `inPath` does not match any defining file for a symbol target.
+   * Matches are empty; tells the agent why the scope filter yielded no graph.
+   */
+  skipped_scope?: { reason: string };
 }
 
 export interface FindImpactOpts {
@@ -78,6 +84,11 @@ export interface FindImpactOpts {
   depth?: number | undefined;
   /** Default `500`. Caps total rows; truncation surfaces as `terminated_by: "limit"`. */
   limit?: number | undefined;
+  /**
+   * Optional defining-file scope for symbol targets (show-engine prefix/exact
+   * rules — directory-shaped paths are prefix filters; otherwise exact file).
+   */
+  inPath?: string | undefined;
 }
 
 const DEFAULT_DEPTH = 3;
@@ -101,8 +112,31 @@ export function findImpact(
   const depthLimit = depthRaw === 0 ? UNBOUNDED_DEPTH_SENTINEL : depthRaw;
   const limit = opts.limit ?? DEFAULT_LIMIT;
 
-  const target = resolveTarget(db, opts.target);
+  let target = resolveTarget(db, opts.target);
   const { backends, skipped } = resolveBackends(viaOpt, target.kind);
+
+  if (
+    opts.inPath !== undefined &&
+    opts.inPath.length > 0 &&
+    target.kind === "symbol"
+  ) {
+    const scoped = filterMatchedInByInPath(target.matched_in, opts.inPath);
+    target = { ...target, matched_in: scoped };
+    if (scoped.length === 0) {
+      return emptyImpactResult({
+        target,
+        direction,
+        backends,
+        depthRaw,
+        depthLimit,
+        limit,
+        skipped,
+        skippedScope: {
+          reason: `inPath "${opts.inPath}" does not match any defining file for symbol "${target.name}"`,
+        },
+      });
+    }
+  }
   const directions: Array<"up" | "down"> =
     direction === "both" ? ["up", "down"] : [direction];
 
@@ -110,8 +144,33 @@ export function findImpact(
   let maxDepth = 0;
   let depthCapped = false;
 
+  const homonymOrScoped =
+    target.kind === "symbol" &&
+    target.matched_in.length > 0 &&
+    (target.matched_in.length > 1 ||
+      (opts.inPath !== undefined && opts.inPath.length > 0));
+
   for (const dir of directions) {
     for (const backend of backends) {
+      if (backend === "calls" && homonymOrScoped) {
+        for (const scopeFile of target.matched_in) {
+          const rows = walk(db, {
+            target,
+            direction: dir,
+            backend,
+            depthLimit,
+            rowCap: limit + 1,
+            scopeFiles: [scopeFile],
+          });
+          for (const r of rows) {
+            if (r.depth > maxDepth) maxDepth = r.depth;
+            if (r.depth >= depthLimit) depthCapped = true;
+            allNodes.push(r);
+          }
+        }
+        continue;
+      }
+
       const rows = walk(db, {
         target,
         direction: dir,
@@ -265,6 +324,8 @@ interface WalkOpts {
   backend: "dependencies" | "calls" | "imports";
   depthLimit: number;
   rowCap: number;
+  /** When set, only the first hop from the seed uses call sites in these files. */
+  scopeFiles?: string[] | undefined;
 }
 
 /**
@@ -287,6 +348,14 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   const edge: ImpactNode["edge"] =
     opts.direction === "up" ? "called_by" : "calls";
 
+  const scopeFiles = opts.scopeFiles;
+  const scopeClause =
+    scopeFiles !== undefined && scopeFiles.length > 0
+      ? `AND (walk.depth > 0 OR c.file_path IN (${scopeFiles.map(() => "?").join(", ")}))`
+      : "";
+  const scopeParams =
+    scopeFiles !== undefined && scopeFiles.length > 0 ? scopeFiles : [];
+
   // Seed depth = 0; `WHERE depth > 0` filters seed; `< depthLimit` is the cap.
   const sql = `
     WITH RECURSIVE walk(node, depth, path, file_path) AS (
@@ -299,6 +368,7 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
       WHERE (c.provenance IS NULL OR c.provenance = 'ast')
         AND walk.depth < ?
         AND instr(walk.path, char(30) || c.${joinToCol} || char(30)) = 0
+        ${scopeClause}
     )
     SELECT node, depth, file_path
     FROM (
@@ -315,7 +385,13 @@ function walkCalls(db: CodemapDatabase, opts: WalkOpts): ImpactNode[] {
   `;
   const rows = db
     .query(sql)
-    .all(seedName, seedName, opts.depthLimit, opts.rowCap) as Array<{
+    .all(
+      seedName,
+      seedName,
+      opts.depthLimit,
+      ...scopeParams,
+      opts.rowCap,
+    ) as Array<{
     node: string;
     depth: number;
     file_path: string | null;
@@ -402,4 +478,47 @@ function lookupSymbolFile(
     )
     .get(name) as { file_path: string } | null;
   return r?.file_path;
+}
+
+/** Prefix/exact filter — mirrors `findSymbolsByName` `inPath` semantics. */
+function filterMatchedInByInPath(
+  matchedIn: string[],
+  inPath: string,
+): string[] {
+  if (looksLikeDirectory(inPath)) {
+    const prefix = inPath.endsWith("/") ? inPath : `${inPath}/`;
+    return matchedIn.filter((filePath) => filePath.startsWith(prefix));
+  }
+  return matchedIn.filter((filePath) => filePath === inPath);
+}
+
+function emptyImpactResult(opts: {
+  target: ImpactTarget;
+  direction: ImpactDirection;
+  backends: Array<"dependencies" | "calls" | "imports">;
+  depthRaw: number;
+  depthLimit: number;
+  limit: number;
+  skipped: Array<{
+    backend: "dependencies" | "calls" | "imports";
+    reason: string;
+  }>;
+  skippedScope: { reason: string };
+}): ImpactResult {
+  const result: ImpactResult = {
+    target: opts.target,
+    direction: opts.direction,
+    via: opts.backends,
+    depth_limit: opts.depthRaw,
+    matches: [],
+    summary: {
+      nodes: 0,
+      max_depth_reached: 0,
+      by_kind: {},
+      terminated_by: "exhausted",
+    },
+    skipped_scope: opts.skippedScope,
+  };
+  if (opts.skipped.length > 0) result.skipped_backends = opts.skipped;
+  return result;
 }

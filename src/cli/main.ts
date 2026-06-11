@@ -322,6 +322,7 @@ Copies bundled agent templates into .agents/ under the project root.
       via: parsed.via,
       depth: parsed.depth,
       limit: parsed.limit,
+      inPath: parsed.inPath,
       summary: parsed.summary,
       json: parsed.json,
     });

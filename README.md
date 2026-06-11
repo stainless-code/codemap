@@ -204,6 +204,7 @@ codemap snippet foo --json                                      # {matches: [{..
 
 # Impact analysis — symbol/file blast-radius walker (callers, callees, dependents, dependencies)
 codemap impact handleQuery                                      # both directions, depth 3, all compatible graphs
+codemap impact dup --in src/a.ts --via calls                    # homonym symbol scoped to one defining file
 codemap impact src/db.ts --direction up                         # what depends on db.ts (file-level, deps + imports)
 codemap impact handleAudit --depth 1 --via calls                # direct callers via the calls table only
 codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fan-in score

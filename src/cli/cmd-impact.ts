@@ -4,7 +4,9 @@ import type {
   ImpactDirection,
   ImpactResult,
 } from "../application/impact-engine";
+import { toProjectRelative } from "../application/validate-engine";
 import { closeDb, openDb } from "../db";
+import { getProjectRoot } from "../runtime";
 import { bootstrapCodemap } from "./bootstrap-codemap";
 
 interface ImpactOpts {
@@ -16,6 +18,7 @@ interface ImpactOpts {
   via: ImpactBackend;
   depth: number;
   limit: number;
+  inPath: string | undefined;
   summary: boolean;
   json: boolean;
 }
@@ -36,7 +39,7 @@ const BACKENDS: ReadonlySet<ImpactBackend> = new Set([
  * Print `codemap impact` usage.
  */
 export function printImpactCmdHelp(): void {
-  console.log(`Usage: codemap impact <target> [--direction <d>] [--depth <N>] [--via <b>] [--limit <N>] [--summary] [--json]
+  console.log(`Usage: codemap impact <target> [--in <path>] [--direction <d>] [--depth <N>] [--via <b>] [--limit <N>] [--summary] [--json]
 
 Walk the dependency / calls / imports graph from <target> and return the
 blast radius — every symbol or file reachable in N hops. Replaces composing
@@ -58,6 +61,8 @@ Flags:
                       explicit choices land in skipped_backends.
   --limit <N>         Cap total result rows. Default 500. Truncation reports
                       \`terminated_by: "limit"\` in summary.
+  --in <path>         Disambiguate symbol homonyms by defining file (prefix or
+                      exact — same rules as \`codemap show --in\`).
   --summary           Return only target + summary (skip per-node matches).
   --json              Emit the JSON envelope. Required for --summary
                       consumption in CI.
@@ -68,10 +73,12 @@ Output (JSON, all cases):
     "matches": [ {depth, direction, edge, kind, name?, file_path, ...}, ... ],
     "summary": { "nodes": N, "max_depth_reached": N, "by_kind": {...},
                  "terminated_by": "depth|limit|exhausted" },
-    "skipped_backends"?: [ {backend, reason}, ... ] }
+    "skipped_backends"?: [ {backend, reason}, ... ],
+    "skipped_scope"?: { "reason": "..." } }
 
 Examples:
   codemap impact handleQuery
+  codemap impact dup --in src/a.ts --via calls
   codemap impact src/db.ts --direction up
   codemap impact handleAudit --depth 1 --via calls
   codemap impact runWatchLoop --json --summary
@@ -91,6 +98,7 @@ export function parseImpactRest(rest: string[]):
       via: ImpactBackend;
       depth: number;
       limit: number;
+      inPath: string | undefined;
       summary: boolean;
       json: boolean;
     } {
@@ -103,6 +111,7 @@ export function parseImpactRest(rest: string[]):
   let via: ImpactBackend = "all";
   let depth = 3;
   let limit = 500;
+  let inPath: string | undefined;
   let summary = false;
   let json = false;
 
@@ -172,6 +181,18 @@ export function parseImpactRest(rest: string[]):
       i++;
       continue;
     }
+    if (a === "--in") {
+      const next = rest[i + 1];
+      if (next === undefined || next.startsWith("-")) {
+        return {
+          kind: "error",
+          message: `codemap impact: "--in" requires a path prefix or file path.`,
+        };
+      }
+      inPath = next;
+      i++;
+      continue;
+    }
     if (a === "--limit") {
       const next = rest[i + 1];
       if (next === undefined) {
@@ -213,7 +234,17 @@ export function parseImpactRest(rest: string[]):
     };
   }
 
-  return { kind: "run", target, direction, via, depth, limit, summary, json };
+  return {
+    kind: "run",
+    target,
+    direction,
+    via,
+    depth,
+    limit,
+    inPath,
+    summary,
+    json,
+  };
 }
 
 /**
@@ -229,12 +260,17 @@ export async function runImpactCmd(opts: ImpactOpts): Promise<void> {
     const db = openDb();
     let result: ImpactResult;
     try {
+      const inPath =
+        opts.inPath !== undefined && opts.inPath.length > 0
+          ? toProjectRelative(getProjectRoot(), opts.inPath)
+          : undefined;
       result = findImpact(db, {
         target: opts.target,
         direction: opts.direction,
         via: opts.via,
         depth: opts.depth,
         limit: opts.limit,
+        inPath,
       });
     } finally {
       closeDb(db, { readonly: true });
@@ -269,6 +305,9 @@ function renderTerminal(result: ImpactResult, summaryOnly: boolean): void {
     for (const s of result.skipped_backends) {
       console.error(`# skipped backend "${s.backend}": ${s.reason}`);
     }
+  }
+  if (result.skipped_scope !== undefined) {
+    console.error(`# skipped scope: ${result.skipped_scope.reason}`);
   }
   if (!summaryOnly) {
     for (const m of result.matches) {

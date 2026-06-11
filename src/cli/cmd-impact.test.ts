@@ -21,6 +21,7 @@ describe("parseImpactRest — happy paths", () => {
       via: "all",
       depth: 3,
       limit: 500,
+      inPath: undefined,
       summary: false,
       json: false,
     });
@@ -48,8 +49,31 @@ describe("parseImpactRest — happy paths", () => {
       via: "dependencies",
       depth: 5,
       limit: 100,
+      inPath: undefined,
       summary: true,
       json: true,
+    });
+  });
+
+  it("parses --in for homonym disambiguation", () => {
+    const r = parseImpactRest([
+      "impact",
+      "dup",
+      "--in",
+      "src/a.ts",
+      "--via",
+      "calls",
+    ]);
+    expect(r).toEqual({
+      kind: "run",
+      target: "dup",
+      direction: "both",
+      via: "calls",
+      depth: 3,
+      limit: 500,
+      inPath: "src/a.ts",
+      summary: false,
+      json: false,
     });
   });
 
@@ -113,5 +137,11 @@ describe("parseImpactRest — validation", () => {
     const r = parseImpactRest(["impact", "x", "--direction"]);
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.message).toMatch(/requires a value/);
+  });
+
+  it("rejects --in without value", () => {
+    const r = parseImpactRest(["impact", "x", "--in"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toMatch(/--in/);
   });
 });

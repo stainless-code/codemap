@@ -1,6 +1,6 @@
 # PR 2 — impact `inPath` homonym scoping
 
-> **Status:** open (not started) · **PR:** 2 of 3 · **Effort:** S–M
+> **Status:** open (in progress) · **PR:** 2 of 3 · **Effort:** S–M
 >
 > **Orchestrator:** [`security-hardening-orchestrator.md`](./security-hardening-orchestrator.md)
 >
@@ -9,8 +9,6 @@
 ---
 
 ## Agent start here
-
-**Blocked until PR 1 merges.**
 
 ### Key touchpoints
 
@@ -37,16 +35,16 @@ findImpact({ target, inPath? })
 
 ## Task list
 
-| ID  | Task                                                 | Status  | Verify                                           |
-| --- | ---------------------------------------------------- | ------- | ------------------------------------------------ |
-| 4.1 | `inPath?: string` on `FindImpactOpts` / `findImpact` | pending | `bun test src/application/impact-engine.test.ts` |
-| 4.2 | Multi `matched_in` → per-file walks; merge/dedup     | pending | homonym fixture                                  |
-| 4.3 | `inPath` ∉ `matched_in` → empty + skip reason        | pending | test                                             |
-| 4.4 | Walkers: `scopeFiles` on call-site file              | pending | test                                             |
-| 4.5 | CLI `codemap impact --in <path>`                     | pending | `bun test src/cli/cmd-impact.test.ts`            |
-| 4.6 | MCP/HTTP `impact` `in` param                         | pending | MCP tests                                        |
-| 4.7 | Doc lift (architecture § impact)                     | pending | format check                                     |
-| 4.s | Commit + PR + CI                                     | pending | `bun run check`                                  |
+| ID  | Task                                                 | Status   | Verify                                           |
+| --- | ---------------------------------------------------- | -------- | ------------------------------------------------ |
+| 4.1 | `inPath?: string` on `FindImpactOpts` / `findImpact` | **done** | `bun test src/application/impact-engine.test.ts` |
+| 4.2 | Multi `matched_in` → per-file walks; merge/dedup     | **done** | homonym fixture                                  |
+| 4.3 | `inPath` ∉ `matched_in` → empty + skip reason        | **done** | test                                             |
+| 4.4 | Walkers: `scopeFiles` on call-site file              | **done** | test                                             |
+| 4.5 | CLI `codemap impact --in <path>`                     | **done** | `bun test src/cli/cmd-impact.test.ts`            |
+| 4.6 | MCP/HTTP `impact` `in` param                         | **done** | MCP tests                                        |
+| 4.7 | Doc lift (architecture § impact)                     | **done** | format check                                     |
+| 4.s | Commit + PR + CI                                     | **done** | `bun run check`                                  |
 
 ---
 
@@ -62,9 +60,9 @@ findImpact({ target, inPath? })
 
 ## Acceptance
 
-- [ ] Homonym: unscoped walk unions per-defining-file graphs
-- [ ] `inPath` outside `matched_in` → empty matches + skip reason
-- [ ] CLI `--in` and MCP `in` wired
+- [x] Homonym: unscoped walk unions per-defining-file graphs
+- [x] `inPath` outside `matched_in` → empty matches + skip reason
+- [x] CLI `--in` and MCP `in` wired
 - [ ] PR merged to `main`
 
 ### Verify
