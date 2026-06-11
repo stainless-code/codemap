@@ -1,13 +1,33 @@
+import { resolve } from "node:path";
+
 import type { ResolvedCodemapConfig } from "./config";
+import { isRuntimeSwapActive } from "./runtime-swap";
 
 let _config: ResolvedCodemapConfig | null = null;
 
 /**
  * Store resolved config for the current process (`getProjectRoot`, `openDb`, etc.).
  * Must run before indexing or `openDb()`; typically via `createCodemap` or the CLI.
+ *
+ * Throws when switching to a different `root` mid-process (audit worktree reindex
+ * is the only exempt path — bracketed via `runtime-swap.ts`).
  */
 export function initCodemap(config: ResolvedCodemapConfig): void {
+  if (_config !== null && !isRuntimeSwapActive()) {
+    const current = resolve(_config.root);
+    const next = resolve(config.root);
+    if (current !== next) {
+      throw new Error(
+        `Codemap: cannot switch project root from ${current} to ${next} in the same process (use a fresh process or audit --base worktree reindex)`,
+      );
+    }
+  }
   _config = config;
+}
+
+/** Maintainer test helper — clears process-global config between test cases. */
+export function resetCodemapForTest(): void {
+  _config = null;
 }
 
 export function getCodemapConfig(): ResolvedCodemapConfig {

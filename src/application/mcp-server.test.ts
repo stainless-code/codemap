@@ -21,9 +21,12 @@ import {
   upsertQueryBaseline,
 } from "../db";
 import { initCodemap } from "../runtime";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import { createMcpServer } from "./mcp-server";
 import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
+
+installCodemapTestTeardown();
 
 let benchDir: string;
 

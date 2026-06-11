@@ -11,6 +11,7 @@ import { join } from "node:path";
 
 import { resolveCodemapConfig } from "../../src/config";
 import { initCodemap } from "../../src/runtime";
+import { installCodemapTestTeardown } from "../../src/test-helpers/runtime-reset";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import { compareLogArms, summarizeLogComparison } from "./compare-live-logs";
 import { runLiveMcpArm } from "./live-mcp-arm";
@@ -42,6 +43,8 @@ import {
   runTraditionalProbe,
   traditionalToolSequence,
 } from "./traditional-probe";
+
+installCodemapTestTeardown();
 
 const sampleLog = join(
   import.meta.dir,

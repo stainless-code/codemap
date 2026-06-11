@@ -1,19 +1,31 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
+import { resolveCodemapConfig } from "../config";
 import { createTables, insertFile, upsertQueryBaseline } from "../db";
 import type { CodemapDatabase } from "../db";
 import { diffRows } from "../diff-rows";
+import { configureResolver } from "../resolver";
+import { getProjectRoot, initCodemap } from "../runtime";
 import { openCodemapDatabase } from "../sqlite-db";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import {
   buildFindingKeySet,
   collapseAuditEnvelopeForSummary,
   computeDelta,
   findingKey,
+  makeWorktreeReindex,
   runAudit,
   tagAddedWithAttribution,
   V1_DELTAS,
 } from "./audit-engine";
 import type { AuditEnvelope } from "./audit-engine";
+import * as runIndex from "./run-index";
+import type { IndexResult } from "./types";
+
+installCodemapTestTeardown();
 
 function freshDb(): CodemapDatabase {
   const db = openCodemapDatabase(":memory:");
@@ -485,6 +497,37 @@ describe("computeDelta — files", () => {
       expect(result).toEqual({ added: [{ path: "src/new.ts" }], removed: [] });
     } finally {
       db.close();
+    }
+  });
+});
+
+describe("makeWorktreeReindex", () => {
+  it("swaps roots under runtime bracket and restores live config", async () => {
+    const liveRoot = mkdtempSync(join(tmpdir(), "audit-reindex-live-"));
+    const wtRoot = mkdtempSync(join(tmpdir(), "audit-reindex-wt-"));
+    writeFileSync(join(liveRoot, "package.json"), "{}");
+    writeFileSync(join(wtRoot, "package.json"), "{}");
+    mkdirSync(join(wtRoot, ".codemap"), { recursive: true });
+
+    initCodemap(resolveCodemapConfig(liveRoot, {}));
+    configureResolver(liveRoot, null);
+
+    const spy = spyOn(runIndex, "runCodemapIndex").mockResolvedValue({
+      mode: "full",
+      indexed: 0,
+      skipped: 0,
+      elapsedMs: 0,
+      stats: { files: 0 },
+    } as IndexResult);
+    try {
+      await makeWorktreeReindex()(wtRoot);
+      expect(getProjectRoot()).toBe(liveRoot);
+      expect(() =>
+        initCodemap(resolveCodemapConfig("/other-root", {})),
+      ).toThrow(/cannot switch project root/);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
     }
   });
 });

@@ -440,10 +440,10 @@ export async function loadUserConfig(
     const def = mod.default;
     if (typeof def === "function") {
       const out = await def();
-      return out as CodemapUserConfig;
+      return parseCodemapUserConfig(out);
     }
     if (def && typeof def === "object") {
-      return def as CodemapUserConfig;
+      return parseCodemapUserConfig(def);
     }
     return undefined;
   };
@@ -452,7 +452,7 @@ export async function loadUserConfig(
     if (explicitPath.endsWith(".json")) {
       if (!existsSync(explicitPath)) return undefined;
       const raw = await readJsonFile(explicitPath);
-      return raw as CodemapUserConfig;
+      return parseCodemapUserConfig(raw);
     }
     return tryImport(explicitPath);
   }
@@ -463,12 +463,12 @@ export async function loadUserConfig(
     if (basename.endsWith(".json")) {
       if (existsSync(candidate)) {
         const raw = await readJsonFile(candidate);
-        return raw as CodemapUserConfig;
+        return parseCodemapUserConfig(raw);
       }
       continue;
     }
     const fromImport = await tryImport(candidate);
-    if (fromImport) return fromImport;
+    if (fromImport) return parseCodemapUserConfig(fromImport);
   }
 
   return undefined;

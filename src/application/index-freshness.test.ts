@@ -3,6 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "../config";
 import * as dbModule from "../db";
 import { closeDb, createTables, openDb, setMeta } from "../db";

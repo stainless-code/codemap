@@ -3,9 +3,13 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, insertFile, openDb } from "../db";
-import { initCodemap } from "../runtime";
+import { initCodemap, resetCodemapForTest } from "../runtime";
 import {
   applySourceCharBudget,
   DEFAULT_EXPLORE_ROW_LIMIT,
@@ -85,11 +89,13 @@ describe("resolveEffectiveSnippetBudget", () => {
     const largeDir = mkdtempSync(join(tmpdir(), "output-budget-large-"));
     mkdirSync(join(smallDir, "src"), { recursive: true });
     mkdirSync(join(largeDir, "src"), { recursive: true });
+    resetCodemapForTest();
     initCodemap(resolveCodemapConfig(smallDir, undefined));
     const small = seedFileCount(3);
     const smallBudget = resolveEffectiveSnippetBudget(small);
     closeDb(small);
 
+    resetCodemapForTest();
     initCodemap(resolveCodemapConfig(largeDir, undefined));
     const large = seedFileCount(6000);
     try {

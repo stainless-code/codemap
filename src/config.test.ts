@@ -238,14 +238,29 @@ describe("loadUserConfig", () => {
     expect(cfg).toBeUndefined();
   });
 
-  it("invalid JSON config throws when resolved", async () => {
+  it("invalid JSON config throws at load", async () => {
     const stateDir = join(dir, ".codemap");
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(
       join(stateDir, "config.json"),
       JSON.stringify({ include: [1, 2] }),
     );
-    const cfg = await loadUserConfig(dir);
-    expect(() => resolveCodemapConfig(dir, cfg)).toThrow(/include/);
+    await expect(loadUserConfig(dir)).rejects.toThrow(/include/);
+  });
+
+  it("invalid explicit .ts config throws at load", async () => {
+    const p = join(dir, "bad.ts");
+    writeFileSync(p, "export default { include: [1, 2] };\n");
+    await expect(loadUserConfig(dir, p)).rejects.toThrow(/include/);
+  });
+
+  it("invalid state-dir config.ts throws at load", async () => {
+    const stateDir = join(dir, ".codemap");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(
+      join(stateDir, "config.ts"),
+      "export default { extra: 1 };\n",
+    );
+    await expect(loadUserConfig(dir)).rejects.toThrow(/extra/);
   });
 });

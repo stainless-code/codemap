@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "../config";
 import {
   closeDb,

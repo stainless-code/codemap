@@ -21,6 +21,7 @@ import {
 } from "../db";
 import type { DependencyRow, SymbolRow } from "../db";
 import { initCodemap } from "../runtime";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import {
   buildContextEnvelope,
   capRecipeSqlLimit,
@@ -32,6 +33,8 @@ import {
   resolveContextBudget,
 } from "./context-engine";
 import * as indexEngine from "./index-engine";
+
+installCodemapTestTeardown();
 
 let benchDir: string;
 
