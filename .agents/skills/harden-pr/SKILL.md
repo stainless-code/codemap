@@ -294,6 +294,4 @@ Skill invocation **is** the commit authorization. After the loop: if fixes exist
 | Branch done      | `/harden-pr full` or "production-ready pass"           |
 | Deferred backlog | `/harden-pr reconcile`                                 |
 
-**Eval probes:** [`fixtures/harden-probes/`](../../../fixtures/harden-probes/) — manual workflow scoring; schema enforced by `scripts/harden-probes/validate-fixtures.test.mjs`.
-
 Replaces the old copy-paste: _"spawn subagents → fix → loop until clean"_ — this skill **is** that loop.

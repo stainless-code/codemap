@@ -14,7 +14,6 @@
 | **In-repo test bench** | `bun run test:golden`                                                      | Index `fixtures/minimal/` (bench corpus) → compare `fixtures/golden/minimal/*.json`. Map: `fixtures/CAPABILITIES.json`. |
 | **Golden guard**       | `bun run test:scripts`                                                     | `scripts/query-golden-coverage-matrix.test.mjs` — every bundled recipe + substrate table has a scenario.                |
 | **Agent eval**         | `bun run test:agent-eval`                                                  | Probe arms vs golden ids (MCP-on vs glob/read).                                                                         |
-| **Harden-pr probes**   | `bun run test:harden-probes`                                               | Schema + pre-fix fail + score oracle; manual agent run + `acceptance.sh` after fix.                                     |
 | **Integration (git)**  | `src/application/run-index.test.ts`                                        | `runCodemapIndex` incremental paths: heritage + calls re-resolution, delete/reindex.                                    |
 | **CLI e2e**            | `src/cli/cmd-test-bench-e2e.test.ts`, `src/cli/cmd-cli-parity-e2e.test.ts` | Spawned CLI on `fixtures/minimal` (bench smoke + resource parity).                                                      |
 | **Apply CLI e2e**      | `src/cli/cmd-apply.test.ts`                                                | Temp project + full index: recipe dry-run/apply, `--rows`, second recipe disk apply.                                    |
@@ -102,18 +101,6 @@ Codemap development uses **only** the committed bench ([fixtures/README.md](../f
 ## Agent eval probes
 
 `scripts/agent-eval/scenarios.json` — one probe per `CAPABILITIES.json` capability id (groups with `unitTests` or `enforcedBy` instead: `recipes.bundled`, `cli.bench-smoke`, `cli.mcp.http`). Each probe’s `goldenId` must appear in that group’s `goldenScenarios`; multiple substrate ids per group are fine — one matching probe is enough. Enforced by `scripts/agent-eval/capability-probes.test.mjs` in `test:scripts`.
-
-### Harden-pr workflow probes
-
-Manual eval for [`.agents/skills/harden-pr/`](../.agents/skills/harden-pr/SKILL.md) — not automated agent runs in CI yet.
-
-| Artifact                                                                                                  | Role                                                           |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [`fixtures/harden-probes/`](../fixtures/harden-probes/)                                                   | Injected production-bar gaps + `expected-findings.json` oracle |
-| [`scripts/agent-eval/harden-scenarios.json`](../scripts/agent-eval/harden-scenarios.json)                 | Scenario index (probe dir, mode, acceptance script)            |
-| [`scripts/harden-probes/validate-fixtures.test.mjs`](../scripts/harden-probes/validate-fixtures.test.mjs) | Schema guard in `test:scripts`                                 |
-
-Run a probe: open the probe dir in Cursor → `/harden-pr lite` → score findings with `score-probe.mjs` → `bash acceptance.sh`. Mechanical smoke: `bun run test:harden-probes`. Full protocol: [benchmark.md § Harden-pr workflow eval](./benchmark.md#harden-pr-workflow-eval).
 
 ---
 
