@@ -199,18 +199,22 @@ describe("computeValidateRows", () => {
   );
 
   it("rejects absolute paths outside the project root", () => {
-    const outside = join(tmpdir(), "codemap-validate-abs-outside-");
-    mkdirSync(outside, { recursive: true });
-    const outsideFile = join(outside, "secret.ts");
-    writeFileSync(outsideFile, "export const s = 1;\n");
-
-    const rows = withDb((db) =>
-      computeValidateRows(db, tmpRoot, [outsideFile]),
+    const outside = mkdtempSync(
+      join(tmpdir(), "codemap-validate-abs-outside-"),
     );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.status).toBe("rejected");
-    expect(rows[0]?.reason).toBe("path escapes project root");
-    rmSync(outside, { recursive: true, force: true });
+    try {
+      const outsideFile = join(outside, "secret.ts");
+      writeFileSync(outsideFile, "export const s = 1;\n");
+
+      const rows = withDb((db) =>
+        computeValidateRows(db, tmpRoot, [outsideFile]),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.status).toBe("rejected");
+      expect(rows[0]?.reason).toBe("path escapes project root");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it("dedupes paths and sorts by path", () => {

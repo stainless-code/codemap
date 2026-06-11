@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   assertServeBindRequiresToken,
   isLoopbackHost,
+  normalizeServeBindHost,
   serveBindTokenRequiredMessage,
 } from "./serve-bind-policy";
 
@@ -18,6 +19,14 @@ describe("isLoopbackHost", () => {
     ["192.168.1.1", false],
   ] as const)("host %s → %s", (host, expected) => {
     expect(isLoopbackHost(host)).toBe(expected);
+  });
+});
+
+describe("normalizeServeBindHost", () => {
+  it("strips brackets from IPv6 URL literals", () => {
+    expect(normalizeServeBindHost("[::1]")).toBe("::1");
+    expect(normalizeServeBindHost("::1")).toBe("::1");
+    expect(normalizeServeBindHost("127.0.0.1")).toBe("127.0.0.1");
   });
 });
 

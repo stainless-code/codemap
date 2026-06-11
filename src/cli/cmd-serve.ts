@@ -1,5 +1,8 @@
 import { runHttpServer } from "../application/http-server";
-import { serveBindTokenRequiredMessage } from "../application/serve-bind-policy";
+import {
+  normalizeServeBindHost,
+  serveBindTokenRequiredMessage,
+} from "../application/serve-bind-policy";
 import {
   applyWatchPolicy,
   envWatchDefaultOn,
@@ -151,6 +154,8 @@ export function parseServeRest(rest: string[]):
       message: `codemap serve: unknown option "${a}". Run \`codemap serve --help\` for usage.`,
     };
   }
+
+  host = normalizeServeBindHost(host);
 
   const bindMessage = serveBindTokenRequiredMessage(host, token);
   if (bindMessage !== undefined) {

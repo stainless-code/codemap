@@ -15,6 +15,17 @@ export function isLoopbackHost(host: string): boolean {
   return h === "localhost" || h === "::1" || h === "[::1]" || isIpv4Loopback(h);
 }
 
+/**
+ * `server.listen` expects unbracketed IPv6 literals (`::1`, not `[::1]` —
+ * Node rejects the bracketed form with ENOTFOUND).
+ */
+export function normalizeServeBindHost(host: string): string {
+  if (host.startsWith("[") && host.endsWith("]")) {
+    return host.slice(1, -1);
+  }
+  return host;
+}
+
 /** Error message when a non-loopback bind lacks a token; `undefined` when OK. */
 export function serveBindTokenRequiredMessage(
   host: string,

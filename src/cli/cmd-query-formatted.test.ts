@@ -1,6 +1,6 @@
 /**
- * End-to-end coverage for formatted query output (`--format sarif|…`).
- * Ensures DML is blocked via `queryRows` / PRAGMA query_only on the sarif path.
+ * End-to-end DML guard for formatted query output (`--format sarif|badge|…`).
+ * Asserts `queryRows` / PRAGMA query_only on every non-json/text format path.
  */
 
 import {

@@ -97,6 +97,7 @@ describe("parseServeRest", () => {
   it("parses bracketed IPv6 loopback without token", () => {
     const r = parseServeRest(["serve", "--host", "[::1]"]);
     if (r.kind !== "run") throw new Error("expected run");
+    expect(r.host).toBe("::1");
     expect(r.token).toBeUndefined();
   });
 
