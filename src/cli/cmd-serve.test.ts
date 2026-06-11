@@ -88,6 +88,12 @@ describe("parseServeRest", () => {
     expect(r.token).toBeUndefined();
   });
 
+  it("parses 127.0.0.0/8 loopback without token", () => {
+    const r = parseServeRest(["serve", "--host", "127.0.0.2"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.token).toBeUndefined();
+  });
+
   it("parses bracketed IPv6 loopback without token", () => {
     const r = parseServeRest(["serve", "--host", "[::1]"]);
     if (r.kind !== "run") throw new Error("expected run");

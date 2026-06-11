@@ -169,10 +169,11 @@ plugins that don't speak MCP). Single project root per server (set via
 --root / CODEMAP_ROOT).
 
 Default bind: 127.0.0.1:${DEFAULT_PORT} (loopback only — refuse 0.0.0.0 unless
-explicitly opted in via --host 0.0.0.0).
+explicitly opted in via --host 0.0.0.0). Any 127.0.0.0/8 address (e.g.
+127.0.0.2) is treated as loopback for the --token requirement.
 
 Flags:
-  --host <ip>     Bind address (default: ${DEFAULT_HOST}).
+  --host <ip>     Bind address (default: ${DEFAULT_HOST}; 127.* is loopback).
   --port <n>      Bind port (default: ${DEFAULT_PORT}).
   --token <secret>
                   Require Authorization: Bearer <secret> on every request.

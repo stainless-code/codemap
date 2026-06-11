@@ -23,15 +23,17 @@ file. Prints rows for entries that are out of sync — without the agent paying
 to re-read every file.
 
   paths       Project-relative or absolute file paths to check. If omitted,
-              all indexed files are checked.
+              all indexed files are checked. Output path keys are always
+              project-relative POSIX paths (absolute argv is normalized).
 
 Statuses:
   stale       The file exists but its content_hash differs from the index.
   missing     The file is in the index but has been deleted on disk.
   unindexed   The file exists on disk but is not present in the index (only
               when explicit paths are passed).
-  rejected    The path could not be checked safely (escapes the project root
-              or resolves outside via symlink). Includes a reason field.
+  rejected    The path could not be checked safely. reason is one of:
+              path escapes project root | path escapes via symlink |
+              path resolves outside project root.
 
 Flags:
   --json      Emit a JSON array of {path, status[, reason]} objects (for agents).

@@ -90,32 +90,35 @@ async function fileCount(): Promise<number> {
 }
 
 describe("runQueryCmd — formatted output DML guard", () => {
-  it("rejects DELETE via --format sarif without mutating the index", async () => {
-    const before = await fileCount();
+  it.each(["sarif", "badge", "mermaid", "annotations", "codeclimate"] as const)(
+    "rejects DELETE via --format %s without mutating the index",
+    async (format) => {
+      const before = await fileCount();
 
-    const r = await runCli(
-      [
-        "query",
-        "--format",
-        "sarif",
-        "DELETE FROM files WHERE path = 'src/drop.ts'",
-      ],
-      { CODEMAP_ROOT: projectRoot },
-    );
-    expect(r.exitCode).toBe(1);
-    expect(JSON.parse(r.out)).toMatchObject({ error: expect.any(String) });
+      const r = await runCli(
+        [
+          "query",
+          "--format",
+          format,
+          "DELETE FROM files WHERE path = 'src/drop.ts'",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(r.exitCode).toBe(1);
+      expect(JSON.parse(r.out)).toMatchObject({ error: expect.any(String) });
 
-    expect(await fileCount()).toBe(before);
+      expect(await fileCount()).toBe(before);
 
-    const drop = await runCli(
-      [
-        "query",
-        "--json",
-        "SELECT COUNT(*) AS n FROM files WHERE path = 'src/drop.ts'",
-      ],
-      { CODEMAP_ROOT: projectRoot },
-    );
-    expect(drop.exitCode).toBe(0);
-    expect(JSON.parse(drop.out)).toEqual([{ n: 1 }]);
-  });
+      const drop = await runCli(
+        [
+          "query",
+          "--json",
+          "SELECT COUNT(*) AS n FROM files WHERE path = 'src/drop.ts'",
+        ],
+        { CODEMAP_ROOT: projectRoot },
+      );
+      expect(drop.exitCode).toBe(0);
+      expect(JSON.parse(drop.out)).toEqual([{ n: 1 }]);
+    },
+  );
 });

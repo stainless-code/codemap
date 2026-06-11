@@ -31,8 +31,8 @@ codemap serve --host 0.0.0.0
   → parseServeRest: require --token when !isLoopbackHost(host)
 
 codemap validate <paths>
-  → computeValidateRows → rejectValidatePath
-      → pathEscapesProjectRoot | pathTraversesSymlinkOutsideRoot → status rejected
+  → computeValidateRows → rejectUnsafeProjectRelativePath / readUtf8WithinProjectRoot
+      → pathEscapesProjectRoot | pathTraversesSymlinkOutsideRoot | realpath → status rejected
 ```
 
 ---
@@ -46,7 +46,7 @@ codemap validate <paths>
 | 2.1 | `isLoopbackHost` + non-loopback `--token` required         | **done**    | `bun test src/cli/cmd-serve.test.ts`                |
 | 2.2 | Serve tests updated                                        | **done**    | same                                                |
 | 3.1 | `pathTraversesSymlinkOutsideRoot`, `resolvePathWithinRoot` | **done**    | `bun test src/application/path-containment.test.ts` |
-| 3.2 | `validate` `rejected` + `rejectValidatePath`               | **done**    | `bun test src/cli/cmd-validate.test.ts`             |
+| 3.2 | `validate` `rejected` + safe read containment              | **done**    | `bun test src/cli/cmd-validate.test.ts`             |
 | 3.3 | Test `../../../etc/passwd` → `rejected`                    | **done**    | same                                                |
 | 1.x | `docs/architecture.md` lift                                | **done**    | `bun run format:check`                              |
 | 1.s | Commit + PR + CI                                           | **pending** | `bun run check` (committed; PR + CI open)           |

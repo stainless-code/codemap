@@ -267,7 +267,7 @@ function registerValidateTool(server: McpServer): void {
     "validate",
     withToolAnnotations("validate", {
       description:
-        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns only out-of-sync rows with status `stale` / `missing` / `unindexed` / `rejected` (fresh paths omitted; `rejected` includes optional `reason` when a path escapes the project root or resolves outside via symlink). Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose a stale index before issuing structural queries.",
+        "Compare on-disk SHA-256 of indexed files to the indexed `files.content_hash` column. Returns only out-of-sync rows with status `stale` / `missing` / `unindexed` / `rejected` (fresh paths omitted; `rejected` includes optional `reason`: path escapes project root | path escapes via symlink | path resolves outside project root). Output `path` keys are project-relative POSIX paths. Empty `paths` validates every indexed file. Useful for 'codemap doctor' agents that diagnose a stale index before issuing structural queries.",
       inputSchema: validateArgsSchema,
     }),
     (args) => wrapToolResult(handleValidate(args)),
