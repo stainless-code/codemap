@@ -417,6 +417,17 @@ describe("findImpact — inPath + homonym scoping", () => {
     expect(r.matches.map((m) => m.name)).toEqual(["onlyA"]);
   });
 
+  it("inPath on unknown symbol omits skipped_scope", () => {
+    const r = findImpact(db, {
+      target: "missing",
+      direction: "down",
+      via: "calls",
+      inPath: "src/a.ts",
+    });
+    expect(r.target.matched_in).toEqual([]);
+    expect(r.skipped_scope).toBeUndefined();
+  });
+
   it("inPath outside matched_in returns empty matches with skipped_scope", () => {
     const r = findImpact(db, {
       target: "dup",
@@ -426,6 +437,18 @@ describe("findImpact — inPath + homonym scoping", () => {
     });
     expect(r.matches).toEqual([]);
     expect(r.skipped_scope?.reason).toContain("src/z.ts");
+  });
+
+  it("unscoped homonym unions per-file graphs for direction=up", () => {
+    seedCall("src/a.ts", "callerA", "dup");
+    seedCall("src/b.ts", "callerB", "dup");
+
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "up",
+      via: "calls",
+    });
+    expect(r.matches.map((m) => m.name).sort()).toEqual(["callerA", "callerB"]);
   });
 
   it("inPath directory prefix scopes homonym definitions", () => {

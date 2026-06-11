@@ -118,13 +118,13 @@ export function findImpact(
   if (
     opts.inPath !== undefined &&
     opts.inPath.length > 0 &&
-    target.kind === "symbol"
+    target.kind === "symbol" &&
+    target.matched_in.length > 0
   ) {
     const scoped = filterMatchedInByInPath(target.matched_in, opts.inPath);
-    target = { ...target, matched_in: scoped };
     if (scoped.length === 0) {
       return emptyImpactResult({
-        target,
+        target: { ...target, matched_in: scoped },
         direction,
         backends,
         depthRaw,
@@ -136,6 +136,7 @@ export function findImpact(
         },
       });
     }
+    target = { ...target, matched_in: scoped };
   }
   const directions: Array<"up" | "down"> =
     direction === "both" ? ["up", "down"] : [direction];

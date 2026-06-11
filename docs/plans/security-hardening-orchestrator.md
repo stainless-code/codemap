@@ -24,7 +24,7 @@
 | PR    | Plan                                                            | Status                                                                              | Blocks                              |
 | ----- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
 | **1** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#180](https://github.com/stainless-code/codemap/pull/180) · `a5caca8`) | —                                   |
-| **2** | [`impact-inpath-homonyms.md`](./impact-inpath-homonyms.md)      | **in progress** (`fix/impact-inpath-homonyms`)                                      | —                                   |
+| **2** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **PR open** (`fix/impact-inpath-homonyms`)                                          | —                                   |
 | **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)      | **pending**                                                                         | PR **1** merged (PR **2** optional) |
 
 | — | — | **deferred** | golden `schema.test.ts` + path guards |
@@ -71,7 +71,8 @@ Evaluated 2026-06 against [roadmap § Floors](../roadmap.md#floors-v1-product-sh
 | 2026-06-05 | PR 1 harden | `/harden-pr full` — plan retired; contracts in architecture/glossary.        |
 | 2026-06-05 | PR 1 merge  | [#180](https://github.com/stainless-code/codemap/pull/180) → `a5caca8`.      |
 | 2026-06-05 | PR 2 start  | `fix/impact-inpath-homonyms` — `inPath` + homonym walks in impact-engine.    |
-| —          | PR 2 merge  | _fill_                                                                       |
+| 2026-06-05 | PR 2 harden | `/harden-pr full` — plan retired; CLI/MCP/docs parity.                       |
+| —          | PR 2 merge  | _PR URL · merge SHA_                                                         |
 | —          | PR 3 start  | _from `main`_                                                                |
 | —          | PR 3 merge  | _fill · close orchestrator_                                                  |
 

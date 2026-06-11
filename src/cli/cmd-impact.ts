@@ -48,7 +48,9 @@ blast radius — every symbol or file reachable in N hops. Replaces composing
 Args:
   <target>            Symbol name (exact, case-sensitive) OR project-relative
                       file path (auto-detected by '/' or by matching an
-                      indexed files.path row).
+                      indexed files.path row). Symbol homonyms (same name in
+                      multiple files): unscoped walks union per-defining-file
+                      call graphs; use --in to pick one definition.
 
 Flags:
   --direction <d>     up=callers/dependents, down=callees/dependencies,

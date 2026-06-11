@@ -210,7 +210,8 @@ codemap impact handleAudit --depth 1 --via calls                # direct callers
 codemap impact runWatchLoop --json --summary | jq '.summary.nodes'  # CI-gate fan-in score
 # Replaces hand-composed `WITH RECURSIVE` queries. Cycle-detected, depth-bounded
 # (default 3, --depth 0 = unbounded), limit-capped (default 500). Result envelope:
-# {target, matches: [{depth, edge, kind, name?, file_path}], summary: {nodes, terminated_by}}.
+# {target, matches: [...], summary: {nodes, terminated_by}, skipped_scope?}.
+# Homonym symbols: unscoped unions per-defining-file graphs; --in scopes one file.
 
 # Affected tests — reverse dependency walk from changed sources → test files to run
 codemap affected --json                                         # working-tree changes vs HEAD (git status + diff)

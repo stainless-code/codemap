@@ -1891,6 +1891,32 @@ describe("MCP server — impact tool", () => {
     }
   });
 
+  it("impact in mismatch returns skipped_scope", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/a.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0),
+                ('src/b.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "dup", in: "src/z.ts" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toEqual([]);
+      expect(json.skipped_scope?.reason).toContain("src/z.ts");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("impact returns isError on non-integer depth (Zod rejects)", async () => {
     const { client, server } = await makeClient();
     try {

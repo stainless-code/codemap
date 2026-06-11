@@ -102,8 +102,7 @@ Tools (21; snake_case — mirrors CLI verbs where a shell twin exists):
   validate             Hash drift rows (stale/missing/unindexed/rejected + reason).
   show                 Symbol metadata: file:line + signature.
   snippet              Same lookup + source text from disk.
-  impact               Symbol/file blast-radius walker (callers, callees,
-                       dependents, dependencies).
+  impact               Blast-radius walker; homonym symbols accept in scope.
   affected             Reverse-dependency walk to test paths.
   trace                Shortest call path + budget-capped snippets.
   explore              Multi-name neighborhood survey.
