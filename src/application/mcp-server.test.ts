@@ -24,7 +24,10 @@ import { initCodemap } from "../runtime";
 import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import { assembleMcpInstructions } from "./agent-content";
 import { buildMcpInstructionsCodebaseMapAppendix } from "./context-engine";
-import { createMcpServer } from "./mcp-server";
+import {
+  createMcpServer,
+  resolveMcpInitializeInstructions,
+} from "./mcp-server";
 import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 
@@ -92,6 +95,20 @@ describe("MCP server — initialize instructions", () => {
     } finally {
       await server.close();
     }
+  });
+
+  it("resolveMcpInitializeInstructions honors caller-provided instructions", async () => {
+    const custom = "custom-mcp-instructions\n";
+    const resolved = await resolveMcpInitializeInstructions({
+      instructions: custom,
+    });
+    expect(resolved).toBe(custom);
+  });
+
+  it("resolveMcpInitializeInstructions assembles codebase map appendix by default", async () => {
+    const resolved = await resolveMcpInitializeInstructions({});
+    expect(resolved).toContain("map_id:");
+    expect(resolved).toContain("Session start");
   });
 
   it("can append codebase map block to initialize instructions", async () => {

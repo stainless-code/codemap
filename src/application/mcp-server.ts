@@ -644,6 +644,26 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
   configureResolver(getProjectRoot(), getTsconfigPath());
 }
 
+/** Initialize `instructions` for `runMcpServer` — honors `opts.instructions` when set. */
+export async function resolveMcpInitializeInstructions(
+  opts: Pick<ServerOpts, "instructions">,
+): Promise<string> {
+  if (opts.instructions !== undefined) return opts.instructions;
+  try {
+    const { openDb, closeDb } = await import("../db");
+    const db = openDb();
+    try {
+      return assembleMcpInstructions(
+        buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
+      );
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch {
+    return assembleMcpInstructions();
+  }
+}
+
 /**
  * Starts the MCP server over stdio. Resolves on client disconnect
  * (`session-lifecycle.ts`). Logs to stderr per MCP convention.
@@ -681,22 +701,7 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     await watchSession.acquireClient();
   }
 
-  let instructions = opts.instructions;
-  if (instructions === undefined) {
-    try {
-      const { openDb, closeDb } = await import("../db");
-      const db = openDb();
-      try {
-        instructions = assembleMcpInstructions(
-          buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
-        );
-      } finally {
-        closeDb(db, { readonly: true });
-      }
-    } catch {
-      instructions = assembleMcpInstructions();
-    }
-  }
+  const instructions = await resolveMcpInitializeInstructions(opts);
 
   const server = createMcpServer({ ...opts, instructions });
   const transport = new StdioServerTransport();
