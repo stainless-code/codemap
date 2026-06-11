@@ -571,12 +571,14 @@ export const contextArgsSchema = {
   compact: z.boolean().optional(),
   intent: z.string().optional(),
   include_snippets: z.boolean().optional(),
+  include_codebase_map: z.boolean().optional(),
 };
 
 export interface ContextArgs {
   compact?: boolean;
   intent?: string;
   include_snippets?: boolean;
+  include_codebase_map?: boolean;
 }
 
 export function handleContext(args: ContextArgs): ToolResult {
@@ -587,6 +589,7 @@ export function handleContext(args: ContextArgs): ToolResult {
         compact: args.compact === true,
         intent: args.intent ?? null,
         include_snippets: args.include_snippets,
+        include_codebase_map: args.include_codebase_map,
       });
       return ok(envelope);
     } finally {

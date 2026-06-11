@@ -976,6 +976,32 @@ describe("handleContext", () => {
       const payload = result.payload as Record<string, unknown>;
       expect(payload.start_here).toBeUndefined();
       expect(payload.hubs).toBeUndefined();
+      expect(payload.map_id).toBeUndefined();
+      expect(payload.codebase_map).toBeUndefined();
+    }
+  });
+
+  it("includes map_id and codebase_map by default", () => {
+    const result = handleContext({});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as {
+        map_id?: string;
+        codebase_map?: { cli_entry_hints: unknown[] };
+      };
+      expect(payload.map_id).toMatch(/^[0-9a-f]{16}$/);
+      expect(payload.codebase_map?.cli_entry_hints.length).toBe(12);
+    }
+  });
+
+  it("omits map fields when include_codebase_map is false", () => {
+    const result = handleContext({ include_codebase_map: false });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const payload = result.payload as Record<string, unknown>;
+      expect(payload.start_here).toBeDefined();
+      expect(payload.map_id).toBeUndefined();
+      expect(payload.codebase_map).toBeUndefined();
     }
   });
 });

@@ -43,9 +43,11 @@ const MCP_INSTRUCTIONS_FILE = "mcp-instructions.md";
 const MCP_RECIPE_REFS_RE = /<!--\s*codemap-mcp-recipe-refs:\s*([^>]+?)-->/;
 
 /** MCP initialize playbook — `templates/agent-content/mcp-instructions.md`. */
-export function assembleMcpInstructions(): string {
+export function assembleMcpInstructions(appendix?: string): string {
   const path = join(resolveAgentContentDir(), MCP_INSTRUCTIONS_FILE);
-  return readFileSync(path, "utf8").trimEnd() + "\n";
+  const base = readFileSync(path, "utf8").trimEnd() + "\n";
+  if (appendix === undefined || appendix === "") return base;
+  return base + appendix;
 }
 
 /** Recipe ids declared in the MCP instructions machine-ref comment. */

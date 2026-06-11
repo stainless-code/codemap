@@ -13,6 +13,7 @@ import {
   initCodemap,
 } from "../runtime";
 import { assembleMcpInstructions } from "./agent-content";
+import { buildMcpInstructionsCodebaseMapAppendix } from "./context-engine";
 import {
   formatIndexFreshnessMcpBlock,
   jsonPayloadNeedsMcpFreshnessBlock,
@@ -113,6 +114,8 @@ interface ServerOpts {
   watch?: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
   debounceMs?: number;
+  /** Override MCP initialize `instructions` (tests + post-bootstrap appendix). */
+  instructions?: string;
 }
 
 /**
@@ -160,7 +163,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
       version: opts.version,
     },
     {
-      instructions: assembleMcpInstructions(),
+      instructions: opts.instructions ?? assembleMcpInstructions(),
     },
   );
 
@@ -674,7 +677,22 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     warnIndexFreshnessToStderr("codemap mcp");
   }
 
-  const server = createMcpServer(opts);
+  let instructions: string;
+  try {
+    const { openDb, closeDb } = await import("../db");
+    const db = openDb();
+    try {
+      instructions = assembleMcpInstructions(
+        buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
+      );
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch {
+    instructions = assembleMcpInstructions();
+  }
+
+  const server = createMcpServer({ ...opts, instructions });
   const transport = new StdioServerTransport();
 
   if (watchSession !== undefined) {

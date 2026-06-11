@@ -15,6 +15,7 @@ describe("parseContextRest", () => {
       compact: false,
       intent: null,
       includeSnippets: false,
+      includeCodebaseMap: true,
     });
   });
 
@@ -24,6 +25,17 @@ describe("parseContextRest", () => {
       compact: true,
       intent: null,
       includeSnippets: false,
+      includeCodebaseMap: true,
+    });
+  });
+
+  it("parses --no-codebase-map", () => {
+    expect(parseContextRest(["context", "--no-codebase-map"])).toEqual({
+      kind: "run",
+      compact: false,
+      intent: null,
+      includeSnippets: false,
+      includeCodebaseMap: false,
     });
   });
 
@@ -33,6 +45,7 @@ describe("parseContextRest", () => {
       compact: false,
       intent: "refactor auth",
       includeSnippets: false,
+      includeCodebaseMap: true,
     });
   });
 
@@ -44,6 +57,7 @@ describe("parseContextRest", () => {
       compact: true,
       intent: "fix bug",
       includeSnippets: false,
+      includeCodebaseMap: true,
     });
   });
 
@@ -74,6 +88,7 @@ describe("parseContextRest", () => {
       compact: false,
       intent: "refactor auth",
       includeSnippets: false,
+      includeCodebaseMap: true,
     });
   });
 

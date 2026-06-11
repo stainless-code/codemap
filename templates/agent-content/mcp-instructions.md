@@ -4,7 +4,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file count, language breakdown, **`start_here`** (index summary + recipe cards + hub leaders), recipe catalog, **`index_freshness`** (one call replaces 4–5 queries). Pass **`include_snippets: true`** for one-line export previews on hub leaders (ignored with **`compact: true`**). Prefer **`start_here.hub_leaders`** over legacy **`hubs`** for signatures.
+1. **`context`** — project root, schema version, file count, language breakdown, **`start_here`** (index summary + recipe cards + hub leaders), **`map_id`** + **`codebase_map`** (hub paths + codemap CLI/MCP routing hints), recipe catalog, **`index_freshness`** (one call replaces 4–5 queries). Pass **`include_snippets: true`** for one-line export previews on hub leaders (ignored with **`compact: true`**). Omit map fields with **`compact: true`** or **`include_codebase_map: false`**. Prefer **`start_here.hub_leaders`** over legacy **`hubs`** for signatures. Compare **`map_id`** across sessions to detect structural summary drift without re-fetching full **`start_here`**.
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
 

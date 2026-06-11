@@ -1,17 +1,8 @@
-/**
- * Outcome-shaped CLI aliases — thin wrappers over `query --recipe <id>`.
- * Capped at 5 to avoid alias-sprawl; promote a sixth only when the recipe
- * becomes a headline outcome ([roadmap.md](../../docs/roadmap.md)).
- */
-export const OUTCOME_ALIASES = Object.freeze({
-  "dead-code": "untested-and-dead",
-  deprecated: "deprecated-symbols",
-  boundaries: "boundary-violations",
-  hotspots: "fan-in",
-  "coverage-gaps": "worst-covered-exports",
-} as const);
+import { OUTCOME_ALIASES } from "../outcome-aliases";
+import type { OutcomeAlias } from "../outcome-aliases";
 
-export type OutcomeAlias = keyof typeof OUTCOME_ALIASES;
+export { OUTCOME_ALIASES };
+export type { OutcomeAlias };
 
 export function isOutcomeAlias(token: string): token is OutcomeAlias {
   return Object.hasOwn(OUTCOME_ALIASES, token);

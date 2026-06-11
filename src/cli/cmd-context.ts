@@ -9,26 +9,29 @@ interface ContextOpts {
   compact: boolean;
   intent: string | null;
   includeSnippets: boolean;
+  includeCodebaseMap: boolean;
 }
 
 /**
  * Print **`codemap context`** usage.
  */
 export function printContextCmdHelp(): void {
-  console.log(`Usage: codemap context [--compact] [--for "<intent>"] [--include-snippets]
+  console.log(`Usage: codemap context [--compact] [--for "<intent>"] [--include-snippets] [--no-codebase-map]
 
 Emit a JSON envelope describing the current index — project metadata, top
 hubs (fan-in), a sample of markers, session-start shortcuts (start_here),
-and the recipe catalog (bundled + project-local). Designed for agents and
-editors that want a single-command "give me everything cheap".
+map_id / codebase_map routing card, and the recipe catalog (bundled +
+project-local). Designed for agents and editors that want a single-command
+"give me everything cheap".
 
 Flags:
-  --compact          Drop hubs, sample_markers, and start_here; emit JSON
-                     without pretty-print (smaller payload).
+  --compact          Drop hubs, sample_markers, start_here, map_id, and
+                     codebase_map; emit JSON without pretty-print (smaller).
   --for "<intent>"   Pre-classify a free-text intent (refactor, debug, test,
                      feature, explore) and recommend recipes that match.
   --include-snippets One-line export previews on hub leaders (ignored when
                      --compact). Same as MCP \`context\` \`include_snippets\`.
+  --no-codebase-map  Omit map_id and codebase_map (start_here still included).
   --help, -h         Show this help.
 
 Examples:
@@ -50,6 +53,7 @@ export function parseContextRest(rest: string[]):
       compact: boolean;
       intent: string | null;
       includeSnippets: boolean;
+      includeCodebaseMap: boolean;
     } {
   if (rest[0] !== "context") {
     throw new Error("parseContextRest: expected context");
@@ -57,11 +61,16 @@ export function parseContextRest(rest: string[]):
   let compact = false;
   let intent: string | null = null;
   let includeSnippets = false;
+  let includeCodebaseMap = true;
   for (let i = 1; i < rest.length; i++) {
     const a = rest[i];
     if (a === "--help" || a === "-h") return { kind: "help" };
     if (a === "--compact") {
       compact = true;
+      continue;
+    }
+    if (a === "--no-codebase-map") {
+      includeCodebaseMap = false;
       continue;
     }
     if (a === "--include-snippets") {
@@ -85,7 +94,7 @@ export function parseContextRest(rest: string[]):
       message: `codemap context: unknown option "${a}". Run codemap context --help for usage.`,
     };
   }
-  return { kind: "run", compact, intent, includeSnippets };
+  return { kind: "run", compact, intent, includeSnippets, includeCodebaseMap };
 }
 
 /**
@@ -98,6 +107,7 @@ export async function runContextCmd(opts: ContextOpts): Promise<void> {
       compact: opts.compact,
       intent: opts.intent ?? undefined,
       include_snippets: opts.includeSnippets,
+      include_codebase_map: opts.includeCodebaseMap,
     });
     emitToolResult(result, { json: true, pretty: !opts.compact });
   } catch (err) {

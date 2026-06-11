@@ -23,6 +23,7 @@ describe("parseContextRest — include-snippets", () => {
       compact: false,
       intent: null,
       includeSnippets: true,
+      includeCodebaseMap: true,
     });
   });
 });
