@@ -12,8 +12,9 @@ SELECT name, kind, file_path, line_start
 FROM symbols WHERE name LIKE '%Config%' ORDER BY name;
 
 -- Field-qualified search — CLI: `codemap show --query '…'`; MCP/HTTP `show` / `snippet` with `{query: …}`:
--- Fast tier (equality): `codemap show --query 'name:hashContent' --print-sql`  → `name = ?`
--- Slow tier (substring): `codemap show --query 'kind:function name:Auth path:src/' --print-sql`
+-- Fast tier (equality index): positional `codemap show hashContent` or lone `name:Token` (no %/_ wildcards, no kind/path/in/free text) → `name = ?`
+-- Slow tier (broader scan): `name:%pat%` substring LIKE; multi-field `kind:… name:… path:…`; free text → name LIKE or source_fts with --with-fts
+-- Examples: `codemap show --query 'name:hashContent' --print-sql` (fast); `codemap show --query 'kind:function name:Auth path:src/' --print-sql` (slow)
 SELECT name, kind, file_path, line_start, line_end, signature,
        is_exported, parent_name, visibility
 FROM symbols

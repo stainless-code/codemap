@@ -77,7 +77,7 @@ Long-running MCP / HTTP sessions dominate agent workflows; one-shot CLI keeps th
 
 Predicate-as-API only — enrich row shape and audit deltas; no standalone pass/fail verdict primitive ([Moat A](./roadmap.md#moats-load-bearing)).
 
-- [x] **Tiered lookup fast paths** — `show` / `name:Token` (no wildcards) route to equality index (`idx_symbols_name_covering`); substring / FTS / multi-field stay slow tier. MCP + CLI help document tiers. See [architecture.md § Show wiring](./architecture.md#show--snippet-wiring).
+- [x] **Tiered lookup fast paths** — `show` / `name:Token` (no wildcards) route to equality index (`idx_symbols_name_covering`); substring / FTS / multi-field stay slow tier. MCP + CLI help document tiers. See [architecture.md § CLI usage](./architecture.md#cli-usage).
 
 ### Distribution & evaluation depth
 

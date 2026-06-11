@@ -194,7 +194,7 @@ TS shape for the JSON emitted by `codemap context`. Stable contract; agents can 
 
 ### covering index
 
-A SQLite index that includes every column needed by a query, so SQLite reads everything from the index B-tree without touching the main table. The query plan shows `USING COVERING INDEX`. Used heavily for AI agent query patterns — see [architecture § Covering indexes](./architecture.md#covering-indexes).
+A SQLite index that includes every column needed by a query, so SQLite reads everything from the index B-tree without touching the main table. The query plan shows `USING COVERING INDEX`. Used heavily for AI agent query patterns — e.g. `idx_symbols_name_covering` for `codemap show` equality lookups. See [architecture § Covering indexes](./architecture.md#covering-indexes).
 
 ### `css_classes` (table)
 
@@ -543,11 +543,11 @@ Long-running transport shutdown rules in `src/application/session-lifecycle.ts`.
 
 ### show
 
-`codemap show <name>` — one-step lookup that returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for symbol(s). **Exact mode:** `<name>` is case-sensitive; flags `--kind`, `--in`. **Field-qualified mode:** `--query 'kind:… name:… path:… in:…'` with optional free text; `--with-fts` (or `fts5: true` when indexed) searches file bodies via `source_fts` and returns every symbol in matching files; `--print-sql` prints Moat-A equivalent SQL. Output: `{matches, disambiguation?, warning?}` (`warning` when FTS was requested but `source_fts` is empty). MCP: `show` with `{name}` or `{query, with_fts?}`. Distinct from **snippet** (adds source text) and from hand-composed `query` SQL. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+`codemap show <name>` — one-step lookup that returns metadata (`file_path:line_start-line_end` + `signature` + `kind`) for symbol(s). **Fast tier (equality index):** positional `<name>` or lone `name:Token` with no `%`/`_` wildcards and no other query fields — same rows as exact `<name>`. **Slow tier:** `name:%pat%` substring LIKE, multi-field `--query`, or free text (`name LIKE` / `source_fts` with `--with-fts` or `fts5: true`). **Exact mode flags:** `--kind`, `--in` (positional only). `--print-sql` prints Moat-A equivalent SQL. Output: `{matches, disambiguation?, warning?}` (`warning` when FTS was requested but `source_fts` is empty). MCP: `show` with `{name}` or `{query, with_fts?}`. Distinct from **snippet** (adds source text) and from hand-composed `query` SQL. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
 
 ### snippet
 
-`codemap snippet <name>` — same lookup modes as **show** (`<name>` + `--kind` / `--in`, or `--query` + `--with-fts`), but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since last index), and `missing` (true when file is gone). Envelope: `{matches, disambiguation?, warning?}` with the same additive fields on each row. Stale-file behavior: `source` is always returned when the file exists; `stale: true` is metadata the agent reads (no auto-reindex). MCP: `snippet` with `{name}` or `{query, with_fts?}`. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
+`codemap snippet <name>` — same fast/slow lookup tiers as **show** (`<name>` + `--kind` / `--in`, or `--query` + `--with-fts`), but each match also carries `source` (file lines from disk at `line_start..line_end`), `stale` (true when content_hash drifted since last index), and `missing` (true when file is gone). Envelope: `{matches, disambiguation?, warning?}` with the same additive fields on each row. Stale-file behavior: `source` is always returned when the file exists; `stale: true` is metadata the agent reads (no auto-reindex). MCP: `snippet` with `{name}` or `{query, with_fts?}`. See [`architecture.md` § Show / snippet wiring](./architecture.md#cli-usage).
 
 ### `suppressions` (table) / `// codemap-ignore-next-line` / `// codemap-ignore-file`
 
