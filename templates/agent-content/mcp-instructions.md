@@ -70,7 +70,7 @@ Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commi
 
 ## Anti-patterns
 
-- Don't grep for "where is X defined" — **`show`** (exact `name` or `{query: …}`) or **`query_recipe`**.
+- Don't grep for "where is X defined" — **`show`** / **`snippet`** fast tier (`name` with optional `kind`/`in`, or lone `query: 'name:Token'` without wildcards) or **`query_recipe`** `find-symbol-definitions`; slow tier for `name:%pat%`, multi-field `query`, or free text.
 - Don't hand-roll `WITH RECURSIVE` for impact — **`impact`**.
 - Convenience tools are thin composers — fall back to **`query_recipe`** / **`query`** when unsure.
 - Don't skip **`context`** at session start.

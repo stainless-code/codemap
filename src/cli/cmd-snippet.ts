@@ -39,7 +39,7 @@ sliced from disk at line_start..line_end.
 
 Lookup tiers (same as \`codemap show\`):
   Fast (equality index) — positional <name>, or \`name:<Token>\` with no
-  wildcards (% / _) and no other query fields.
+  wildcards (% / _) and no other query fields (same rows as exact <name>).
   Slow (broader scan) — \`name:%pat%\` substring LIKE, multi-field query,
   free-text tokens (name LIKE or source_fts when --with-fts / fts5: true).
 

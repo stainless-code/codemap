@@ -342,7 +342,7 @@ function registerShowTool(server: McpServer, opts: ServerOpts): void {
     "show",
     withToolAnnotations("show", {
       description:
-        "Look up symbol(s) by exact name or field-qualified `query` search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Fast tier: exact `name` arg or `query` with lone `name:Token` (no %/_ wildcards, no kind/path/in/free text) uses equality index (`name = ?`). Slow tier: `name:%pat%` substring LIKE, multi-field query, or free text (name LIKE or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` tool for arbitrary SQL.",
+        "Look up symbol(s) by exact name or field-qualified `query` search; returns {matches: [{name, kind, file_path, line_start, line_end, signature, ...}], disambiguation?, warning?}. Fast tier: exact `name` (optional `kind`, `in` filters) or `query` with lone `name:Token` (no %/_ wildcards, no other query fields) uses equality index (`name = ?`). Slow tier: `name:%pat%` substring LIKE, multi-field query, or free text (name LIKE or source_fts with with_fts when indexed — FTS matches file bodies and returns every symbol in matching files). Use `snippet` for source text; use `query` tool for arbitrary SQL.",
       inputSchema: showArgsSchema,
     }),
     (args) => wrapToolResult(handleShow(args, opts.root)),
@@ -354,7 +354,7 @@ function registerSnippetTool(server: McpServer, opts: ServerOpts): void {
     "snippet",
     withToolAnnotations("snippet", {
       description:
-        "Same lookup tiers as `show` (fast: exact `name` or lone `name:Token` without wildcards → equality index; slow: substring LIKE, multi-field query, or free text with optional `with_fts` — FTS matches file bodies and returns every symbol in matching files) but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Returns `{matches, disambiguation?, warning?}`; source/stale/missing are additive fields on each match.",
+        "Same lookup tiers as `show` (fast: exact `name` with optional `kind`/`in`, or lone `name:Token` without wildcards → equality index; slow: substring LIKE, multi-field query, or free text with optional `with_fts` — FTS matches file bodies and returns every symbol in matching files) but each match carries `source` (file lines from disk at line_start..line_end) plus `stale` (true when content_hash drifted since indexing — line range may have shifted; agent decides whether to act or re-index) and `missing` (true when file is gone). Returns `{matches, disambiguation?, warning?}`; source/stale/missing are additive fields on each match.",
       inputSchema: snippetArgsSchema,
     }),
     (args) => wrapToolResult(handleSnippet(args, opts.root)),

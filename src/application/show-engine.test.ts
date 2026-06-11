@@ -85,11 +85,14 @@ describe("findSymbolsByName", () => {
       .query(
         `EXPLAIN QUERY PLAN SELECT name, kind, file_path, line_start, line_end, signature,
                       is_exported, parent_name, visibility
-               FROM symbols WHERE name = ?`,
+               FROM symbols
+               WHERE name = ?
+               ORDER BY file_path ASC, line_start ASC`,
       )
       .all("foo") as Array<{ detail: string }>;
     const text = plan.map((r) => r.detail).join("\n");
     expect(text).toContain("idx_symbols_name_covering");
+    expect(text).toMatch(/USING COVERING INDEX/i);
   });
 
   it("returns all matches for an ambiguous name (deterministic order)", () => {

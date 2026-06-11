@@ -77,23 +77,23 @@ If the question matches any of these, use the index instead of grepping:
 
 ## Quick reference queries
 
-| I need to...                       | Query                                                                                                                                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Find a symbol (fast tier)          | `codemap show <name>` or lone `codemap show --query 'name:Token'` (no `%`/`_` wildcards) — equality index; recipe: `find-symbol-definitions`            |
-| Field-qualified search (slow tier) | `codemap show --query 'kind:function name:Auth path:src/'` or `name:%pat%` substring; MCP: `show` / `snippet` with `query` (+ `with_fts` for free text) |
-| Call path / neighborhood           | `codemap trace` / `explore` / `node` (or MCP twins; recipes: `call-path`, `symbol-neighborhood`)                                                        |
-| Affected tests                     | `codemap affected --json` or MCP `affected` (recipe: `affected-tests`)                                                                                  |
-| Find a symbol (fuzzy)              | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                                                                         |
-| Symbol docs                        | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...'`                                                                                   |
-| Who imports this file?             | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                                                                 |
-| What does this depend on?          | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                                                                 |
-| Who calls X?                       | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...' AND (provenance IS NULL OR provenance = 'ast')`                            |
-| Component info                     | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                                                                |
-| TODOs in a file                    | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                                                                |
-| Deprecated symbols                 | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                                                      |
-| Symbol coverage                    | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                                                     |
-| Untested + dead exports            | `codemap query --json --recipe untested-and-dead`                                                                                                       |
-| Coverage-confirmed dead            | `codemap query --json --recipe coverage-confirmed-dead` (sort by `confidence`)                                                                          |
+| I need to...                       | Query                                                                                                                                                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Find a symbol (fast tier)          | `codemap show <name>` or lone `codemap show --query 'name:Token'` (no `%`/`_` wildcards; optional `--kind` / `--in` stay fast); MCP: `show` / `snippet` (`name`, optional `kind`, `in`); recipe: `find-symbol-definitions` |
+| Field-qualified search (slow tier) | `codemap show --query 'kind:function name:Auth path:src/'` or `name:%pat%` substring; MCP: `show` / `snippet` with `query` (+ `with_fts` for free text)                                                                    |
+| Call path / neighborhood           | `codemap trace` / `explore` / `node` (or MCP twins; recipes: `call-path`, `symbol-neighborhood`)                                                                                                                           |
+| Affected tests                     | `codemap affected --json` or MCP `affected` (recipe: `affected-tests`)                                                                                                                                                     |
+| Find a symbol (fuzzy)              | `SELECT name, kind, file_path, line_start FROM symbols WHERE name LIKE '%...%'`                                                                                                                                            |
+| Symbol docs                        | `SELECT name, signature, doc_comment FROM symbols WHERE name = '...'`                                                                                                                                                      |
+| Who imports this file?             | `SELECT DISTINCT from_path FROM dependencies WHERE to_path LIKE '%...'`                                                                                                                                                    |
+| What does this depend on?          | `SELECT DISTINCT to_path FROM dependencies WHERE from_path LIKE '%...'`                                                                                                                                                    |
+| Who calls X?                       | `SELECT DISTINCT caller_name, file_path FROM calls WHERE callee_name = '...' AND (provenance IS NULL OR provenance = 'ast')`                                                                                               |
+| Component info                     | `SELECT name, props_type, hooks_used FROM components WHERE name = '...'`                                                                                                                                                   |
+| TODOs in a file                    | `SELECT line_number, content FROM markers WHERE file_path LIKE '%...' AND kind = 'TODO'`                                                                                                                                   |
+| Deprecated symbols                 | `SELECT name, kind, file_path FROM symbols WHERE doc_comment LIKE '%@deprecated%'`                                                                                                                                         |
+| Symbol coverage                    | `SELECT name, hit_statements, total_statements, coverage_pct FROM coverage WHERE file_path = '...'`                                                                                                                        |
+| Untested + dead exports            | `codemap query --json --recipe untested-and-dead`                                                                                                                                                                          |
+| Coverage-confirmed dead            | `codemap query --json --recipe coverage-confirmed-dead` (sort by `confidence`)                                                                                                                                             |
 
 ## When Grep / Read IS appropriate
 
