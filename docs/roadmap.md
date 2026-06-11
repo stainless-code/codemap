@@ -69,7 +69,7 @@ Prioritized agent & indexing ops queue (2026-05). Reference: [agents.md](./agent
 Long-running MCP / HTTP sessions dominate agent workflows; one-shot CLI keeps the sub-100ms cold-start floor ([§ Floors — No daemon for one-shot CLI](./roadmap.md#floors-v1-product-shape)). Items here apply to **`mcp` / `serve` / `watch` only** unless noted.
 
 - [ ] **MCP shared daemon per project** — one watcher + one SQLite writer per indexed root; Unix socket / named pipe so concurrent agent sessions share a live index instead of each spawning watchers and contending on WAL. Complements perf item **6.1** (read pool) but is a separate write-side + lifecycle concern. Effort: L.
-- [ ] **Codebase map in bootstrap responses** — hash-stable structural summary (top hubs, CLI entry hints, schema version, index freshness) auto-included in `context` / MCP initialize payload. **Partial:** hubs + `start_here.index_summary` + `index_freshness` ship on `context`; CLI entry hints + hash-stable map id still open. Opt-out via flag. Effort: S–M.
+- [ ] **Codebase map in bootstrap responses** — hash-stable structural summary (top hubs, CLI entry hints, schema version, index freshness) auto-included in `context` / MCP initialize payload. **Partial:** hubs + `start_here.index_summary` + `index_freshness` ship on `context`; CLI entry hints + hash-stable map id still open. Plan: [`plans/codebase-map-bootstrap.md`](./plans/codebase-map-bootstrap.md). Effort: S–M.
 - [ ] **`--mcp-invocation global|auto` flag** — explicit override to force global `codemap` on PATH vs PM-aware auto-resolve. Effort: S.
 - [ ] **`agents init` uninstall (teardown)** — symmetric inverse of init for failed pilots, template mistakes, or leaving a repo: remove codemap-managed MCP entries, pointer sections, and IDE symlinks only (same scoped paths as init; never delete user-authored `.agents/` siblings). `--target` filter, `--yes` non-interactive. Not the happy-path docs story — adoption stays `init --mcp --git-hooks` + committed `.agents/`. Effort: S.
 
@@ -77,7 +77,7 @@ Long-running MCP / HTTP sessions dominate agent workflows; one-shot CLI keeps th
 
 Predicate-as-API only — enrich row shape and audit deltas; no standalone pass/fail verdict primitive ([Moat A](./roadmap.md#moats-load-bearing)).
 
-- [ ] **Tiered lookup fast paths** — `show` / exact-name recipe paths hit covering indexes first; document latency expectations in MCP tool descriptions. FTS and broad scans remain explicit fallbacks. Effort: S–M.
+- [ ] **Tiered lookup fast paths** — `show` / exact-name recipe paths hit covering indexes first; document latency expectations in MCP tool descriptions. FTS and broad scans remain explicit fallbacks. Plan: [`plans/tiered-lookup-fast-paths.md`](./plans/tiered-lookup-fast-paths.md). Effort: S–M.
 
 ### Distribution & evaluation depth
 
