@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -108,6 +114,39 @@ describe("computeValidateRows", () => {
       computeValidateRows(db, tmpRoot, ["src/new.ts"]),
     );
     expect(rows).toEqual([{ path: "src/new.ts", status: "unindexed" }]);
+  });
+
+  it("rejects explicit paths that escape project root", () => {
+    const rows = withDb((db) =>
+      computeValidateRows(db, tmpRoot, ["../../../etc/passwd"]),
+    );
+    expect(rows).toEqual([
+      {
+        path: "../../../etc/passwd",
+        status: "rejected",
+        reason: "path escapes project root",
+      },
+    ]);
+  });
+
+  it("rejects explicit paths that escape via symlink", () => {
+    const base = mkdtempSync(join(tmpdir(), "codemap-validate-symlink-"));
+    const outside = join(base, "outside");
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "secret.ts"), "export const s = 1;\n");
+    symlinkSync(join(outside, "secret.ts"), join(tmpRoot, "escape.ts"));
+
+    const rows = withDb((db) =>
+      computeValidateRows(db, tmpRoot, ["escape.ts"]),
+    );
+    expect(rows).toEqual([
+      {
+        path: "escape.ts",
+        status: "rejected",
+        reason: "path escapes via symlink",
+      },
+    ]);
+    rmSync(base, { recursive: true, force: true });
   });
 
   it("dedupes paths and sorts by path", () => {

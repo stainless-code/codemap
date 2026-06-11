@@ -3,6 +3,10 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
+import {
+  pathEscapesProjectRoot,
+  pathTraversesSymlinkOutsideRoot,
+} from "./path-containment";
 
 /**
  * One row in the staleness report. `status` distinguishes the three cases an
@@ -10,7 +14,9 @@ import { hashContent } from "../hash";
  */
 export interface ValidateRow {
   path: string;
-  status: "stale" | "missing" | "unindexed";
+  status: "stale" | "missing" | "unindexed" | "rejected";
+  /** Present when `status` is `rejected` (path could not be checked safely). */
+  reason?: string;
 }
 
 /**
@@ -40,6 +46,12 @@ export function computeValidateRows(
     const rel = toProjectRelative(projectRoot, raw);
     if (seen.has(rel)) continue;
     seen.add(rel);
+
+    const rejectReason = rejectValidatePath(projectRoot, rel);
+    if (rejectReason !== undefined) {
+      rows.push({ path: rel, status: "rejected", reason: rejectReason });
+      continue;
+    }
 
     const indexedHash = indexByPath.get(rel);
     const abs = resolve(projectRoot, rel);
@@ -73,6 +85,19 @@ export function computeValidateRows(
  * slashes (tinyglobby / Bun.Glob / git diff all emit POSIX), so we normalize
  * here to make `indexByPath.get(rel)` succeed cross-platform.
  */
+function rejectValidatePath(
+  projectRoot: string,
+  rel: string,
+): string | undefined {
+  if (pathEscapesProjectRoot(projectRoot, rel)) {
+    return "path escapes project root";
+  }
+  if (pathTraversesSymlinkOutsideRoot(projectRoot, resolve(projectRoot, rel))) {
+    return "path escapes via symlink";
+  }
+  return undefined;
+}
+
 export function toProjectRelative(projectRoot: string, p: string): string {
   const rel = isAbsolute(p) ? relative(projectRoot, p) : p;
   return sep === "/" ? rel : rel.split(sep).join("/");
