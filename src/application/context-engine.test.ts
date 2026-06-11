@@ -20,17 +20,22 @@ import {
   setMeta,
 } from "../db";
 import type { DependencyRow, SymbolRow } from "../db";
+import { OUTCOME_ALIASES } from "../outcome-aliases";
 import { initCodemap } from "../runtime";
 import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import {
+  buildCliEntryHints,
   buildContextEnvelope,
   capRecipeSqlLimit,
   classifyIntent,
   composeStartHere,
+  computeMapId,
   defaultStartHereClassification,
+  formatCodebaseMapMcpAppendix,
   normalizeContextIntent,
   readRecipeSqlLimit,
   resolveContextBudget,
+  SESSION_START_MCP_TOOLS,
 } from "./context-engine";
 import * as indexEngine from "./index-engine";
 
@@ -457,7 +462,157 @@ describe("composeStartHere", () => {
   });
 });
 
+describe("buildCliEntryHints", () => {
+  it("includes five outcome aliases and seven session-start MCP tools", () => {
+    const hints = buildCliEntryHints();
+    const cli = hints.filter((h) => h.surface === "cli");
+    const mcp = hints.filter((h) => h.surface === "mcp");
+    expect(cli).toHaveLength(Object.keys(OUTCOME_ALIASES).length);
+    expect(mcp.map((h) => h.id)).toEqual([...SESSION_START_MCP_TOOLS]);
+    expect(cli.find((h) => h.id === "hotspots")?.maps_to).toBe(
+      "query --recipe fan-in",
+    );
+    expect(mcp.find((h) => h.id === "context")?.note).toContain("map_id");
+  });
+});
+
+describe("computeMapId", () => {
+  it("is stable for the same canonical inputs regardless of hub_paths order", () => {
+    const summary = {
+      files: 3,
+      symbols: 2,
+      imports: 0,
+      components: 0,
+      dependencies: 2,
+      file_churn: 0,
+    };
+    const base = {
+      index_summary: summary,
+      schema_version: 1,
+      file_count: 3,
+      last_indexed_commit: "abc123",
+    };
+    const a = computeMapId({ ...base, hub_paths: ["src/b.ts", "src/a.ts"] });
+    const b = computeMapId({ ...base, hub_paths: ["src/a.ts", "src/b.ts"] });
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[0-9a-f]{16}$/);
+  });
+});
+
+describe("formatCodebaseMapMcpAppendix", () => {
+  it("lists map_id and top three hub paths", () => {
+    const text = formatCodebaseMapMcpAppendix("deadbeefcafebabe", [
+      "src/hub.ts",
+      "src/other.ts",
+      "src/leaf.ts",
+      "src/extra.ts",
+    ]);
+    expect(text).toContain("map_id: `deadbeefcafebabe`");
+    expect(text).toContain("`src/hub.ts`");
+    expect(text).not.toContain("`src/extra.ts`");
+    expect(text).toContain("call MCP tool `context`");
+  });
+
+  it("handles empty hub paths", () => {
+    const text = formatCodebaseMapMcpAppendix("abc", []);
+    expect(text).toContain("top hubs: (none indexed)");
+  });
+});
+
 describe("buildContextEnvelope", () => {
+  it("includes map_id and codebase_map in non-compact mode", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(envelope.map_id).toMatch(/^[0-9a-f]{16}$/);
+        expect(envelope.codebase_map?.hub_paths).toEqual(
+          envelope.start_here?.hub_leaders.map((h) => h.file_path),
+        );
+        expect(envelope.codebase_map?.cli_entry_hints.length).toBe(
+          Object.keys(OUTCOME_ALIASES).length + SESSION_START_MCP_TOOLS.length,
+        );
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("returns identical map_id for unchanged index", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const opts = { compact: false, intent: null };
+        const first = buildContextEnvelope(db, benchDir, opts);
+        const second = buildContextEnvelope(db, benchDir, opts);
+        expect(first.map_id).toBe(second.map_id);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("changes map_id when hub rankings change", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const before = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        insertDependencies(db, [
+          { from_path: "src/hub.ts", to_path: "src/leaf.ts" },
+          { from_path: "src/hub.ts", to_path: "src/other.ts" },
+        ]);
+        const after = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(before.map_id).not.toBe(after.map_id);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("omits map fields when include_codebase_map is false", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+          include_codebase_map: false,
+        });
+        expect(envelope.start_here).toBeDefined();
+        expect(envelope.map_id).toBeUndefined();
+        expect(envelope.codebase_map).toBeUndefined();
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("omits map fields when compact", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const envelope = buildContextEnvelope(db, benchDir, {
+          compact: true,
+          intent: null,
+          include_codebase_map: true,
+        });
+        expect(envelope.map_id).toBeUndefined();
+        expect(envelope.codebase_map).toBeUndefined();
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
   it("includes start_here in non-compact mode", () => {
     const head = "cccccccccccccccccccccccccccccccccccccccc";
     const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue(

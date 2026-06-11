@@ -13,6 +13,7 @@ import {
   initCodemap,
 } from "../runtime";
 import { assembleMcpInstructions } from "./agent-content";
+import { buildMcpInstructionsCodebaseMapAppendix } from "./context-engine";
 import {
   formatIndexFreshnessMcpBlock,
   jsonPayloadNeedsMcpFreshnessBlock,
@@ -113,6 +114,8 @@ interface ServerOpts {
   watch?: boolean;
   /** Coalesce burst events into one reindex after `debounceMs` of quiet. Only meaningful when `watch: true`. */
   debounceMs?: number;
+  /** Override MCP initialize `instructions` (tests + post-bootstrap appendix). */
+  instructions?: string;
 }
 
 /**
@@ -160,7 +163,7 @@ export function createMcpServer(opts: ServerOpts): McpServer {
       version: opts.version,
     },
     {
-      instructions: assembleMcpInstructions(),
+      instructions: opts.instructions ?? assembleMcpInstructions(),
     },
   );
 
@@ -255,7 +258,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     withToolAnnotations("context", {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders (ignored when compact: true).",
+        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, map_id + codebase_map routing card, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders (ignored when compact: true). Omit map fields with compact: true or include_codebase_map: false.",
       inputSchema: contextArgsSchema,
     }),
     (args) => wrapToolResult(handleContext(args)),
@@ -641,6 +644,26 @@ async function bootstrapForMcp(opts: ServerOpts): Promise<void> {
   configureResolver(getProjectRoot(), getTsconfigPath());
 }
 
+/** Initialize `instructions` for `runMcpServer` — honors `opts.instructions` when set. */
+export async function resolveMcpInitializeInstructions(
+  opts: Pick<ServerOpts, "instructions">,
+): Promise<string> {
+  if (opts.instructions !== undefined) return opts.instructions;
+  try {
+    const { openDb, closeDb } = await import("../db");
+    const db = openDb();
+    try {
+      return assembleMcpInstructions(
+        buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
+      );
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+  } catch {
+    return assembleMcpInstructions();
+  }
+}
+
 /**
  * Starts the MCP server over stdio. Resolves on client disconnect
  * (`session-lifecycle.ts`). Logs to stderr per MCP convention.
@@ -674,12 +697,14 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     warnIndexFreshnessToStderr("codemap mcp");
   }
 
-  const server = createMcpServer(opts);
-  const transport = new StdioServerTransport();
-
   if (watchSession !== undefined) {
     await watchSession.acquireClient();
   }
+
+  const instructions = await resolveMcpInitializeInstructions(opts);
+
+  const server = createMcpServer({ ...opts, instructions });
+  const transport = new StdioServerTransport();
 
   await server.connect(transport);
 

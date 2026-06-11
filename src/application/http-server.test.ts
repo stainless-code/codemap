@@ -427,6 +427,25 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(leader?.signatures?.[0]?.snippet).toContain("export const SNIP");
   });
 
+  it("context includes map_id and codebase_map by default", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "context", {});
+    expect(r.status).toBe(200);
+    expect(r.json.map_id).toMatch(/^[0-9a-f]{16}$/);
+    expect(r.json.codebase_map?.cli_entry_hints?.length).toBe(12);
+  });
+
+  it("context omits map fields when include_codebase_map is false", async () => {
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "context", {
+      include_codebase_map: false,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.start_here).toBeDefined();
+    expect(r.json.map_id).toBeUndefined();
+    expect(r.json.codebase_map).toBeUndefined();
+  });
+
   it("validate returns staleness rows", async () => {
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "validate", {});

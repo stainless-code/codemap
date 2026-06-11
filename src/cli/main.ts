@@ -153,6 +153,7 @@ Copies bundled agent templates into .agents/ under the project root.
       compact: parsed.compact,
       intent: parsed.intent,
       includeSnippets: parsed.includeSnippets,
+      includeCodebaseMap: parsed.includeCodebaseMap,
     });
     return;
   }

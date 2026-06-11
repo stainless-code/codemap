@@ -22,7 +22,12 @@ import {
 } from "../db";
 import { initCodemap } from "../runtime";
 import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
-import { createMcpServer } from "./mcp-server";
+import { assembleMcpInstructions } from "./agent-content";
+import { buildMcpInstructionsCodebaseMapAppendix } from "./context-engine";
+import {
+  createMcpServer,
+  resolveMcpInitializeInstructions,
+} from "./mcp-server";
 import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 
@@ -87,6 +92,52 @@ describe("MCP server — initialize instructions", () => {
       expect(instructions).toContain("index_freshness");
       expect(instructions).toContain("start_here");
       expect(instructions).toContain("pending_sync");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("resolveMcpInitializeInstructions honors caller-provided instructions", async () => {
+    const custom = "custom-mcp-instructions\n";
+    const resolved = await resolveMcpInitializeInstructions({
+      instructions: custom,
+    });
+    expect(resolved).toBe(custom);
+  });
+
+  it("resolveMcpInitializeInstructions assembles codebase map appendix by default", async () => {
+    const resolved = await resolveMcpInitializeInstructions({});
+    expect(resolved).toContain("map_id:");
+    expect(resolved).toContain("Session start");
+  });
+
+  it("can append codebase map block to initialize instructions", async () => {
+    const db = openDb();
+    let appendix: string;
+    try {
+      appendix = buildMcpInstructionsCodebaseMapAppendix(db, benchDir);
+    } finally {
+      closeDb(db, { readonly: true });
+    }
+    expect(appendix).toContain("map_id:");
+    expect(appendix).toContain("Codebase map");
+
+    const server = createMcpServer({
+      version: "0.0.0-test",
+      root: benchDir,
+      instructions: assembleMcpInstructions(appendix),
+    });
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    try {
+      await Promise.all([
+        server.connect(serverTransport),
+        client.connect(clientTransport),
+      ]);
+      const instructions = client.getInstructions();
+      expect(instructions).toContain("map_id:");
+      expect(instructions).toContain("call MCP tool `context`");
     } finally {
       await server.close();
     }

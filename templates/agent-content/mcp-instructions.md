@@ -4,7 +4,7 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 ## Session start
 
-1. **`context`** — project root, schema version, file count, language breakdown, **`start_here`** (index summary + recipe cards + hub leaders), recipe catalog, **`index_freshness`** (one call replaces 4–5 queries). Pass **`include_snippets: true`** for one-line export previews on hub leaders (ignored with **`compact: true`**). Prefer **`start_here.hub_leaders`** over legacy **`hubs`** for signatures.
+1. **`context`** — project root, schema version, file count, language breakdown, **`start_here`** (index summary + recipe cards + hub leaders), **`map_id`** + **`codebase_map`** (hub paths + codemap CLI/MCP routing hints), recipe catalog, **`index_freshness`** (one call replaces 4–5 queries). Pass **`include_snippets: true`** for one-line export previews on hub leaders (ignored with **`compact: true`**). Omit map fields with **`compact: true`** or **`include_codebase_map: false`**. Prefer **`start_here.hub_leaders`** over legacy **`hubs`** for signatures. Compare **`map_id`** across sessions to detect structural summary drift without re-fetching full **`start_here`**.
 2. **`codemap://rule`** — always-on priming: query the index for structure, don't grep.
 3. When you need the catalog or DDL: **`codemap://recipes`**, **`codemap://schema`**.
 
@@ -12,12 +12,12 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 Every successful JSON tool response carries index-level freshness metadata (not a pass/fail verdict):
 
-| Surface                                          | Where to read it                                                                                      |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **`context`**                                    | `index_freshness`; **`start_here`** when not `compact` (optional `include_snippets`)                  |
-| **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                       |
-| **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                            |
-| **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged) |
+| Surface                                          | Where to read it                                                                                                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`context`**                                    | `index_freshness`; **`start_here`** when not `compact` (optional `include_snippets`); **`map_id`** + **`codebase_map`** when not `compact` (optional `include_codebase_map: false`) |
+| **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                                                                                                     |
+| **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                                                                                                          |
+| **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged)                                                                               |
 
 Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commit_drift` (`HEAD` ≠ `last_indexed_commit`), `warning` (single agent-readable line when anything is off).
 

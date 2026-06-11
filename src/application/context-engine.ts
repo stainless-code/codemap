@@ -2,6 +2,8 @@ import { resolve } from "node:path";
 
 import { getMeta, SCHEMA_VERSION } from "../db";
 import type { CodemapDatabase } from "../db";
+import { hashContent } from "../hash";
+import { OUTCOME_ALIASES } from "../outcome-aliases";
 import { CODEMAP_VERSION } from "../version";
 import { computeIndexFreshness } from "./index-freshness";
 import type { IndexFreshness } from "./index-freshness";
@@ -12,6 +14,37 @@ import { getIndexedContentHash, readSymbolSource } from "./show-engine";
 /** Max recipe cards in `start_here.recipes`. */
 const START_HERE_RECIPE_LIMIT = 4;
 const DEFAULT_MARKER_LIMIT = 20;
+
+/** Session-start MCP tools cited in `cli_entry_hints` (matches mcp-instructions.md). */
+export const SESSION_START_MCP_TOOLS = [
+  "context",
+  "show",
+  "query_recipe",
+  "trace",
+  "explore",
+  "node",
+  "validate",
+] as const;
+
+export interface ContextCliEntryHint {
+  surface: "cli" | "mcp";
+  id: string;
+  maps_to: string;
+  note?: string;
+}
+
+export interface ContextCodebaseMap {
+  hub_paths: string[];
+  cli_entry_hints: ContextCliEntryHint[];
+}
+
+export interface MapIdCanonical {
+  hub_paths: string[];
+  index_summary: ContextIndexSummary;
+  schema_version: number;
+  file_count: number;
+  last_indexed_commit: string | null;
+}
 
 export interface ContextBudget {
   hub_limit: number;
@@ -83,6 +116,10 @@ export interface ContextEnvelope {
    * signatures. Replaces a common show → explore chain after bootstrap.
    */
   start_here?: ContextStartHere;
+  /** Hash-stable fingerprint of hub paths + index summary + schema (omit when compact / opt-out). */
+  map_id?: string;
+  /** Routing card: top hub paths + codemap CLI/MCP entry hints (omit when compact / opt-out). */
+  codebase_map?: ContextCodebaseMap;
   recipes: { id: string; description: string }[];
   index_freshness: IndexFreshness;
   intent?: {
@@ -140,6 +177,105 @@ export interface BuildContextEnvelopeOpts {
   intent: string | null;
   /** One-line export previews on hub leader signatures (CLI `--include-snippets`, MCP/HTTP `include_snippets`). */
   include_snippets?: boolean;
+  /** When false, omit `map_id` and `codebase_map` (default true when not `compact`). */
+  include_codebase_map?: boolean;
+}
+
+/** Static codemap CLI/MCP routing rows for `codebase_map.cli_entry_hints`. */
+export function buildCliEntryHints(): ContextCliEntryHint[] {
+  const hints: ContextCliEntryHint[] = [];
+  for (const [alias, recipeId] of Object.entries(OUTCOME_ALIASES)) {
+    hints.push({
+      surface: "cli",
+      id: alias,
+      maps_to: `query --recipe ${recipeId}`,
+    });
+  }
+  const mcpNotes: Partial<
+    Record<(typeof SESSION_START_MCP_TOOLS)[number], string>
+  > = {
+    context: "session bootstrap; map_id + cli_entry_hints",
+    show: "exact symbol lookup",
+    query_recipe: "bundled SQL recipes",
+    trace: "call path + snippets",
+    explore: "multi-symbol neighborhood",
+    node: "one-hop symbol card",
+    validate: "per-file index drift",
+  };
+  for (const tool of SESSION_START_MCP_TOOLS) {
+    const note = mcpNotes[tool];
+    hints.push({
+      surface: "mcp",
+      id: tool,
+      maps_to: tool,
+      ...(note !== undefined ? { note } : {}),
+    });
+  }
+  return hints;
+}
+
+/** First 16 hex chars of SHA-256 over canonical JSON (sorted hub_paths). */
+export function computeMapId(canonical: MapIdCanonical): string {
+  const payload = {
+    hub_paths: [...canonical.hub_paths].sort(),
+    index_summary: canonical.index_summary,
+    schema_version: canonical.schema_version,
+    file_count: canonical.file_count,
+    last_indexed_commit: canonical.last_indexed_commit,
+  };
+  return hashContent(JSON.stringify(payload)).slice(0, 16);
+}
+
+export function buildCodebaseMap(opts: {
+  hubLeaders: ContextHubLeader[];
+  include: boolean;
+  compact: boolean;
+}): ContextCodebaseMap | undefined {
+  if (opts.compact || !opts.include) return undefined;
+  return {
+    hub_paths: opts.hubLeaders.map((h) => h.file_path),
+    cli_entry_hints: buildCliEntryHints(),
+  };
+}
+
+/** MCP initialize appendix — map_id + top hubs; full map via `context` tool. */
+export function formatCodebaseMapMcpAppendix(
+  map_id: string,
+  hub_paths: string[],
+): string {
+  const top = hub_paths.slice(0, 3);
+  const hubLine =
+    top.length > 0
+      ? `top hubs: ${top.map((p) => `\`${p}\``).join(", ")}`
+      : "top hubs: (none indexed)";
+  return [
+    "",
+    "## Codebase map (indexed project)",
+    "",
+    `map_id: \`${map_id}\``,
+    hubLine,
+    "",
+    "Full routing table and fresh map_id: call MCP tool `context` (or `codemap context --json`).",
+  ].join("\n");
+}
+
+/** Build MCP instructions appendix from an open index (after MCP bootstrap). */
+export function buildMcpInstructionsCodebaseMapAppendix(
+  db: CodemapDatabase,
+  projectRoot: string,
+): string {
+  const envelope = buildContextEnvelope(db, projectRoot, {
+    compact: false,
+    intent: null,
+    include_codebase_map: true,
+  });
+  if (envelope.map_id === undefined || envelope.codebase_map === undefined) {
+    return "\n\n## Codebase map\n\nCall MCP tool `context` for the full bootstrap envelope.\n";
+  }
+  return formatCodebaseMapMcpAppendix(
+    envelope.map_id,
+    envelope.codebase_map.hub_paths,
+  );
 }
 
 /**
@@ -320,6 +456,22 @@ export function buildContextEnvelope(
         fanInRows: hubLeaderRows,
       },
     );
+
+    const includeMap = opts.include_codebase_map !== false;
+    envelope.codebase_map = buildCodebaseMap({
+      hubLeaders: envelope.start_here.hub_leaders,
+      include: includeMap,
+      compact: false,
+    });
+    if (envelope.codebase_map !== undefined) {
+      envelope.map_id = computeMapId({
+        hub_paths: envelope.codebase_map.hub_paths,
+        index_summary: envelope.start_here.index_summary,
+        schema_version: SCHEMA_VERSION,
+        file_count: fileCount,
+        last_indexed_commit: lastCommit,
+      });
+    }
   }
 
   if (intentClassification !== null && userIntent !== null) {
