@@ -1850,6 +1850,73 @@ describe("MCP server — impact tool", () => {
     }
   });
 
+  it("impact in scopes homonym symbols to one defining file", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES
+           ('src/a.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0),
+           ('src/b.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0),
+           ('src/a.ts', 'onlyA', 'function', 1, 1, 'function onlyA()', 0, 0),
+           ('src/b.ts', 'onlyB', 'function', 1, 1, 'function onlyB()', 0, 0)`,
+      );
+      db.run(
+        `INSERT INTO calls (file_path, caller_name, caller_scope, callee_name, line_start, column_start, column_end)
+         VALUES ('src/a.ts', 'dup', 'function', 'onlyA', 1, 0, 1),
+                ('src/b.ts', 'dup', 'function', 'onlyB', 1, 0, 1)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: {
+          target: "dup",
+          direction: "down",
+          via: "calls",
+          in: "src/a.ts",
+        },
+      });
+      const json = readJson(r);
+      expect(json.target.matched_in).toEqual(["src/a.ts"]);
+      expect(json.matches.map((m: { name: string }) => m.name)).toEqual([
+        "onlyA",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("impact in mismatch returns skipped_scope", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, is_exported, is_default_export)
+         VALUES ('src/a.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0),
+                ('src/b.ts', 'dup', 'function', 1, 1, 'function dup()', 0, 0)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "impact",
+        arguments: { target: "dup", in: "src/z.ts" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toEqual([]);
+      expect(json.skipped_scope?.reason).toContain("src/z.ts");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("impact returns isError on non-integer depth (Zod rejects)", async () => {
     const { client, server } = await makeClient();
     try {

@@ -872,6 +872,7 @@ export const impactArgsSchema = {
   via: z.enum(["dependencies", "calls", "imports", "all"]).optional(),
   depth: z.number().int().nonnegative().optional(),
   limit: z.number().int().positive().optional(),
+  in: z.string().min(1).optional(),
   summary: z.boolean().optional(),
 };
 
@@ -881,6 +882,7 @@ export interface ImpactArgs {
   via?: ImpactBackend;
   depth?: number;
   limit?: number;
+  in?: string;
   summary?: boolean;
 }
 
@@ -888,12 +890,17 @@ export function handleImpact(args: ImpactArgs): ToolResult {
   try {
     const db = openDb();
     try {
+      const inPath =
+        args.in !== undefined && args.in.length > 0
+          ? toProjectRelative(getProjectRoot(), args.in)
+          : undefined;
       const result = findImpact(db, {
         target: args.target,
         direction: args.direction,
         via: args.via,
         depth: args.depth,
         limit: args.limit,
+        inPath,
       });
       // mirrors cmd-impact.ts: trim `matches`, keep `summary.nodes`.
       const payload =

@@ -385,6 +385,89 @@ describe("findImpact — target resolution", () => {
   });
 });
 
+describe("findImpact — inPath + homonym scoping", () => {
+  beforeEach(() => {
+    seedFile("src/a.ts");
+    seedFile("src/b.ts");
+    seedSymbol("dup", "src/a.ts");
+    seedSymbol("dup", "src/b.ts");
+    seedSymbol("onlyA", "src/a.ts");
+    seedSymbol("onlyB", "src/b.ts");
+    seedCall("src/a.ts", "dup", "onlyA");
+    seedCall("src/b.ts", "dup", "onlyB");
+  });
+
+  it("unscoped homonym unions per-defining-file call graphs", () => {
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "down",
+      via: "calls",
+    });
+    expect(r.matches.map((m) => m.name).sort()).toEqual(["onlyA", "onlyB"]);
+  });
+
+  it("inPath scopes homonym to one defining file", () => {
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "down",
+      via: "calls",
+      inPath: "src/a.ts",
+    });
+    expect(r.target.matched_in).toEqual(["src/a.ts"]);
+    expect(r.matches.map((m) => m.name)).toEqual(["onlyA"]);
+  });
+
+  it("inPath on unknown symbol omits skipped_scope", () => {
+    const r = findImpact(db, {
+      target: "missing",
+      direction: "down",
+      via: "calls",
+      inPath: "src/a.ts",
+    });
+    expect(r.target.matched_in).toEqual([]);
+    expect(r.skipped_scope).toBeUndefined();
+  });
+
+  it("inPath outside matched_in returns empty matches with skipped_scope", () => {
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "down",
+      via: "calls",
+      inPath: "src/z.ts",
+    });
+    expect(r.matches).toEqual([]);
+    expect(r.skipped_scope?.reason).toContain("src/z.ts");
+  });
+
+  it("unscoped homonym unions per-file graphs for direction=up", () => {
+    seedCall("src/a.ts", "callerA", "dup");
+    seedCall("src/b.ts", "callerB", "dup");
+
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "up",
+      via: "calls",
+    });
+    expect(r.matches.map((m) => m.name).sort()).toEqual(["callerA", "callerB"]);
+  });
+
+  it("inPath directory prefix scopes homonym definitions", () => {
+    seedFile("src/pkg/b.ts");
+    seedSymbol("dup", "src/pkg/b.ts");
+    seedSymbol("onlyPkg", "src/pkg/b.ts");
+    seedCall("src/pkg/b.ts", "dup", "onlyPkg");
+
+    const r = findImpact(db, {
+      target: "dup",
+      direction: "down",
+      via: "calls",
+      inPath: "src/pkg",
+    });
+    expect(r.target.matched_in).toEqual(["src/pkg/b.ts"]);
+    expect(r.matches.map((m) => m.name)).toEqual(["onlyPkg"]);
+  });
+});
+
 describe("findImpact — envelope shape + summary", () => {
   beforeEach(() => {
     seedFile("src/a.ts");

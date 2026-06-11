@@ -65,7 +65,7 @@ Graph composers (MCP trace / explore / node twins):
   codemap node <name> [--kind <k>] [--in <path>] [--include-snippets] [--budget-chars N] [--compact]
 
 Impact analysis (graph walk for refactor blast-radius):
-  codemap impact <target> [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]
+  codemap impact <target> [--in <path>] [--direction up|down|both] [--depth N] [--via <b>] [--limit N] [--summary] [--json]
 
 Affected tests (reverse dep walk → test files to run):
   codemap affected [--stdin] [--changed-since <ref>] [--json] [<path>...]
