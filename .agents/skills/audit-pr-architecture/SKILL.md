@@ -96,6 +96,8 @@ Use codemap's own queries — same substrate for boundary checks, dead code, com
 bun src/index.ts audit --base origin/main --json   # delta vs base ref
 bun src/index.ts query --json --recipe untested-and-dead
 bun src/index.ts query --json --recipe unimported-exports
+bun src/index.ts query --json --recipe duplicates
+# high-complexity-untested: ingest coverage first or COALESCE treats missing as 0%
 bun src/index.ts query --json --recipe high-complexity-untested
 ```
 
@@ -109,7 +111,7 @@ Apply these verdicts to results:
 | `high-complexity-untested` row added by the PR                                           | **Untested orchestration** — split or test before merge. |
 | Unused dependency in `package.json`                                                      | Out of scope for this audit unless the PR added it.      |
 
-Duplication / structural-clone detection (AST-hash) is a [roadmap item](../../../docs/roadmap.md#backlog) and not yet a substrate column — for now, eyeball clones in the diff or use ad-hoc text grep.
+Duplication / structural-clone detection ships via `symbols.body_hash` and the `duplicates` recipe — see [glossary § body_hash](../../../docs/glossary.md#symbolsbody_hash--structural-duplicate-bodies). For diff review, eyeball clones or use ad-hoc text grep.
 
 ### 4. Cross-check structural STOP signals
 

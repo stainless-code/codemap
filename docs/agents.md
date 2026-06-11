@@ -218,6 +218,16 @@ Warning goes to stderr only so `codemap skill > file.md` stays clean.
 
 Do **not** duplicate long IDE matrices, **`--force`** / pointer behavior, **`codemap-pointer`** details, section assembler shape, or pointer-version semantics in **README.md** or **packaging.md** — link **here** instead.
 
+## Shipped agent & indexing milestones
+
+Maintainer inventory — contracts live in [architecture.md](./architecture.md), [golden-queries.md](./golden-queries.md), and [glossary.md](./glossary.md); not duplicated on [roadmap.md](./roadmap.md).
+
+**Wave 1–2** ([#126](https://github.com/stainless-code/codemap/pull/126)–[#138](https://github.com/stainless-code/codemap/pull/138)): MCP instructions, allowlist, WSL watch, git hooks, trace/explore/node, `agents init --mcp`, affected tests, index lock/`unlock`, parse-worker hardening, field-qualified search.
+
+**Agent eval** ([#139](https://github.com/stainless-code/codemap/pull/139) probe + [#144](https://github.com/stainless-code/codemap/pull/144) live MCP arms + log comparison): see [benchmark § Agent eval harness](./benchmark.md#agent-eval-harness).
+
+**Warm-path / bootstrap** — `index_freshness` on `context` / tool metadata / HTTP headers ([#149](https://github.com/stainless-code/codemap/pull/149)); `start_here` composer ([#151](https://github.com/stainless-code/codemap/pull/151)); adaptive output budgets ([#152](https://github.com/stainless-code/codemap/pull/152)); MCP session lifecycle ([#153](https://github.com/stainless-code/codemap/pull/153); **no MCP idle timeout** — [architecture § Session lifecycle](./architecture.md#session-lifecycle-wiring)); PM-aware MCP spawn ([#154](https://github.com/stainless-code/codemap/pull/154)); safer init re-runs ([#155](https://github.com/stainless-code/codemap/pull/155)); VS Code workspace root in MCP ([#156](https://github.com/stainless-code/codemap/pull/156)); `agents init --targets` ([#158](https://github.com/stainless-code/codemap/pull/158)).
+
 ## Related
 
 - [architecture.md](./architecture.md) — CLI chunks, layering.

@@ -2,7 +2,7 @@
 
 > **Status:** open (tiers **7–8**, **13**) · tiers **1–6** shipped · tiers **9–12** partial — live tables and `SCHEMA_VERSION` in [`architecture.md § Schema`](../architecture.md#schema) / [`src/db.ts`](../../src/db.ts). Apply executor + eight diff-shape recipes shipped — [`architecture.md § Apply`](../architecture.md#apply--input-modes-transport-and-policy).
 >
-> **Per-tier ship status (fact-checked 2026-06; `SCHEMA_VERSION` 37):** Tiers **1–6** shipped. Tier headings carry the PR landing date for that slice; the remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}` + `function_params`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **9–12** partial; **7–8** + **13** open.
+> **Per-tier ship status (fact-checked 2026-06; `SCHEMA_VERSION` 40):** Tiers **1–6** shipped. Tier headings carry the PR landing date for that slice; the remainder wave closed **2026-05-19** (tiers 1–6 foundation landed **2026-05-14**–**15**). Tier **1**: call-shape columns, side-effect `import_specifiers` + `import_id`. Tier **2**: `bindings.resolution_kind='re-exported'`. Tier **3**: `jsx_elements` / `jsx_attributes`. Tier **5**: `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`. Tier **4** partial: `symbols.{return_type,is_async,is_generator}` + `function_params`; `generic_params` / `type_predicates` deferred. Tier **6** partial: `dynamic_imports`, `files.{is_barrel,has_side_effects}`; `files.is_entry` deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md). Tiers **9–12** partial; **7–8** + **13** open.
 >
 > **Motivator:** Codemap's distinctive value is the SQL-against-structural-index substrate. Per [Moat B](../roadmap.md#moats-load-bearing) — _"Extracted structure ≥ verdicts. Schema breadth is the substrate every recipe layers on."_ — the load-bearing growth axis is **what oxc / Lightning CSS / config loaders give us that the index doesn't yet expose.** Tiers **1–6** shipped: position-precise calls/imports/exports, `references` / `scopes` / `bindings`, JSX, behavioral facts, module-graph flags, and more — see [architecture § Schema](../architecture.md#schema). **Open tiers 7–8 + 13** below enumerate CSS rule depth, project meta, ORM/SQL tracking, and other AST surfaces we discard at parse time today. Each remaining tier ships as an independent tracer-bullet PR that compounds into a maximal substrate.
 >
@@ -515,7 +515,7 @@ Tier 8 (project meta) — parallel-safe; cheapest; ship first or last.
 - Tier 9 depends on Tier 1 + Tier 2.
 - Tier 10 depends on Tier 2 (`scope_id`).
 - Tier 11 has no hard deps but Tier 2's `scope_id` enriches some metrics.
-- Tier 12 depends on Tier 6 (`files.is_entry`).
+- Tier 12 optionally enriched by C.9 (`files.is_entry` — deferred to [`c9-plugin-layer.md`](./c9-plugin-layer.md)); ships heuristic entry detection without it.
 - Tier 13 depends on Tier 1 + Tier 5 (decorators for TypeORM).
 
 **Parallel-safe:** Tier 7 (CSS), Tier 8 (project meta) can ship anytime.

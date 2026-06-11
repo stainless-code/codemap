@@ -293,7 +293,7 @@ await cm.index({ quiet: true });
 const rows = cm.query("SELECT name FROM symbols LIMIT 5");
 ```
 
-`createCodemap` configures a process-global runtime (`initCodemap`); only **one active project per process** is supported. Advanced: `runCodemapIndex` for an open DB handle. **Module layout:** [docs/architecture.md § Layering](docs/architecture.md#layering).
+`createCodemap` configures a process-global runtime (`initCodemap`); only **one active project per process** is supported. Advanced: `runCodemapIndex` when you hold a `CodemapDatabase` handle (library integration — not a separate public `openDb()` export; use `createCodemap` for the supported path). **Module layout:** [docs/architecture.md § Layering](docs/architecture.md#layering).
 
 ---
 

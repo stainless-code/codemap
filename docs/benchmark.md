@@ -96,7 +96,7 @@ CODEMAP_ROOT=/absolute/path/to/your-app CODEMAP_BENCHMARK_CONFIG=fixtures/benchm
 
 - **Tracked example:** [fixtures/benchmark/scenarios.example.json](../fixtures/benchmark/scenarios.example.json) — copy to `*.local.json` (see [.gitignore](../.gitignore); do not commit proprietary paths).
 - **`CODEMAP_BENCHMARK_CONFIG`** is passed to **`path.resolve()`** from **`process.cwd()`** — use an absolute path or a path relative to where you run the command (not relative to **`src/`**).
-- Each entry has **`name`**, **`indexedSql`**, and **`traditional`**: either **`{ "globs": [...], "regex": "...", "mode": "files" | "matches" }`** or **`{ "builtin": "fanoutImportLines" }`** (same traditional path as **`--recipe fan-out`**). **`indexedSql`** must be a **single** read-only **`SELECT`** (or **`WITH` … `SELECT`**) — mutating statements are **rejected** at load time.
+- Each entry has **`name`**, **`indexedSql`**, and **`traditional`**: either **`{ "globs": [...], "regex": "...", "mode": "files" | "matches" }`** or **`{ "builtin": "fanoutImportLines" }`** (line-scan proxy paired with indexed **`--recipe fan-out`** SQL in default scenario 8 — not the same code path). **`indexedSql`** must be a **single** read-only **`SELECT`** (or **`WITH` … `SELECT`**) — mutating statements are **rejected** at load time.
 - **`traditional.regex`:** treated as trusted input from your local JSON (benchmark tooling is developer-facing). **`mode": "files"`** reuses one **`RegExp`** per scenario for efficiency.
 - **`replaceDefault`:** `true` (default) uses only this list; `false` **appends** these scenarios after the built-in eight.
 

@@ -4,7 +4,7 @@
 >
 > **Motivator:** GitHub Marketplace is the dominant discovery + adoption surface for tools in the codebase-intelligence cohort, and codemap is currently absent from it. The in-repo Action closes the CI wrapper gap once it is tagged and listed; until then consumers can use the CLI surfaces directly or a local-path action ref.
 >
-> **Tier:** M effort. Wraps existing CLI surface; no schema changes, no new engines, no new transports. Only new substrate is the optional PR-comment writer (~one TS module).
+> **Tier:** M effort. Wraps existing CLI surface; no schema changes, no new engines, no new transports. PR-comment writer shipped (Slice 3); open work is listing/tags/smoke (Slice 5).
 >
 > **Roadmap:** [§ Core substrate & platform](../roadmap.md#core-substrate--platform)
 
