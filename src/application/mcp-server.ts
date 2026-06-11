@@ -681,19 +681,21 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     await watchSession.acquireClient();
   }
 
-  let instructions: string;
-  try {
-    const { openDb, closeDb } = await import("../db");
-    const db = openDb();
+  let instructions = opts.instructions;
+  if (instructions === undefined) {
     try {
-      instructions = assembleMcpInstructions(
-        buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
-      );
-    } finally {
-      closeDb(db, { readonly: true });
+      const { openDb, closeDb } = await import("../db");
+      const db = openDb();
+      try {
+        instructions = assembleMcpInstructions(
+          buildMcpInstructionsCodebaseMapAppendix(db, getProjectRoot()),
+        );
+      } finally {
+        closeDb(db, { readonly: true });
+      }
+    } catch {
+      instructions = assembleMcpInstructions();
     }
-  } catch {
-    instructions = assembleMcpInstructions();
   }
 
   const server = createMcpServer({ ...opts, instructions });
