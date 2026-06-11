@@ -469,7 +469,7 @@ describe("http-server — POST /tool/{other tools}", () => {
     expect(r.json.matches[0]).toHaveProperty("missing");
   });
 
-  it("show with query returns field-qualified matches", async () => {
+  it("show with query fast tier returns exact name matches", async () => {
     const db = openDb();
     try {
       db.run(
@@ -480,7 +480,28 @@ describe("http-server — POST /tool/{other tools}", () => {
       closeDb(db);
     }
     serverHandle = await startServer();
-    const r = await postTool(serverHandle.port, "show", { query: "name:Auth" });
+    const r = await postTool(serverHandle.port, "show", {
+      query: "name:AuthService",
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.matches).toHaveLength(1);
+    expect(r.json.matches[0].name).toBe("AuthService");
+  });
+
+  it("show with query returns field-qualified substring matches", async () => {
+    const db = openDb();
+    try {
+      db.run(
+        `INSERT INTO symbols (file_path, name, kind, line_start, line_end, signature, doc_comment)
+         VALUES ('src/a.ts', 'AuthService', 'class', 1, 1, 'class AuthService', NULL)`,
+      );
+    } finally {
+      closeDb(db);
+    }
+    serverHandle = await startServer();
+    const r = await postTool(serverHandle.port, "show", {
+      query: "kind:class name:Auth",
+    });
     expect(r.status).toBe(200);
     expect(r.json.matches).toHaveLength(1);
     expect(r.json.matches[0].name).toBe("AuthService");
@@ -518,7 +539,7 @@ describe("http-server — POST /tool/{other tools}", () => {
     }
     serverHandle = await startServer();
     const r = await postTool(serverHandle.port, "snippet", {
-      query: "name:Auth",
+      query: "kind:class name:Auth",
     });
     expect(r.status).toBe(200);
     expect(r.json.matches).toHaveLength(1);

@@ -100,6 +100,22 @@ describe("SQLite layer (in-memory)", () => {
     }
   });
 
+  it("createIndexes adds idx_symbols_name_covering", () => {
+    const db = openCodemapDatabase(":memory:");
+    try {
+      createTables(db);
+      createIndexes(db);
+      const row = db
+        .query(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_symbols_name_covering'",
+        )
+        .get() as { name: string } | null;
+      expect(row?.name).toBe("idx_symbols_name_covering");
+    } finally {
+      closeDb(db);
+    }
+  });
+
   it("symbols.visibility round-trips with index hit on WHERE visibility = ?", () => {
     const db = openCodemapDatabase(":memory:");
     try {

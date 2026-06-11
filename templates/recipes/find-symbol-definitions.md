@@ -14,7 +14,7 @@ actions:
 
 # find-symbol-definitions
 
-Locate every definition of a named symbol with column-precise positions. Foundation for `rename-preview`'s definition-row CTE (Tier 6 will extend to call sites + re-export aliases via [`find-call-sites`](./find-call-sites.md) + [`find-export-sites`](./find-export-sites.md)).
+Locate every definition of a named symbol with column-precise positions. **Fast tier** — `WHERE name = ?` equality (same as `codemap show <name>` / lone `show --query 'name:Token'` without wildcards). For substring discovery use `find-symbol-by-kind` or `show --query 'name:%pat%'`. Foundation for `rename-preview`'s definition-row CTE (Tier 6 will extend to call sites + re-export aliases via [`find-call-sites`](./find-call-sites.md) + [`find-export-sites`](./find-export-sites.md)).
 
 ```bash
 codemap query --recipe find-symbol-definitions --params name=usePermissions

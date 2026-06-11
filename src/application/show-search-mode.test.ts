@@ -6,8 +6,10 @@ import { openCodemapDatabase } from "../sqlite-db";
 import {
   executeShowLookup,
   formatShowSearchSqlForQuery,
+  isExactNamePattern,
   normalizeSearchInGlob,
   parseAndNormalizeSearchQuery,
+  resolveExactNameFromParsedQuery,
   resolveSearchWithFts,
   resolveShowLookupMode,
   validateShowSnippetLookupArgs,
@@ -98,6 +100,64 @@ describe("formatShowSearchSqlForQuery", () => {
     if (!result.ok) return;
     expect(result.sql).toContain("kind = 'function'");
     expect(result.sql).toContain("name LIKE '%entry%'");
+  });
+
+  it("returns equality SQL for lone name:Token fast path", () => {
+    const result = formatShowSearchSqlForQuery("name:hashContent", "/tmp", {
+      withFtsCli: false,
+      db,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.sql).toContain("name = 'hashContent'");
+    expect(result.sql).not.toContain("LIKE");
+  });
+
+  it("keeps LIKE SQL for name:%wild% slow tier", () => {
+    const result = formatShowSearchSqlForQuery("name:%Sym%", "/tmp", {
+      withFtsCli: false,
+      db,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.sql).toContain("name LIKE '%\\%Sym\\%%'");
+  });
+});
+
+describe("isExactNamePattern", () => {
+  it("accepts literal tokens", () => {
+    expect(isExactNamePattern("hashContent")).toBe(true);
+    expect(isExactNamePattern("runShowCmd")).toBe(true);
+  });
+
+  it("rejects unescaped wildcards", () => {
+    expect(isExactNamePattern("%foo%")).toBe(false);
+    expect(isExactNamePattern("foo_bar")).toBe(false);
+  });
+
+  it("allows escaped wildcards", () => {
+    expect(isExactNamePattern("foo\\%bar")).toBe(true);
+  });
+});
+
+describe("resolveExactNameFromParsedQuery", () => {
+  it("resolves lone name pattern", () => {
+    expect(
+      resolveExactNameFromParsedQuery({
+        namePatterns: ["MySymbol"],
+        freeText: [],
+      }),
+    ).toBe("MySymbol");
+  });
+
+  it("returns undefined when kind is set", () => {
+    expect(
+      resolveExactNameFromParsedQuery({
+        kind: "function",
+        namePatterns: ["MySymbol"],
+        freeText: [],
+      }),
+    ).toBeUndefined();
   });
 });
 
@@ -220,6 +280,66 @@ describe("executeShowLookup", () => {
     expect(r.matches).toHaveLength(1);
     expect(r.matches[0]!.name).toBe("foo");
     expect(r.warning).toBeUndefined();
+  });
+
+  it("name:Token fast path matches exact lookup rows", () => {
+    const exact = executeShowLookup(
+      db,
+      { ok: true, kind: "exact", name: "foo", inPath: undefined },
+      { withFtsCli: false },
+    );
+    const query = executeShowLookup(
+      db,
+      {
+        ok: true,
+        kind: "query",
+        parsed: { namePatterns: ["foo"], freeText: [] },
+      },
+      { withFtsCli: false },
+    );
+    expect(query.matches).toEqual(exact.matches);
+  });
+
+  it("kind + name uses slow LIKE tier even for literal name token", () => {
+    const exact = executeShowLookup(
+      db,
+      { ok: true, kind: "exact", name: "foo", inPath: undefined },
+      { withFtsCli: false },
+    );
+    const slow = executeShowLookup(
+      db,
+      {
+        ok: true,
+        kind: "query",
+        parsed: {
+          kind: "function",
+          namePatterns: ["foo"],
+          freeText: [],
+        },
+      },
+      { withFtsCli: false },
+    );
+    expect(slow.matches.length).toBeLessThanOrEqual(exact.matches.length);
+    expect(slow.matches.every((m) => m.kind === "function")).toBe(true);
+  });
+
+  it("name:%Sym% stays on slow LIKE tier", () => {
+    const slow = executeShowLookup(
+      db,
+      {
+        ok: true,
+        kind: "query",
+        parsed: { namePatterns: ["%Sym%"], freeText: [] },
+      },
+      { withFtsCli: false },
+    );
+    expect(
+      resolveExactNameFromParsedQuery({
+        namePatterns: ["%Sym%"],
+        freeText: [],
+      }),
+    ).toBeUndefined();
+    expect(slow.matches).toEqual([]);
   });
 
   it("query mode returns empty matches without error envelope", () => {

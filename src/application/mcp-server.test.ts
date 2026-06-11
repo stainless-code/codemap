@@ -1607,6 +1607,23 @@ describe("MCP server — show + snippet tools", () => {
     }
   });
 
+  it("show with query fast tier returns exact name matches", async () => {
+    seedSymbol({ file: "src/a.ts", name: "AuthService", kind: "class" });
+    seedSymbol({ file: "src/b.ts", name: "Other", kind: "class" });
+    const { client, server } = await makeClient();
+    try {
+      const r = await client.callTool({
+        name: "show",
+        arguments: { query: "name:AuthService" },
+      });
+      const json = readJson(r);
+      expect(json.matches).toHaveLength(1);
+      expect(json.matches[0].name).toBe("AuthService");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("show with query field search returns substring matches", async () => {
     seedSymbol({ file: "src/a.ts", name: "AuthService", kind: "class" });
     seedSymbol({ file: "src/b.ts", name: "Other", kind: "class" });
@@ -1614,7 +1631,7 @@ describe("MCP server — show + snippet tools", () => {
     try {
       const r = await client.callTool({
         name: "show",
-        arguments: { query: "name:Auth" },
+        arguments: { query: "kind:class name:Auth" },
       });
       const json = readJson(r);
       expect(json.matches).toHaveLength(1);
@@ -1637,7 +1654,7 @@ describe("MCP server — show + snippet tools", () => {
     try {
       const r = await client.callTool({
         name: "snippet",
-        arguments: { query: "name:Auth" },
+        arguments: { query: "kind:class name:Auth" },
       });
       const json = readJson(r);
       expect(json.matches).toHaveLength(1);
