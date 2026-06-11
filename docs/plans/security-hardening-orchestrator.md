@@ -21,11 +21,11 @@
 
 ## PR schedule
 
-| PR    | Plan                                                           | Status                       | Blocks                              |
-| ----- | -------------------------------------------------------------- | ---------------------------- | ----------------------------------- |
-| **1** | [`security-hardening-wave1.md`](./security-hardening-wave1.md) | **implemented, uncommitted** | —                                   |
-| **2** | [`impact-inpath-homonyms.md`](./impact-inpath-homonyms.md)     | **pending**                  | PR **1** merged                     |
-| **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)     | **pending**                  | PR **1** merged (PR **2** optional) |
+| PR    | Plan                                                           | Status                    | Blocks                              |
+| ----- | -------------------------------------------------------------- | ------------------------- | ----------------------------------- |
+| **1** | [`security-hardening-wave1.md`](./security-hardening-wave1.md) | **committed, PR pending** | —                                   |
+| **2** | [`impact-inpath-homonyms.md`](./impact-inpath-homonyms.md)     | **pending**               | PR **1** merged                     |
+| **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)     | **pending**               | PR **1** merged (PR **2** optional) |
 
 | — | — | **deferred** | golden `schema.test.ts` + path guards |
 | — | — | **skip** | atomic `ensureStateConfig` writes |
@@ -64,15 +64,15 @@ Evaluated 2026-06 against [roadmap § Floors](../roadmap.md#floors-v1-product-sh
 
 ## Session log
 
-| Date       | Event      | Notes                                                                         |
-| ---------- | ---------- | ----------------------------------------------------------------------------- |
-| 2026-06-10 | Triage     | ROI on 7 slices; 3-PR program adopted.                                        |
-| 2026-06-10 | PR 1 impl  | PR **1** code complete; **not committed**. Docs: orchestrator + per-PR plans. |
-| —          | PR 1 merge | _PR URL · merge SHA · update plan status → closed_                            |
-| —          | PR 2 start | _from `main`_                                                                 |
-| —          | PR 2 merge | _fill_                                                                        |
-| —          | PR 3 start | _from `main`_                                                                 |
-| —          | PR 3 merge | _fill · close orchestrator_                                                   |
+| Date       | Event      | Notes                                                                        |
+| ---------- | ---------- | ---------------------------------------------------------------------------- |
+| 2026-06-10 | Triage     | ROI on 7 slices; 3-PR program adopted.                                       |
+| 2026-06-10 | PR 1 impl  | PR **1** committed on `fix/security-hardening-wave1`; harden pass in flight. |
+| —          | PR 1 merge | _PR URL · merge SHA · update plan status → closed_                           |
+| —          | PR 2 start | _from `main`_                                                                |
+| —          | PR 2 merge | _fill_                                                                       |
+| —          | PR 3 start | _from `main`_                                                                |
+| —          | PR 3 merge | _fill · close orchestrator_                                                  |
 
 ---
 

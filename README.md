@@ -50,7 +50,7 @@ codemap dead-code --json                                     # outcome alias →
 codemap query --json --recipe fan-out                        # recipe SQL by id (alias: -r)
 codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"  # ad-hoc SQL
 codemap --files src/a.ts src/b.tsx                           # targeted re-index after edits
-codemap validate --json                                      # detect stale / missing / unindexed files
+codemap validate --json                                      # detect stale / missing / unindexed / rejected files
 codemap context --compact --for "refactor auth"              # JSON envelope + intent-matched recipes
 codemap ingest-coverage coverage/coverage-final.json --json  # Istanbul / LCOV (auto-detected) → coverage table; joins with symbols
 NODE_V8_COVERAGE=.cov bun test && codemap ingest-coverage .cov --runtime --json  # V8 protocol (per-process dumps); local-only
@@ -162,9 +162,9 @@ codemap query --format diff-json 'SELECT "README.md" AS file_path, 1 AS line_sta
 codemap --with-fts --full
 codemap query --recipe text-in-deprecated-functions    # demonstrates FTS5 ⨯ symbols ⨯ coverage JOIN
 # HTTP API — same tool taxonomy as `codemap mcp`, exposed over POST /tool/{name} for
-# non-MCP consumers (CI scripts, curl, IDE plugins). Loopback default; optional --token.
+# non-MCP consumers (CI scripts, curl, IDE plugins). Loopback default; --token required on non-loopback.
 TOKEN=$(openssl rand -hex 32)
-codemap serve --port 7878 --token "$TOKEN" &
+codemap serve --port 7878 --token "$TOKEN" &                 # --token required when --host is not loopback
 curl -s -X POST http://127.0.0.1:7878/tool/query \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \

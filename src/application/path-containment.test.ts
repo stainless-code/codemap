@@ -46,6 +46,25 @@ describe("pathTraversesSymlinkOutsideRoot", () => {
       true,
     );
   });
+
+  it("returns true when an intermediate directory symlinks outside the root", () => {
+    const base = mkdtempSync(join(tmpdir(), "codemap-symlink-dir-"));
+    const root = join(base, "proj");
+    const outside = join(base, "outside");
+    mkdirSync(root, { recursive: true });
+    mkdirSync(join(outside, "nested"), { recursive: true });
+    writeFileSync(
+      join(outside, "nested", "secret.ts"),
+      "export const s = 1;\n",
+    );
+    symlinkSync(outside, join(root, "linked-dir"));
+    expect(
+      pathTraversesSymlinkOutsideRoot(
+        root,
+        join(root, "linked-dir", "nested", "secret.ts"),
+      ),
+    ).toBe(true);
+  });
 });
 
 describe("resolvePathWithinRoot", () => {

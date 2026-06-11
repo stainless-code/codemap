@@ -22,6 +22,10 @@ import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { buildHttpToolCatalogEntry } from "./mcp-tool-annotations";
 import { listResources, readResource } from "./resource-handlers";
 import {
+  assertServeBindRequiresToken,
+  isLoopbackHost,
+} from "./serve-bind-policy";
+import {
   bindWatchClientRelease,
   createManagedWatchSession,
   HTTP_WATCH_RELEASE_GRACE_MS,
@@ -119,6 +123,7 @@ export interface HttpServerOpts {
  * to JSON `{"error": "..."}` with appropriate status codes.
  */
 export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
+  assertServeBindRequiresToken(opts.host, opts.token);
   await bootstrapForServe(opts);
 
   let managedWatchSession: ManagedWatchSession | undefined;
@@ -692,7 +697,7 @@ function csrfCheck(
     return `cross-origin request rejected (Sec-Fetch-Site: ${String(fetchSite)}). codemap serve does not accept browser-driven cross-origin requests.`;
   }
 
-  if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
+  if (isLoopbackHost(host)) {
     const hostHeader = req.headers.host;
     if (hostHeader !== undefined) {
       const allowed = new Set([

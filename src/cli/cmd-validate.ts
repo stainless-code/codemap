@@ -30,9 +30,12 @@ Statuses:
   missing     The file is in the index but has been deleted on disk.
   unindexed   The file exists on disk but is not present in the index (only
               when explicit paths are passed).
+  rejected    The path could not be checked safely (escapes the project root
+              or resolves outside via symlink). Includes a reason field.
 
 Flags:
-  --json      Emit a JSON array of {path, status} objects (for agents).
+  --json      Emit a JSON array of {path, status[, reason]} objects (for agents).
+              Exits 1 when any row is returned (including rejected).
   --help, -h  Show this help.
 
 Examples:

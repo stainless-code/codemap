@@ -1,4 +1,5 @@
 import { runHttpServer } from "../application/http-server";
+import { serveBindTokenRequiredMessage } from "../application/serve-bind-policy";
 import {
   applyWatchPolicy,
   envWatchDefaultOn,
@@ -12,12 +13,6 @@ import { CODEMAP_VERSION } from "../version";
  */
 export const DEFAULT_HOST = "127.0.0.1";
 export const DEFAULT_PORT = 7878;
-
-/** Hosts safe to bind without mandatory auth (loopback only). */
-export function isLoopbackHost(host: string): boolean {
-  const h = host.toLowerCase();
-  return h === "127.0.0.1" || h === "localhost" || h === "::1" || h === "[::1]";
-}
 
 export interface ServeRunOpts {
   host: string;
@@ -157,12 +152,9 @@ export function parseServeRest(rest: string[]):
     };
   }
 
-  if (!isLoopbackHost(host) && (token === undefined || token.length === 0)) {
-    return {
-      kind: "error",
-      message:
-        "codemap serve: non-loopback bind requires --token (use a long random secret). Example: codemap serve --host 0.0.0.0 --token $(openssl rand -hex 32)",
-    };
+  const bindMessage = serveBindTokenRequiredMessage(host, token);
+  if (bindMessage !== undefined) {
+    return { kind: "error", message: bindMessage };
   }
 
   return { kind: "run", host, port, token, watch, debounceMs };

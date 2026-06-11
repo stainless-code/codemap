@@ -15,7 +15,7 @@ codemap --full
 # Check index freshness (index-level — HEAD drift, pending sync, disk-ahead)
 codemap context --compact | jq '.index_freshness'
 
-# Per-file staleness (content_hash drift)
+# Per-file staleness (content_hash drift; includes rejected paths with reason)
 codemap validate --json
 ```
 

@@ -9,7 +9,7 @@ import {
 } from "./path-containment";
 
 /**
- * One row in the staleness report. `status` distinguishes the three cases an
+ * One row in the staleness report. `status` distinguishes the cases an
  * agent might want to act on differently.
  */
 export interface ValidateRow {

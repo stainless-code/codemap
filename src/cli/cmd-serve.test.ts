@@ -88,6 +88,18 @@ describe("parseServeRest", () => {
     expect(r.token).toBeUndefined();
   });
 
+  it("parses bracketed IPv6 loopback without token", () => {
+    const r = parseServeRest(["serve", "--host", "[::1]"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.token).toBeUndefined();
+  });
+
+  it("rejects all-interfaces IPv6 bind without --token", () => {
+    const r = parseServeRest(["serve", "--host", "::"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--token");
+  });
+
   it("parses --token <secret>", () => {
     const r = parseServeRest(["serve", "--token", "abc123"]);
     if (r.kind !== "run") throw new Error("expected run");

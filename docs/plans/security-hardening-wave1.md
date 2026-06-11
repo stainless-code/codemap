@@ -1,6 +1,6 @@
 # PR 1 — query / serve / validate hardening
 
-> **Status:** open (implemented, uncommitted) · **PR:** 1 of 3 · **Effort:** S
+> **Status:** open (committed, PR pending) · **PR:** 1 of 3 · **Effort:** S
 >
 > **Orchestrator:** [`security-hardening-orchestrator.md`](./security-hardening-orchestrator.md)
 >
@@ -49,7 +49,7 @@ codemap validate <paths>
 | 3.2 | `validate` `rejected` + `rejectValidatePath`               | **done**    | `bun test src/cli/cmd-validate.test.ts`             |
 | 3.3 | Test `../../../etc/passwd` → `rejected`                    | **done**    | same                                                |
 | 1.x | `docs/architecture.md` lift                                | **done**    | `bun run format:check`                              |
-| 1.s | Commit + PR + CI                                           | **pending** | `bun run check`                                     |
+| 1.s | Commit + PR + CI                                           | **pending** | `bun run check` (committed; PR + CI open)           |
 
 ---
 
