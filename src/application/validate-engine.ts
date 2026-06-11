@@ -1,16 +1,21 @@
-import { readFileSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, relative, sep } from "node:path";
 
 import type { CodemapDatabase } from "../db";
 import { hashContent } from "../hash";
+import {
+  readUtf8WithinProjectRoot,
+  rejectUnsafeProjectRelativePath,
+} from "./path-containment";
 
 /**
- * One row in the staleness report. `status` distinguishes the three cases an
+ * One row in the staleness report. `status` distinguishes the cases an
  * agent might want to act on differently.
  */
 export interface ValidateRow {
   path: string;
-  status: "stale" | "missing" | "unindexed";
+  status: "stale" | "missing" | "unindexed" | "rejected";
+  /** Present when `status` is `rejected` (path could not be checked safely). */
+  reason?: string;
 }
 
 /**
@@ -41,14 +46,23 @@ export function computeValidateRows(
     if (seen.has(rel)) continue;
     seen.add(rel);
 
-    const indexedHash = indexByPath.get(rel);
-    const abs = resolve(projectRoot, rel);
-    let source: string | undefined;
-    try {
-      source = readFileSync(abs, "utf8");
-    } catch {
-      source = undefined;
+    const rejectReason = rejectUnsafeProjectRelativePath(projectRoot, rel);
+    if (rejectReason !== undefined) {
+      rows.push({ path: rel, status: "rejected", reason: rejectReason });
+      continue;
     }
+
+    const indexedHash = indexByPath.get(rel);
+    const readResult = readUtf8WithinProjectRoot(projectRoot, rel);
+    if (readResult.ok === false && readResult.status === "rejected") {
+      rows.push({
+        path: rel,
+        status: "rejected",
+        reason: readResult.reason,
+      });
+      continue;
+    }
+    const source = readResult.ok === true ? readResult.content : undefined;
 
     if (indexedHash === undefined) {
       if (source !== undefined) rows.push({ path: rel, status: "unindexed" });

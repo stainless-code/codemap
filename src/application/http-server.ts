@@ -22,6 +22,11 @@ import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { buildHttpToolCatalogEntry } from "./mcp-tool-annotations";
 import { listResources, readResource } from "./resource-handlers";
 import {
+  assertServeBindRequiresToken,
+  isLoopbackHost,
+  normalizeServeBindHost,
+} from "./serve-bind-policy";
+import {
   bindWatchClientRelease,
   createManagedWatchSession,
   HTTP_WATCH_RELEASE_GRACE_MS,
@@ -119,6 +124,8 @@ export interface HttpServerOpts {
  * to JSON `{"error": "..."}` with appropriate status codes.
  */
 export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
+  const bindHost = normalizeServeBindHost(opts.host);
+  assertServeBindRequiresToken(bindHost, opts.token);
   await bootstrapForServe(opts);
 
   let managedWatchSession: ManagedWatchSession | undefined;
@@ -147,6 +154,7 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
 
   const serveOpts: HttpServerOpts = {
     ...opts,
+    host: bindHost,
     managedWatchSession,
   };
 
@@ -159,10 +167,10 @@ export async function runHttpServer(opts: HttpServerOpts): Promise<void> {
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(opts.port, opts.host, () => {
+    server.listen(opts.port, bindHost, () => {
       // eslint-disable-next-line no-console -- intentional bootstrap log on stderr
       console.error(
-        `codemap serve: listening on http://${opts.host}:${opts.port}` +
+        `codemap serve: listening on http://${bindHost}:${opts.port}` +
           (opts.token !== undefined ? " (auth: Bearer)" : "") +
           (opts.watch === true ? " (watch: on)" : ""),
       );
@@ -692,7 +700,7 @@ function csrfCheck(
     return `cross-origin request rejected (Sec-Fetch-Site: ${String(fetchSite)}). codemap serve does not accept browser-driven cross-origin requests.`;
   }
 
-  if (host === "127.0.0.1" || host === "localhost" || host === "::1") {
+  if (isLoopbackHost(host)) {
     const hostHeader = req.headers.host;
     if (hostHeader !== undefined) {
       const allowed = new Set([

@@ -99,7 +99,7 @@ Tools (21; snake_case — mirrors CLI verbs where a shell twin exists):
   ingest_coverage      Load Istanbul/LCOV/V8 coverage into the index.
   ingest_churn         Load precomputed file_churn JSON into the index.
   context              Project bootstrap envelope.
-  validate             On-disk hash vs indexed hash.
+  validate             Hash drift rows (stale/missing/unindexed/rejected + reason).
   show                 Symbol metadata: file:line + signature.
   snippet              Same lookup + source text from disk.
   impact               Symbol/file blast-radius walker (callers, callees,

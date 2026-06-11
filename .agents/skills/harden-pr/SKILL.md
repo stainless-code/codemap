@@ -4,8 +4,8 @@ description: >-
   Bring a branch to pristine, maximum production readiness without changing PR intent —
   spawn parallel Task subagents (never inline review), fix in-bounds findings, loop autonomously until
   clean or pass cap, then report once. Use after a tracer-bullet commit (lite), before PR
-  is done (full), or on "harden", "harden-pr", "pristine", "review until clean",
-  "production-ready pass". Invoking this skill authorizes one harden commit at cycle end.
+  is done (full), on "harden", "harden-pr", "pristine", "review until clean",
+  "production-ready pass", or "harden-pr reconcile". Invoking this skill authorizes one harden commit at cycle end.
   NEVER stop mid-loop to ask about commits, babysit, or the next pass. NEVER redesign the
   feature or change observable runtime behavior.
 ---
@@ -16,9 +16,9 @@ description: >-
 
 Local loop: parallel reviewer subagents → merge findings → fix in-bounds → re-verify → repeat until clean or cap → **one final report**.
 
-**Invoking this skill (`/harden-pr`, `harden-pr lite`, `harden-pr full`) is a run-to-completion command.** The agent executes the full loop before ending the turn.
+**Invoking this skill (`/harden-pr`, `harden-pr lite`, `harden-pr full`, `harden-pr quick`, `harden-pr reconcile`) is a run-to-completion command.** The agent executes the full loop before ending the turn.
 
-Sister skills: [`audit-pr-architecture`](../audit-pr-architecture/SKILL.md) (extended structural reviewer). Mention **`babysit`** only in the final report (full mode) — never mid-loop.
+Sister skills: [`audit-pr-architecture`](../audit-pr-architecture/SKILL.md) (extended structural reviewer). **Ledger:** [LEDGER.md](./LEDGER.md) (rejections + deferred — one file). Mention **`babysit`** only in the final report (full mode) — never mid-loop.
 
 ## Run-to-completion (read first)
 
@@ -42,12 +42,14 @@ Otherwise: resolve anchor → run all passes → fix → verify → next pass �
 
 ## Modes
 
-| Mode     | When                                                                                                                                         | Scope                   | Max passes |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ---------- |
-| **Lite** | After each tracer-bullet slice commit ([`tracer-bullets`](../../rules/tracer-bullets.md) cadence)                                            | Files in the slice diff | 2          |
-| **Full** | User intent ("full harden", "PR done", "production-ready pass") **or** offer when an in-flight `docs/plans/<topic>.md` checklist is complete | `origin/main...HEAD`    | 3          |
+| Mode          | When                                                                                                                                         | Scope                     | Max passes |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ---------- |
+| **Lite**      | After each tracer-bullet slice commit ([`tracer-bullets`](../../rules/tracer-bullets.md) cadence)                                            | Files in the slice diff   | 2          |
+| **Quick**     | Cheap uncertainty pass ("quick harden")                                                                                                      | Last commit or slice diff | 1          |
+| **Full**      | User intent ("full harden", "PR done", "production-ready pass") **or** offer when an in-flight `docs/plans/<topic>.md` checklist is complete | `origin/main...HEAD`      | 3          |
+| **Reconcile** | `/harden-pr reconcile` — process [LEDGER.md § Deferred](./LEDGER.md#deferred), then run **full** if branch still open                        | `origin/main...HEAD`      | 3          |
 
-Default to **lite** when invoked immediately after a slice commit. Default to **full** when the user signals branch completion.
+Default to **lite** when invoked immediately after a slice commit. Default to **full** when the user signals branch completion. **Quick** = core 3 reviewers only (no extended roster).
 
 ## Production bar (what "pristine" means)
 
@@ -75,6 +77,27 @@ Resolve in order; stop at the first hit:
 3. **User anchor** — ask once: "What must not change?" (1–2 sentences). **Only step that may interrupt the loop.**
 
 Reviewers treat the anchor as contract. Findings that would violate it → **report, do not apply**.
+
+Record `HEAD` at loop start (`git rev-parse HEAD`) in the final report. If `HEAD` changes mid-loop from unrelated work, re-resolve the anchor before the next pass.
+
+## Vet step (parent, after merge — before fix)
+
+Subagents over-report. After merge + dedupe:
+
+1. Read [LEDGER.md § Rejections](./LEDGER.md#rejections) — drop findings matching a rejection entry.
+2. For each remaining finding: **re-read** `file` at `line` (or the cited region). Drop if the claim is false or by-design.
+3. New by-design drops → append one bullet to **§ Rejections** in [LEDGER.md](./LEDGER.md).
+4. Sort survivors by leverage: `severity` first, then `confidence` desc, then `effort` asc (`S` before `L`).
+
+**Anti-pattern:** applying a fix without re-reading the cited location.
+
+## Reconcile mode
+
+Run-to-completion like other modes:
+
+1. Read [LEDGER.md § Deferred](./LEDGER.md#deferred). Re-vet each row (same vet step). Fix in-bounds items; remove fixed lines.
+2. Run **full** harden on `origin/main...HEAD` (same loop as full mode).
+3. On cap: append still-deferred items to **§ Deferred** in [LEDGER.md](./LEDGER.md). Report what was reconciled vs still open.
 
 ## In-bounds vs out-of-bounds
 
@@ -106,9 +129,15 @@ Each reviewer returns **only** a JSON array (no prose wrapper). Parent parses ar
   "finding": "One-sentence claim about a gap vs production bar",
   "severity": "blocker | major | minor | nit | info",
   "file": "repo-relative/path or \"multiple\"",
-  "fixable_in_bounds": true
+  "line": 42,
+  "confidence": "high | medium | low",
+  "effort": "S | M | L",
+  "fixable_in_bounds": true,
+  "production_bar": "Tests | Docs | Structure | …"
 }
 ```
+
+Use `line: null` when the gap is file-level (e.g. missing test file).
 
 **Severity → action**
 
@@ -124,8 +153,9 @@ Each reviewer returns **only** a JSON array (no prose wrapper). Parent parses ar
 1. Concatenate all reviewer arrays.
 2. Drop `info` unless it blocks ship shape.
 3. Dedupe: same `file` + same root cause → keep highest severity, merge `finding` text.
-4. Sort actionable: `blocker` → `major` → `minor` → `nit`.
-5. If merged list is empty → pass succeeds; skip fix phase.
+4. Sort actionable: `blocker` → `major` → `minor` → `nit`; within tier → `confidence` desc → `effort` asc.
+5. **Vet** (§ Vet step).
+6. If vetted list is empty → pass succeeds; skip fix phase.
 
 **Example merged queue (pass 1)**
 
@@ -135,19 +165,31 @@ Each reviewer returns **only** a JSON array (no prose wrapper). Parent parses ar
     "finding": "CLI --help documents summary counts but not per-row attribution on --base JSON rows.",
     "severity": "major",
     "file": "src/cli/cmd-audit.ts",
-    "fixable_in_bounds": true
+    "line": 120,
+    "confidence": "high",
+    "effort": "S",
+    "fixable_in_bounds": true,
+    "production_bar": "Docs"
   },
   {
     "finding": "Skill shard leaks requiredColumns when describing attribution.",
     "severity": "major",
     "file": "templates/agent-content/skill/10-recipes-context.md",
-    "fixable_in_bounds": true
+    "line": null,
+    "confidence": "high",
+    "effort": "M",
+    "fixable_in_bounds": true,
+    "production_bar": "Surfaces"
   },
   {
     "finding": "No e2e test for attribution: inherited on deprecated delta.",
     "severity": "nit",
     "file": "src/application/audit-worktree.test.ts",
-    "fixable_in_bounds": true
+    "line": null,
+    "confidence": "medium",
+    "effort": "S",
+    "fixable_in_bounds": true,
+    "production_bar": "Tests"
   }
 ]
 ```
@@ -170,7 +212,7 @@ You are the **{ROLE}** reviewer for `/harden-pr` on `{REPO}`.
 **Task:** {EXTRA}
 
 **Return ONLY** a JSON array of findings:
-[{ "finding": "...", "severity": "blocker|major|minor|nit|info", "file": "...", "fixable_in_bounds": true|false }]
+[{ "finding": "...", "severity": "blocker|major|minor|nit|info", "file": "...", "line": N|null, "confidence": "high|medium|low", "effort": "S|M|L", "fixable_in_bounds": true|false, "production_bar": "..." }]
 If clean: []
 
 Readonly — do not edit files.
@@ -216,23 +258,25 @@ Re-derive layer globs from `docs/architecture.md` § Layering — don't hardcode
 Execute **without pausing for user input** until exit condition:
 
 ```
-resolve intent anchor
+resolve intent anchor; stamp HEAD
 pass = 1
 loop:
   Task-batch all applicable reviewers (parallel, readonly)
   parent: merge + dedupe JSON findings (§ Finding schema)
+  parent: vet findings (§ Vet step)
   if none actionable → goto done
   fix in-bounds (pass 1: all; passes 2+: blockers first, then in-scope nits)
-  run project checks on touched files
+  per fix: run verification gate from verify-after-each-step on touched files
   if clean and no new findings → goto done
   if pass >= max_passes → goto capped
   pass += 1
   goto loop
 capped:
+  append deferred rows to LEDGER.md § Deferred
   emit deferred-nits list (each nit must cite plan Out of scope or cross-PR blocker — not "optional")
 done:
   if uncommitted fixes → git commit -m "harden: …"
-  emit final report (include babysit one-liner if full mode)
+  emit final report (include babysit one-liner if full mode; include anchor HEAD stamp)
 ```
 
 **Pass cap behavior:** after cap, stop auto-fixing; list deferred nits. Do not block the next tracer slice.
@@ -243,9 +287,11 @@ Skill invocation **is** the commit authorization. After the loop: if fixes exist
 
 ## Quick invoke
 
-| Intent      | Say                                                    |
-| ----------- | ------------------------------------------------------ |
-| Post-slice  | `/harden-pr lite` or `/harden-pr` after a slice commit |
-| Branch done | `/harden-pr full` or "production-ready pass"           |
+| Intent           | Say                                                    |
+| ---------------- | ------------------------------------------------------ |
+| Post-slice       | `/harden-pr lite` or `/harden-pr` after a slice commit |
+| Cheap pass       | `/harden-pr quick`                                     |
+| Branch done      | `/harden-pr full` or "production-ready pass"           |
+| Deferred backlog | `/harden-pr reconcile`                                 |
 
 Replaces the old copy-paste: _"spawn subagents → fix → loop until clean"_ — this skill **is** that loop.

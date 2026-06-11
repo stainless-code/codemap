@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,9 +15,11 @@ import { resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import { hashContent } from "../hash";
 import { initCodemap } from "../runtime";
+import { canCreateSymlinks } from "../test/symlink-capable";
 import { parseValidateRest } from "./cmd-validate";
 
 let tmpRoot = "";
+const symlinkCapable = canCreateSymlinks();
 
 beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), "codemap-validate-"));
@@ -108,6 +116,115 @@ describe("computeValidateRows", () => {
       computeValidateRows(db, tmpRoot, ["src/new.ts"]),
     );
     expect(rows).toEqual([{ path: "src/new.ts", status: "unindexed" }]);
+  });
+
+  it("rejects explicit paths that escape project root", () => {
+    const rows = withDb((db) =>
+      computeValidateRows(db, tmpRoot, ["../../../etc/passwd"]),
+    );
+    expect(rows).toEqual([
+      {
+        path: "../../../etc/passwd",
+        status: "rejected",
+        reason: "path escapes project root",
+      },
+    ]);
+  });
+
+  it.skipIf(!symlinkCapable)(
+    "rejects explicit paths that escape via symlink",
+    () => {
+      const base = mkdtempSync(join(tmpdir(), "codemap-validate-symlink-"));
+      const outside = join(base, "outside");
+      mkdirSync(outside, { recursive: true });
+      writeFileSync(join(outside, "secret.ts"), "export const s = 1;\n");
+      symlinkSync(join(outside, "secret.ts"), join(tmpRoot, "escape.ts"));
+
+      const rows = withDb((db) =>
+        computeValidateRows(db, tmpRoot, ["escape.ts"]),
+      );
+      expect(rows).toEqual([
+        {
+          path: "escape.ts",
+          status: "rejected",
+          reason: "path escapes via symlink",
+        },
+      ]);
+      rmSync(base, { recursive: true, force: true });
+    },
+  );
+
+  it.skipIf(!symlinkCapable)(
+    "rejects indexed escape paths on full-scan validate",
+    () => {
+      const base = mkdtempSync(join(tmpdir(), "codemap-validate-scan-"));
+      const outside = join(base, "outside");
+      mkdirSync(outside, { recursive: true });
+      writeFileSync(join(outside, "secret.ts"), "export const s = 1;\n");
+      symlinkSync(join(outside, "secret.ts"), join(tmpRoot, "escape.ts"));
+      seedIndex([
+        {
+          path: "escape.ts",
+          content_hash: hashContent("export const s = 1;\n"),
+        },
+      ]);
+
+      const rows = withDb((db) => computeValidateRows(db, tmpRoot, []));
+      expect(rows).toEqual([
+        {
+          path: "escape.ts",
+          status: "rejected",
+          reason: "path escapes via symlink",
+        },
+      ]);
+      rmSync(base, { recursive: true, force: true });
+    },
+  );
+
+  it.skipIf(!symlinkCapable)(
+    "rejects indexed broken symlinks on full-scan validate",
+    () => {
+      symlinkSync(join(tmpRoot, "missing.ts"), join(tmpRoot, "broken.ts"));
+      seedIndex([{ path: "broken.ts", content_hash: hashContent("stale\n") }]);
+
+      const rows = withDb((db) => computeValidateRows(db, tmpRoot, []));
+      expect(rows).toEqual([
+        {
+          path: "broken.ts",
+          status: "rejected",
+          reason: "path escapes via symlink",
+        },
+      ]);
+    },
+  );
+
+  it("normalizes absolute paths inside the project root", () => {
+    const old = "export const a = 1\n";
+    const abs = join(tmpRoot, "src/a.ts");
+    writeFileSync(abs, "export const a = 2\n");
+    seedIndex([{ path: "src/a.ts", content_hash: hashContent(old) }]);
+
+    const rows = withDb((db) => computeValidateRows(db, tmpRoot, [abs]));
+    expect(rows).toEqual([{ path: "src/a.ts", status: "stale" }]);
+  });
+
+  it("rejects absolute paths outside the project root", () => {
+    const outside = mkdtempSync(
+      join(tmpdir(), "codemap-validate-abs-outside-"),
+    );
+    try {
+      const outsideFile = join(outside, "secret.ts");
+      writeFileSync(outsideFile, "export const s = 1;\n");
+
+      const rows = withDb((db) =>
+        computeValidateRows(db, tmpRoot, [outsideFile]),
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.status).toBe("rejected");
+      expect(rows[0]?.reason).toBe("path escapes project root");
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it("dedupes paths and sorts by path", () => {

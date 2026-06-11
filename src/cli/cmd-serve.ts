@@ -1,5 +1,9 @@
 import { runHttpServer } from "../application/http-server";
 import {
+  normalizeServeBindHost,
+  serveBindTokenRequiredMessage,
+} from "../application/serve-bind-policy";
+import {
   applyWatchPolicy,
   envWatchDefaultOn,
 } from "../application/watch-policy";
@@ -151,6 +155,13 @@ export function parseServeRest(rest: string[]):
     };
   }
 
+  host = normalizeServeBindHost(host);
+
+  const bindMessage = serveBindTokenRequiredMessage(host, token);
+  if (bindMessage !== undefined) {
+    return { kind: "error", message: bindMessage };
+  }
+
   return { kind: "run", host, port, token, watch, debounceMs };
 }
 
@@ -163,15 +174,17 @@ plugins that don't speak MCP). Single project root per server (set via
 --root / CODEMAP_ROOT).
 
 Default bind: 127.0.0.1:${DEFAULT_PORT} (loopback only — refuse 0.0.0.0 unless
-explicitly opted in via --host 0.0.0.0).
+explicitly opted in via --host 0.0.0.0). Any 127.0.0.0/8 address (e.g.
+127.0.0.2) is treated as loopback for the --token requirement.
 
 Flags:
-  --host <ip>     Bind address (default: ${DEFAULT_HOST}).
+  --host <ip>     Bind address (default: ${DEFAULT_HOST}; 127.* is loopback).
   --port <n>      Bind port (default: ${DEFAULT_PORT}).
   --token <secret>
                   Require Authorization: Bearer <secret> on every request.
-                  GET /health is exempt so liveness probes work without
-                  leaking the token. Use a long random string.
+                  Mandatory when binding a non-loopback address (e.g.
+                  --host 0.0.0.0). GET /health is exempt so liveness probes
+                  work without leaking the token. Use a long random string.
   --watch         [default ON] Boot an in-process file watcher so every
                   tool reads a live index — eliminates the per-request
                   reindex prelude. Default-ON since 2026-05; explicit

@@ -63,10 +63,48 @@ describe("parseServeRest", () => {
     expect(rOver.kind).toBe("error");
   });
 
-  it("parses --host <ip>", () => {
-    const r = parseServeRest(["serve", "--host", "0.0.0.0"]);
+  it("parses --host <ip> with --token on non-loopback", () => {
+    const r = parseServeRest([
+      "serve",
+      "--host",
+      "0.0.0.0",
+      "--token",
+      "secret",
+    ]);
     if (r.kind !== "run") throw new Error("expected run");
     expect(r.host).toBe("0.0.0.0");
+    expect(r.token).toBe("secret");
+  });
+
+  it("rejects non-loopback bind without --token", () => {
+    const r = parseServeRest(["serve", "--host", "0.0.0.0"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--token");
+  });
+
+  it("parses --host loopback without token", () => {
+    const r = parseServeRest(["serve", "--host", "127.0.0.1"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.token).toBeUndefined();
+  });
+
+  it("parses 127.0.0.0/8 loopback without token", () => {
+    const r = parseServeRest(["serve", "--host", "127.0.0.2"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.token).toBeUndefined();
+  });
+
+  it("parses bracketed IPv6 loopback without token", () => {
+    const r = parseServeRest(["serve", "--host", "[::1]"]);
+    if (r.kind !== "run") throw new Error("expected run");
+    expect(r.host).toBe("::1");
+    expect(r.token).toBeUndefined();
+  });
+
+  it("rejects all-interfaces IPv6 bind without --token", () => {
+    const r = parseServeRest(["serve", "--host", "::"]);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.message).toContain("--token");
   });
 
   it("parses --token <secret>", () => {

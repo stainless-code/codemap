@@ -1118,13 +1118,8 @@ function printFormattedQuery(
     badgeStyle: BadgeStyle;
   },
 ): FormattedQueryResult {
-  let db: Awaited<ReturnType<typeof openDb>> | undefined;
   try {
-    db = openDb();
-    let rows = db.query(sql).all(...(opts.bindValues ?? [])) as Record<
-      string,
-      unknown
-    >[];
+    let rows = queryRows(sql, opts.bindValues) as Record<string, unknown>[];
     if (opts.changedFiles !== undefined) {
       rows = filterRowsByChangedFiles(rows, opts.changedFiles) as Record<
         string,
@@ -1201,8 +1196,6 @@ function printFormattedQuery(
     const msg = err instanceof Error ? err.message : String(err);
     console.log(JSON.stringify({ error: msg }));
     return { ok: false };
-  } finally {
-    if (db !== undefined) closeDb(db, { readonly: true });
   }
 }
 

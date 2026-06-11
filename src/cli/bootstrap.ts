@@ -45,7 +45,7 @@ MCP server (Model Context Protocol — for agent hosts):
   # CLI parity: query batch, trace, explore, node, file, schema, symbols, context --include-snippets
 
 HTTP server (for non-MCP consumers — CI scripts, curl, IDE plugins):
-  codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]   # watcher default-ON
+  codemap serve [--host 127.0.0.1] [--port 7878] [--token <secret>]   # token required on non-loopback; watcher default-ON
 
 Watch mode (long-running; keeps .codemap/index.db fresh on file edits):
   codemap watch [--debounce 250] [--quiet]
