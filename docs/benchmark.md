@@ -367,6 +367,48 @@ Environment overrides: `AGENT_EVAL_OUTPUT`, `AGENT_EVAL_FIXTURE_ROOT`, `AGENT_EV
 
 Numbers are stable for a given fixture + schema; re-run locally after intentional schema or probe changes.
 
+### Harden-pr workflow eval
+
+Manual A/B harness for [`.agents/skills/harden-pr/`](../.agents/skills/harden-pr/SKILL.md) — complements codemap **query** probes above. Measures whether an agent **detects, fixes, and verifies** production-bar gaps on a branch, not SQL vs grep cost.
+
+| Artifact                                                                                                  | Role                                                              |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`fixtures/harden-probes/`](../fixtures/harden-probes/)                                                   | Mini corpora with injected gaps + `expected-findings.json` oracle |
+| [`scripts/agent-eval/harden-scenarios.json`](../scripts/agent-eval/harden-scenarios.json)                 | Scenario index (probe dir, mode, acceptance script)               |
+| [`.agents/skills/harden-pr/LEDGER.md`](../.agents/skills/harden-pr/LEDGER.md)                             | Rejections (vet) + deferred backlog (reconcile) — one file        |
+| [`scripts/harden-probes/validate-fixtures.test.mjs`](../scripts/harden-probes/validate-fixtures.test.mjs) | Golden finding schema guard (`test:scripts`)                      |
+
+**Run one probe:**
+
+```bash
+cd fixtures/harden-probes/missing-test
+# Cursor: attach harden-pr → `/harden-pr lite`
+bash acceptance.sh   # after harden — must exit 0
+```
+
+**Mechanical smoke (CI via `test:scripts`):**
+
+```bash
+bun run test:harden-probes
+# schema guard + pre-fix acceptance fails + score-probe oracle
+
+# Score agent findings JSON against golden:
+bun scripts/harden-probes/score-probe.mjs fixtures/harden-probes/missing-test .agent-eval/my-findings.json
+```
+
+**Score each run** (spreadsheet or research note — not CI-gated yet):
+
+| Metric   | Pass                                                                           |
+| -------- | ------------------------------------------------------------------------------ |
+| Recall   | Finds ≥1 golden row in `expected-findings.json` (same `file` + production bar) |
+| Fix      | `acceptance.sh` green; intent anchor unchanged                                 |
+| Autonomy | Zero mid-loop commit/babysit/next-pass prompts                                 |
+| Passes   | ≤ mode cap (lite 2, full 3)                                                    |
+
+**A/B skill versions:** same probe dir, two sessions (before/after skill edit); compare recall, false fixes, passes, autonomy.
+
+Future: log parser for `Task` reviewer JSON (same spirit as `parse-agent-log.ts`) to automate recall scoring.
+
 #### Dual-agent study (codemap self-index, provisional)
 
 Exploratory runs on the **codemap repo** index (not `fixtures/minimal`) — four structural tasks, MCP-on vs MCP-forbidden (grep/read/shell only). Not pinned in CI; methodology caveats apply.
