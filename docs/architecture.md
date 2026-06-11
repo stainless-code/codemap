@@ -234,13 +234,13 @@ The npm package exports **`createCodemap`**, **`Codemap`** (`query`, `index`), *
 2. **`await cm.index({ mode, files?, quiet? })`** — same pipeline as the CLI (incremental / full / targeted).
 3. **`cm.query(sql)`** — read-only SQL against `.codemap/index.db` (opens the DB per call).
 
-**Constraint:** `initCodemap` is global to the process; only one active indexed project at a time.
+**Constraint:** One project root per process — a second `initCodemap` / `createCodemap` with a different `root` throws. Audit `--base` worktree reindex brackets root swaps via `runtime-swap.ts`. Re-init on the same root is allowed.
 
 ### User config
 
 Optional **`<state-dir>/config.{ts,js,json}`** (default `.codemap/config.*`; default export: object or async factory). **`--config <path>`** overrides with an explicit file (absolute or relative to cwd). Example shape: [`codemap.config.example.json`](../codemap.config.example.json). **Self-healing (D11):** `<state-dir>/.gitignore` is reconciled to canonical on every codemap boot via **`ensureStateGitignore`** (`src/application/state-dir.ts`); JSON config is reconciled via **`ensureStateConfig`** (`src/application/state-config.ts` — prunes unknown keys with a warning, sorts alphabetically, write-only-on-drift). TS/JS configs are validate-only at load time. Bumping the canonical `STATE_GITIGNORE_BODY` constant or the Zod schema IS the migration — every consumer's project repairs itself on next boot. Single attachment point: **`src/cli/bootstrap-codemap.ts`** runs the reconcilers before `loadUserConfig`.
 
-**Validation:** **`codemapUserConfigSchema`** ([Zod](https://zod.dev)) — strict object (unknown keys are rejected). **`defineConfig({ ... })`**, **`parseCodemapUserConfig`**, and **`resolveCodemapConfig`** (CLI and merged `createCodemap({ config })`) all go through the same schema. Invalid config throws **`TypeError`** with a short path/message list.
+**Validation:** **`codemapUserConfigSchema`** ([Zod](https://zod.dev)) — strict object (unknown keys are rejected). **`defineConfig({ ... })`**, **`parseCodemapUserConfig`**, **`loadUserConfig`**, and **`resolveCodemapConfig`** (CLI and merged `createCodemap({ config })`) all go through the same schema. Invalid config throws **`TypeError`** with a short path/message list.
 
 **Exports:** `codemapUserConfigSchema`, `parseCodemapUserConfig`, `defineConfig`, and **`CodemapUserConfig`** (inferred type) from the package entry — see **`src/config.ts`** / **`dist/index.d.mts`**.
 

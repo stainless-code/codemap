@@ -45,7 +45,9 @@ export interface CodemapInitOptions {
  * and returns a {@link Codemap} handle.
  *
  * @remarks
- * Only one Codemap project per process: `initCodemap` is global; the last `createCodemap()` wins.
+ * One project root per process: a second `createCodemap()` with a different `root` throws.
+ * Re-initializing the same root is allowed. Audit `--base` worktree reindex is the only
+ * production path that may temporarily switch roots (`runtime-swap.ts`).
  */
 export async function createCodemap(
   options: CodemapInitOptions = {},

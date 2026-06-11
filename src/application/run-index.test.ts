@@ -4,6 +4,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, getMeta, openDb, setMeta } from "../db";
 import { hashContent } from "../hash";

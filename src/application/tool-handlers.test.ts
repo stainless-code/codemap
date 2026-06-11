@@ -15,6 +15,7 @@ import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, insertFile, openDb } from "../db";
 import { upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import {
   handleApply,
   handleApplyDiffInput,
@@ -26,6 +27,8 @@ import {
   handleShow,
   handleSnippet,
 } from "./tool-handlers";
+
+installCodemapTestTeardown();
 
 let projectRoot: string;
 

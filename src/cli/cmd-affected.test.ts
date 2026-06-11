@@ -2,6 +2,10 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "../config";
 import { closeDb, openDb } from "../db";
 import { initCodemap } from "../runtime";

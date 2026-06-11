@@ -14,11 +14,14 @@ import { join } from "node:path";
 import { resolveCodemapConfig } from "../config";
 import { closeDb, createTables, openDb, upsertQueryBaseline } from "../db";
 import { initCodemap } from "../runtime";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
 import { handleRequest } from "./http-server";
 import { MCP_TOOL_NAMES } from "./mcp-tool-allowlist";
 import { MCP_TOOL_ANNOTATIONS } from "./mcp-tool-annotations";
 import { createManagedWatchSession } from "./session-lifecycle";
 import { _resetWatchStateForTests } from "./watcher";
+
+installCodemapTestTeardown();
 
 let benchDir: string;
 let serverHandle: { close: () => Promise<void>; port: number } | undefined;

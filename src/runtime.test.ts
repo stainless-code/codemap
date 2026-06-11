@@ -1,10 +1,43 @@
-import { describe, expect, it, beforeAll } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import { resolveCodemapConfig } from "./config";
 import { initCodemap, isPathExcluded } from "./runtime";
+import { enterRuntimeSwap, exitRuntimeSwap } from "./runtime-swap";
+import { installCodemapTestTeardown } from "./test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
+describe("initCodemap root guard", () => {
+  it("throws when switching to a different root without runtime swap", () => {
+    initCodemap(resolveCodemapConfig("/root-a", {}));
+    expect(() => initCodemap(resolveCodemapConfig("/root-b", {}))).toThrow(
+      /cannot switch project root/,
+    );
+  });
+
+  it("allows re-init on the same root", () => {
+    initCodemap(resolveCodemapConfig("/same-root", { excludeDirNames: ["x"] }));
+    expect(() =>
+      initCodemap(resolveCodemapConfig("/same-root", {})),
+    ).not.toThrow();
+  });
+
+  it("allows root switch inside audit runtime swap bracket", () => {
+    initCodemap(resolveCodemapConfig("/live-root", {}));
+    enterRuntimeSwap();
+    try {
+      expect(() =>
+        initCodemap(resolveCodemapConfig("/worktree-root", {})),
+      ).not.toThrow();
+      initCodemap(resolveCodemapConfig("/live-root", {}));
+    } finally {
+      exitRuntimeSwap();
+    }
+  });
+});
 
 describe("isPathExcluded", () => {
-  beforeAll(() => {
+  beforeEach(() => {
     initCodemap(
       resolveCodemapConfig("/virtual-root", {
         excludeDirNames: ["node_modules", ".git", "dist"],

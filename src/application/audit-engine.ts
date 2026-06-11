@@ -9,6 +9,7 @@ import {
   getTsconfigPath,
   initCodemap,
 } from "../runtime";
+import { enterRuntimeSwap, exitRuntimeSwap } from "../runtime-swap";
 import { openCodemapDatabase } from "../sqlite-db";
 import {
   isGitRepo,
@@ -456,6 +457,7 @@ export function makeWorktreeReindex(): ReindexFn {
       // to <worktree>/.codemap/index.db via the default state-dir.
       const savedConfig = getCodemapConfig();
       let wtDb;
+      enterRuntimeSwap();
       try {
         const wtUser = await loadUserConfig(worktreePath, undefined);
         initCodemap(resolveCodemapConfig(worktreePath, wtUser));
@@ -466,6 +468,7 @@ export function makeWorktreeReindex(): ReindexFn {
         wtDb?.close();
         initCodemap(savedConfig);
         configureResolver(getProjectRoot(), getTsconfigPath());
+        exitRuntimeSwap();
       }
     });
     // Catch on the chain itself so one failed reindex doesn't poison the

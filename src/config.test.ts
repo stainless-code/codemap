@@ -238,14 +238,13 @@ describe("loadUserConfig", () => {
     expect(cfg).toBeUndefined();
   });
 
-  it("invalid JSON config throws when resolved", async () => {
+  it("invalid JSON config throws at load", async () => {
     const stateDir = join(dir, ".codemap");
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(
       join(stateDir, "config.json"),
       JSON.stringify({ include: [1, 2] }),
     );
-    const cfg = await loadUserConfig(dir);
-    expect(() => resolveCodemapConfig(dir, cfg)).toThrow(/include/);
+    await expect(loadUserConfig(dir)).rejects.toThrow(/include/);
   });
 });

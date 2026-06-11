@@ -1,7 +1,10 @@
+import { resolve } from "node:path";
+
 import { ResolverFactory } from "oxc-resolver";
 
 import { projectRelativePathFromResolved } from "./application/path-containment";
 import type { ImportRow, DependencyRow } from "./db";
+import { isRuntimeSwapActive } from "./runtime-swap";
 
 let _projectRoot: string | null = null;
 let _tsconfigPath: string | null = null;
@@ -15,8 +18,24 @@ export function configureResolver(
   projectRoot: string,
   tsconfigPath: string | null,
 ): void {
+  if (_projectRoot !== null && !isRuntimeSwapActive()) {
+    const current = resolve(_projectRoot);
+    const next = resolve(projectRoot);
+    if (current !== next) {
+      throw new Error(
+        `Codemap: cannot switch resolver root from ${current} to ${next} in the same process`,
+      );
+    }
+  }
   _projectRoot = projectRoot;
   _tsconfigPath = tsconfigPath;
+  _resolver = null;
+}
+
+/** Maintainer test helper — clears resolver singleton between test cases. */
+export function resetResolverForTest(): void {
+  _projectRoot = null;
+  _tsconfigPath = null;
   _resolver = null;
 }
 

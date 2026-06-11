@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
 
 import { createCodemap } from "../api";
+import { installCodemapTestTeardown } from "../test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 const MINIMAL_ROOT = join(import.meta.dir, "../../fixtures/minimal");
 const JSX_PATHS = [
   "src/bench/jsx-synthesis/PageShell.tsx",

@@ -1,6 +1,6 @@
 # PR 3 — runtime guards & test isolation
 
-> **Status:** open (not started) · **PR:** 3 of 3 · **Effort:** S–M
+> **Status:** open (in progress) · **PR:** 3 of 3 · **Effort:** S–M
 >
 > **Orchestrator:** [`security-hardening-orchestrator.md`](./security-hardening-orchestrator.md)
 >
@@ -34,12 +34,12 @@
 
 | ID  | Task                                                     | Status  | Verify                         |
 | --- | -------------------------------------------------------- | ------- | ------------------------------ |
-| 5.1 | `runtime-swap.ts` + audit worktree bracket               | pending | `bun test src/runtime.test.ts` |
-| 5.2 | `initCodemap` / `configureResolver` throw on root switch | pending | runtime tests                  |
-| 5.3 | `resetCodemapForTest` + `installCodemapTestTeardown`     | pending | —                              |
-| 5.4 | Teardown rollout on `initCodemap` test suites            | pending | affected `*.test.ts`           |
-| 5.5 | `loadUserConfig` → `parseCodemapUserConfig` at load      | pending | `bun test src/config.test.ts`  |
-| 5.6 | `api.ts` + architecture: throws-on-root-switch           | pending | —                              |
+| 5.1 | `runtime-swap.ts` + audit worktree bracket               | done    | `bun test src/runtime.test.ts` |
+| 5.2 | `initCodemap` / `configureResolver` throw on root switch | done    | runtime tests                  |
+| 5.3 | `resetCodemapForTest` + `installCodemapTestTeardown`     | done    | —                              |
+| 5.4 | Teardown rollout on `initCodemap` test suites            | done    | affected `*.test.ts`           |
+| 5.5 | `loadUserConfig` → `parseCodemapUserConfig` at load      | done    | `bun test src/config.test.ts`  |
+| 5.6 | `api.ts` + architecture: throws-on-root-switch           | done    | —                              |
 | 5.s | Commit + PR + CI                                         | pending | `bun run check`                |
 
 ---

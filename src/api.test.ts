@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createCodemap } from "./api";
+import { installCodemapTestTeardown } from "./test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
 
 describe("createCodemap", () => {
   test("query runs against the index database", async () => {

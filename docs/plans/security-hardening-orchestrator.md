@@ -24,8 +24,8 @@
 | PR    | Plan                                                            | Status                                                                              | Blocks                              |
 | ----- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
 | **1** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#180](https://github.com/stainless-code/codemap/pull/180) · `a5caca8`) | —                                   |
-| **2** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **PR open** (`fix/impact-inpath-homonyms`)                                          | —                                   |
-| **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)      | **pending**                                                                         | PR **1** merged (PR **2** optional) |
+| **2** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#181](https://github.com/stainless-code/codemap/pull/181) · `aae172f`) | —                                   |
+| **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)      | **in progress** (`fix/runtime-test-isolation`)                                      | PR **1** merged (PR **2** optional) |
 
 | — | — | **deferred** | golden `schema.test.ts` + path guards |
 | — | — | **skip** | atomic `ensureStateConfig` writes |
@@ -64,17 +64,17 @@ Evaluated 2026-06 against [roadmap § Floors](../roadmap.md#floors-v1-product-sh
 
 ## Session log
 
-| Date       | Event       | Notes                                                                        |
-| ---------- | ----------- | ---------------------------------------------------------------------------- |
-| 2026-06-10 | Triage      | ROI on 7 slices; 3-PR program adopted.                                       |
-| 2026-06-10 | PR 1 impl   | PR **1** committed on `fix/security-hardening-wave1`; harden pass in flight. |
-| 2026-06-05 | PR 1 harden | `/harden-pr full` — plan retired; contracts in architecture/glossary.        |
-| 2026-06-05 | PR 1 merge  | [#180](https://github.com/stainless-code/codemap/pull/180) → `a5caca8`.      |
-| 2026-06-05 | PR 2 start  | `fix/impact-inpath-homonyms` — `inPath` + homonym walks in impact-engine.    |
-| 2026-06-05 | PR 2 harden | `/harden-pr full` — plan retired; CLI/MCP/docs parity.                       |
-| —          | PR 2 merge  | _PR URL · merge SHA_                                                         |
-| —          | PR 3 start  | _from `main`_                                                                |
-| —          | PR 3 merge  | _fill · close orchestrator_                                                  |
+| Date       | Event       | Notes                                                                         |
+| ---------- | ----------- | ----------------------------------------------------------------------------- |
+| 2026-06-10 | Triage      | ROI on 7 slices; 3-PR program adopted.                                        |
+| 2026-06-10 | PR 1 impl   | PR **1** committed on `fix/security-hardening-wave1`; harden pass in flight.  |
+| 2026-06-05 | PR 1 harden | `/harden-pr full` — plan retired; contracts in architecture/glossary.         |
+| 2026-06-05 | PR 1 merge  | [#180](https://github.com/stainless-code/codemap/pull/180) → `a5caca8`.       |
+| 2026-06-05 | PR 2 start  | `fix/impact-inpath-homonyms` — `inPath` + homonym walks in impact-engine.     |
+| 2026-06-05 | PR 2 harden | `/harden-pr full` — plan retired; CLI/MCP/docs parity.                        |
+| 2026-06-05 | PR 2 merge  | [#181](https://github.com/stainless-code/codemap/pull/181) → `aae172f`.       |
+| 2026-06-05 | PR 3 start  | `fix/runtime-test-isolation` — root guards + test teardown + config validate. |
+| —          | PR 3 merge  | _fill · close orchestrator_                                                   |
 
 ---
 

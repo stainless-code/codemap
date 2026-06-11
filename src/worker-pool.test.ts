@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
+import { installCodemapTestTeardown } from "./test-helpers/runtime-reset";
+
+installCodemapTestTeardown();
+
 import { resolveCodemapConfig } from "./config";
 import { globSync } from "./glob-sync";
 import { initCodemap } from "./runtime";
