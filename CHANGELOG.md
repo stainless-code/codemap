@@ -1,5 +1,41 @@
 # @stainless-code/codemap
 
+## 0.11.0
+
+### Minor Changes
+
+- [#178](https://github.com/stainless-code/codemap/pull/178) [`36106ff`](https://github.com/stainless-code/codemap/commit/36106ff66b691bfbe682da5e5cb29a1779e24a1e) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add structural duplicate detection: `symbols.body_hash` at index time (canonical function body AST) and bundled `duplicates` recipe. Schema version 39 — existing indexes rebuild on next `codemap` run. Function-shaped symbols only; trivial one-line bodies skipped. Triage collisions with `snippet` — shared control-flow skeletons can false-positive.
+
+- [#179](https://github.com/stainless-code/codemap/pull/179) [`8595173`](https://github.com/stainless-code/codemap/commit/8595173216db236050a363fcffc98d9c60471c44) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add churn × complexity hotspot ranking: `file_churn` refreshed on every index from git history, with `codemap ingest-churn`, MCP/HTTP `ingest_churn`, and config `churn.file` for non-git repos. Schema version 40 — existing indexes rebuild on next `codemap` run. New `churn-complexity-hotspots` recipe ranks files or symbols (`by_symbol`) by change frequency × complexity with normalized 0–100 scores and `churn_trend`. Outcome alias `hotspots` still maps to fan-in.
+
+- [#173](https://github.com/stainless-code/codemap/pull/173) [`d4982c4`](https://github.com/stainless-code/codemap/commit/d4982c49fd7a96a5185ed09bccca8caac0911c77) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add SonarSource cognitive complexity on `symbols` (same function-shaped coverage as cyclomatic, including class methods). Schema version 38 — existing indexes rebuild on next `codemap` run. New recipe `high-cognitive-complexity`; `high-complexity-untested` rows include `cognitive_complexity`.
+
+### Patch Changes
+
+- [#177](https://github.com/stainless-code/codemap/pull/177) [`bb8bae9`](https://github.com/stainless-code/codemap/commit/bb8bae9492c879fa8d7b82ef726b9fe82b8705d6) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - On `audit --base <ref>` (CLI / MCP / HTTP), each `added` row carries `attribution: introduced | inherited` (branch-new vs pre-existing at merge base). `--summary` adds `added_introduced` / `added_inherited` per delta.
+
+- [#172](https://github.com/stainless-code/codemap/pull/172) [`cf7df2f`](https://github.com/stainless-code/codemap/commit/cf7df2fd94a855f0f48bc8ce509836e7f3e6d8d2) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `query --format codeclimate` (GitLab Code Quality JSON) and `query --format badge` (markdown issue-count line or `codemap-badge/v1` JSON via `--badge-style json`). Available on CLI, MCP, and HTTP query tools.
+
+- [#183](https://github.com/stainless-code/codemap/pull/183) [`b509e4c`](https://github.com/stainless-code/codemap/commit/b509e4c808a3652604357dcea64a34833de0f74f) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add hash-stable `map_id` and `codebase_map` routing hints to `context` responses (CLI, MCP, HTTP). MCP initialize instructions now include `map_id` and top hub paths. Opt out with `--no-codebase-map` or `include_codebase_map: false`; omitted when `compact`.
+
+- [#176](https://github.com/stainless-code/codemap/pull/176) [`16687a0`](https://github.com/stainless-code/codemap/commit/16687a0d0bf403d2278d763c355575e161142eaa) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `coverage-confirmed-dead` recipe: static dead exports with `confidence` (`high` when ingested 0% coverage, `medium` when unmeasured), plus `reason` and `caller_count`.
+
+- [#174](https://github.com/stainless-code/codemap/pull/174) [`a11242e`](https://github.com/stainless-code/codemap/commit/a11242e887c76bc439bb5fb09cc0d9589319e584) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `reason` and `evidence_json` columns on high-judgment recipe rows (`boundary-violations`, `deprecated-symbols`, `unimported-exports`) so agents can cite detection path before `apply` or manual edits.
+
+- [#175](https://github.com/stainless-code/codemap/pull/175) [`af86d10`](https://github.com/stainless-code/codemap/commit/af86d100f3c6f107b575589a9a244728ea53e0b6) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add `high-crap-score` recipe: CRAP ranking with measured coverage when ingested, or graph-estimated 85/40/0% tiers from test reachability otherwise.
+
+  Extend `unimported-exports` with `unresolved_import_blind_spot` reason and `evidence_json` (unresolved import hop) so dead-export / high-CRAP triage does not over-trust the graph past alias blind spots.
+
+- [#181](https://github.com/stainless-code/codemap/pull/181) [`aae172f`](https://github.com/stainless-code/codemap/commit/aae172f40bd2afd214d93e8d2e9941b0b1471312) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Scope `codemap impact` and MCP/HTTP `impact` homonym symbols: `--in` / `in` disambiguates by defining file (same prefix/exact rules as `codemap show --in`); unscoped homonyms union per-defining-file call graphs instead of merging by name only. Mismatched scope returns empty `matches` with `skipped_scope`.
+
+- [#170](https://github.com/stainless-code/codemap/pull/170) [`e74410c`](https://github.com/stainless-code/codemap/commit/e74410cf2fd0095cca83ca501b8d69786fc17b56) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - MCP `tools/list` and HTTP `GET /tools` expose advisory `readOnlyHint`, `destructiveHint`, and `idempotentHint` per tool so clients can gate auto-approval. Apply tools carry `destructiveHint`; read-only query tools carry `readOnlyHint`.
+
+- [#180](https://github.com/stainless-code/codemap/pull/180) [`a5caca8`](https://github.com/stainless-code/codemap/commit/a5caca8e5ba5d08206fe68228e0d9dff8a17e014) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Harden read surfaces: `codemap query --format …` blocks index mutations via the same read-only guard as `--json`; `codemap serve` requires `--token` when `--host` is not loopback (any `127.0.0.0/8` address counts as loopback, so `--token` stays optional on `127.0.0.2` and similar); `codemap validate` (and MCP/HTTP `validate`) can return `rejected` rows with optional `reason` (`path escapes project root` | `path escapes via symlink` | `path resolves outside project root`) — output `path` keys are always project-relative POSIX paths.
+
+- [#182](https://github.com/stainless-code/codemap/pull/182) [`3568c5f`](https://github.com/stainless-code/codemap/commit/3568c5f3e0f83f05ca0aaf9eebd7d0f0b69bb4cf) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `createCodemap()` and the CLI now reject invalid project config at load time. A second `createCodemap()` with a different project root in the same process throws (audit `--base` worktree reindex is exempt).
+
+- [#184](https://github.com/stainless-code/codemap/pull/184) [`fb73e0d`](https://github.com/stainless-code/codemap/commit/fb73e0d272a0d5b93cd143f61054a7b927b4332b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `show` and `snippet` now use fast equality lookup for exact `name` and lone `name:Token` queries (no wildcards); substring, multi-field, and FTS paths stay on the broader slow tier. CLI help, MCP tool descriptions, and bundled agent guidance document the two tiers.
+
 ## 0.10.1
 
 ### Patch Changes
