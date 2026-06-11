@@ -38,13 +38,19 @@ Look up symbol(s) by exact name and return file_path:line_start-line_end +
 signature. One-step lookup that beats composing
 \`SELECT … FROM symbols WHERE name = ?\` by hand.
 
+Lookup tiers:
+  Fast (equality index) — positional <name>, or \`name:<Token>\` with no
+  wildcards (% / _) and no other query fields (same rows as exact <name>).
+  Slow (broader scan) — \`name:%pat%\` substring LIKE, multi-field query,
+  free-text tokens (name LIKE or source_fts when --with-fts / fts5: true).
+
 Field-qualified search (--query):
   kind:<kind>        Exact symbols.kind (function, class, const, …).
-  name:<pattern>     Case-sensitive substring on symbols.name (LIKE).
+  name:<pattern>     Case-sensitive; equality when pattern has no wildcards,
+                     otherwise substring LIKE on symbols.name.
   path:<path>        File scope — directory prefix or exact file path.
   in:<glob>          SQLite GLOB on file_path (e.g. in:src/**/*.ts).
-  Free text          Unqualified tokens → name LIKE, or source_fts phrase
-                     search when FTS5 is indexed (--with-fts or fts5: true).
+  Free text          Unqualified tokens → slow tier (name LIKE or source_fts).
                      With FTS, matches file bodies — returns all symbols in
                      matching files (not symbol-level body hits).
 

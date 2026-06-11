@@ -602,6 +602,7 @@ export function createIndexes(db: CodemapDatabase) {
   db.run(`
     -- Covering indexes: include columns returned by common queries to avoid table lookups
     CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name, kind, file_path, line_start, line_end, signature, is_exported);
+    CREATE INDEX IF NOT EXISTS idx_symbols_name_covering ON symbols(name, kind, file_path, line_start, line_end, signature, is_exported, parent_name, visibility);
     CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind, is_exported, name, file_path);
     CREATE INDEX IF NOT EXISTS idx_symbols_file ON symbols(file_path);
 

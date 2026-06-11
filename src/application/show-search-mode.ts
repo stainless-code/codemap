@@ -17,6 +17,48 @@ import { findSymbolsByName } from "./show-engine";
 import type { SymbolMatch } from "./show-engine";
 import { toProjectRelative } from "./validate-engine";
 
+/** True when a `name:` pattern has no unescaped LIKE metacharacters (`%`, `_`). */
+export function isExactNamePattern(pattern: string): boolean {
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === "\\" && i + 1 < pattern.length) {
+      i++;
+      continue;
+    }
+    if (c === "%" || c === "_") return false;
+  }
+  return true;
+}
+
+/**
+ * Fast tier: single `name:` token, no wildcards, no kind/path/in/free-text —
+ * route to equality lookup (`name = ?`) instead of `name LIKE`.
+ */
+export function resolveExactNameFromParsedQuery(
+  parsed: ParsedSearchQuery,
+): string | undefined {
+  if (parsed.freeText.length > 0) return undefined;
+  if (parsed.kind !== undefined) return undefined;
+  if (parsed.path !== undefined) return undefined;
+  if (parsed.inGlob !== undefined) return undefined;
+  if (parsed.namePatterns.length !== 1) return undefined;
+  const pattern = parsed.namePatterns[0]!;
+  if (!isExactNamePattern(pattern)) return undefined;
+  return pattern;
+}
+
+const EXACT_NAME_LOOKUP_SQL = `SELECT name, kind, file_path, line_start, line_end, signature,
+                      is_exported, parent_name, visibility
+               FROM symbols
+               WHERE name = ?
+               ORDER BY file_path ASC, line_start ASC`;
+
+/** Moat-A SQL preview for fast-tier `name:Token` lookups. */
+export function formatExactNameLookupSqlForDisplay(name: string): string {
+  const escaped = name.replace(/'/g, "''");
+  return EXACT_NAME_LOOKUP_SQL.replace("?", `'${escaped}'`).trim();
+}
+
 export type ShowLookupMode =
   | { ok: true; kind: "exact"; name: string; inPath: string | undefined }
   | { ok: true; kind: "query"; parsed: ParsedSearchQuery }
@@ -70,6 +112,14 @@ export function formatShowSearchSqlForQuery(
 
   let useFts = false;
   let warning: string | undefined;
+  const exactName = resolveExactNameFromParsedQuery(parsedQuery.parsed);
+  if (exactName !== undefined) {
+    return {
+      ok: true,
+      sql: formatExactNameLookupSqlForDisplay(exactName),
+    };
+  }
+
   if (parsedQuery.parsed.freeText.length > 0 && opts.db !== undefined) {
     const fts = resolveSearchWithFts(opts.db, {
       withFtsCli: opts.withFtsCli,
@@ -114,6 +164,13 @@ export function executeShowLookup(
         kind: opts.exactKind,
         inPath: mode.inPath,
       }),
+    };
+  }
+
+  const exactName = resolveExactNameFromParsedQuery(mode.parsed);
+  if (exactName !== undefined) {
+    return {
+      matches: findSymbolsByName(db, { name: exactName }),
     };
   }
 
