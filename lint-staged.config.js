@@ -45,7 +45,7 @@ function pairedTestPath(file) {
 
 /**
  * Run paired unit tests when a source file is staged without its test file.
- * Skips pairs already in the staged set (the `*.test.ts` glob runs those).
+ * Skips pairs already in the staged set (the `*.test.{ts,tsx}` globs run those).
  */
 function relatedTests(filenames) {
   const staged = new Set(filenames.map(toPosixRel));
@@ -69,5 +69,6 @@ export default {
   "*.{css,json,md,mdc,html,yaml,yml}": "bun run format:check",
   "*.{ts,tsx}": [typecheckStagedFiles, relatedTests],
   "*.test.ts": "bun test",
+  "*.test.tsx": "bun test",
   "scripts/**/*.test.mjs": "bun test",
 };
