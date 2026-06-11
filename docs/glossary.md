@@ -125,7 +125,7 @@ CI-aggregate flag on `codemap query` and `codemap audit`. Aliases `--format sari
 
 ### `codemap validate`
 
-CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses: `stale | missing | unindexed | rejected` (`rejected` carries optional `reason` when a path escapes the project root, resolves outside via symlink, or has a broken symlink; output `path` keys are always project-relative POSIX paths). Exits `1` on any drift.
+CLI subcommand comparing on-disk SHA-256 against `files.content_hash`. Statuses: `stale | missing | unindexed | rejected` (`rejected` carries optional `reason`: `path escapes project root` | `path escapes via symlink` | `path resolves outside project root`; output `path` keys are always project-relative POSIX paths). Exits `1` on any drift.
 
 ### `module_cycles` (table) / circular imports
 

@@ -90,7 +90,15 @@ async function fileCount(): Promise<number> {
 }
 
 describe("runQueryCmd — formatted output DML guard", () => {
-  it.each(["sarif", "badge", "mermaid", "annotations", "codeclimate"] as const)(
+  it.each([
+    "sarif",
+    "badge",
+    "mermaid",
+    "annotations",
+    "codeclimate",
+    "diff",
+    "diff-json",
+  ] as const)(
     "rejects DELETE via --format %s without mutating the index",
     async (format) => {
       const before = await fileCount();

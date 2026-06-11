@@ -198,6 +198,16 @@ describe("computeValidateRows", () => {
     },
   );
 
+  it("normalizes absolute paths inside the project root", () => {
+    const old = "export const a = 1\n";
+    const abs = join(tmpRoot, "src/a.ts");
+    writeFileSync(abs, "export const a = 2\n");
+    seedIndex([{ path: "src/a.ts", content_hash: hashContent(old) }]);
+
+    const rows = withDb((db) => computeValidateRows(db, tmpRoot, [abs]));
+    expect(rows).toEqual([{ path: "src/a.ts", status: "stale" }]);
+  });
+
   it("rejects absolute paths outside the project root", () => {
     const outside = mkdtempSync(
       join(tmpdir(), "codemap-validate-abs-outside-"),
