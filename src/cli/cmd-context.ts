@@ -37,6 +37,7 @@ Flags:
 Examples:
   codemap context
   codemap context --compact
+  codemap context --no-codebase-map
   codemap context --for "refactor the auth module"
   codemap context --include-snippets
 `);

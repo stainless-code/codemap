@@ -258,7 +258,7 @@ function registerContextTool(server: McpServer): void {
     "context",
     withToolAnnotations("context", {
       description:
-        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders (ignored when compact: true).",
+        "Project bootstrap snapshot — returns the same envelope `codemap context` prints (project root, schema version, file count, start_here shortcuts, map_id + codebase_map routing card, recipe catalog, index_freshness). Pass include_snippets for one-line export previews on hub leaders (ignored when compact: true). Omit map fields with compact: true or include_codebase_map: false.",
       inputSchema: contextArgsSchema,
     }),
     (args) => wrapToolResult(handleContext(args)),
@@ -677,6 +677,10 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
     warnIndexFreshnessToStderr("codemap mcp");
   }
 
+  if (watchSession !== undefined) {
+    await watchSession.acquireClient();
+  }
+
   let instructions: string;
   try {
     const { openDb, closeDb } = await import("../db");
@@ -694,10 +698,6 @@ export async function runMcpServer(opts: ServerOpts): Promise<void> {
 
   const server = createMcpServer({ ...opts, instructions });
   const transport = new StdioServerTransport();
-
-  if (watchSession !== undefined) {
-    await watchSession.acquireClient();
-  }
 
   await server.connect(transport);
 

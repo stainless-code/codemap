@@ -12,12 +12,12 @@ Operational playbook injected into the MCP initialize handshake. Full schema, re
 
 Every successful JSON tool response carries index-level freshness metadata (not a pass/fail verdict):
 
-| Surface                                          | Where to read it                                                                                      |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| **`context`**                                    | `index_freshness`; **`start_here`** when not `compact` (optional `include_snippets`)                  |
-| **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                       |
-| **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                            |
-| **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged) |
+| Surface                                          | Where to read it                                                                                                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`context`**                                    | `index_freshness`; **`start_here`** when not `compact` (optional `include_snippets`); **`map_id`** + **`codebase_map`** when not `compact` (optional `include_codebase_map: false`) |
+| **Object payloads** (`show`, `query` summary, …) | `index_freshness` merged inline                                                                                                                                                     |
+| **Array payloads** (`query` rows)                | second `content` block prefixed `@codemap/index_freshness`                                                                                                                          |
+| **HTTP**                                         | `X-Codemap-Pending-Sync`, `X-Codemap-Commit-Drift`, `X-Codemap-Warning` headers (JSON body unchanged)                                                                               |
 
 Key fields: `pending_sync` (watcher debounce queue or in-flight reindex), `commit_drift` (`HEAD` ≠ `last_indexed_commit`), `warning` (single agent-readable line when anything is off).
 

@@ -512,6 +512,11 @@ describe("formatCodebaseMapMcpAppendix", () => {
     expect(text).not.toContain("`src/extra.ts`");
     expect(text).toContain("call MCP tool `context`");
   });
+
+  it("handles empty hub paths", () => {
+    const text = formatCodebaseMapMcpAppendix("abc", []);
+    expect(text).toContain("top hubs: (none indexed)");
+  });
 });
 
 describe("buildContextEnvelope", () => {
@@ -544,6 +549,29 @@ describe("buildContextEnvelope", () => {
         const first = buildContextEnvelope(db, benchDir, opts);
         const second = buildContextEnvelope(db, benchDir, opts);
         expect(first.map_id).toBe(second.map_id);
+      });
+    } finally {
+      revParse.mockRestore();
+    }
+  });
+
+  it("changes map_id when hub rankings change", () => {
+    const revParse = spyOn(indexEngine, "getCurrentCommit").mockReturnValue("");
+    try {
+      withSeededDb((db) => {
+        const before = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        insertDependencies(db, [
+          { from_path: "src/hub.ts", to_path: "src/leaf.ts" },
+          { from_path: "src/hub.ts", to_path: "src/other.ts" },
+        ]);
+        const after = buildContextEnvelope(db, benchDir, {
+          compact: false,
+          intent: null,
+        });
+        expect(before.map_id).not.toBe(after.map_id);
       });
     } finally {
       revParse.mockRestore();
