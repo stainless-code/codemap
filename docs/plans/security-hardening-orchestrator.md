@@ -21,11 +21,11 @@
 
 ## PR schedule
 
-| PR    | Plan                                                            | Status                                                                              | Blocks                              |
-| ----- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
-| **1** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#180](https://github.com/stainless-code/codemap/pull/180) · `a5caca8`) | —                                   |
-| **2** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#181](https://github.com/stainless-code/codemap/pull/181) · `aae172f`) | —                                   |
-| **3** | [`runtime-test-isolation.md`](./runtime-test-isolation.md)      | **in progress** (`fix/runtime-test-isolation`)                                      | PR **1** merged (PR **2** optional) |
+| PR    | Plan                                                            | Status                                                                                                  | Blocks |
+| ----- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------ |
+| **1** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#180](https://github.com/stainless-code/codemap/pull/180) · `a5caca8`)                     | —      |
+| **2** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **merged** ([#181](https://github.com/stainless-code/codemap/pull/181) · `aae172f`)                     | —      |
+| **3** | lifted → [`architecture.md`](../architecture.md) (plan retired) | **PR open** ([#182](https://github.com/stainless-code/codemap/pull/182) · `fix/runtime-test-isolation`) | —      |
 
 | — | — | **deferred** | golden `schema.test.ts` + path guards |
 | — | — | **skip** | atomic `ensureStateConfig` writes |
@@ -74,6 +74,7 @@ Evaluated 2026-06 against [roadmap § Floors](../roadmap.md#floors-v1-product-sh
 | 2026-06-05 | PR 2 harden | `/harden-pr full` — plan retired; CLI/MCP/docs parity.                        |
 | 2026-06-05 | PR 2 merge  | [#181](https://github.com/stainless-code/codemap/pull/181) → `aae172f`.       |
 | 2026-06-05 | PR 3 start  | `fix/runtime-test-isolation` — root guards + test teardown + config validate. |
+| 2026-06-05 | PR 3 harden | `/harden-pr full` — plan retired; swap finally fix + API/config tests.        |
 | —          | PR 3 merge  | _fill · close orchestrator_                                                   |
 
 ---

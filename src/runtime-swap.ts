@@ -15,3 +15,8 @@ export function exitRuntimeSwap(): void {
 export function isRuntimeSwapActive(): boolean {
   return _runtimeSwapDepth > 0;
 }
+
+/** Maintainer test helper — clears swap depth between test cases. */
+export function resetRuntimeSwapForTest(): void {
+  _runtimeSwapDepth = 0;
+}

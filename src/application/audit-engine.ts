@@ -459,15 +459,18 @@ export function makeWorktreeReindex(): ReindexFn {
       let wtDb;
       enterRuntimeSwap();
       try {
-        const wtUser = await loadUserConfig(worktreePath, undefined);
-        initCodemap(resolveCodemapConfig(worktreePath, wtUser));
-        configureResolver(getProjectRoot(), getTsconfigPath());
-        wtDb = openCodemapDatabase();
-        await runCodemapIndex(wtDb, { mode: "full", quiet: true, commit });
+        try {
+          const wtUser = await loadUserConfig(worktreePath, undefined);
+          initCodemap(resolveCodemapConfig(worktreePath, wtUser));
+          configureResolver(getProjectRoot(), getTsconfigPath());
+          wtDb = openCodemapDatabase();
+          await runCodemapIndex(wtDb, { mode: "full", quiet: true, commit });
+        } finally {
+          wtDb?.close();
+          initCodemap(savedConfig);
+          configureResolver(getProjectRoot(), getTsconfigPath());
+        }
       } finally {
-        wtDb?.close();
-        initCodemap(savedConfig);
-        configureResolver(getProjectRoot(), getTsconfigPath());
         exitRuntimeSwap();
       }
     });

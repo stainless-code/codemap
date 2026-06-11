@@ -2,6 +2,7 @@ import { afterEach, beforeEach } from "bun:test";
 
 import { resetResolverForTest } from "../resolver";
 import { resetCodemapForTest } from "../runtime";
+import { resetRuntimeSwapForTest } from "../runtime-swap";
 
 /**
  * Clears process-global codemap + resolver state. Maintainer tests only —
@@ -10,6 +11,7 @@ import { resetCodemapForTest } from "../runtime";
 export function resetRuntimeForTest(): void {
   resetCodemapForTest();
   resetResolverForTest();
+  resetRuntimeSwapForTest();
 }
 
 /**

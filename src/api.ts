@@ -47,7 +47,10 @@ export interface CodemapInitOptions {
  * @remarks
  * One project root per process: a second `createCodemap()` with a different `root` throws.
  * Re-initializing the same root is allowed. Audit `--base` worktree reindex is the only
- * production path that may temporarily switch roots (`runtime-swap.ts`).
+ * production path that may temporarily switch roots.
+ *
+ * Invalid project config (unknown keys, wrong types) throws at load time via the same
+ * schema as {@link parseCodemapUserConfig}.
  */
 export async function createCodemap(
   options: CodemapInitOptions = {},

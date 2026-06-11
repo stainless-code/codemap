@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
 import { resolveCodemapConfig } from "./config";
+import { configureResolver } from "./resolver";
 import { initCodemap, isPathExcluded } from "./runtime";
 import { enterRuntimeSwap, exitRuntimeSwap } from "./runtime-swap";
 import { installCodemapTestTeardown } from "./test-helpers/runtime-reset";
@@ -33,6 +34,18 @@ describe("initCodemap root guard", () => {
     } finally {
       exitRuntimeSwap();
     }
+    expect(() => initCodemap(resolveCodemapConfig("/other-root", {}))).toThrow(
+      /cannot switch project root/,
+    );
+  });
+});
+
+describe("configureResolver root guard", () => {
+  it("throws when switching to a different root without runtime swap", () => {
+    configureResolver("/resolver-a", null);
+    expect(() => configureResolver("/resolver-b", null)).toThrow(
+      /cannot switch resolver root/,
+    );
   });
 });
 
