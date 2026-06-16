@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.1
+
+### Patch Changes
+
+- [`3aff237`](https://github.com/stainless-code/codemap/commit/3aff23766db67e8e171ea7d8ef1183f4a9631f76) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Refresh runtime and toolchain dependencies (better-sqlite3, oxc-parser, oxfmt, oxlint, and related dev tooling) to latest compatible releases. Pin transitive hono and js-yaml to patched versions so dependency audits report no known vulnerabilities.
+
 ## 0.11.0
 
 ### Minor Changes
@@ -141,20 +147,25 @@
 - [#107](https://github.com/stainless-code/codemap/pull/107) [`f24f8b6`](https://github.com/stainless-code/codemap/commit/f24f8b6d1b531d4425664f6f1aca506bd11cfd6c) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Substrate tiers 1–6 remainder (excludes C.9 / `files.is_entry`). **Schema bump** `SCHEMA_VERSION` 27 → **34** — first run after upgrade auto-rebuilds `.codemap/index.db` via the existing version-mismatch path.
 
   **Tier 1 — call + import precision**
+
   - `calls.{args_count,is_method_call,is_constructor_call,is_optional_chain}`; constructor vs call dedup key fix
   - `symbols.{return_type,is_async,is_generator}`
   - Side-effect `import_specifiers` rows (`kind='side-effect'`) + `import_id` FK to `imports`
 
   **Tier 2 — bindings**
+
   - `bindings.resolution_kind='re-exported'` when resolution walks a re-export chain
 
   **Tier 3 — JSX**
+
   - New tables `jsx_elements` / `jsx_attributes`; extractor with per-file parent linking post-pass
 
   **Tier 5 — behavioral**
+
   - New tables `async_calls`, `try_catch`, `decorators`, `jsdoc_tags`; context stack for `in_loop` / `in_try`
 
   **Tier 6 — module graph (no entry points)**
+
   - `dynamic_imports` table + extractor
   - Post-pass `files.is_barrel` and parse-time `files.has_side_effects`
 
@@ -219,6 +230,7 @@
   `parseQueryRest` validates `--recipe <id>` / `--recipes-json` / `--print-sql <id>` BEFORE `runQueryCmd` calls `bootstrapCodemap`, so the recipe registry hit `getProjectRoot()` pre-init, the throw was silently caught, and the loader fell back to bundled-only. The MCP and HTTP transports always bootstrap before reaching the loader, so project recipes worked there throughout — only the CLI path was affected.
 
   Fix is surgical:
+
   - New `setQueryRecipesProjectRoot(root)` API in `application/query-recipes.ts` — caller-supplied root takes precedence over the runtime config (which isn't initialised yet during argv parse).
   - `cli/main.ts` calls it once right after `parseBootstrapArgs` returns `root`, so every subsequent verb (parser-side and post-bootstrap) sees the same value.
 
@@ -233,6 +245,7 @@
 ### Patch Changes
 
 - [#91](https://github.com/stainless-code/codemap/pull/91) [`82bca4b`](https://github.com/stainless-code/codemap/commit/82bca4b4732ab90a32b140f740ee5d4a97b04379) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Slim the auto-generated `<state-dir>/.gitignore` header for consumer clarity:
+
   - Drop the internal function-name reference (`ensureStateGitignore`) — consumers can't look it up.
   - Drop the "Rule 9 analogue" / "bump alongside any new cache" line — it was guidance for codemap contributors, leaking into every consumer's checkout.
   - Reframe "blacklist" / parenthetical mention of tracked files in plainer language.
@@ -251,6 +264,7 @@
 ### Patch Changes
 
 - [#89](https://github.com/stainless-code/codemap/pull/89) [`6e53458`](https://github.com/stainless-code/codemap/commit/6e5345868c3b5d64c97fc6a7cf8b44cd5951f041) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - **`codemap audit --base <ref>` now materialises the sha-keyed cache via `git archive | tar -x` instead of `git worktree add`.** The cache entry at `.codemap/audit-cache/<sha>/` is a plain extracted tree with no `.git` pointer file and no registered git worktree, so:
+
   - `git clean -xdf` sweeps it without needing `-ff` (which used to also nuke unrelated nested repos).
   - Plain `rm -rf` works — no more dangling registrations under `<repo>/.git/worktrees/` that needed `git worktree prune`.
 
@@ -265,6 +279,7 @@
 ### Patch Changes
 
 - [`904e4a5`](https://github.com/stainless-code/codemap/commit/904e4a538baff6c18c2dc3af5cf154d35129a796) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Two skill / docs clarifications that ship in the live-served skill (`codemap skill` / `codemap://skill` / `GET /resources/<encoded-skill-uri>`):
+
   - **`parent_name` vs `scope_local_id`** ([#86](https://github.com/stainless-code/codemap/pull/86)). `parent_name` is the nearest _named_ enclosing scope — it walks past anonymous arrows / IIFEs / callbacks, so `parent_name IS NULL` matches **both** true module-scope symbols and symbols inside top-level anonymous IIFEs. For a strict "module-scope only" filter use `scope_local_id = 0`. `docs/architecture.md` `symbols.parent_name` column doc + `40-query-patterns.md` mutability example updated accordingly.
 
   - **`imports.source` vs `imports.resolved_path`** ([#87](https://github.com/stainless-code/codemap/pull/87)). The single most common cause of empty `imports` result sets on alias-using codebases (TS `paths`, Webpack / Vite aliases, Node subpath imports `#internal/…`, monorepo workspaces) is picking the wrong column. The skill now explicitly teaches: filter `source` for "via alias / package name", filter `resolved_path` for "via on-disk path", and `WHERE resolved_path IS NULL` for "external packages only".
@@ -278,6 +293,7 @@
 - [#84](https://github.com/stainless-code/codemap/pull/84) [`e003218`](https://github.com/stainless-code/codemap/commit/e0032189620fb8cea16cb7921c87d5530d8403f1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `symbols.kind` distinguishes `const` / `let` / `var` instead of collapsing all three into `'const'`. Schema bump `SCHEMA_VERSION` 26 → 27 — first run after upgrade auto-rebuilds `.codemap/index.db` via the existing version-mismatch path; consumer queries see the new values immediately.
 
   **What changes:**
+
   - `let x = 1` now emits `kind = 'let'` + `signature = 'let x'`.
   - `var y = 2` now emits `kind = 'var'` + `signature = 'var y'`.
   - `const z = 3` unchanged (`kind = 'const'` + `signature = 'const z'`).
@@ -328,6 +344,7 @@
 - [#80](https://github.com/stainless-code/codemap/pull/80) [`7c3ba71`](https://github.com/stainless-code/codemap/commit/7c3ba71381fb43e07c61fc5e70dda472b4ff7602) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap skill` / `codemap rule` — live-served agent content. Consumer-disk `.agents/skills/codemap/SKILL.md` and `.agents/rules/codemap.md` are now **thin pointer files** (~16-22 lines); the full content is served live by the installed binary, so `bun update @stainless-code/codemap` automatically refreshes what agents see without re-running `agents init`.
 
   **Three transports, one engine:**
+
   - **CLI:** `codemap skill` / `codemap rule`
   - **MCP:** resources `codemap://skill` / `codemap://rule`
   - **HTTP:** `GET /resources/{encoded-uri}` against `codemap serve`
@@ -345,6 +362,7 @@
 - [#78](https://github.com/stainless-code/codemap/pull/78) [`84f9b97`](https://github.com/stainless-code/codemap/commit/84f9b97d332fcc0174b6231d318921dd8999f7a1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap apply <recipe-id>` — substrate-shaped fix executor over the existing `--format diff-json` row contract. The recipe SQL describes the transformation (`{file_path, line_start, before_pattern, after_pattern}` rows); codemap is the executor. Floor "No fix engine" preserved — codemap doesn't synthesise edits, it only executes the hunks the recipe row described.
 
   **Three transports, one engine:**
+
   - **CLI:** `codemap apply <recipe-id> [--params k=v[,k=v]] [--dry-run] [--yes] [--json]`
   - **MCP tool:** `apply` (registered alongside `impact` / `show` / `snippet`)
   - **HTTP:** `POST /tool/apply`
@@ -352,6 +370,7 @@
   All three dispatch the same pure `applyDiffPayload` engine in `application/apply-engine.ts`.
 
   **Decisions worth knowing (Q1–Q10 locked in `docs/plans/codemap-apply.md`, lifted into `docs/architecture.md § Apply wiring` on this PR):**
+
   - **Apply-by-default, `--dry-run` opts into preview.** Verb-name semantics + `git apply` / `terraform apply` precedent.
   - **Per-recipe-run all-or-nothing (Q2 (c)).** Phase 1 validates every row first; any conflict aborts phase 2 entirely before any file is touched. Cross-file invariants matter — `rename-preview` produces a definition row + N import rows, and partial application leaves the project syntactically broken.
   - **Scan-and-collect conflicts (Q3 (b)).** Phase 1 walks every row and collects all conflicts in one pass — better remediation UX than fail-fast.
@@ -396,6 +415,7 @@
   Eliminates the bash round-trip on every agent invocation.
 
   Surface (one tool per CLI verb plus `query_batch`, all snake_case):
+
   - `query`, `query_batch`, `query_recipe`, `audit`, `save_baseline`,
     `list_baselines`, `drop_baseline`, `context`, `validate`
   - Resources: `codemap://recipes`, `codemap://recipes/{id}`,
@@ -450,6 +470,7 @@
   `action` defaults to `"deny"` (the only shape v1 surfaces); `"allow"` reserves the slot for future whitelist semantics.
 
   **Substrate**
+
   - New config field `boundaries: BoundaryRule[]` on the Zod user-config schema (`src/config.ts`); validated at config-load time.
   - New table `boundary_rules(name PK, from_glob, to_glob, action CHECK IN ('deny','allow'))` (`STRICT, WITHOUT ROWID`) — fully derived from config, dropped on `--full` / `SCHEMA_VERSION` rebuilds and re-filled by the next index pass.
   - New helper `reconcileBoundaryRules(db, rules)` in `src/db.ts`; called from `runCodemapIndex` after `createSchema` so the table tracks config exactly.
@@ -464,6 +485,7 @@
   ```
 
   **Lockstep**
+
   - `docs/architecture.md` § Schema gains a `boundary_rules` subsection.
   - `docs/glossary.md` adds `boundaries` / `boundary_rules` / `boundary-violations` entry.
   - `docs/roadmap.md § Backlog` removes the now-shipped item per Rule 2.
@@ -476,6 +498,7 @@
 - [#52](https://github.com/stainless-code/codemap/pull/52) [`fe5a355`](https://github.com/stainless-code/codemap/commit/fe5a3551bb9abd91021a8a0e021cbcd42c44234f) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap audit --base <ref>` — ad-hoc structural-drift audit against any git committish (`origin/main`, `HEAD~5`, `<sha>`, tag, …). Closes the highest-frequency post-watch agent loop: "what changed structurally between this branch and `origin/main`?". Replaces today's 3-step `--baseline` dance (switch branches, reindex, save baselines, switch back) with one verb.
 
   **Three transports, one engine:**
+
   - **CLI:** `codemap audit --base <ref> [--<delta>-baseline <name>] [--summary] [--json] [--no-index]`
   - **MCP tool:** `audit` with new `base?: string` arg
   - **HTTP:** `POST /tool/audit` (auto-wired via the existing dispatcher)
@@ -483,6 +506,7 @@
   All three dispatch the same pure `runAuditFromRef` engine in `application/audit-engine.ts`.
 
   **How it works:**
+
   1. `git rev-parse --verify "<ref>^{commit}"` resolves `<ref>` to a sha (clean error on non-git or unresolvable ref).
   2. Cache lookup at `<projectRoot>/.codemap/audit-cache/<sha>/.codemap.db`. Hit → sub-100ms; miss → continue.
   3. **Atomic populate** — `git worktree add` to a per-pid temp dir + `runCodemapIndex({mode: "full"})` against the worktree's `.codemap.db` + POSIX `rename` claims the final `<sha>/` slot. Concurrent CI matrix runs against the same sha race-safely without lock files (loser's rename fails with EEXIST → falls through to cache hit).
@@ -490,6 +514,7 @@
   5. Compose `AuditEnvelope` with per-delta `base.source: "ref"` (new value) + `base.ref` (user-supplied string) + `base.sha` (resolved).
 
   **Decisions worth knowing:**
+
   - **`AuditBase` is now a discriminated union** — existing `{source: "baseline", name, sha, indexed_at}` rows untouched; new `{source: "ref", ref, sha, indexed_at}` arm. Consumers narrowing on `base.source` keep compiling.
   - **Mutually exclusive with `--baseline <prefix>`.** Parser + handler both guard. Per-delta `--<key>-baseline` overrides compose orthogonally with both, so `--base origin/main --files-baseline pre-refactor-files` is valid (mixed sources).
   - **Eviction:** hardcoded LRU 5 entries / 500 MiB; `git worktree remove --force` + `rm -rf` for each victim. Orphan `.tmp.*` dirs older than 10 min get swept on the next cycle. No config knobs in v1; defer to v1.x+ if real consumers ask.
@@ -519,11 +544,13 @@
   **Self-healing files (D11):** `<state-dir>/.gitignore` and `<state-dir>/config.json` are owned by idempotent `ensure*` reconcilers (`src/application/state-dir.ts`, `src/application/state-config.ts`) that run on every codemap boot — read → validate → reconcile → write only on drift. **The setup logic IS the migration**: future codemap versions add new generated artifacts to `STATE_GITIGNORE_BODY` (or extend the Zod schema), and every consumer's project repairs itself on the next `codemap` invocation. No more per-feature `.gitignore` patching in `agents-init.ts`.
 
   **Pre-v1 — no migration shim:**
+
   - `<root>/.codemap.db` → `<state-dir>/index.db` (rename basename)
   - `<root>/codemap.config.{ts,json}` → `<state-dir>/config.{ts,js,json}` (move file)
   - Existing dev clones: `rm .codemap.db .codemap.db-shm .codemap.db-wal` once and re-index; move `codemap.config.*` into `.codemap/` (or set `--config <old-path>` to keep using the legacy location explicitly).
 
   **New flags + env:**
+
   - `--state-dir <path>` — override the state directory (resolves relative to project root).
   - `CODEMAP_STATE_DIR` — same, env-var form.
 
@@ -536,6 +563,7 @@
 - [#50](https://github.com/stainless-code/codemap/pull/50) [`90092ae`](https://github.com/stainless-code/codemap/commit/90092ae51fc8d88e825cdd931bc3fb4bd9c9f047) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap impact <target>` — symbol/file blast-radius walker. Replaces hand-composed `WITH RECURSIVE` queries that agents struggle to write reliably with a single verb that walks the calls / dependencies / imports graphs (callers, callees, dependents, dependencies). Depth- and limit-bounded, cycle-detected.
 
   **Three transports, one engine:**
+
   - **CLI:** `codemap impact <target> [--direction up|down|both] [--depth N] [--via dependencies|calls|imports|all] [--limit N] [--summary] [--json]`
   - **MCP tool:** `impact` (registered alongside `show` / `snippet`)
   - **HTTP:** `POST /tool/impact`
@@ -543,6 +571,7 @@
   All three dispatch the same pure `findImpact` engine in `application/impact-engine.ts` per the post-PR [#41](https://github.com/stainless-code/codemap/issues/41) layering — adding tools never duplicates business logic.
 
   **Decisions worth knowing:**
+
   - **Target auto-resolution.** Contains `/` or matches `files.path` → file target; otherwise symbol (case-sensitive, exact). Symbol targets walk `calls`; file targets walk `dependencies` + `imports` (`resolved_path` only). Mismatched explicit `--via` choices land in `skipped_backends` (no error — agent sees why their selection yielded fewer rows than expected).
   - **Cycle detection.** SQLite has no native cycle predicate; we materialise a comma-bounded path string per row and `instr` it to break re-entry. Bounded depth + `--limit` (default 500) keep cyclic graphs cheap regardless. `--depth 0` walks unbounded but stays cycle-detected and limit-capped.
   - **Termination classification.** `summary.terminated_by`: `limit` > `depth` > `exhausted`. CI gates can branch on it.
@@ -558,6 +587,7 @@
   Default bind `127.0.0.1:7878` (loopback only — refuse `0.0.0.0` unless explicitly opted in via `--host 0.0.0.0`). Optional `--token <secret>` requires `Authorization: Bearer <secret>` on every request; `GET /health` is auth-exempt so liveness probes work without leaking the token. Bare `node:http` (no Express / Fastify dep) — runs on Bun + Node.
 
   **Routes:**
+
   - `POST /tool/{name}` — every MCP tool (query, query_recipe, query_batch, audit, context, validate, show, snippet, save_baseline, list_baselines, drop_baseline). Body `{<args>}`; response = same `codemap query --json` envelope (NOT MCP's `{content: [...]}` wrapper). `format: "sarif"` payloads ship as `application/sarif+json`; `format: "annotations"` as `text/plain`.
   - `GET /resources/{encoded-uri}` — mirror of MCP resources (`codemap://recipes`, `codemap://recipes/{id}`, `codemap://schema`, `codemap://skill`).
   - `GET /health` — liveness (auth-exempt); `GET /tools` / `GET /resources` — catalogs.
@@ -571,6 +601,7 @@
 - [#47](https://github.com/stainless-code/codemap/pull/47) [`5ef9ce4`](https://github.com/stainless-code/codemap/commit/5ef9ce4b398f60aa0e446dee5f8cc73e0978ae42) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap watch` — long-running process that re-indexes changed files in real time so every CLI / MCP / HTTP query reads live data without a per-query reindex prelude. Eliminates the single biggest source of agent-side friction: "is the index stale right now?"
 
   **Three shapes:**
+
   - **Standalone**: `codemap watch [--debounce 250] [--quiet]` — foreground process; logs `reindex N file(s) in Mms` per batch unless `--quiet`. SIGINT / SIGTERM drains pending edits.
   - **MCP killer combo**: `codemap mcp --watch [--debounce <ms>]` — boots stdio MCP server + watcher in one process. Long Cursor / Claude Code sessions never hit a stale index; agents stop having to remember to reindex between edit + query.
   - **HTTP killer combo**: `codemap serve --watch [--debounce <ms>]` — same shape for non-MCP consumers (CI scripts, IDE plugins, simple `curl`).
@@ -588,6 +619,7 @@
   **Both formats land in v1** (Istanbul + LCOV) so every test runner is a first-class consumer on day one — `vitest --coverage`, `jest --coverage`, `c8`, `nyc` (Istanbul JSON), and `bun test --coverage` (LCOV) all work without waiting on a follow-up release.
 
   **Bundled recipes (auto-discovered, no opt-in needed):**
+
   - `untested-and-dead` — exported functions with no callers AND zero coverage; the killer recipe combining structural and runtime evidence axes.
   - `files-by-coverage` — files ranked ascending by statement coverage.
   - `worst-covered-exports` — top-20 worst-covered exported functions.
@@ -595,6 +627,7 @@
   Each recipe ships a frontmatter `actions` block so agents see per-row follow-up hints in `--json` output.
 
   **Schema:**
+
   - New `coverage` table with natural-key PK `(file_path, name, line_start)` — intentionally not a FK to `symbols.id` so coverage rows survive the `symbols` drop-recreate cycle on every `--full` reindex.
   - `idx_coverage_file_name` covers the typical join shape and the `GROUP BY file_path` scan used by the `files-by-coverage` recipe.
   - Three new `meta` keys (`coverage_last_ingested_at` / `_path` / `_format`) record ingest freshness.
@@ -654,20 +687,24 @@
   Stale-index friction is empirically the most-frequent agent UX issue under `codemap mcp` (driving the watch-mode planning in PR [#46](https://github.com/stainless-code/codemap/issues/46)) and the most-frequent CI/IDE-plugin friction under `codemap serve`. Both modes are inherently long-running, so the chokidar co-process pays for itself immediately. Decision originally resolved 2026-05 (research note `§ 6 Q1`); this PR ships it.
 
   **New defaults.**
+
   - `codemap mcp` — watcher boots automatically; tools always read a live index.
   - `codemap serve` — same.
   - One-shot CLI defaults preserved: `codemap query` / `codemap show` / `codemap snippet` / etc. still spawn no watcher.
 
   **Opt out.**
+
   - `--no-watch` flag (new) — explicit opt-out for ephemeral-index workflows, fire-and-forget CI scripts, etc.
   - `CODEMAP_WATCH=0` / `CODEMAP_WATCH="false"` — env-shortcut mirroring `--no-watch` for IDE / CI launches that can't easily edit the spawn command.
 
   **Backwards-compat preserved.**
+
   - `--watch` flag still parses and is honored (no-op since it matches the new default; kept so existing scripts and launch commands don't break).
   - `CODEMAP_WATCH=1` / `CODEMAP_WATCH="true"` still parses (redundant after the flip, kept for backwards-compat).
   - `--no-watch` wins over `--watch` when both passed (last-write semantics).
 
   **Tradeoffs accepted.**
+
   - Slightly slower mcp/serve startup (~chokidar boot cost, validated tiny on Bun + Node by PR [#46](https://github.com/stainless-code/codemap/issues/46)'s 6-watcher audit).
   - Spawns a second process — visible to users running `htop` / `Activity Monitor`. Worth it for the live-index correctness gain.
 
@@ -680,19 +717,23 @@
   Recipes may now declare `params` in sibling `<id>.md` frontmatter and consume values through positional `?` placeholders in SQL. Values validate before SQL binding and support `string`, `number`, and `boolean` types.
 
   **CLI**
+
   - `codemap query --recipe <id> --params key=value[,key=value]`
   - `--params` may be repeated; duplicate keys use last-write semantics.
   - Values may contain `=` (split on first equals). Values containing literal commas should use repeated `--params`.
   - Param validation is strict: missing required, unknown, and malformed values return `{error}`.
 
   **MCP / HTTP**
+
   - `query_recipe` accepts `params: {key: value}`.
   - HTTP `POST /tool/query_recipe` uses the same shape.
 
   **Catalog**
+
   - `--recipes-json`, `codemap://recipes`, and `codemap://recipes/{id}` expose the `params` declaration for each parametrised recipe.
 
   **Example bundled recipe**
+
   - `find-symbol-by-kind` demonstrates the new path:
     `codemap query --json --recipe find-symbol-by-kind --params kind=function,name_pattern=%Query%`
 
@@ -703,6 +744,7 @@
 - [#37](https://github.com/stainless-code/codemap/pull/37) [`5110b1a`](https://github.com/stainless-code/codemap/commit/5110b1a595bb4b971710d0367d56770c82c91651) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - feat(recipes): recipes-as-content registry — bundled .md siblings + project-local recipes
 
   Two complementary capabilities:
+
   1. **Bundled recipes get richer descriptions.** Every bundled recipe in
      `templates/recipes/` is now a `<id>.sql` file paired with an optional
      `<id>.md` description body (replaces the inline TypeScript map in
@@ -756,12 +798,14 @@
   ```
 
   The v1 recipe emits rows shaped for `--format diff` / `diff-json` and covers:
+
   - symbol definition lines from `symbols`
   - direct named import specifier lines from `imports.specifiers` when `imports.resolved_path` points at the target symbol file
 
   It intentionally does **not** cover call sites, re-export alias chains, string literals, comments, dynamic dispatch, or template-literal property access yet. Those require more precise source-location substrate (for calls / exports) or non-structural search. The recipe `.md` documents the caveats clearly and repeats the key product-floor rule: codemap never writes files; this is a preview for review / `git apply --check`.
 
   Parameters:
+
   - `old` (required string)
   - `new` (required string)
   - `kind` (optional string)
@@ -789,6 +833,7 @@
 
   Two sibling verbs that close the "agent wants to read this thing" loop
   without composing SQL:
+
   - **`codemap show <name>`** — returns metadata
     (`file_path:line_start-line_end` + `signature` + `kind`) for the
     symbol(s) matching the exact name (case-sensitive).
@@ -818,6 +863,7 @@
   Architecturally: pure transport-agnostic engine in
   `src/application/show-engine.ts` (mirrors the cmd-_ ↔ _-engine seam
   from PRs [#33](https://github.com/stainless-code/codemap/issues/33) / [#35](https://github.com/stainless-code/codemap/issues/35) / [#37](https://github.com/stainless-code/codemap/issues/37)); thin CLI verbs in `src/cli/cmd-show.ts`
+
   - `src/cli/cmd-snippet.ts`. Reuses `findSymbolsByName`, `hashContent`
     (from `src/hash.ts`), `toProjectRelative` (now exported from
     `cmd-validate.ts`), and `files.content_hash` — same primitives the
@@ -846,11 +892,13 @@
   Adds per-function cyclomatic complexity computed during AST walking. Schema bump `SCHEMA_VERSION` 7 → 8 — first reindex after upgrade triggers a full rebuild via the existing version-mismatch path.
 
   **What lands:**
+
   - New `complexity REAL` column on `symbols`. Computed via McCabe formula (`1 + decision points`) for function-shaped symbols (top-level `function` declarations + arrow-function consts). `NULL` for non-functions (interfaces, types, enums, plain consts) and class methods (v1 limitation; documented in the recipe `.md`).
   - Decision points counted: `if`, `while`, `do…while`, `for`, `for…in`, `for…of`, `case X:` arms (not `default:` fall-through), `&&` / `||` / `??` short-circuit operators, `?:` ternary, `catch` clauses.
   - New bundled recipe `high-complexity-untested` — function-shaped symbols with complexity ≥ 10 AND measured coverage < 50%. Combines structural + runtime evidence axes; surfaces refactor-priority candidates that single-axis recipes (`untested-and-dead`, `worst-covered-exports`) miss because they're "called but undertested."
 
   **Implementation:**
+
   - Parser visitor (`src/parser.ts`) maintains a `complexityStack` keyed by symbol index. On function entry, pushes counter at 1 + symbol index. Branching-node visitors increment the top counter. On function exit, pops and writes complexity into the symbol row already pushed during entry.
   - Nested function declarations get their own stack entries — inner branches don't count toward the outer function. (Standard McCabe — each function counted independently.)
 
@@ -859,6 +907,7 @@
   Agent rule + skill lockstep updated per `docs/README.md` Rule 10 — both `templates/agents/` and `.agents/` codemap rule + skill mention the `complexity` column, the new recipe, and the cyclomatic-complexity definition.
 
   **Out of scope:**
+
   - **Class method complexity** — `MethodDefinition` visitor currently doesn't push to the complexity stack. Documented in `high-complexity-untested.md` v1 limitation; refactor opportunity for class-heavy projects.
   - **Per-class / per-file rollups** — `complexity` is per-symbol; project-local recipes can `SUM` / `AVG` it as needed.
 
@@ -867,6 +916,7 @@
   Implements the FTS5+Mermaid plan ([`docs/plans/fts5-mermaid.md`](https://github.com/stainless-code/codemap/blob/main/docs/plans/fts5-mermaid.md)) — two non-goal flips in one PR.
 
   **FTS5 (opt-in, default OFF):**
+
   - New `source_fts` virtual table — `(file_path UNINDEXED, content)` columns, `tokenize='porter unicode61'`. Always created; populated only when toggle is on.
   - Toggle via `codemap.config.ts` `fts5: true` OR `--with-fts` CLI flag at index time. CLI overrides config (logs stderr line on override).
   - Indexer tees file content into `source_fts` in same transaction as `files` row insert (atomic). Worker → main serialization cost is zero on default-OFF path.
@@ -875,6 +925,7 @@
   - Bundled demo recipe `text-in-deprecated-functions` — `@deprecated` functions in files containing `TODO`/`FIXME`/`HACK` markers AND coverage `<50%`. Demonstrates FTS5 ⨯ `symbols` ⨯ `coverage` JOIN composability that ripgrep can't match.
 
   **Mermaid output formatter:**
+
   - New `--format mermaid` output mode. Renders `{from, to, label?, kind?}` row-shape as `flowchart LR`.
   - **Bounded-input contract** (50-edge ceiling, `MERMAID_MAX_EDGES`): unbounded inputs reject with a scope-suggestion error naming the recipe + count + scoping knobs (`LIMIT` / `--via` / `WHERE`). Auto-truncation deliberately out of scope (would be a verdict masquerading as an output mode).
   - Available across CLI, MCP `query` / `query_recipe` tools, HTTP `POST /tool/query` (text/plain content type).
@@ -890,6 +941,7 @@
 - [#67](https://github.com/stainless-code/codemap/pull/67) [`3e03db7`](https://github.com/stainless-code/codemap/commit/3e03db7a62584b4e676261dbdbfc7fb497c2c50a) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - feat(mcp): add `codemap://files/{path}` + `codemap://symbols/{name}` resources (research note § 1.8)
 
   Two new MCP / HTTP resources for direct agent reads — saves the recipe-compose round-trip when the agent just wants "everything about this file" or "where is this symbol?".
+
   - **`codemap://files/{path}`** — per-file roll-up. Returns `{path, language, line_count, symbols, imports, exports, coverage}`. `imports.specifiers` parsed inline (callers don't have to JSON.parse). `coverage` is `{measured_symbols, avg_coverage_pct, per_symbol}` when coverage was ingested, else `null`. URI-encode the path.
   - **`codemap://symbols/{name}`** — symbol lookup by exact name. Returns `{matches, disambiguation?}` envelope (same shape as the `show` verb per PR [#39](https://github.com/stainless-code/codemap/issues/39)). Optional `?in=<path-prefix>` query parameter mirrors `show --in <path>` (directory prefix or exact file).
 
@@ -904,6 +956,7 @@
 - [`8da7f3d`](https://github.com/stainless-code/codemap/commit/8da7f3df36460ae366f1ad5d0a22cea1e66d0559) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - docs(cli): `mcp --help` and `serve --help` now list every shipped tool + resource
 
   Stale help text in `src/cli/cmd-mcp.ts` and `src/cli/cmd-serve.ts` listed the original v1 tool / resource taxonomy. Updated to match what's registered today (verified against `src/application/mcp-server.ts`):
+
   - **`mcp --help` Tools section** now includes `show`, `snippet`, `impact` (was missing all three).
   - **`mcp --help` Resources section** now distinguishes lazy-cached catalog resources (`recipes`, `recipes/{id}`, `schema`, `skill`) from live read-per-call resources (`files/{path}`, `symbols/{name}`) — was listing only the original four.
   - **`serve --help` Routes section** now includes `POST /tool/impact` (was missing) and lists every mirrored MCP resource explicitly under `GET /resources/{encoded-uri}` (was a `...` ellipsis).
@@ -911,6 +964,7 @@
   No behavior change — purely a documentation accuracy fix. Bundled agent rule + skill (`templates/agents/` and `.agents/`) already enumerate the six resources correctly.
 
 - [#75](https://github.com/stainless-code/codemap/pull/75) [`ba01d81`](https://github.com/stainless-code/codemap/commit/ba01d81303820a374ad96b157ce14dfd0378e4b1) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Outcome-shaped CLI aliases — five thin top-level verbs that wrap `query --recipe <id>`:
+
   - `codemap dead-code` → `query --recipe untested-and-dead`
   - `codemap deprecated` → `query --recipe deprecated-symbols`
   - `codemap boundaries` → `query --recipe boundary-violations`
@@ -934,6 +988,7 @@
   Schema docs: `architecture.md` § `recipe_recency`. Term entry: `glossary.md`. Bundled agent rule + skill (`templates/agents/`) + dev-side mirror (`.agents/`) updated in lockstep per Rule 10.
 
 - [#65](https://github.com/stainless-code/codemap/pull/65) [`1b7a5c7`](https://github.com/stainless-code/codemap/commit/1b7a5c73fbabfc1cb5827e9090e32728d9d469bf) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - feat(recipes): ship two new bundled recipes from research note § 1
+
   - **`components-touching-deprecated`** (research note § 1.1) — UNION of two paths surfacing components that touch `@deprecated` symbols: hook path (`components.hooks_used` JSON overlap) + call path (`calls.caller_name = component`, `callee_name` is `@deprecated`). Hook-only variants ship false negatives — recipe spells out the explicit UNION. Action template `review-deprecation-impact`.
   - **`refactor-risk-ranking`** (research note § 1.4) — per-file ranking by `(fan_in + 1) × (100 - avg_coverage_pct)`. Three correctness fixes vs the naïve formula: orphans (`fan_in = 0`) score on coverage alone via `+1`; NULL `coverage_pct` treated as 0% via `COALESCE` (otherwise the row drops from `ORDER BY`); files with no exports excluded (no public-API surface to refactor externally). Output is per-file (not per-symbol) — empirical test showed per-symbol ranking ties on file-level fan_in. Per-symbol via `calls` is a documented tuning axis for project-local override. Action template `review-refactor-impact`.
 
@@ -946,6 +1001,7 @@
   Surfaces exports that have no detectable import. Useful as a starting candidate list for "what's unused?" — explicitly **NOT** a "safe to delete" list.
 
   V1 limitations documented in the recipe `.md`:
+
   1. **Re-export chains not followed** — false positives if A re-exports `bar` from B and consumers import `bar` from A. Tracked under research note § 1.2; future recipe with recursive CTE walking `re_export_source` will close the gap.
   2. **Unresolved imports ignored** — when `imports.resolved_path IS NULL` (codemap's resolver couldn't resolve a `tsconfig.json` path alias or external package), those rows don't count toward "used" matching.
   3. **Default exports skipped** — common framework entry points (Next.js `page.tsx`, Storybook stories, `vite.config.ts`) skipped to reduce noise. Override in project-local recipe if you want to include them.
@@ -1031,17 +1087,20 @@
 - [#15](https://github.com/stainless-code/codemap/pull/15) [`f2362f9`](https://github.com/stainless-code/codemap/commit/f2362f9d2b81398a1fa02415fc4a6ed0095d2923) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix three HIGH-severity bugs found via cross-audit triangulation, plus performance and docs improvements.
 
   **Bug fixes**
+
   - Add missing `onerror` handler on Bun Worker — prevents silent promise hang when a parse worker crashes
   - Require JSX return or hook usage for component detection — eliminates false positives (e.g. `FormatCurrency()` in `.tsx` files no longer indexed as a component)
   - Include previously-indexed files in incremental and `--files` modes — custom-extension files indexed during `--full` no longer silently go stale
 
   **Performance**
+
   - Batch CSS imports instead of inserting one-at-a-time (both full-rebuild and incremental paths)
   - Add `Map<string, Statement>` cache for `better-sqlite3` `run()`/`query()` — avoids ~2,000+ redundant `prepare()` calls on large projects
   - Hoist `inner.query()` in `wrap()` to prepare once per call instead of per `.get()`/`.all()`
   - Skip `PRAGMA optimize` on `closeDb` for read-only query paths
 
   **Docs**
+
   - Fix Wyhash → SHA-256 in architecture.md and SKILL.md (3 locations)
   - Correct `symbols.kind` values (`variable` → `const`, `type_alias` → `type`) and `exports.kind` values
   - Clarify `Database.query()` caching is Bun-only; Node statement cache via wrapper
@@ -1049,10 +1108,12 @@
   - Update benchmark.md and golden-queries.md for enriched fixture
 
   **Testing**
+
   - Enrich `fixtures/minimal/` to cover all 10 indexed tables (CSS module, `@keyframes`, `@import`, non-component PascalCase export, FIXME marker)
   - Add 7 new golden scenarios (exports, css_variables, css_classes, css_keyframes, css_imports, markers-all-kinds, components-no-false-positives)
 
   **Cleanup**
+
   - Remove unused `analyzeDependencies: true` from CSS parser
   - Deduplicate `fetchTableStats` (was duplicated across `index-engine.ts` and `run-index.ts`)
   - Remove dead `eslint-disable-next-line` directives (oxlint doesn't enforce those rules)
@@ -1083,6 +1144,7 @@
 ### Patch Changes
 
 - [#8](https://github.com/stainless-code/codemap/pull/8) [`889ed5b`](https://github.com/stainless-code/codemap/commit/889ed5b695823e9a57f133c9643af9dbb3e89236) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - **Query CLI**
+
   - **`codemap query --json`**: print a JSON array of result rows to stdout (and **`{"error":"…"}`** on SQL errors) for agents and automation. Document that the query subcommand does **not** cap rows — use SQL **`LIMIT`** for bounded results. Update bundled agent rule and skill with **`--json`** preference, verbatim structural answers, and generic SQL recipes (fan-out + sample targets).
 
   - **`codemap query --recipe <id>`** for bundled read-only SQL so agents can run common structural queries without embedding SQL on the command line. **`--json`** works with recipes the same way as ad-hoc SQL. Bundled ids include dependency **`fan-out`** / **`fan-out-sample`** / **`fan-out-sample-json`** (JSON1 **`json_group_array`**) / **`fan-in`**, index **`index-summary`**, **`files-largest`**, React **`components-by-hooks`** (comma-based hook count, no JSON1), and **`markers-by-kind`**. The benchmark suite uses the **`fan-out`** recipe SQL for an indexed-path scenario; docs clarify that recipes add no extra query cost vs pasting the same SQL.
@@ -1090,21 +1152,26 @@
   - **Recipe discovery (no index / DB):** **`codemap query --recipes-json`** prints all bundled recipes (**`id`**, **`description`**, **`sql`**) as JSON. **`codemap query --print-sql <id>`** prints one recipe’s SQL. **`listQueryRecipeCatalog()`** in **`src/cli/query-recipes.ts`** is the single derived view of **`QUERY_RECIPES`** for the JSON output.
 
   **Golden tests**
+
   - **`bun run test:golden`**: index **`fixtures/minimal`**, run scenarios from **`fixtures/golden/scenarios.json`**, and compare query JSON to **`fixtures/golden/minimal/`**. Use **`bun scripts/query-golden.ts --update`** after intentional fixture or schema changes. Documented in **benchmark.md** and **CONTRIBUTING**.
 
   **Query robustness**
+
   - With **`--json`**, **`{"error":"…"}`** is printed for invalid SQL, database open failures, and **`codemap query`** bootstrap failures (config / resolver setup), not only bad SQL. The CLI sets **`process.exitCode`** instead of **`process.exit`** so piped stdout is not cut off mid-stream.
 
   **Benchmark & `CODEMAP_BENCHMARK_CONFIG`**
+
   - Each **`indexedSql`** in custom scenario JSON is validated as a single read-only **`SELECT`** (or **`WITH` … `SELECT`**) — DDL/DML and **`RETURNING`** are rejected before execution.
   - Config file paths are resolved from **`process.cwd()`** (see **benchmark.md**). **`traditional.regex`** strings are developer-controlled (local JSON); **`files`** mode compiles the regex once per scenario.
   - Overlapping **globs** in the traditional path are **deduplicated** so **Files read** / **Bytes read** count each path once.
   - The default **components in `shop/`** scenario uses a **`LIKE`** filter aligned with the traditional globs under **`components/shop/`** (**\*.tsx** and **\*.jsx**, matching **`components`** rows from the parser) and avoids unrelated paths such as **`workshop`**.
 
   **Recipes (determinism)**
+
   - Bundled recipe SQL adds stable secondary **`ORDER BY`** columns (and orders inner **`LIMIT`** samples) so **`--recipe`** / **`--json`** output does not vary on aggregate ties.
 
   **External QA**
+
   - **`bun run qa:external`**: **`--max-files`** and **`--max-symbols`** must be positive integers (invalid values throw before indexing).
 
 ## 0.1.3
