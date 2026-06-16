@@ -19,7 +19,7 @@ Replaces all \`file_churn\` rows — include every indexed path you want
 retained. Enables \`churn-complexity-hotspots\`. JSON must be an array of
 objects with \`file_path\`, \`commit_count\`, \`weighted_commits\`, optional
 \`lines_added\` / \`lines_removed\` (default 0), \`last_commit_at\` /
-\`churn_trend\` (\`accelerating\` \| \`stable\` \| \`cooling\`) /
+\`churn_trend\` (\`accelerating\` | \`stable\` | \`cooling\`) /
 \`computed_at\` (defaults to current time). Run \`codemap\` (index) first —
 only indexed paths are kept; unindexed paths are skipped.
 
