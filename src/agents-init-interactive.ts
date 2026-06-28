@@ -1,3 +1,5 @@
+import { styleText } from "node:util";
+
 import {
   cancel,
   confirm,
@@ -73,6 +75,9 @@ const INTEGRATION_OPTIONS: {
   },
 ];
 
+/** @clack/prompts 1.6+ no longer dims `note()` body text by default. */
+const dimNote = { format: (text: string) => styleText("dim", text) };
+
 function summarizeTargets(targets: AgentsInitTarget[]): string[] {
   const lines: string[] = [];
   for (const t of targets) {
@@ -92,6 +97,7 @@ export async function runAgentsInitInteractive(
   note(
     "Canonical templates always install to .agents/ (rules + skills).\nOptional steps wire other tools to the same content.",
     "Codemap",
+    dimNote,
   );
 
   const targetsRaw = await multiselect<AgentsInitTarget>({
@@ -140,7 +146,7 @@ export async function runAgentsInitInteractive(
     ...summarizeTargets(targets).map((l) => `• ${l}`),
   ];
 
-  note(lines.join("\n"), "Summary");
+  note(lines.join("\n"), "Summary", dimNote);
 
   const ok = await confirm({
     message: "Proceed?",
