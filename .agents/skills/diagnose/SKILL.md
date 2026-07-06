@@ -48,6 +48,8 @@ Stop and say so explicitly. List what you tried. Ask the user for: (a) access to
 
 Do not proceed to Phase 2 until you have a loop you believe in.
 
+**Done when:** one command is red-capable, deterministic, fast, and agent-runnable (`bun test <file>`, `bun src/index.ts query --json …`, or a throwaway harness). No red-capable command → no Phase 2.
+
 ## Phase 2 — Reproduce
 
 Run the loop. Watch the bug appear.
@@ -60,6 +62,8 @@ Confirm:
 
 Do not proceed until you reproduce the bug.
 
+**Done when:** minimal repro documented; non-load-bearing steps removed; exact symptom captured (error message / wrong output / slow timing) for later fix verification.
+
 ## Phase 3 — Hypothesise
 
 Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
@@ -71,6 +75,8 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
 
 **Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just changed #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
+
+**Done when:** 3–5 ranked, falsifiable hypotheses stated (each with a prediction); user has seen the list before any fix attempt.
 
 ## Phase 4 — Instrument
 
@@ -85,6 +91,8 @@ Tool preference:
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 
 **Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan, `--performance` flag for index runs), then bisect. Measure first, fix second.
+
+**Done when:** one hypothesis confirmed or all falsified with evidence — one variable changed per probe, each probe mapped to a Phase 3 prediction.
 
 ## Phase 5 — Fix + regression test
 
@@ -102,6 +110,8 @@ If a correct seam exists:
 4. Watch it pass.
 5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
 
+**Done when:** loop is green against the original scenario; regression test added at a correct seam, or the seam-gap is documented as an architectural finding.
+
 ## Phase 6 — Cleanup + post-mortem
 
 Required before declaring done:
@@ -114,3 +124,5 @@ Required before declaring done:
 - [ ] If the post-mortem yields a permanent insight, **lift** it into `.agents/rules/` or the relevant skill; append to [`.agents/lessons.md`](../../lessons.md) only when it is not yet encoded elsewhere
 
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to [`improve-codebase-architecture`](../improve-codebase-architecture/SKILL.md) with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+
+**Done when:** no `[DEBUG-…]` sediment (`grep` clean); throwaway harnesses deleted; commit / PR message states the winning root-cause hypothesis; any durable insight lifted into `.agents/rules/` or a skill (else `.agents/lessons.md`).

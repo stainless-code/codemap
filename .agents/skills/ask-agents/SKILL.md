@@ -1,6 +1,6 @@
 ---
 name: ask-agents
-description: Which user-only agent workflow to run — grilling, docs-aware grilling, or meta authoring help.
+description: Which user-only agent workflow to run — grilling, docs-aware grilling, teaching, or meta authoring help.
 disable-model-invocation: true
 ---
 
@@ -33,15 +33,16 @@ Keep grilling + plan authoring in **one window** until issues are filed. Each im
 
 ## Standalone
 
-| Invoke                                                         | When                                            |
-| -------------------------------------------------------------- | ----------------------------------------------- |
-| [`grill-me`](../grill-me/SKILL.md)                             | Sharpen a plan with **no** codebase (stateless) |
-| [`writing-great-skills`](../writing-great-skills/SKILL.md)     | Skill vocabulary + principles                   |
-| [`writing-agents-config`](../writing-agents-config/SKILL.md)   | Codemap repo tier/pairing deltas                |
-| [`domain-modeling`](../domain-modeling/SKILL.md)               | Ubiquitous language inline + batch glossary     |
-| [`tdd`](../tdd/SKILL.md)                                       | RED→GREEN tracer-bullet TDD                     |
-| [`verify-after-each-step`](../verify-after-each-step/SKILL.md) | Per-file checks after each milestone            |
-| [`diagnose`](../diagnose/SKILL.md)                             | Debug loop for hard bugs                        |
-| [`write-a-skill`](../write-a-skill/SKILL.md)                   | Author a new skill in this repo                 |
+| Invoke                                                         | When                                                                     |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`grill-me`](../grill-me/SKILL.md)                             | Sharpen a plan with **no** codebase (stateless)                          |
+| [`writing-great-skills`](../writing-great-skills/SKILL.md)     | Skill vocabulary + principles                                            |
+| [`writing-agents-config`](../writing-agents-config/SKILL.md)   | Codemap repo tier/pairing deltas                                         |
+| [`domain-modeling`](../domain-modeling/SKILL.md)               | Ubiquitous language inline + batch glossary                              |
+| [`tdd`](../tdd/SKILL.md)                                       | RED→GREEN tracer-bullet TDD                                              |
+| [`verify-after-each-step`](../verify-after-each-step/SKILL.md) | Per-file checks after each milestone                                     |
+| [`diagnose`](../diagnose/SKILL.md)                             | Debug loop for hard bugs                                                 |
+| [`write-a-skill`](../write-a-skill/SKILL.md)                   | Author a new skill in this repo                                          |
+| [`teach`](../teach/SKILL.md)                                   | Multi-session learning workspace (missions, lessons, retrieval practice) |
 
 Meta: [`agents-tier-system`](../agents-tier-system/SKILL.md).

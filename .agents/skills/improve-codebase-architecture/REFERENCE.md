@@ -71,7 +71,7 @@ When a candidate needs post-merge structural review, fire [`audit-pr-architectur
 
 ### oxlint (style + import hygiene)
 
-This repo runs **oxlint** (repo-root `.oxlintrc.json`) for general lint — not as the primary architectural boundary system. Use **`import/no-cycle`** and **`eslint/no-restricted-imports`** when a plan needs directional import bans codified in source (e.g. blocking `application/` → `cli/` value imports). Nested configs must **`extends`** the parent — oxlint does not auto-merge (same caveats as persist's REFERENCE).
+This repo runs **oxlint** (repo-root `.oxlintrc.json`) for general lint — not as the primary architectural boundary system. Use **`import/no-cycle`** and **`eslint/no-restricted-imports`** when a plan needs directional import bans codified in source (e.g. blocking `application/` → `cli/` value imports). Nested configs must **`extends`** the parent — oxlint does not auto-merge.
 
 Example leaf for an application-layer gate:
 
