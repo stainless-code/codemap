@@ -16,6 +16,8 @@ When creating **any** new rule or skill, follow this convention:
    ln -s ../../.agents/rules/<name>.md .cursor/rules/<name>.mdc
    ```
 
+**Naming:** Tier-2 priming rules that pair with a skill use `<skill-slug>-priming.md` when the rule name would otherwise differ from the skill folder. When names already match, no suffix.
+
 ## Skills (`SKILL.md` files)
 
 1. Create the directory and file in `.agents/skills/<name>/SKILL.md`
@@ -24,6 +26,8 @@ When creating **any** new rule or skill, follow this convention:
    ```bash
    ln -s ../../.agents/skills/<name> .cursor/skills/<name>
    ```
+
+**Never** name bulk reference files `AGENTS.md` inside skill folders — use `FULL-GUIDE.md` or topic siblings.
 
 ## Why
 
@@ -35,3 +39,5 @@ When creating **any** new rule or skill, follow this convention:
 
 - Never place original rule/skill content directly in `.cursor/rules/` or `.cursor/skills/`.
 - Never create a rule or skill without both the `.agents/` file and the `.cursor/` symlink.
+
+Related: [`agents-tier-system.md`](./agents-tier-system.md) · [`AGENTS.md`](../../AGENTS.md).

@@ -15,6 +15,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   skip-ci:
     name: Gate (skip full CI for version PRs?)
@@ -39,7 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -54,7 +59,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -69,7 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -84,7 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -108,7 +119,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -140,6 +153,26 @@ jobs:
           timeout 45 node dist/index.mjs --full
           node dist/index.mjs query "SELECT COUNT(*) AS files FROM files"
 
+  check-pack:
+    name: 📦 Pack validation
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Build
+        run: bun run build
+
+      - name: Run pack validation
+        run: bun run check:pack
+
   benchmark:
     name: 📊 Benchmark (fixture)
     needs: skip-ci
@@ -147,7 +180,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
@@ -159,22 +194,31 @@ jobs:
           bun run benchmark
 
   audit:
-    # Non-blocking — visibility into transitive-dep CVEs without gating PRs.
-    # Promote to a hard gate once the team agrees on a vulnerability budget.
-    name: 🛡 Audit (non-blocking)
+    # `bun audit` exits 0 regardless of severity — the scan below blocks on high/critical.
+    # Transitive-dep CVE visibility; advisory-API outage doesn't block.
+    name: 🛡 Audit
     needs: skip-ci
     if: needs['skip-ci'].outputs.skip != 'true'
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: bun audit
-        run: bun audit
+      - name: bun audit (block on high/critical)
+        run: |
+          set +e
+          # bun emits ANSI color even when piped — strip it or the severity grep misses it.
+          NO_COLOR=1 bun audit 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > /tmp/bun-audit.log
+          cat /tmp/bun-audit.log
+          if grep -E '(^|[[:space:]])(high|critical):[[:space:]]' /tmp/bun-audit.log; then
+            echo "::error::high or critical vulnerabilities found — blocking"
+            exit 1
+          fi
 
   action-smoke:
     # Dogfood Slice 4 of plan PR #73: invoke `uses: ./` from this very repo
@@ -194,7 +238,9 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
 
       - name: Run the local-path action
         uses: ./
@@ -207,7 +253,18 @@ jobs:
 
   ci-complete:
     name: CI complete
-    needs: [skip-ci, format, lint, typecheck, test, build, benchmark]
+    needs:
+      [
+        skip-ci,
+        format,
+        lint,
+        typecheck,
+        test,
+        build,
+        check-pack,
+        audit,
+        benchmark,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -219,6 +276,8 @@ jobs:
             needs.typecheck.result != 'success' ||
             needs.test.result != 'success' ||
             needs.build.result != 'success' ||
+            needs['check-pack'].result != 'success' ||
+            needs.audit.result != 'success' ||
             needs.benchmark.result != 'success'
           )
         run: exit 1
