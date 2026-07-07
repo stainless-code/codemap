@@ -69,14 +69,14 @@ None of the five source audits examined these — useful starting points if a fo
 
 ## Surviving deferrals (lifted to `roadmap.md`, trigger-gated)
 
-| Item                                                          | Trigger                                                                                                                            |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **5.2 IPC encoding (CBOR / transferables)**                   | After a `parse_ms_pure_worker` instrumentation split shows IPC > ~30% of `parse_ms`. None today; needs IPC time measurable first.  |
-| **5.4 `extractMarkers` lineMap reuse on TS/JS**               | If marker extraction becomes hot on >10k-file trees. ~1ms on this repo; refactor scope > payoff today.                             |
-| **5.6 group-by bucketizer cache per root**                    | When a `mcp` / `serve` user reports slow repeated `query --group-by owner                                                          | package`. Niche, state-management complexity, no current pattern. |
-| **5.7 sync git subprocess collapse**                          | If git-subprocess time becomes measurable in incremental wall. Tier 2.3 mostly killed it; remaining 4 calls × <10ms each marginal. |
-| **6.1 Persistent read-only connection pool**                  | When `mcp` / `serve` indexing 10k+ trees reports contention. **Scoped to long-running transports only**, NOT one-shot CLI.         |
-| **6.2 CI dep install / `package-manager-detector` vendoring** | After timing existing CI install steps confirms meaningful savings.                                                                |
+| Item                                                          | Trigger                                                                                                                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **5.2 IPC encoding (CBOR / transferables)**                   | After a `parse_ms_pure_worker` instrumentation split shows IPC > ~30% of `parse_ms`. None today; needs IPC time measurable first.              |
+| **5.4 `extractMarkers` lineMap reuse on TS/JS**               | If marker extraction becomes hot on >10k-file trees. ~1ms on this repo; refactor scope > payoff today.                                         |
+| **5.6 group-by bucketizer cache per root**                    | When a `mcp` / `serve` user reports slow repeated `query --group-by owner \| package`. Niche, state-management complexity, no current pattern. |
+| **5.7 sync git subprocess collapse**                          | If git-subprocess time becomes measurable in incremental wall. Tier 2.3 mostly killed it; remaining 4 calls × <10ms each marginal.             |
+| **6.1 Persistent read-only connection pool**                  | When `mcp` / `serve` indexing 10k+ trees reports contention. **Scoped to long-running transports only**, NOT one-shot CLI.                     |
+| **6.2 CI dep install / `package-manager-detector` vendoring** | After timing existing CI install steps confirms meaningful savings.                                                                            |
 
 See [`roadmap.md`](../roadmap.md) for the consolidated backlog entry.
 
