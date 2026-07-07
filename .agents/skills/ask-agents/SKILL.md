@@ -42,7 +42,6 @@ Keep grilling + plan authoring in **one window** until issues are filed. Each im
 | [`tdd`](../tdd/SKILL.md)                                       | RED→GREEN tracer-bullet TDD                                              |
 | [`verify-after-each-step`](../verify-after-each-step/SKILL.md) | Per-file checks after each milestone                                     |
 | [`diagnose`](../diagnose/SKILL.md)                             | Debug loop for hard bugs                                                 |
-| [`write-a-skill`](../write-a-skill/SKILL.md)                   | Author a new skill in this repo                                          |
 | [`teach`](../teach/SKILL.md)                                   | Multi-session learning workspace (missions, lessons, retrieval practice) |
 
 Meta: [`agents-tier-system`](../agents-tier-system/SKILL.md).

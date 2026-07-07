@@ -37,4 +37,4 @@ Consumers install **`@stainless-code/codemap`** and interact through CLI, MCP, H
 
 Before shipping text on a consumer surface: **“Would a user who only `npm i @stainless-code/codemap` care?”** If no → cut it or move it to a maintainer doc.
 
-Related: [`write-a-skill`](../skills/write-a-skill/SKILL.md) (maintainer vs shipped templates), [`docs-governance`](./docs-governance.md) Rule 10 (agent-content layers).
+Related: [`docs-governance`](./docs-governance.md) Rule 10 (agent-content layers).
