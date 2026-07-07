@@ -1,9 +1,9 @@
 ---
-name: diagnose
+name: diagnosing-bugs
 description: Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says "diagnose this" / "debug this", reports a bug, says something is broken/throwing/failing, or describes a performance regression.
 ---
 
-# Diagnose
+# Diagnosing bugs
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
@@ -46,7 +46,16 @@ The goal is not a clean repro but a **higher reproduction rate**. Loop the trigg
 
 Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps, broken `.codemap/index.db`), or (c) permission to add temporary instrumentation. Do **not** proceed to hypothesise without a loop.
 
-Do not proceed to Phase 2 until you have a loop you believe in.
+### Completion criterion — a tight loop that goes red
+
+Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** — a test invocation (`bun test <file>`), `bun src/index.ts query --json …`, a throwaway harness, or [`scripts/hitl-loop.template.sh`](scripts/hitl-loop.template.sh) for the human-in-the-loop case — that you have **already run at least once** (paste the invocation and its output), and that is:
+
+- [ ] **Red-capable** — it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring" — it must be able to _catch this specific bug_.
+- [ ] **Deterministic** — same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).
+- [ ] **Fast** — seconds, not minutes.
+- [ ] **Agent-runnable** — you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.
+
+If you catch yourself reading code to build a theory before this command exists, **stop — jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.
 
 ## Phase 2 — Reproduce
 
@@ -58,7 +67,15 @@ Confirm:
 - [ ] The failure is reproducible across multiple runs (or, for non-deterministic bugs, reproducible at a high enough rate to debug against).
 - [ ] You have captured the exact symptom (error message, wrong output, slow timing) so later phases can verify the fix actually addresses it.
 
-Do not proceed until you reproduce the bug.
+### Minimise
+
+Once it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut — keep only what's load-bearing for the failure.
+
+Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.
+
+**Done when** every remaining element is load-bearing — removing any one of them makes the loop go green.
+
+Do not proceed until you have reproduced **and** minimised.
 
 ## Phase 3 — Hypothesise
 
@@ -71,6 +88,8 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
 
 **Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just changed #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
+
+**Done when:** 3–5 ranked, falsifiable hypotheses stated (each with a prediction); user has seen the list before any fix attempt.
 
 ## Phase 4 — Instrument
 
@@ -85,6 +104,8 @@ Tool preference:
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 
 **Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan, `--performance` flag for index runs), then bisect. Measure first, fix second.
+
+**Done when:** one hypothesis confirmed or all falsified with evidence — one variable changed per probe, each probe mapped to a Phase 3 prediction.
 
 ## Phase 5 — Fix + regression test
 
@@ -102,6 +123,8 @@ If a correct seam exists:
 4. Watch it pass.
 5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
 
+**Done when:** loop is green against the original scenario; regression test added at a correct seam, or the seam-gap is documented as an architectural finding.
+
 ## Phase 6 — Cleanup + post-mortem
 
 Required before declaring done:
@@ -114,3 +137,5 @@ Required before declaring done:
 - [ ] If the post-mortem yields a permanent insight, **lift** it into `.agents/rules/` or the relevant skill; append to [`.agents/lessons.md`](../../lessons.md) only when it is not yet encoded elsewhere
 
 **Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to [`improve-codebase-architecture`](../improve-codebase-architecture/SKILL.md) with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+
+**Done when:** no `[DEBUG-…]` sediment (`grep` clean); throwaway harnesses deleted; commit / PR message states the winning root-cause hypothesis; any durable insight lifted into `.agents/rules/` or a skill (else `.agents/lessons.md`).

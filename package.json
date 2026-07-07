@@ -19,7 +19,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/stainless-code/codemap.git"
+    "url": "git+https://github.com/stainless-code/codemap.git"
   },
   "bin": {
     "codemap": "./dist/index.mjs"
@@ -30,6 +30,7 @@
     "templates"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
   "exports": {
@@ -39,7 +40,8 @@
     }
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "scripts": {
     "benchmark": "bun src/benchmark.ts",
@@ -48,26 +50,31 @@
     "changeset": "changeset",
     "check": "bun run build && bun run --parallel format:check lint:ci test test:scripts typecheck && bun run test:golden && bun run test:agent-eval",
     "check-updates": "bun update -i --latest",
+    "check:pack": "attw --pack . --profile esm-only && publint",
     "check:perf-baseline": "bun scripts/check-perf-baseline.ts",
     "check:perf-baseline:update": "bun scripts/check-perf-baseline.ts --update",
     "clean": "git clean -xdf -e .env -e docs/research/scratch",
     "dev": "bun src/index.ts",
     "fix": "bun run lint:fix && bun run format",
-    "format": "oxfmt",
+    "fix:changes": "bun run lint:fix:changes && bun run format:changes",
+    "format": "oxfmt --no-error-on-unmatched-pattern",
+    "format:changes": "bun scripts/run-on-changed-files.ts format",
     "format:check": "oxfmt --check --no-error-on-unmatched-pattern",
     "lint": "oxlint --no-error-on-unmatched-pattern",
     "lint-staged": "lint-staged",
+    "lint:changes": "bun scripts/run-on-changed-files.ts lint",
     "lint:ci": "oxlint --quiet",
-    "lint:fix": "oxlint --fix",
+    "lint:fix": "bun run lint --fix",
+    "lint:fix:changes": "bun scripts/run-on-changed-files.ts lint:fix",
     "pack": "bun run build && npm pack",
     "prepare": "husky || true",
-    "prepublishOnly": "bun run check",
+    "prepublishOnly": "bun run check && bun run check:pack",
     "qa:external": "bun scripts/qa-external-repo.ts",
     "release": "changeset publish",
     "test": "bun test ./src",
     "test:agent-eval": "bun test scripts/agent-eval",
     "test:ci": "bun run test:coverage",
-    "test:coverage": "bun test --coverage ./src",
+    "test:coverage": "bun test --coverage --coverage-threshold=0.75 ./src",
     "test:golden": "bun scripts/query-golden.ts",
     "test:golden:external": "bun scripts/query-golden.ts --corpus external",
     "test:scripts": "bash -c 'files=$(find scripts -name \"*.test.mjs\"); if [ -z \"$files\" ]; then echo \"no scripts test files found\" >&2; exit 1; fi; exec bun test $files'",
@@ -87,16 +94,18 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.4",
     "@changesets/changelog-github": "0.7.0",
     "@changesets/cli": "2.31.0",
     "@types/better-sqlite3": "7.6.13",
     "@types/bun": "1.3.14",
-    "@types/node": "26.0.1",
-    "@typescript/native-preview": "7.0.0-dev.20260628.1",
+    "@types/node": "26.1.0",
+    "@typescript/native-preview": "7.0.0-dev.20260706.1",
     "husky": "9.1.7",
     "lint-staged": "17.0.8",
-    "oxfmt": "0.56.0",
-    "oxlint": "1.71.0",
+    "oxfmt": "0.57.0",
+    "oxlint": "1.72.0",
+    "publint": "0.3.21",
     "tsdown": "0.22.3",
     "typescript": "6.0.3",
     "unrun": "0.3.1"
@@ -111,5 +120,6 @@
     "bun": ">=1.0.0",
     "node": "^20.19.0 || >=22.12.0"
   },
+  "packageManager": "bun@1.3.14",
   "contributing": ".github/CONTRIBUTING.md"
 }

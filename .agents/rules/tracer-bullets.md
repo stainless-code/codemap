@@ -3,68 +3,18 @@ description: Build features in small end-to-end slices, not big horizontal layer
 alwaysApply: true
 ---
 
-# Tracer Bullets
+# Tracer bullets
 
-When building features, build a tiny end-to-end slice first, validate it works, then expand.
-
-## Why
-
-AI agents tend to produce complete solutions in one leap — all parsers, all schema, all docs — without ever testing whether the critical path works. This creates massive review burden and rework ("slop").
+Build a tiny end-to-end slice first, validate, then expand. AI agents tend to produce complete solutions in one leap without testing the critical path — massive review burden and rework ("slop").
 
 ## Rules
 
-1. **Start with one vertical slice** that touches all relevant layers for the simplest case
-2. **Commit and validate** that slice before expanding — the pre-commit hook will run format, lint, typecheck, and tests on staged files (when AI/agent env vars trigger it)
-3. **Lite-harden the slice** — run [`harden-pr`](../skills/harden-pr/SKILL.md) in **lite** mode (parallel reviewers → fix in-bounds → up to 2 passes). When the user has asked for commits: one `harden: …` commit before the next slice. Does not change feature intent — production polish only.
-4. **Expand outward** from the working slice in subsequent commits
-5. **Never build horizontal layers in isolation** (e.g. all DB helpers before any CLI wiring, or all docs before any working index path)
+1. **One vertical slice** — touches all relevant layers for the simplest case (CLI + parser + db + test, etc.).
+2. **Commit and validate** before expanding — pre-commit runs format, lint, typecheck, tests on staged files (when AI/agent env vars trigger it).
+3. **Lite-harden the slice** — [`harden-pr`](../skills/harden-pr/SKILL.md) **lite** mode after each slice (fix in working tree; commit when the user asks).
+4. **Expand outward** from the working slice.
+5. **Never build horizontal layers in isolation** (all DB helpers before any CLI wiring, all docs before any working index path, etc.).
 
-## Feature layers in this project
+Feature layers and worked examples: [`tracer-bullets` skill](../skills/tracer-bullets/SKILL.md).
 
-A typical vertical slice for Codemap touches these layers top-to-bottom:
-
-1. **CLI / orchestration** — `src/cli/` (`bootstrap.ts`, `main.ts`, lazy `cmd-*` chunks; entry `src/index.ts`)
-2. **Workers / parsing** — `src/parse-worker.ts` / `parse-worker-node.ts`, `parse-worker-core.ts`, `src/parser.ts`, `src/css-parser.ts`, `src/adapters/`
-3. **Persistence** — `src/db.ts` (schema, inserts, `SCHEMA_VERSION`)
-4. **Config / runtime** — `src/config.ts`, `src/runtime.ts`, resolver
-5. **Tests** — `src/*.test.ts`
-6. **Docs** — `docs/*.md` when behavior is user-visible
-
-## Example 1: Support a new source extension
-
-Bad — building in layers:
-
-- Update every glob, parser, and docs in one giant change
-- Hope CI and the index agree
-
-Good — tracer bullet:
-
-1. **`constants` + adapter** — `LANG_MAP` + builtin adapter extensions + `extractFileData` — commit, `bun run check`, small test parsing a one-line file
-2. **Resolver** — `resolver` extensions if needed — commit, validate
-3. **Docs** — `docs/architecture.md` table row — commit, validate
-
-## Example 2: Add a new SQLite column or table
-
-Bad — schema + all call sites + benchmarks in one unreviewable diff.
-
-Good — tracer bullet:
-
-1. **Schema + insert path** — `db.ts` + one write path exercised by a test or CLI run — commit, validate
-2. **Readers / query UX** — expose in `query` or docs — commit, validate
-3. **Benchmark / fixtures** — if numbers matter — separate commit
-
-## Example 3: New CLI flag
-
-Bad — flag parsing, help text, config, and tests all speculative.
-
-Good — tracer bullet:
-
-1. **Parse flag + minimal behavior** — e.g. `--dry-run` that only logs — commit, test
-2. **Wire to real work** — connect to indexer — commit, validate
-3. **Document** — README / `docs/architecture.md` — commit
-
-## Commit cadence
-
-Each commit should represent a functional, describable milestone — not a placeholder. Every tracer bullet is a shippable slice that works end-to-end, even if the feature isn't complete yet. Small commits get validated by the pre-commit hook and are easier to review and revert.
-
-Before opening a PR, run [`harden-pr`](../skills/harden-pr/SKILL.md) in **full** mode on `origin/main...HEAD` (or accept the offer when the plan checklist is complete).
+Before opening a PR: [`harden-pr`](../skills/harden-pr/SKILL.md) **full** on `origin/main...HEAD`.

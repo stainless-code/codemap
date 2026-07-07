@@ -7,8 +7,9 @@ const pkg = JSON.parse(
 ) as { scripts: Record<string, string> };
 
 describe("package.json publish scripts", () => {
-  test("prepublishOnly uses the same validation gate as check", () => {
-    expect(pkg.scripts.prepublishOnly).toBe("bun run check");
+  test("prepublishOnly uses the same validation gate as check plus pack validation", () => {
+    expect(pkg.scripts.prepublishOnly).toContain("bun run check");
+    expect(pkg.scripts.prepublishOnly).toContain("check:pack");
     expect(pkg.scripts.check).toContain("typecheck");
     expect(pkg.scripts.check).toContain("test");
     expect(pkg.scripts.check).toContain("test:golden");

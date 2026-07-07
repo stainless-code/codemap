@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  # npm — group devDep bumps into one weekly PR (avoids one-PR-per-dep noise).
+  # Peer ranges are the public surface — not bumped.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      dev-deps:
+        dependency-type: development
+
+  # GitHub Actions — bumps the SHA-pinned actions' commits (and the trailing
+  # `# vN` comment), so a pinned major stays tamper-resistant without manual
+  # tracking.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
