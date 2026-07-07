@@ -5,17 +5,18 @@ alwaysApply: true
 
 # Consumer surfaces
 
-Consumers install **`@stainless-code/codemap`** and interact through CLI, MCP, HTTP, and bundled agent templates. They must only see **what to run** and **what it does** — never how this repo implements it.
+Consumers install **`@stainless-code/codemap`** and interact through CLI, MCP, HTTP, the library `import` surface (`.` export), and bundled agent templates. They must only see **what to run** and **what it does** — never how this repo implements it.
 
 ## Consumer surfaces (write for users)
 
-| Surface                                  | Audience                                                                                                                   |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `templates/agent-content/**`             | Served live via `codemap skill` / `codemap rule`, `codemap://skill` / `codemap://rule`, MCP `instructions`, HTTP resources |
-| `templates/agents/**`                    | Copied into consumer projects by `codemap agents init`                                                                     |
-| **`.changeset/*.md` body**               | Release notes → `CHANGELOG.md` on npm                                                                                      |
-| **Root `README.md` (install / usage)**   | npm landing page                                                                                                           |
-| **CLI help text and user-facing errors** | Terminal output                                                                                                            |
+| Surface                                    | Audience                                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `templates/agent-content/**`               | Served live via `codemap skill` / `codemap rule`, `codemap://skill` / `codemap://rule`, MCP `instructions`, HTTP resources |
+| `templates/agents/**`                      | Copied into consumer projects by `codemap agents init`                                                                     |
+| **`.changeset/*.md` body**                 | Release notes → `CHANGELOG.md` on npm                                                                                      |
+| **Root `README.md` (install / usage)**     | npm landing page                                                                                                           |
+| **CLI help text and user-facing errors**   | Terminal output                                                                                                            |
+| **Public API `.d.mts` / JSDoc on exports** | IDE hovers + type previews for `import` consumers                                                                          |
 
 `docs/agents.md` is maintainer reference linked from bundled README — keep **MCP wiring / init** sections consumer-accurate; implementation tables belong in maintainer sections, not in served agent-content.
 
@@ -32,9 +33,10 @@ Consumers install **`@stainless-code/codemap`** and interact through CLI, MCP, H
 2. **Changesets** — user-visible outcome only; no Action refactors, detect-pm delegation, or sync comments between source files.
 3. **Served skill / rule** — no hardcoded `{command: "codemap"}` unless documenting legacy manual wiring; prefer `codemap agents init --mcp` and PM-specific examples (`npx`, `pnpm exec`, `yarn exec`, `bunx`, dlx).
 4. **Cross-ref maintainer detail** — plans, architecture internals, and contributor tables stay in `docs/` or `.agents/` skills; link from consumer text only when the user must follow a public doc (e.g. [agents.md § MCP wiring](https://github.com/stainless-code/codemap/blob/main/docs/agents.md#mcp-wiring-via-agents-init)).
+5. **JSDoc on exports** — `@example` imports must resolve against `exports`; the rest (behavior-not-implementation, no `src/` paths, prose depth) follows item 1, the maintainer-only list, and [`authoring-discipline`](./authoring-discipline.md) § PROSE.
 
 ## Decision test
 
 Before shipping text on a consumer surface: **“Would a user who only `npm i @stainless-code/codemap` care?”** If no → cut it or move it to a maintainer doc.
 
-Related: [`write-a-skill`](../skills/write-a-skill/SKILL.md) (maintainer vs shipped templates), [`docs-governance`](./docs-governance.md) Rule 10 (agent-content layers).
+Related: [`docs-governance`](./docs-governance.md) Rule 10 (agent-content layers).
