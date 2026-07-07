@@ -1,5 +1,13 @@
 # @stainless-code/codemap
 
+## 0.11.2
+
+### Patch Changes
+
+- [#186](https://github.com/stainless-code/codemap/pull/186) [`cdacb91`](https://github.com/stainless-code/codemap/commit/cdacb91643bd97fee54cccd83aea2e4dde98c02b) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Refresh dependency tree to latest compatible releases. Interactive `codemap agents init` note text stays dimmed.
+
+- [#187](https://github.com/stainless-code/codemap/pull/187) [`4afb0e2`](https://github.com/stainless-code/codemap/commit/4afb0e2c76263cdf9b7fe63c3d67b6c93f9b2ace) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Publish to npm via trusted publishing (GitHub OIDC) with Sigstore provenance, so released tarballs are verifiably built from this repo. Mark the library `.` export as side-effect-free for bundler tree-shaking.
+
 ## 0.11.1
 
 ### Patch Changes
