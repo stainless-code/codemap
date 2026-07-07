@@ -4,17 +4,28 @@ import { join } from "node:path";
 
 /**
  * Plan 2 slice 2.2 — measured coverage overrides graph tiers when ingest ran.
- * Run via `bun run test:scripts` (golden runner already ingests coverage in setup).
+ * Each case indexes `fixtures/minimal` itself — do not rely on `test:golden`
+ * (which runs after `test:scripts` in `check`) or on a leftover DB.
  */
 import { $ } from "bun";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 
+async function indexFixtureMinimal() {
+  await $`rm -f fixtures/minimal/.codemap/index.db fixtures/minimal/.codemap/index.db-shm fixtures/minimal/.codemap/index.db-wal`
+    .cwd(REPO_ROOT)
+    .quiet();
+  await $`bun src/index.ts --full --root fixtures/minimal`
+    .cwd(REPO_ROOT)
+    .quiet();
+  await $`bun src/index.ts ingest-coverage coverage/coverage-final.json --root fixtures/minimal`
+    .cwd(REPO_ROOT)
+    .quiet();
+}
+
 describe("high-crap-score measured override", () => {
   it("uses coverage_source measured when coverage row exists (now @ 100%)", async () => {
-    await $`bun src/index.ts ingest-coverage coverage/coverage-final.json --root fixtures/minimal`
-      .cwd(REPO_ROOT)
-      .quiet();
+    await indexFixtureMinimal();
     const result =
       await $`bun src/index.ts query --recipe high-crap-score --json --params min_crap=1 --root fixtures/minimal`
         .cwd(REPO_ROOT)

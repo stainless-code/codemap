@@ -26,18 +26,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Bun and install
-        uses: ./.github/actions/setup
-
       # npm trusted publishing (OIDC) needs npm ≥ 11.5.1 + Node ≥ 22.14
       # (docs.npmjs.com/trusted-publishers). setup-bun leaves the runner's
       # npm 10.x in PATH → `npm publish` can't detect OIDC → ENEEDAUTH.
       # Node 24 ships npm 11.x; npm then auto-authenticates via OIDC (no token).
+      #
+      # MUST run before `bun install`: better-sqlite3's native addon is built
+      # by node-gyp against whichever `node` is in PATH. If install runs under
+      # the runner's default Node and we then switch to Node 24, the
+      # `worker-pool.dist.test.ts` smoke test spawns `node dist/index.mjs --full`
+      # under Node 24 and hits ERR_DLOPEN_FAILED (NODE_MODULE_VERSION mismatch)
+      # → prepublishOnly fails → publish fails. Putting Node 24 in PATH first
+      # makes node-gyp compile against ABI 137 so the test passes.
       - name: Setup Node + npm for trusted publishing
         uses: actions/setup-node@v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Bun and install
+        uses: ./.github/actions/setup
 
       # Opens/updates the Version PR when `.changeset/*.md` exist. When there are none, the action
       # can still run `publish` (see changesets/action) so a just-merged Version PR can ship.
