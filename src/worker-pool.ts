@@ -401,7 +401,7 @@ export function parseFilesParallel(filePaths: string[]): Promise<ParsedFile[]> {
       let processed = 0;
       try {
         const results: ParsedFile[] = [];
-        for (let i = 0; i < chunk.length; ) {
+        for (let i = 0; i < chunk.length;) {
           const sliceEnd = Math.min(i + recycleEvery, chunk.length);
           const slice = chunk.slice(i, sliceEnd);
           results.push(
