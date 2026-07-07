@@ -82,7 +82,7 @@
     "version": "changeset version && bun run format CHANGELOG.md"
   },
   "dependencies": {
-    "@clack/prompts": "1.5.1",
+    "@clack/prompts": "1.7.0",
     "@modelcontextprotocol/sdk": "1.29.0",
     "better-sqlite3": "12.11.1",
     "chokidar": "5.0.0",
