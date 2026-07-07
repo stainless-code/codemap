@@ -1,9 +1,9 @@
 ---
-name: diagnose
+name: diagnosing-bugs
 description: Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says "diagnose this" / "debug this", reports a bug, says something is broken/throwing/failing, or describes a performance regression.
 ---
 
-# Diagnose
+# Diagnosing bugs
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
@@ -46,9 +46,16 @@ The goal is not a clean repro but a **higher reproduction rate**. Loop the trigg
 
 Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps, broken `.codemap/index.db`), or (c) permission to add temporary instrumentation. Do **not** proceed to hypothesise without a loop.
 
-Do not proceed to Phase 2 until you have a loop you believe in.
+### Completion criterion — a tight loop that goes red
 
-**Done when:** one command is red-capable, deterministic, fast, and agent-runnable (`bun test <file>`, `bun src/index.ts query --json …`, or a throwaway harness). No red-capable command → no Phase 2.
+Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** — a test invocation (`bun test <file>`), `bun src/index.ts query --json …`, a throwaway harness, or [`scripts/hitl-loop.template.sh`](scripts/hitl-loop.template.sh) for the human-in-the-loop case — that you have **already run at least once** (paste the invocation and its output), and that is:
+
+- [ ] **Red-capable** — it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring" — it must be able to _catch this specific bug_.
+- [ ] **Deterministic** — same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).
+- [ ] **Fast** — seconds, not minutes.
+- [ ] **Agent-runnable** — you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.
+
+If you catch yourself reading code to build a theory before this command exists, **stop — jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.
 
 ## Phase 2 — Reproduce
 
@@ -60,9 +67,15 @@ Confirm:
 - [ ] The failure is reproducible across multiple runs (or, for non-deterministic bugs, reproducible at a high enough rate to debug against).
 - [ ] You have captured the exact symptom (error message, wrong output, slow timing) so later phases can verify the fix actually addresses it.
 
-Do not proceed until you reproduce the bug.
+### Minimise
 
-**Done when:** minimal repro documented; non-load-bearing steps removed; exact symptom captured (error message / wrong output / slow timing) for later fix verification.
+Once it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut — keep only what's load-bearing for the failure.
+
+Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.
+
+**Done when** every remaining element is load-bearing — removing any one of them makes the loop go green.
+
+Do not proceed until you have reproduced **and** minimised.
 
 ## Phase 3 — Hypothesise
 

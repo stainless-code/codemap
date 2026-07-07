@@ -5,7 +5,7 @@ description: Full tier assignments, pairing conventions, and authoring checklist
 
 # `.agents/` tier system — full reference
 
-Always-on priming: [`.agents/rules/agents-tier-system.md`](../../rules/agents-tier-system.md). Entry points: [`AGENTS.md`](../../../AGENTS.md), [`agents-first-convention`](../../rules/agents-first-convention.md), [`writing-agents-config`](../writing-agents-config/SKILL.md).
+Always-on priming: [`.agents/rules/agents-tier-system.md`](../../rules/agents-tier-system.md). Entry points: [`.agents/README.md`](../../README.md) (hub), [`AGENTS.md`](../../../AGENTS.md) (cross-tool stub), [`agents-first-convention`](../../rules/agents-first-convention.md), [`writing-agents-config`](../writing-agents-config/SKILL.md).
 
 ## Discover on disk (do not maintain partial catalogs here)
 

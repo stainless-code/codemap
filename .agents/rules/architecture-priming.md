@@ -19,7 +19,7 @@ For each signal: STOP and run [`improve-codebase-architecture`](../skills/improv
 
 ## Otherwise, proceed normally
 
-Line-level changes **do not trigger this rule**. Use intent-triggered skills (`harden-pr`, `diagnose`, etc.).
+Line-level changes **do not trigger this rule**. Use intent-triggered skills (`harden-pr`, `diagnosing-bugs`, etc.).
 
 ## Reference
 

@@ -1,5 +1,7 @@
 # Agent instructions
 
+Full `.agents/` hub: [`.agents/README.md`](.agents/README.md).
+
 Canonical read order: [`.agents/rules/agents-first-convention.md`](.agents/rules/agents-first-convention.md) · [`.agents/rules/agents-tier-system.md`](.agents/rules/agents-tier-system.md) (START HERE).
 
 | Topic                | Link                                                                                                 |
@@ -16,6 +18,6 @@ Canonical read order: [`.agents/rules/agents-first-convention.md`](.agents/rules
 | PR comments          | [`.agents/rules/pr-comment-fact-check.md`](.agents/rules/pr-comment-fact-check.md)                   |
 | Plan-PR inspiration  | [`.agents/rules/plan-pr-inspiration-discipline.md`](.agents/rules/plan-pr-inspiration-discipline.md) |
 
-Intent (not always-on): `agents-tier-system`, `ask-agents`, `audit-pr-architecture`, `authoring-discipline`, `codemap`, `diagnose`, `docs-governance`, `docs-lifecycle-sweep`, `domain-modeling`, `grill-me`, `grilling`, `grill-with-docs`, `harden-pr`, `improve-codebase-architecture`, `pr-comment-fact-check`, `tdd`, `teach`, `tracer-bullets`, `verify-after-each-step`, `writing-agents-config`, `writing-great-skills`.
+Intent (not always-on): `agents-tier-system`, `ask-agents`, `audit-pr-architecture`, `authoring-discipline`, `codemap`, `diagnosing-bugs`, `docs-governance`, `docs-lifecycle-sweep`, `domain-modeling`, `grill-me`, `grilling`, `grill-with-docs`, `harden-pr`, `improve-codebase-architecture`, `pr-comment-fact-check`, `tdd`, `teach`, `tracer-bullets`, `verify-after-each-step`, `writing-agents-config`, `writing-great-skills`.
 
 Human Day-1: [README](README.md) Getting Started · [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).

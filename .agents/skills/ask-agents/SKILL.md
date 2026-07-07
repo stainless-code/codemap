@@ -23,7 +23,7 @@ Keep grilling + plan authoring in **one window** until issues are filed. Each im
 ## Codebase health (not feature work)
 
 - **`/improve-codebase-architecture`** — surface deepening opportunities; pick one → back to main flow at grill-with-docs.
-- **`/diagnose`** — hard bugs and perf regressions (model-invoked skill — not a router target).
+- **`/diagnosing-bugs`** — hard bugs and perf regressions (model-invoked skill — not a router target).
 - Periodic hygiene: **`/docs-lifecycle-sweep`** on `docs/` (model-invoked).
 
 ## Crossing sessions
@@ -41,7 +41,7 @@ Keep grilling + plan authoring in **one window** until issues are filed. Each im
 | [`domain-modeling`](../domain-modeling/SKILL.md)               | Ubiquitous language inline + batch glossary                              |
 | [`tdd`](../tdd/SKILL.md)                                       | RED→GREEN tracer-bullet TDD                                              |
 | [`verify-after-each-step`](../verify-after-each-step/SKILL.md) | Per-file checks after each milestone                                     |
-| [`diagnose`](../diagnose/SKILL.md)                             | Debug loop for hard bugs                                                 |
+| [`diagnosing-bugs`](../diagnosing-bugs/SKILL.md)               | Debug loop for hard bugs                                                 |
 | [`teach`](../teach/SKILL.md)                                   | Multi-session learning workspace (missions, lessons, retrieval practice) |
 
 Meta: [`agents-tier-system`](../agents-tier-system/SKILL.md).

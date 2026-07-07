@@ -60,7 +60,7 @@ find .agents/skills -name SKILL.md -exec sh -c 'n=$(wc -l < "$1"); [ "$n" -gt 12
 ## Codemap-specific tradeoffs
 
 - **Tier-2 attach** — `agents-tier-system` (`agents/**` + `cursor/**`); `docs-governance` (`docs/**`, `.agents/**`); `architecture-priming` when authoring structural refactors.
-- **Intent-only skills** — `improve-codebase-architecture`, `domain-modeling`, `docs-lifecycle-sweep`, `diagnose`, `tdd`, `pr-comment-fact-check`, `harden-pr`, `codemap`, `audit-pr-architecture`. No glob (no per-file tax).
+- **Intent-only skills** — `improve-codebase-architecture`, `domain-modeling`, `docs-lifecycle-sweep`, `diagnosing-bugs`, `tdd`, `pr-comment-fact-check`, `harden-pr`, `codemap`, `audit-pr-architecture`. No glob (no per-file tax).
 - **Ship policy** — `templates/agent-content/**` is served live (CLI/MCP/HTTP); `templates/agents/**` is copied by `codemap agents init`. Consumer surfaces describe behavior only ([`consumer-surfaces`](../../rules/consumer-surfaces.md)).
 - **Symlink convention** — source under `.agents/`; `.cursor/rules/<name>.mdc` and `.cursor/skills/<name>` are symlinks only.
 - **Cross-skill links** — relative `../skill/SKILL.md` and sibling files resolve reliably in Cursor agents. Relative links inside `.agents/` are an **intentional delta**, not drift.
