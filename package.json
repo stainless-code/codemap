@@ -87,7 +87,7 @@
     "better-sqlite3": "12.11.1",
     "chokidar": "5.0.0",
     "lightningcss": "1.32.0",
-    "oxc-parser": "0.136.0",
+    "oxc-parser": "0.139.0",
     "oxc-resolver": "11.20.0",
     "package-manager-detector": "1.6.0",
     "tinyglobby": "0.2.17",
