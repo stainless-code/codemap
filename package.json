@@ -79,6 +79,7 @@
     "test:golden:external": "bun scripts/query-golden.ts --corpus external",
     "test:scripts": "bash -c 'files=$(find scripts -name \"*.test.mjs\"); if [ -z \"$files\" ]; then echo \"no scripts test files found\" >&2; exit 1; fi; exec bun test $files'",
     "typecheck": "tsgo --noEmit",
+    "upgrade-packages:evidence": "bun run scripts/upgrade-packages/evidence.ts",
     "version": "changeset version && bun run format CHANGELOG.md"
   },
   "dependencies": {
