@@ -14,6 +14,9 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
+  # Tag push after `changeset publish` fails without this when the tagged
+  # commit's tree includes workflow files (GitHub App restriction).
+  workflows: write
 
 jobs:
   release:
