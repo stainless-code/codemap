@@ -1,0 +1,168 @@
+---
+import data from "blume:data";
+import { contentHref } from "blume/components/content/base-href.ts";
+import { EN_UI } from "blume/core/i18n-ui.ts";
+import type { UIStrings } from "blume/core/i18n-ui.ts";
+import type { Navigation } from "blume/core/types.ts";
+import Logo from "blume/components/layout/Logo.astro";
+
+interface Props {
+  site: { title: string; description?: string };
+  navigation: Navigation;
+  ui: UIStrings;
+}
+
+const { site, navigation, ui } = Astro.props;
+
+// `layout.Footer` is wired by RootLayout, which does not forward `logo` — pull
+// the resolved brand mark from the generated data module so the footer stays in
+// sync with the header logo.
+const logo = data.config.logo;
+const repoUrl = navigation.repoUrl;
+const year = new Date().getFullYear();
+
+// Merge over the English defaults so a label missing from a translation still
+// renders instead of coming out blank — the PageActions pattern.
+const strings = { ...EN_UI, ...ui };
+
+// Grouped, intentional columns (not derived from the flat `navigation.tabs`
+// list). Base-path-correct links come from `contentHref`.
+const groups: {
+  label: string;
+  links: { href: string; label: string; external?: boolean }[];
+}[] = [
+  {
+    label: "Guides",
+    links: [
+      {
+        href: contentHref("/guides/getting-started"),
+        label: "Getting started",
+      },
+      { href: contentHref("/guides/agents-mcp"), label: "Agents & MCP" },
+      { href: contentHref("/guides"), label: "All guides" },
+    ],
+  },
+  {
+    label: "Recipes",
+    links: [
+      { href: contentHref("/recipes"), label: "Catalog" },
+      {
+        href: contentHref("/recipes/find-symbol-definitions"),
+        label: "find-symbol-definitions",
+      },
+      { href: contentHref("/recipes/affected-tests"), label: "affected-tests" },
+    ],
+  },
+  {
+    label: "Concepts",
+    links: [
+      { href: contentHref("/concepts/why-codemap"), label: "Why Codemap" },
+      {
+        href: contentHref("/concepts/schema-overview"),
+        label: "Schema overview",
+      },
+      { href: contentHref("/concepts"), label: "All concepts" },
+    ],
+  },
+  {
+    label: "Reference",
+    links: [
+      { href: contentHref("/reference/cli"), label: "CLI" },
+      { href: contentHref("/reference/mcp"), label: "MCP" },
+      { href: contentHref("/reference/api"), label: "API" },
+      { href: contentHref("/reference/roadmap"), label: "Roadmap" },
+    ],
+  },
+  {
+    label: "Project",
+    links: [
+      { href: contentHref("/changelog"), label: "Changelog" },
+      ...(repoUrl
+        ? [{ href: repoUrl, label: "GitHub", external: true as const }]
+        : [
+            {
+              href: "https://github.com/stainless-code/codemap",
+              label: "GitHub",
+              external: true as const,
+            },
+          ]),
+    ],
+  },
+];
+---
+
+<footer class="border-border border-t">
+  <div class="mx-auto max-w-[1400px] px-6 py-16 sm:py-20">
+    <div class="grid gap-12 lg:grid-cols-[1.4fr_3fr] lg:gap-16">
+      <div class="lg:w-72 lg:shrink-0">
+        <Logo logo={logo} site={site} />
+        {
+          site.description && (
+            <p class="mt-4 max-w-xs text-balance text-muted-foreground text-sm leading-relaxed">
+              {site.description}
+            </p>
+          )
+        }
+        {
+          repoUrl && (
+            <a
+              class="mt-6 inline-flex items-center gap-1.5 rounded-blume border border-border px-3 py-1.5 text-muted-foreground text-sm transition-colors hover:border-foreground hover:text-foreground"
+              href={repoUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              <svg
+                class="size-4"
+                fill="currentColor"
+                height="16"
+                viewBox="0 0 24 24"
+                width="16"
+              >
+                <path d="M12 .5C5.37.5 0 5.78 0 12.29c0 5.2 3.44 9.6 8.2 11.16.6.1.82-.25.82-.56v-2c-3.34.71-4.04-1.58-4.04-1.58-.55-1.36-1.33-1.73-1.33-1.73-1.09-.73.08-.72.08-.72 1.2.08 1.84 1.21 1.84 1.21 1.07 1.8 2.8 1.28 3.49.98.1-.76.42-1.28.76-1.58-2.67-.3-5.47-1.3-5.47-5.79 0-1.28.47-2.32 1.24-3.14-.13-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.2a11.6 11.6 0 0 1 6.01 0c2.29-1.52 3.3-1.2 3.3-1.2.66 1.65.25 2.87.12 3.17.77.82 1.23 1.86 1.23 3.14 0 4.5-2.8 5.48-5.48 5.77.43.36.81 1.08.81 2.18v3.23c0 .31.21.67.82.56A12.3 12.3 0 0 0 24 12.29C24 5.78 18.63.5 12 .5z" />
+              </svg>
+              GitHub
+            </a>
+          )
+        }
+      </div>
+
+      <nav
+        aria-label={strings.nav.navigation}
+        class="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5"
+      >
+        {
+          groups.map((group) => (
+            <div>
+              <h2 class="font-semibold text-foreground text-xs tracking-wider uppercase">
+                {group.label}
+              </h2>
+              <ul class="mt-4 space-y-3">
+                {group.links.map((link) => (
+                  <li>
+                    <a
+                      class="text-muted-foreground text-sm transition-colors hover:text-foreground"
+                      href={link.href}
+                      {...(link.external
+                        ? { rel: "noreferrer", target: "_blank" }
+                        : {})}
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </nav>
+    </div>
+
+    <div
+      class="mt-16 flex flex-col gap-4 border-border border-t pt-8 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p class="text-muted-foreground text-xs">
+        © {year} Codemap · MIT
+      </p>
+    </div>
+  </div>
+</footer>

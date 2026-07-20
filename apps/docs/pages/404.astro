@@ -1,0 +1,81 @@
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import { withBase } from "blume/components/islands/base-path.ts";
+import { contentHref } from "blume/components/content/base-href.ts";
+import data from "blume:data";
+import { CURATED_POPULAR } from "../components/curated-popular";
+
+export const prerender = true;
+
+const { config } = data;
+const site = { description: config.description, title: config.title };
+
+const popular = CURATED_POPULAR.map(({ route, label }) => ({
+  href: contentHref(route),
+  label,
+}));
+---
+
+<PageLayout
+  analytics={config.analytics}
+  appleIcon={config.appleIcon}
+  banner={config.banner}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  logo={config.logo}
+  navigation={data.navigation}
+  noindex={true}
+  page={{ route: "/404", title: "Page not found" }}
+  searchEnabled={config.search.enabled}
+  site={site}
+  siteUrl={config.site}
+  themeMode={config.theme.mode}
+  ui={data.ui}
+  x={config.x}
+>
+  <div
+    class="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center gap-8 px-6 py-24 text-center"
+  >
+    <p
+      class="font-bold text-7xl text-muted-foreground tracking-tight sm:text-8xl"
+    >
+      404
+    </p>
+    <div class="space-y-3">
+      <h1 class="font-semibold text-2xl text-foreground sm:text-3xl">
+        Page not found
+      </h1>
+      <p class="text-muted-foreground">
+        No doc at this path. Check the URL, use search, or start from Getting
+        started.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+      <a
+        class="rounded-blume bg-accent px-4 py-2 text-accent-foreground text-sm font-medium transition-opacity hover:opacity-90"
+        href={withBase("/")}
+      >
+        Back to home
+      </a>
+      <a
+        class="rounded-blume border border-border px-4 py-2 text-foreground text-sm font-medium transition-colors hover:border-foreground"
+        href={contentHref("/guides/getting-started")}
+      >
+        Getting started
+      </a>
+    </div>
+    <nav
+      aria-label="Start here"
+      class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-border border-t pt-6 text-muted-foreground text-sm"
+    >
+      <span class="text-xs tracking-wider uppercase">Start here</span>
+      {
+        popular.map((link) => (
+          <a class="transition-colors hover:text-foreground" href={link.href}>
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</PageLayout>

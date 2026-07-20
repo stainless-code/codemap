@@ -1,0 +1,25 @@
+---
+title: find-symbol-definitions
+description: Locate every definition of a named symbol with column-precise positions.
+search:
+  tags: ["recipe"]
+---
+
+Fast tier — equality on `name` (same idea as `codemap show <name>`).
+
+```bash
+codemap query --json --recipe find-symbol-definitions --params name=usePermissions
+```
+
+## Params
+
+| Param  | Required | Notes                                                                 |
+| ------ | -------- | --------------------------------------------------------------------- |
+| `name` | yes      | Exact symbol name (case-sensitive). For `LIKE` patterns, use `find-symbol-by-kind` or `show --query 'name:%pat%'`. |
+
+## When to use it
+
+- Jump-to-definition for agents before grepping
+- Feed `rename-preview` — preview with `codemap apply rename-preview --params old=<name>,new=NEW --dry-run`
+
+Rows include `file_path`, `line_start`, and `name_column_start` / `name_column_end` (byte offsets on that line). Full catalog: `codemap query --recipes-json`. Twin without a recipe: `codemap show <name>`.

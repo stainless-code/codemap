@@ -1,0 +1,75 @@
+---
+title: Apply & rename
+description: Turn recipe diff rows into on-disk edits — dry-run, fixpoint, and rename.
+search:
+  tags: ["guide", "apply", "rename"]
+---
+
+You’ve got rows that say what to change — `file_path`, `line_start`, `before_pattern`, `after_pattern`. `codemap apply` validates the on-disk line still matches `before_pattern`, then writes `after_pattern`.
+
+Apply recipes live under [Recipes → Apply / migrate](/recipes#apply--migrate). Preview shape: `--format diff` or `diff-json` ([Formats](/reference/formats)).
+
+## Recipe apply
+
+```bash
+codemap query --recipe rename-preview \
+  --params old=usePermissions,new=useAccess,kind=function \
+  --format diff
+
+codemap apply rename-preview \
+  --params old=usePermissions,new=useAccess,kind=function \
+  --dry-run
+
+codemap apply rename-preview \
+  --params old=usePermissions,new=useAccess,kind=function \
+  --yes
+```
+
+`--dry-run` validates only. `--yes` is required for real writes (and on non-TTY). Recipes that are not `auto_fixable` need `--force` (or config allowlist) before writes.
+
+## Rename alias
+
+`codemap rename` is `apply rename-preview` with friendlier argv. Homonyms: pass `--define-in <file_path>` to anchor the definition file (`--in-file` only narrows output paths).
+
+```bash
+codemap rename usePermissions useAccess --kind function --dry-run
+codemap rename helper worker --define-in lib/helper.ts --yes
+codemap rename --params old=foo,new=bar,define_in=lib/a.ts --dry-run
+```
+
+## Rows and unified diffs
+
+Skip the recipe when you already have rows (agent / codemod / audit `added`):
+
+```bash
+codemap query --recipe stale-imports --format diff-json > rows.json
+codemap apply --rows rows.json --dry-run
+codemap apply --rows - --yes < rows.json
+
+codemap apply --diff-input edits.patch --dry-run
+codemap apply --diff-input edits.patch --yes --commit "chore: drop stale imports"
+```
+
+## Fixpoint and commit
+
+```bash
+codemap apply migrate-import-source \
+  --params from=@old/pkg,to=@new/pkg \
+  --yes --until-empty --max-passes 10
+
+codemap apply rename-preview \
+  --params old=foo,new=bar \
+  --yes --commit "refactor: rename foo → bar"
+```
+
+`--until-empty` loops apply → reindex → repeat until no rows (or `--max-passes`). `--commit` runs `git add` on touched files + commit after a clean apply.
+
+## MCP twins
+
+| CLI                         | MCP                 |
+| --------------------------- | ------------------- |
+| `codemap apply <recipe>`    | `apply`             |
+| `codemap apply --rows …`    | `apply_rows`        |
+| `codemap apply --diff-input`| `apply_diff_input`  |
+
+Writes still need `yes: true`. Non-`auto_fixable` recipes need `force: true`. Full tool table: [MCP](/reference/mcp).

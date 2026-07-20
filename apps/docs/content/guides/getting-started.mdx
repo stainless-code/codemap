@@ -1,0 +1,58 @@
+---
+title: Getting started
+description: Install Codemap and run your first structural query against a local SQLite index.
+search:
+  tags: ["guide", "install"]
+---
+
+Agents burn tokens scanning files to find one symbol. A SQLite index (`.codemap/index.db`) answers the same question in one SQL round-trip.
+
+Experimental — the API may change between minor releases. Pin your version.
+
+## Install
+
+```package-install
+npm i -D @stainless-code/codemap
+```
+
+Or run the published binary without adding a dependency — same CLI either way:
+
+```package-install
+npx @stainless-code/codemap
+```
+
+**Engines:** Node `^20.19.0 || >=22.12.0` and/or Bun `>=1.0.31`.
+
+## Index once
+
+```bash
+codemap
+```
+
+Default is incremental. Use `codemap --full` for a clean rebuild after a schema bump or when the index looks wrong.
+
+## First query
+
+Ad-hoc SQL:
+
+```bash
+codemap query --json "SELECT name, kind, file_path, line_start FROM symbols WHERE name = 'createCodemap'"
+```
+
+Or a bundled recipe (no SQL to invent):
+
+```bash
+codemap query --json --recipe find-symbol-definitions --params name=createCodemap
+```
+
+`--json` is what agents and automation want; omit it for `console.table` in a terminal.
+
+## Wire agents (optional)
+
+```bash
+codemap agents init --mcp
+```
+
+That scaffolds thin pointer rules/skills under `.agents/` and writes PM-aware MCP config (`npx`, `pnpm exec`, `bunx`, …). Full content is served live by `codemap skill` / `codemap rule` (and MCP resources `codemap://skill` / `codemap://rule`) — updating the package refreshes what agents see.
+
+Next: [CLI overview](/guides/cli-overview) · [Agents & MCP](/guides/agents-mcp) · [Recipes](/recipes).

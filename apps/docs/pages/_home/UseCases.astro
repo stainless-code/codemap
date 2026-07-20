@@ -1,0 +1,59 @@
+---
+import { contentHref } from "blume/components/content/base-href.ts";
+
+const cases = [
+  {
+    question: "Where is createCodemap defined?",
+    recipe: "find-symbol-definitions",
+  },
+  {
+    question: "Which tests does this change touch?",
+    recipe: "affected-tests",
+  },
+  {
+    question: "What depends on this file?",
+    recipe: "fan-in",
+  },
+];
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      Ask structure, not grep.
+    </h2>
+    <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
+      Common agent questions map to one bundled recipe — CLI, MCP, or HTTP.
+    </p>
+  </div>
+
+  <div class="mx-auto mt-10 grid max-w-3xl gap-4">
+    {
+      cases.map((item) => (
+        <a
+          class="group flex flex-col gap-2 rounded-blume border border-border px-5 py-4 text-left transition-colors hover:border-foreground/40 sm:flex-row sm:items-center sm:justify-between"
+          href={contentHref(`/recipes/${item.recipe}`)}
+        >
+          <span class="font-medium text-foreground text-sm sm:text-base">
+            {item.question}
+          </span>
+          <code class="shrink-0 font-mono text-accent text-xs sm:text-sm">
+            {item.recipe}
+            <span class="ml-1 text-muted-foreground transition-opacity group-hover:text-foreground">
+              →
+            </span>
+          </code>
+        </a>
+      ))
+    }
+  </div>
+
+  <div class="mt-8 text-center">
+    <a
+      class="inline-flex items-center gap-1 font-medium text-accent transition-opacity hover:opacity-80"
+      href={contentHref("/recipes")}
+    >
+      Browse all recipes →
+    </a>
+  </div>
+</section>

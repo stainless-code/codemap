@@ -1,0 +1,56 @@
+---
+import Card from "blume/components/content/Card.astro";
+import CardGroup from "blume/components/content/CardGroup.astro";
+import { contentHref } from "blume/components/content/base-href.ts";
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      Batteries included.
+    </h2>
+    <p class="mx-auto mt-4 max-w-lg text-balance text-muted-foreground">
+      Recipes, MCP, CI, and agent scaffolding — same index, adopt what you need.
+    </p>
+  </div>
+
+  <div class="mt-10">
+    <CardGroup cols={2}>
+      <Card
+        arrow
+        href={contentHref("/recipes")}
+        icon="book-open"
+        title="Recipes"
+      >
+        Bundled SQL patterns for symbol lookup, impact, dead code, and CI
+        formats.
+      </Card>
+      <Card
+        arrow
+        href={contentHref("/guides/agents-mcp")}
+        icon="plug"
+        title="MCP"
+      >
+        Query the index from Cursor and other MCP clients — same recipes as the
+        CLI.
+      </Card>
+      <Card
+        arrow
+        href={contentHref("/guides/github-action")}
+        icon="github"
+        title="Action"
+      >
+        Run recipes in CI with SARIF, annotations, and badge exit codes.
+      </Card>
+      <Card
+        arrow
+        href={contentHref("/guides/agents-mcp")}
+        icon="bot"
+        title="agents init"
+      >
+        Scaffold version-matched rules and skills that stay in sync with the
+        package.
+      </Card>
+    </CardGroup>
+  </div>
+</section>

@@ -1,0 +1,31 @@
+---
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import Icon from "blume/components/Icon.astro";
+
+const installCommand = "bunx @stainless-code/codemap";
+---
+
+<div
+  class="mx-auto flex w-fit max-w-full items-center gap-2 rounded-blume border border-border bg-background py-1.5 pr-2 pl-3"
+  data-blume-install-box
+>
+  <span
+    aria-hidden="true"
+    class="select-none font-mono text-muted-foreground text-sm">$</span
+  >
+  {/* Strip CodeBlock chrome — chip owns the frame; keep Shiki tokens. */}
+  <div
+    class="min-w-0 flex-1 text-left [&_.prose]:contents [&_pre]:!m-0 [&_pre]:!border-0 [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:text-sm [&_pre_code]:!p-0"
+  >
+    <CodeBlock code={installCommand} lang="bash" />
+  </div>
+  <button
+    aria-label="Copy command"
+    class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    data-blume-copy-install
+    data-command={installCommand}
+    type="button"
+  >
+    <Icon class="size-4" name="copy" size={16} />
+  </button>
+</div>

@@ -1,0 +1,43 @@
+---
+title: Coverage & churn
+description: Load coverage and churn into the index so risk recipes have measured numbers.
+search:
+  tags: ["guide", "coverage", "churn"]
+---
+
+Structural dead-code guesses without runtime evidence are noisy. Load coverage (and optional churn) once, then rank with the [Coverage & churn recipes](/recipes#coverage--churn-risk).
+
+## Ingest coverage
+
+```bash
+codemap ingest-coverage coverage/coverage-final.json   # Istanbul
+codemap ingest-coverage lcov.info                      # LCOV
+codemap ingest-coverage ./coverage/tmp --runtime       # V8 directory
+codemap ingest-coverage ./coverage --json
+```
+
+Auto-detects Istanbul `.json` / LCOV `.info`; pass `--runtime` for V8 dirs. MCP: `ingest_coverage` (`path`, optional `runtime`).
+
+## Ingest churn
+
+Git history fills `file_churn` on each index by default. For fixtures or non-git trees:
+
+```bash
+codemap ingest-churn churn.json --json
+```
+
+Config `churn.file` can replace git-derived churn. MCP: `ingest_churn`.
+
+## Recipes that unlock
+
+| After ingest                         | Recipe ids                                                                 |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| Coverage                             | `worst-covered-exports`, `files-by-coverage`, `coverage-confirmed-dead`, `untested-and-dead`, `high-complexity-untested`, `text-in-deprecated-functions` |
+| Coverage (improves / overrides)      | `high-crap-score`, `refactor-risk-ranking`                                 |
+| Churn (git default or ingest/config) | `churn-complexity-hotspots`                                                |
+
+Empty `file_churn` → check `context` / `churn_hint`. Full catalog: [Recipes](/recipes).
+
+## high-crap-score caveat
+
+Without measured coverage, `high-crap-score` can still emit rows using **graph-estimated** coverage tiers (85% / 40% / 0%). Parse `coverage_source` on each row before CI gates — prefer `ingest-coverage` first so scores use measured data.

@@ -1,0 +1,70 @@
+---
+title: Agents & MCP
+description: Wire Codemap into Cursor and other agents via templates, MCP, and HTTP.
+search:
+  tags: ["guide", "agents", "mcp"]
+---
+
+`codemap agents init` drops thin pointer files into `.agents/`; the full skill and rule are served live from the installed package version. Updating `@stainless-code/codemap` refreshes what agents see — no re-init unless the pointer shape itself changes.
+
+## Scaffold
+
+```bash
+codemap agents init
+codemap agents init --force
+codemap agents init --mcp
+codemap agents init --interactive          # -i; TTY multiselect
+codemap agents init --targets cursor,copilot --mcp
+codemap agents init --git-hooks            # background index on git events
+```
+
+`--force` refreshes only bundled template paths under `.agents/` (and IDE mirrors marked `<!-- codemap-init:managed -->`). Your other rules stay.
+
+## Live content (CLI + MCP + HTTP)
+
+| Surface                | Skill                      | Rule                      |
+| ---------------------- | -------------------------- | ------------------------- |
+| CLI                    | `codemap skill`            | `codemap rule`            |
+| MCP                    | `codemap://skill`          | `codemap://rule`          |
+| HTTP (`codemap serve`) | `GET /resources/{uri}`     | same for `codemap://rule` |
+
+Also useful: `codemap://schema`, `codemap://recipes`, `codemap://mcp-instructions`.
+
+## MCP wiring
+
+```bash
+codemap agents init --mcp
+```
+
+Writes PM-aware spawn for the project’s package manager (`npx`, `pnpm exec`, `yarn exec`, `bunx`, or dlx of `@stainless-code/codemap@latest` when not installed). Merge is idempotent — foreign MCP servers are preserved.
+
+| Target            | Typical files written                                      |
+| ----------------- | ---------------------------------------------------------- |
+| Cursor            | `.cursor/mcp.json`                                         |
+| Claude Code       | `.mcp.json` + `.claude/settings.json`                      |
+| VS Code / Copilot | `.vscode/mcp.json`                                         |
+| Continue / Cline / Gemini / Amazon Q | project MCP JSON under each tool’s path |
+| Windsurf          | user-global Cascade MCP config (when Windsurf is selected) |
+
+Optional IDE mirrors for rules/skills: Cursor, Windsurf, Continue, Cline, Amazon Q, plus root pointers (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`).
+
+## Session start
+
+Long-running `codemap mcp` stays up for the IDE session (no idle timeout). At session start, call **`context`** — project root, schema version, recipe cards, hub leaders, and `index_freshness` (`pending_sync`, `commit_drift`, optional `warning`).
+
+Watcher is default-ON for `mcp` / `serve`. Opt out: `--no-watch` or `CODEMAP_WATCH=0`. When the watcher is off (e.g. WSL `/mnt/*`), use `codemap agents init --git-hooks`.
+
+Tool taxonomy and resources: [MCP reference](/reference/mcp). Allowlist: `CODEMAP_MCP_TOOLS` — see [Env](/reference/env).
+
+## HTTP twin
+
+```bash
+TOKEN=$(openssl rand -hex 32)
+codemap serve --port 7878 --token "$TOKEN"
+curl -s -X POST http://127.0.0.1:7878/tool/query \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"sql":"SELECT name, file_path FROM symbols LIMIT 5"}'
+```
+
+Same tools as MCP; `--token` required when `--host` is not loopback.

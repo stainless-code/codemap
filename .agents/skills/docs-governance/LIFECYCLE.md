@@ -225,3 +225,20 @@ Shipped agent templates under `templates/agent-content/**` follow the same consu
 | **Maintainer-only** | Never leak into served shards                                                                                | Module paths under `src/`, CI wiring, dual-file sync, dogfood paths              |
 
 When lifting durable policy from a closed plan or audit into agent-content, verify parity across CLI help, MCP tool descriptions, served shards, root README, and changeset bodies — not just one surface.
+
+---
+
+## README surfaces (public site vs npm landing vs maintainer docs)
+
+Codemap has three reading surfaces with distinct jobs; never blur them.
+
+| Surface                             | Canonical home                       | Job                                                                                    | Deploy                                             |
+| ----------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| **Public docs site**                | `https://stainless-code.com/codemap` | Canonical user docs — install, guides, concepts, recipes, reference, generated API     | FTP `/codemap` on merge of a **`docs`**-labeled PR |
+| **Root `README.md``** (npm landing) | repo root                            | npm/repo landing digest only — install + one-query hook + pointer to the site          | ships in the npm package                           |
+| **Maintainer `docs/`**              | `docs/` at repo root (Tier B)        | Governance, architecture internals, plans, audits, research — never leaked to the site | tracked in-repo; not deployed                      |
+
+- **Site is canonical for user docs.** Root `README.md` summarizes and links; it does not restate guide/reference prose ([`docs/README.md` Rule 1](../../../docs/README.md)).
+- **`docs` label deploys.** A PR merged with the **`docs`** label triggers `deploy-docs.yml` → FTP to `/codemap`. Releases and `workflow_dispatch` also deploy.
+- **Maintainer `docs/` stays separate.** Curated lifts to the site only; never dump `docs/*.md` wholesale into `apps/docs/` ([`docs/README.md` Rule 1](../../../docs/README.md)).
+- **Docs-only changeset = `patch`** (pre-1.0; schema-breaking is the only `minor` trigger — see [`.agents/lessons.md`](../../lessons.md)).

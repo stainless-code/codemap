@@ -1,0 +1,59 @@
+---
+title: Roadmap
+description: Forward-looking work — not a mirror of shipped CLI or schema.
+search:
+  tags: ["reference", "roadmap"]
+sidebar:
+  badge: "Planned"
+---
+
+Shipped behavior lives in [Guides](/guides), [Concepts](/concepts), and the
+[changelog](/changelog). This page is the forward-looking list. Pull requests
+welcome — open an issue first for anything below so we can agree on shape.
+
+## Next
+
+- **Community language adapters** — optional packages (e.g. Tree-sitter) with a
+  peer dependency on `@stainless-code/codemap` and a public registration API
+  beyond the built-in adapters.
+- **GitHub Marketplace Action listing** — publish the in-tree Action
+  (`action.yml`, SARIF / annotations, CI helpers) to the Marketplace with
+  floating `v1` tags.
+- **LSP diagnostic-push** — recipes as editor diagnostics (not rename /
+  go-to-definition; TypeScript already owns those).
+- **Framework route extraction** — Express / React Router / NestJS-style
+  `http_routes` substrate for reachability recipes.
+- **FTS default-on evaluation** — measure the DB size tax of defaulting
+  `source_fts` on; today full-text search stays opt-in (`--with-fts` /
+  `fts5: true`).
+
+## Later
+
+- **C.9 framework plugin layer** — declarative entry-point hints (globs +
+  optional AST parse of tool configs) so dead-code / unimported-export recipes
+  respect Vite / Next / Vitest roots — no JS eval at index time.
+- **Zero-deps shell installer** — `curl | sh` / PowerShell binary fetch beside
+  npm for consumers without a JS toolchain.
+- **MCP shared daemon per project** — one watcher + one SQLite writer shared
+  across concurrent agent sessions (long-running `mcp` / `serve` only; one-shot
+  CLI stays cold-start fast).
+- **Monorepo / workspace awareness** — discover workspaces and index
+  per-workspace dependency graphs.
+
+## Out of scope
+
+Codemap stays a structural-index primitive. In particular:
+
+- **SQL (and recipes) stay the API** — no pre-baked pass/fail verdict primitive;
+  SARIF / audit deltas are output modes.
+- **No rename / go-to-def LSP engine** — read-side `show` / `snippet` / `impact`
+  already cover agent lookup; diagnostic-push is the only LSP track above.
+- **No LLM or embeddings in the box** — the agent host owns meaning; we supply
+  structure.
+- **No opinionated autofix engine** — `codemap apply` executes explicit
+  recipe/agent diff rows with confirmation gates.
+- **No telemetry upload, no remote-repo clone-and-index** — local checkout is
+  the source of truth.
+
+Maintainer detail (plans, floors, perf triggers) lives in the repo’s
+[`docs/roadmap.md`](https://github.com/stainless-code/codemap/blob/main/docs/roadmap.md).

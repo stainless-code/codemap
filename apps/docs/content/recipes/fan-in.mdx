@@ -1,0 +1,21 @@
+---
+title: fan-in
+description: Rank files by how many other files import them (import hubs).
+search:
+  tags: ["recipe"]
+---
+
+High fan-in means changes ripple through many consumers — protect with tests before refactoring.
+
+```bash
+codemap query --json --recipe fan-in
+codemap hotspots --json   # outcome alias → same recipe
+```
+
+No params. The `dependencies` table aggregates static imports, dynamic imports, and resolved module-graph edges.
+
+:::note
+`hotspots` / `fan-in` rank **import hubs**. Change-frequency × complexity is a different recipe: `churn-complexity-hotspots`.
+:::
+
+Inspect SQL: `codemap query --print-sql fan-in`. Full catalog: `codemap query --recipes-json`. Related: `codemap impact <file>` for a single target’s dependents.

@@ -2,6 +2,8 @@
 
 Technical docs for **[@stainless-code/codemap](https://github.com/stainless-code/codemap)**.
 
+**Canonical user docs:** <https://stainless-code.com/codemap> (install, guides, concepts, recipes, reference, generated API). This `docs/` folder is the **maintainer** Tier-B surface — governance, architecture internals, plans, audits, research. Curated lifts to the site only; never dump these files wholesale into `apps/docs/` (Rule 1).
+
 **Start here:** [../README.md](../README.md) (install, CLI, API, dev commands). **This folder** is deeper reference — pick a row below.
 
 ## File Ownership

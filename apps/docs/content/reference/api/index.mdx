@@ -1,0 +1,41 @@
+---
+title: API
+description: Exhaustive CI-generated TypeDoc reference for the published @stainless-code/codemap library surface.
+sidebar:
+  label: Overview
+search:
+  tags: ["api", "reference"]
+---
+
+import Card from "blume/components/content/Card.astro";
+import CardGroup from "blume/components/content/CardGroup.astro";
+
+One package entry — everything below is re-exported from `@stainless-code/codemap`. Quick start: [Programmatic](/guides/programmatic). Hub: [Reference](/reference).
+
+Experimental — the API may change between minor releases. Pin your version. Pre-1.0: breaking changes ship in **minor** releases (`0.x` → `0.y`), not majors.
+
+## Library surface
+
+<CardGroup cols={2}>
+  <Card title="createCodemap" href="/reference/api/modules" arrow>
+    Index / query runtime — `createCodemap`, `Codemap`
+  </Card>
+  <Card title="defineConfig" href="/reference/api/modules" arrow>
+    Config helpers + Zod schemas
+  </Card>
+  <Card title="Adapters" href="/reference/api/modules" arrow>
+    `LanguageAdapter`, `BUILTIN_ADAPTERS`, …
+  </Card>
+  <Card title="Types" href="/reference/api/modules" arrow>
+    Config, parse, and adapter types
+  </Card>
+</CardGroup>
+
+```ts
+import {
+  createCodemap,
+  defineConfig,
+  BUILTIN_ADAPTERS,
+  CODEMAP_VERSION,
+} from "@stainless-code/codemap";
+```

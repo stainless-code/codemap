@@ -41,7 +41,7 @@ export interface CodemapInitOptions {
 }
 
 /**
- * Programmatic entry point: loads config, calls {@link initCodemap}, configures the import resolver,
+ * Programmatic entry point: loads config, initializes the process runtime, configures the import resolver,
  * and returns a {@link Codemap} handle.
  *
  * @remarks

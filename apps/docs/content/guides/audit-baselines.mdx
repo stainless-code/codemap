@@ -1,0 +1,67 @@
+---
+title: Audit & baselines
+description: Diff the index against a saved baseline or a git merge-base — PR attribution included.
+search:
+  tags: ["guide", "audit", "baseline", "ci"]
+---
+
+“Did this PR introduce new deprecated symbols?” needs a before picture. Save a row snapshot with `--save-baseline`, or diff against a git ref with `audit --base`.
+
+## Query baselines
+
+Snapshot any query / recipe result into `query_baselines` inside the index DB (survives `--full` and schema rebuilds):
+
+```bash
+codemap query --json --recipe deprecated-symbols --save-baseline
+codemap query --json --recipe deprecated-symbols --save-baseline=pre-refactor
+
+codemap query --json --recipe deprecated-symbols --baseline
+codemap query --json --recipe deprecated-symbols --baseline=pre-refactor --summary
+
+codemap query --baselines
+codemap query --drop-baseline pre-refactor
+```
+
+`--baseline` returns `{ baseline, current_row_count, added, removed }` (exact row identity via `JSON.stringify`). Incompatible with non-`json` `--format` / `--group-by`. Ad-hoc SQL must pass an explicit `=<name>` on `--save-baseline`.
+
+## audit --base (PR merge-base)
+
+Materialises `<ref>` via `git archive`, reindexes into a sha-keyed cache, then diffs. No baseline setup required:
+
+```bash
+codemap audit --base origin/main --json
+codemap audit --base origin/main --summary
+codemap audit --base origin/main --ci          # SARIF + non-zero on additions
+```
+
+With `--format json`, each **added** row carries `attribution`: `introduced` (branch-new) or `inherited` (already present at the merge base). Summary adds `added_introduced` / `added_inherited` per delta.
+
+v1 deltas: `files`, `dependencies`, `deprecated`.
+
+## audit --baseline (prefix)
+
+Convention: save `<prefix>-files`, `<prefix>-dependencies`, `<prefix>-deprecated`, then:
+
+```bash
+codemap query --save-baseline=base-files "SELECT path FROM files"
+# … or the recipes / SQL you care about for each delta slot
+
+codemap audit --baseline base --json
+```
+
+Missing slots are silently absent. Per-delta overrides: `--files-baseline`, `--dependencies-baseline`, `--deprecated-baseline` (compose with `--base` or `--baseline`).
+
+## GitHub Action
+
+Default `mode: audit` on `pull_request` runs against `github.base_ref` (override with `audit-base`). Recipe mode can pass `baseline` for `--baseline` on `query --recipe`. Details: [GitHub Action](/guides/github-action).
+
+## MCP
+
+| Goal              | Tool             |
+| ----------------- | ---------------- |
+| Save snapshot     | `save_baseline`  |
+| List              | `list_baselines` |
+| Drop              | `drop_baseline`  |
+| Diff vs base / prefix | `audit`      |
+
+`audit` accepts `base` (git ref) and/or `baseline_prefix` / per-delta `baselines`. One-shot row diff on `query` / `query_recipe` also accepts `baseline`.

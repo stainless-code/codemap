@@ -66,7 +66,9 @@ function relatedTests(filenames) {
 /** @type {import('lint-staged').Configuration} */
 export default {
   "*.{js,jsx,ts,tsx,mjs,mts,cjs,cts}": ["bun run format:check", "bun run lint"],
-  "*.{css,json,md,mdc,html,yaml,yml}": "bun run format:check",
+  // `mdx` in format:check; nested `apps/docs/.oxfmtrc.json` ignores `content/**`
+  // (oxfmt collapses Blume `:::` fences).
+  "*.{css,json,md,mdc,mdx,html,yaml,yml}": "bun run format:check",
   "*.{ts,tsx}": [typecheckStagedFiles, relatedTests],
   "*.test.ts": "bun test",
   "*.test.tsx": "bun test",

@@ -1,0 +1,137 @@
+---
+title: Recipes
+description: Bundled query recipes — find symbols, fan-in, affected tests, and more.
+search:
+  tags: ["recipe"]
+---
+
+Hand-rolling joins across `symbols`, `calls`, and `dependencies` is slow. Recipes are named SQL patterns — `codemap query --recipe <id>` (MCP: `query_recipe`). Prefer a recipe until you know the join paths.
+
+## Featured
+
+| Recipe                                                      | Outcome                                          |
+| ----------------------------------------------------------- | ------------------------------------------------ |
+| [find-symbol-definitions](/recipes/find-symbol-definitions) | Exact-name definition rows (file + column range) |
+| [affected-tests](/recipes/affected-tests)                   | Tests that transitively import changed sources   |
+| [fan-in](/recipes/fan-in)                                   | Top files by how many others depend on them      |
+
+## Catalog truth
+
+```bash
+codemap query --recipes-json
+codemap query --print-sql <id>
+```
+
+Project overrides live in `.codemap/recipes/` ([Config](/guides/config)). Params and per-row actions are in each recipe’s companion `.md`. Tables below list every bundled id by theme — one-line outcome only; SQL stays in the catalog / `--print-sql`.
+
+CI presentation (`--format sarif` / `codeclimate` / `badge`): [Formats](/reference/formats). Diff-shape rows → [Apply](/guides/apply). Coverage / churn unlock: [Coverage & churn](/guides/coverage-churn).
+
+## Symbol & reference lookup
+
+| Id                         | Outcome                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `find-symbol-definitions`  | Exact-name definitions (`WHERE name = ?` — same tier as `codemap show`) |
+| `find-symbol-by-kind`      | Symbols by `kind` + `name_pattern` (`LIKE`)                             |
+| `find-symbol-references`   | Binding-resolved references to a definition (name + defining file)      |
+| `find-references`          | Every identifier use matching a name (write flag + enclosing scope)     |
+| `find-call-sites`          | Parse-resolved call sites of a named function (AST provenance only)     |
+| `find-export-sites`        | Direct exports and re-exports of a named binding                        |
+| `find-import-sites`        | Import sites of a named binding across files                            |
+| `find-jsx-usages`          | JSX element rows for a component / tag name                             |
+| `find-by-param-type`       | Parameters whose type annotation exactly matches a string               |
+| `find-decorator-usage`     | Decorator sites linked to decorated symbols when resolvable             |
+| `find-async-functions`     | Async functions with stringified return type                            |
+| `find-throws-jsdoc`        | Structured `@throws` tags from JSDoc                                    |
+| `find-write-sites`         | Writes to an identifier (assignments, mutations, declarations)          |
+| `find-re-exported-bindings` | Identifier refs resolved via a re-export chain                          |
+| `find-dynamic-imports`     | Dynamic `import()` sites (literal specs may resolve to a path)          |
+| `markers-by-kind`          | Marker counts by kind (`TODO`, `FIXME`, …)                              |
+| `visibility-tags`          | Symbols with JSDoc visibility tags (`public` / `private` / …)           |
+| `components-by-hooks`      | React components ranked by hook count                                   |
+| `tests-by-file`            | Test counts per test file                                               |
+| `env-var-audit`            | Distinct `process.env.X` accesses with use count and file fan-out       |
+
+## Graphs & types
+
+| Id                          | Outcome                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------ |
+| `call-path`                 | Shortest path between two symbols on `calls` (optional import fallback; AST provenance)          |
+| `fan-in`                    | Top files by how many others depend on them                                                      |
+| `fan-out`                   | Top files by dependency edge count                                                               |
+| `fan-out-sample`            | Fan-out leaders plus sample dependency targets                                                   |
+| `fan-out-sample-json`       | Same as `fan-out-sample` with `sample_targets` as a JSON array                                   |
+| `type-ancestors`            | Transitive `extends` + direct `implements` for a class / interface                               |
+| `type-descendants`          | Symbols that `extends` / `implements` a type (pass `file_path` on homonyms)                      |
+| `symbol-neighborhood`       | Callers, callees, and one-hop file dependencies around a symbol                                  |
+| `circular-imports`          | Files in import cycles, grouped by `cycle_id`                                                    |
+| `calls-including-heuristic` | Heuristic callback-synthesis edges (`provenance = 'heuristic'`) — needs `synthesis.heuristicCalls: true` |
+| `unresolved-call-sites`     | Call sites that did not resolve after the call-resolution pass                                   |
+| `barrel-chains`             | Resolved re-export chains to terminal definitions                                                |
+| `barrel-files`              | Top files by export count (barrel / public-API candidates)                                       |
+| `find-barrel-files`         | Files flagged `is_barrel = 1`                                                                    |
+| `affected-tests`            | Tests that transitively import changed sources (also `codemap affected`)                         |
+
+## CI / dead code / boundaries
+
+| Id                              | Outcome                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| `deprecated-symbols`            | Symbols with `@deprecated` JSDoc (`reason` / `evidence_json` on rows)                |
+| `unimported-exports`            | Exports with no import row for that file + name                                      |
+| `boundary-violations`           | Import edges matching a `boundaries.deny` rule in config                             |
+| `untested-and-dead`             | Exported functions that look structurally dead and lack measured coverage            |
+| `stale-imports`                 | Diff-shape unused import specifiers (structural; not a formatter)                    |
+| `unused-type-members`           | Exported type members never directly imported                                        |
+| `components-touching-deprecated` | Components that hook or call `@deprecated` symbols                             |
+| `text-in-deprecated-functions`  | `@deprecated` functions in files with TODO/FIXME/HACK and low coverage               |
+| `find-side-effect-files`        | Files with module-level side effects (`has_side_effects = 1`)                        |
+| `find-side-effect-imports`      | Side-effect-only imports (`import "./mod"` with no bindings)                         |
+
+## Coverage & churn risk
+
+Needs coverage and/or churn data in the index — see [Coverage & churn](/guides/coverage-churn). Without ingest, some recipes still run on graph estimates; parse `coverage_source` before gating CI.
+
+| Id                           | Outcome                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `worst-covered-exports`      | Worst-covered exported functions (test-writing targets)                                         |
+| `files-by-coverage`          | Files ranked ascending by statement coverage                                                    |
+| `coverage-confirmed-dead`    | Structurally dead exports with an explicit coverage `confidence` column                         |
+| `high-crap-score`            | Symbols ranked by CRAP (`CC² × (1 − coverage/100)³ + CC`) — check `coverage_source`             |
+| `churn-complexity-hotspots`  | Files/symbols by churn × cyclomatic complexity (not the `hotspots` alias → `fan-in`)            |
+| `refactor-risk-ranking`      | Files by `(fan_in + 1) × (100 − avg_coverage_pct)`                                              |
+| `high-complexity-untested`   | Functions with cyclomatic complexity ≥ 10 and measured coverage &lt; 50%                        |
+
+## Apply / migrate
+
+Diff-shape rows (`file_path`, `line_start`, `before_pattern`, `after_pattern`) feed `codemap apply`. Workflow: [Apply](/guides/apply). Preview with `--format diff` / `diff-json`.
+
+| Id                     | Outcome                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `rename-preview`       | Diff preview for symbol renames (also `codemap rename`)                      |
+| `migrate-deprecated`   | Migrate call sites / usages of a deprecated symbol to a replacement          |
+| `migrate-import-source` | Exact-match import `source` path migration                                   |
+| `migrate-jsx-prop`     | JSX attribute name renames                                                   |
+| `add-jsdoc-deprecated` | Prepend `@deprecated` JSDoc above `export function <name>` definitions       |
+| `deprecated-usages`    | Rewrite the first line of an existing `@deprecated` block (docs sync)        |
+| `replace-marker-kind`  | Replace marker kind tokens on disk (e.g. `TODO` → `FIXME`)                   |
+
+## Smells & quality
+
+| Id                         | Outcome                                                              |
+| -------------------------- | -------------------------------------------------------------------- |
+| `duplicates`               | Symbols whose `body_hash` collides (identical function bodies)       |
+| `large-functions`          | Functions / methods with `body_line_count` ≥ 50                      |
+| `deeply-nested-functions`  | Functions with nesting depth ≥ 4                                     |
+| `high-cognitive-complexity` | Functions above cognitive-complexity threshold (default 15)          |
+| `find-await-in-loop`       | `await` sites inside loop bodies                                     |
+| `find-swallowed-errors`    | `catch` bodies that only log to `console.*`                          |
+| `find-leftover-console`    | Every `console.*` call site                                          |
+| `find-skipped-tests`       | `describe.skip` / `it.skip` / `.only` / `.todo` sites                |
+| `files-largest`            | Top files by line count                                              |
+
+## Index / ops
+
+| Id                      | Outcome                                                                  |
+| ----------------------- | ------------------------------------------------------------------------ |
+| `index-summary`         | Single row: counts for files, symbols, imports, components, dependencies |
+| `files-hashes`          | Indexed files with `content_hash` (staleness inputs)                     |
+| `call-resolution-stats` | Counts from the call-resolution phase (AST vs unresolved, …)             |

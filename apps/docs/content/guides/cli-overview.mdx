@@ -1,0 +1,102 @@
+---
+title: CLI overview
+description: Common Codemap CLI commands — index, query, recipes, serve, and agents init.
+search:
+  tags: ["guide", "cli"]
+---
+
+Index the tree once per session, then ask structural questions with SQL or a recipe id. Full flag list: [CLI reference](/reference/cli).
+
+## Index
+
+```bash
+codemap                         # incremental
+codemap --full                  # full rebuild
+codemap --files src/a.ts src/b.tsx   # targeted re-index after edits
+codemap validate --json         # stale / missing / unindexed / rejected
+```
+
+State lives under `.codemap/` by default (`--state-dir` / `CODEMAP_STATE_DIR` overrides).
+
+## Query
+
+```bash
+codemap query --json "SELECT name, file_path FROM symbols WHERE name = 'foo'"
+codemap query --json --recipe fan-in
+codemap query --json --recipe find-symbol-definitions --params name=usePermissions
+codemap query --recipes-json          # full catalog (bundled + project-local)
+codemap query --print-sql fan-in      # SQL only — no DB required
+```
+
+N statements in one bootstrap:
+
+```bash
+echo '{"statements":["SELECT COUNT(*) AS n FROM symbols","SELECT COUNT(*) AS n FROM files"]}' \
+  | codemap query batch --stdin --compact
+```
+
+Outcome aliases are thin wrappers over `query --recipe` (every query flag passes through):
+
+```bash
+codemap dead-code --json              # → untested-and-dead
+codemap deprecated --ci               # → deprecated-symbols --ci
+codemap hotspots --json               # → fan-in (import hubs — not churn×complexity)
+codemap boundaries --format sarif     # → boundary-violations
+```
+
+## Lookups & graphs
+
+```bash
+codemap show runQueryCmd
+codemap show foo --kind function --in src/cli
+codemap snippet runQueryCmd --json
+codemap impact handleQuery            # blast radius (callers / dependents)
+codemap affected --json               # changed sources → tests to run
+codemap trace --from createCodemap --to openDatabase
+codemap explore handleQuery executeQuery --depth 1
+codemap node handleQuery
+```
+
+## Apply / ingest (one-liners)
+
+```bash
+codemap apply rename-preview --params old=foo,new=bar --dry-run
+codemap rename foo bar --kind function --dry-run
+codemap ingest-coverage coverage/coverage-final.json
+codemap ingest-churn churn.json
+```
+
+Full workflows: [Apply](/guides/apply) · [Coverage & churn](/guides/coverage-churn).
+
+## Resource cards
+
+```bash
+codemap file src/db.ts
+codemap schema
+codemap symbols handleQuery
+```
+
+Same JSON as `codemap://files/…`, `codemap://schema`, `codemap://symbols/…`.
+
+## Agents & transports
+
+```bash
+codemap agents init                   # scaffold .agents/ pointers
+codemap agents init --mcp             # + PM-aware MCP config
+codemap mcp                           # stdio MCP (watcher default-ON)
+codemap serve --port 7878             # HTTP twin: POST /tool/{name}
+codemap skill                         # live skill markdown
+codemap rule                          # live rule markdown
+```
+
+Opt out of the embedded watcher: `codemap mcp --no-watch` or `CODEMAP_WATCH=0`.
+
+## CI-shaped output
+
+```bash
+codemap query --recipe deprecated-symbols --format sarif
+codemap query --recipe boundary-violations --ci
+codemap audit --base origin/main --json
+```
+
+Formats: [Formats](/reference/formats). Baselines: [Audit & baselines](/guides/audit-baselines). CI wiring: [GitHub Action](/guides/github-action).

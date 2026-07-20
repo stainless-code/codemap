@@ -1,0 +1,49 @@
+---
+import { contentHref } from "blume/components/content/base-href.ts";
+
+const steps = [
+  {
+    title: "Index",
+    body: "One local SQLite map of structure",
+  },
+  {
+    title: "Query",
+    body: "SQL or bundled recipe",
+  },
+  {
+    title: "Join",
+    body: "Compose tables in one predicate",
+  },
+];
+---
+
+<section>
+  <div class="mx-auto max-w-2xl text-center">
+    <h2 class="font-medium text-3xl tracking-tight sm:text-4xl">
+      How it works.
+    </h2>
+  </div>
+
+  <div class="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
+    {
+      steps.map((step, i) => (
+        <div class="rounded-blume border border-border p-5 text-left">
+          <p class="font-mono text-muted-foreground text-xs">
+            {String(i + 1).padStart(2, "0")}
+          </p>
+          <h3 class="mt-2 font-medium text-foreground text-lg">{step.title}</h3>
+          <p class="mt-2 text-muted-foreground text-sm">{step.body}</p>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="mt-8 text-center">
+    <a
+      class="inline-flex items-center gap-1 font-medium text-accent transition-opacity hover:opacity-80"
+      href={contentHref("/concepts")}
+    >
+      Browse concepts →
+    </a>
+  </div>
+</section>
