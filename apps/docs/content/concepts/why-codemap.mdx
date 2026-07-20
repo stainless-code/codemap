@@ -27,14 +27,14 @@ Indexed structural queries stay sub-millisecond on typical trees; the real win f
 3. **Local-first, agent-native** — SQLite on disk; CLI, MCP, HTTP, GitHub Action share the same recipes.
 4. **Honest scope** — say what not to use it for. See [When to skip](/concepts/when-to-skip).
 
-## Vs alternatives (axes, not brands)
+## Vs alternatives (axes)
 
-| Axis              | Codemap                         | Static linters (knip / ESLint / …) | Repo-map style tools      | LSP                         |
-| ----------------- | ------------------------------- | ---------------------------------- | ------------------------- | --------------------------- |
-| Thesis            | Query structure with SQL        | Emit findings / fixes              | Summarize into a blob     | Per-edit semantic helpers   |
-| Who decides       | The agent (via SQL)             | The tool’s rules                   | The tool’s ranking        | The editor                  |
-| Best for          | Where / what / who lookups      | “Did this PR introduce dead code?” | First-touch priming       | Refactor / hover / types    |
+| Axis       | Codemap                    | Static linters           | Repo-map style tools | LSP                       |
+| ---------- | -------------------------- | ------------------------ | -------------------- | ------------------------- |
+| Thesis     | Query structure with SQL   | Emit findings / fixes    | Summarize into a blob | Per-edit semantic helpers |
+| Who decides | The agent (via SQL)       | The tool’s rules         | The tool’s ranking   | The editor                |
+| Best for   | Where / what / who lookups | “Is this dead / banned?” | First-touch priming  | Refactor / hover / types  |
 
-SQLite-backed code-index peers often ship pre-baked graph verbs or NL over the index. Codemap’s differentiation: **SQL + recipes**, **pure structural**, **JS/TS/CSS-ecosystem depth**, plus **CI substrate** (SARIF, audit, Action).
+Named peers in the SQLite / agent-context cohort (SQL vs Cypher vs fixed tools vs quality gates): [Comparison](/concepts/comparison).
 
 They don’t compete for the same slot — use Codemap **and** a linter **and** an LSP.

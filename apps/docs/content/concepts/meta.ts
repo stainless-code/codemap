@@ -5,6 +5,7 @@ export default defineMeta({
   icon: "lightbulb",
   pages: [
     "why-codemap",
+    "comparison",
     "when-to-skip",
     "index-lifecycle",
     "schema-overview",
