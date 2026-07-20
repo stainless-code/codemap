@@ -6,11 +6,13 @@ const title = "Codemap";
 /** Custom `.astro` pages have no frontmatter — name OG cards (else humanized segment). */
 const homeTitle = `${title} — Query your codebase.`;
 const notFoundTitle = "Page not found";
+/** Capacity pitch — do not lead with the brand one-liner (docs-voice). */
+const description =
+  "Local codebase intelligence for AI agents — a SQLite index of symbols, imports, and calls. SQL and recipes instead of scanning the tree.";
 
 export default defineConfig({
   title,
-  description:
-    "Query your codebase — local codebase intelligence for AI agents",
+  description,
 
   logo: { image: "/logo.svg", text: "Codemap" },
 
