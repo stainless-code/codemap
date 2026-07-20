@@ -1,0 +1,49 @@
+---
+import PageLayout from "blume/components/layout/PageLayout.astro";
+import data from "blume:data";
+import Batteries from "./_home/Batteries.astro";
+import FinalCta from "./_home/FinalCta.astro";
+import Hero from "./_home/Hero.astro";
+import HowItWorks from "./_home/HowItWorks.astro";
+import UseCases from "./_home/UseCases.astro";
+import Footer from "../components/blume/Footer.astro";
+
+const { config } = data;
+const pageTitle = `${config.title} — Query your codebase.`;
+
+const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="M20 6 9 17l-5-5"/></svg>';document.addEventListener("click",async(e)=>{const b=e.target.closest("[data-blume-copy-install]");if(!b){return;}try{await navigator.clipboard.writeText(b.dataset.command);}catch{return;}const o=b.innerHTML;b.innerHTML=CHECK;setTimeout(()=>{b.innerHTML=o;},1500);});})();`;
+---
+
+<PageLayout
+  analytics={config.analytics}
+  banner={config.banner}
+  favicon={config.favicon}
+  appleIcon={config.appleIcon}
+  fontCssVars={data.fontCssVars}
+  logo={config.logo}
+  navigation={data.navigation}
+  ogEnabled={config.og.enabled}
+  page={{ description: config.description, route: "/", title: pageTitle }}
+  searchEnabled={config.search.enabled}
+  site={{ description: config.description, title: config.title }}
+  siteUrl={config.site}
+  themeMode={config.theme.mode}
+  x={config.x}
+>
+  <div
+    class="mx-auto grid max-w-[1400px] gap-16 px-6 py-20 sm:py-24 lg:gap-24 xl:gap-32"
+  >
+    <Hero />
+    <UseCases />
+    <HowItWorks />
+    <Batteries />
+    <FinalCta />
+  </div>
+  <script is:inline set:html={copyScript} />
+  <Footer
+    navigation={data.navigation}
+    site={{ description: config.description, title: config.title }}
+    slot="footer"
+    ui={data.ui}
+  />
+</PageLayout>

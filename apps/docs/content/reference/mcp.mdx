@@ -1,0 +1,78 @@
+---
+title: MCP
+description: Codemap MCP tools and resources for agent sessions.
+search:
+  tags: ["reference", "mcp"]
+---
+
+Start with `codemap agents init --mcp`, then `codemap mcp` (stdio; watcher default-ON). HTTP twin: `codemap serve` → `POST /tool/{name}`. Wiring guide: [Agents & MCP](/guides/agents-mcp).
+
+## Session start
+
+1. Call **`context`** — root, schema version, recipe cards, hub leaders, `index_freshness`, optional `codebase_map` / `map_id`.
+2. Read **`codemap://rule`** (always-on priming: query the index for structure, don’t grep).
+3. Catalog / DDL when needed: **`codemap://recipes`**, **`codemap://schema`**.
+
+MCP initialize also injects operational **`instructions`** (tool selection playbook). Full narrative stays on `codemap://skill` / `codemap://rule`.
+
+## All 21 tools
+
+| Tool                | Role                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| `context`           | Session bootstrap — freshness, hubs, recipe cards, optional map      |
+| `validate`          | Per-file staleness                                                   |
+| `query`             | Ad-hoc SQL                                                           |
+| `query_batch`       | N statements / one round-trip                                        |
+| `query_recipe`      | Named recipe by id                                                   |
+| `show`              | Exact / field-qualified symbol lookup                                |
+| `snippet`           | Same rows as `show` + disk text                                      |
+| `impact`            | Blast radius (callers / dependents)                                  |
+| `trace`             | Call path + snippets                                                 |
+| `explore`           | Multi-symbol neighborhood survey                                     |
+| `node`              | One-hop symbol card                                                  |
+| `affected`          | Changed sources → tests                                              |
+| `audit`             | Drift vs git `base` and/or baseline prefix / per-delta baselines     |
+| `save_baseline`     | Snapshot rows (`{name, sql? \| recipe?}`)                            |
+| `list_baselines`    | Saved baselines                                                      |
+| `drop_baseline`     | Delete a baseline by name                                            |
+| `ingest_coverage`   | Load Istanbul / LCOV / V8 coverage                                   |
+| `ingest_churn`      | Load precomputed `file_churn` JSON                                   |
+| `apply`             | Apply a recipe’s diff rows (`yes: true` for writes)                  |
+| `apply_rows`        | Apply pre-built rows                                                 |
+| `apply_diff_input`  | Apply unified diff text                                              |
+
+## Goal → tool (summary)
+
+| Goal                         | Tool                         | Recipe twin (when applicable)        |
+| ---------------------------- | ---------------------------- | ------------------------------------ |
+| Exact symbol                 | `show` / `snippet`           | `find-symbol-definitions`            |
+| Ad-hoc SQL                   | `query` / `query_batch`      | —                                    |
+| Named pattern                | `query_recipe`               | any catalog id                       |
+| Blast radius                 | `impact`                     | `fan-in` (file hubs)                 |
+| Call path                    | `trace`                      | `call-path`                          |
+| Neighborhood                 | `explore` / `node`           | `symbol-neighborhood`                |
+| Tests to run                 | `affected`                   | `affected-tests`                     |
+| Drift vs baseline / base     | `audit`                      | —                                    |
+| Save / list / drop baseline  | `save_baseline` / `list_baselines` / `drop_baseline` | —              |
+| Freshness / bootstrap        | `context` / `validate`       | —                                    |
+| Coverage / churn ingest      | `ingest_coverage` / `ingest_churn` | —                              |
+| Apply recipe / rows / diff   | `apply` / `apply_rows` / `apply_diff_input` | — (writes need `yes: true`) |
+
+Output shapes match CLI `--json` envelopes (snake_case). Array tools append a second content block prefixed `@codemap/index_freshness`; object tools merge freshness inline.
+
+Baselines workflow: [Audit & baselines](/guides/audit-baselines). Apply: [Apply](/guides/apply). Coverage: [Coverage & churn](/guides/coverage-churn).
+
+Allowlist: `CODEMAP_MCP_TOOLS` — see [Env](/reference/env).
+
+## Resources
+
+| URI                         | Content                                      |
+| --------------------------- | -------------------------------------------- |
+| `codemap://rule`            | Always-on priming rule                       |
+| `codemap://skill`           | Full skill (recipes + schema + patterns)     |
+| `codemap://schema`          | Live DDL                                     |
+| `codemap://recipes`         | Catalog                                      |
+| `codemap://recipes/{id}`    | One recipe                                   |
+| `codemap://mcp-instructions`| Initialize playbook text                     |
+| `codemap://files/{path}`    | Live file card                               |
+| `codemap://symbols/{name}`  | Live symbol card                             |

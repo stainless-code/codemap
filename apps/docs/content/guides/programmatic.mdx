@@ -1,0 +1,48 @@
+---
+title: Programmatic
+description: Use Codemap as a library — createCodemap, defineConfig, and language adapters.
+search:
+  tags: ["guide", "api"]
+---
+
+Embed the same index the CLI uses — scripts, custom tools, test harnesses. Exhaustive types and JSDoc: [API reference](/reference/api).
+
+## Quick start
+
+```ts
+import { createCodemap } from "@stainless-code/codemap";
+
+const cm = await createCodemap({ root: "/path/to/repo" });
+await cm.index({ mode: "incremental" });
+await cm.index({ mode: "full" });
+await cm.index({ mode: "files", files: ["src/a.ts"] });
+
+const rows = cm.query("SELECT name FROM symbols LIMIT 5");
+```
+
+`createCodemap` configures a process-global runtime. **One active project root per process** — a second call with a different `root` throws. Re-init with the same root is fine.
+
+## Config helpers
+
+```ts
+import { defineConfig, parseCodemapUserConfig } from "@stainless-code/codemap";
+
+export default defineConfig({
+  include: ["src/**/*.{ts,tsx}"],
+  fts5: false,
+});
+```
+
+Pass inline overrides: `createCodemap({ root, config: { fts5: true } })`. File path: `configFile` (same as CLI `--config`). See [Config](/guides/config).
+
+## Also exported
+
+| Export                                              | Role                                      |
+| --------------------------------------------------- | ----------------------------------------- |
+| `createCodemap` / `Codemap`                         | Index + `query` handle                    |
+| `defineConfig` / `codemapUserConfigSchema`          | User config                               |
+| `BUILTIN_ADAPTERS` / `getAdapterForExtension`       | Language adapters                         |
+| `LanguageAdapter` / `ParsedFilePayload` / …         | Adapter types                             |
+| `CODEMAP_VERSION`                                   | Package version string                    |
+
+Prefer `createCodemap` over holding a raw DB handle. Full library API: [/reference/api](/reference/api).

@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun", "node"]
+  },
+  "include": [
+    "blume.config.ts",
+    "components/**/*.ts",
+    "content/**/meta.ts",
+    "scripts/**/*.ts"
+  ]
+}

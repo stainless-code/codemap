@@ -1,0 +1,22 @@
+{
+  "name": "Codemap",
+  "short_name": "Codemap",
+  "description": "Query your codebase — local codebase intelligence for AI agents",
+  "icons": [
+    {
+      "src": "/codemap/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/codemap/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#1d4ed8",
+  "background_color": "#fafafa",
+  "display": "standalone"
+}

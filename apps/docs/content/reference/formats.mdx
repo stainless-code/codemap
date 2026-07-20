@@ -1,0 +1,30 @@
+---
+title: Formats
+description: Codemap query output formats — JSON, SARIF, Code Climate, badge, and more.
+search:
+  tags: ["reference", "formats"]
+---
+
+`--format` (and `--ci`) apply to flat row lists — not `--summary` / `--group-by` / baseline envelopes. Use JSON for triage; use SARIF / badge / annotations for gates. Full set: `text` | `json` | `sarif` | `annotations` | `mermaid` | `diff` | `diff-json` | `codeclimate` | `badge`.
+
+| Format         | Use                                                              |
+| -------------- | ---------------------------------------------------------------- |
+| `text`         | Human table / text (CLI default)                                 |
+| `json`         | Machine shape (`--json`); agents and automation                  |
+| `sarif`        | SARIF 2.1.0 → GitHub Code Scanning                               |
+| `annotations`  | GitHub Actions `::notice` lines                                  |
+| `mermaid`      | Graph edges — needs `{from, to, …}` rows; rejects >50 edges      |
+| `diff`         | Unified edit preview from `{file_path, line_start, before_pattern, after_pattern}` |
+| `diff-json`    | Same row contract as JSON (feeds [Apply](/guides/apply))         |
+| `codeclimate`  | GitLab Code Quality artifact (locatable rows; flat `minor`)      |
+| `badge`        | Issue-count summary; `--badge-style json` for CI gates           |
+
+```bash
+codemap query --recipe deprecated-symbols --format sarif
+codemap query --recipe deprecated-symbols --ci
+codemap query --recipe boundary-violations --format codeclimate
+codemap query --recipe boundary-violations --format badge --badge-style json
+codemap audit --base origin/main --format sarif
+```
+
+`rule.id` is `codemap.<recipe-id>` (or `codemap.adhoc`). SARIF / annotations / codeclimate / badge auto-detect path columns (`file_path` / `path` / `to_path` / `from_path`). CI wiring: [GitHub Action](/guides/github-action).

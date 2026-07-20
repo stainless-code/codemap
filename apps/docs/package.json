@@ -1,0 +1,16 @@
+{
+  "name": "@stainless-code/codemap-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "audit": "blume audit --fail-on error --skip canonical_bad_target,non_canonical_in_sitemap,indexable_page_not_in_sitemap,BLUME_AUDIT_LINK_TO_BROKEN",
+    "build": "blume build",
+    "check": "blume check",
+    "dev": "blume dev",
+    "preview": "blume preview",
+    "validate": "bun scripts/validate.ts"
+  },
+  "dependencies": {
+    "blume": "1.1.2"
+  }
+}

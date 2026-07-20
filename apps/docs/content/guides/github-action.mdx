@@ -1,0 +1,95 @@
+---
+title: GitHub Action
+description: Run Codemap audits in CI — SARIF, PR comments, and fail-on gates.
+search:
+  tags: ["guide", "ci", "action"]
+---
+
+The composite Action runs the Codemap CLI in CI — default on `pull_request` is an audit against the PR base, emitting SARIF for Code Scanning.
+
+## Minimal workflow
+
+```yaml
+name: Codemap
+on:
+  pull_request:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # SARIF upload
+      pull-requests: write # only if pr-comment: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: stainless-code/codemap@main # pin a tag/sha in production
+```
+
+Default `mode: audit` uses `github.base_ref` when `audit-base` is empty. On non-PR events with no explicit `command:`, the Action no-ops.
+
+## Modes
+
+| `mode`    | Behavior                                                                 |
+| --------- | ------------------------------------------------------------------------ |
+| `audit`   | `codemap audit --base <ref> --format <format>` (default on PRs)          |
+| `recipe`  | `codemap query --recipe <id>` — set `recipe` (+ optional `params`)       |
+| `command` | Escape hatch — raw CLI args; overrides mode/recipe inputs                |
+
+`mode: aggregate` is reserved and currently rejected.
+
+## Inputs
+
+| Input               | Notes                                                                  |
+| ------------------- | ---------------------------------------------------------------------- |
+| `working-directory` | Monorepo subdirectory                                                  |
+| `package-manager`   | Override autodetect (`npm` / `pnpm` / `yarn` / `bun`, …)               |
+| `version`           | Pin CLI; empty → project dep or `dlx @latest`                          |
+| `mode` / `recipe`   | See Modes                                                              |
+| `params`            | Multiline `key=value` for parametrised recipes (`mode: recipe`)        |
+| `baseline`          | Saved baseline name → `query --baseline` (`mode: recipe`)              |
+| `audit-base`        | Git ref for `audit --base`; empty → `github.base_ref` on PRs           |
+| `format`            | Default `sarif`; also `json`, `annotations`, …                         |
+| `output-path`       | Written artifact path (default `codemap.sarif`)                        |
+| `upload-sarif`      | Default `true` — needs Advanced Security on private repos              |
+| `pr-comment`        | Opt-in markdown summary via `codemap pr-comment`                       |
+| `fail-on`           | `any` (default) or `never`                                             |
+| `changed-since`     | Filter rows to files changed since a ref                               |
+| `group-by`          | `owner` / `directory` / `package`                                      |
+| `state-dir`         | Override `.codemap/`                                                   |
+| `token`             | SARIF upload + PR comment; empty → `github.token`                      |
+| `command`           | Raw CLI args (overrides mode / recipe / baseline / …)                  |
+
+## Outputs
+
+| Output           | Notes                                              |
+| ---------------- | -------------------------------------------------- |
+| `agent`          | Resolved package manager                           |
+| `exec`           | Shell-ready invoke string                          |
+| `install_method` | `project-installed` / `dlx-pinned` / `dlx-latest`  |
+| `output-file`    | Echo of `output-path`                              |
+
+Recipe example:
+
+```yaml
+- uses: stainless-code/codemap@main
+  with:
+    mode: recipe
+    recipe: deprecated-symbols
+    format: sarif
+    params: |
+      # optional key=value lines
+```
+
+Audit against an explicit base:
+
+```yaml
+- uses: stainless-code/codemap@main
+  with:
+    mode: audit
+    audit-base: origin/main
+    output-path: codemap-audit.sarif
+```
+
+List recipe ids locally with `codemap query --recipes-json`. Baselines: [Audit & baselines](/guides/audit-baselines). Formats: [Formats](/reference/formats). CLI twin: [CLI overview](/guides/cli-overview).

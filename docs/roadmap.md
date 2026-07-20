@@ -2,6 +2,8 @@
 
 Forward-looking plans only — **not** a mirror of `src/`. **Doc index:** [README.md](./README.md). **Design / ship:** [architecture.md](./architecture.md), [packaging.md](./packaging.md). **Shipped features** (adapters, fixtures, `codemap agents init` — [agents.md](./agents.md)) live in `src/` and linked docs — not enumerated here.
 
+**Public curated subset** (user-facing): [`apps/docs/content/reference/roadmap.mdx`](../apps/docs/content/reference/roadmap.mdx) → `/reference/roadmap`. Keep this file as the maintainer SSOT; trim the public page by hand when Next / Backlog / non-goals move.
+
 ---
 
 ## Next

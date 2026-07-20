@@ -1,0 +1,73 @@
+---
+title: Comparison
+description: Where Codemap fits among code-index and agent-context tools — by product category, not a feature scorecard.
+search:
+  tags: ["concept", "comparison"]
+---
+
+An agent needs “who imports this?” or “which tests are affected?” — some tools answer with SQL, some with Cypher, some with fixed MCP verbs, some with a quality-gate binary. They are not the same product. This page sorts peers by **what they’re trying to be**, then scores the axes Codemap targets.
+
+Static linters, LSP servers, and whole-repo embeddings sit in other slots. See [When to skip](/concepts/when-to-skip).
+
+## Four kinds of “code intelligence”
+
+| Category                     | Exemplars                                  | Compare on                                        |
+| ---------------------------- | ------------------------------------------ | ------------------------------------------------- |
+| Queryable structural index   | Codemap                                    | SQL + recipes, apply, CI formats, freshness       |
+| Polyglot knowledge graph     | codebase-memory-mcp                        | Language breadth, embeddings, Cypher, cross-repo  |
+| Quality-gate analyzer        | fallow                                     | Dead-code depth, CI verdicts, framework rules     |
+| Fixed-tool / visual explorer | codegraph · codedb · code-graph (FalkorDB) | MCP context packs · snapshot search · 3D/GraphRAG |
+
+## What Codemap targets (and what it delegates)
+
+Codemap owns **structural facts you can `SELECT`**, not semantic ranking or editor UX. Embeddings, hover/rename, and verdict autofix stay with peers in those categories. Opt-in FTS5 (`--with-fts`) JOINs body text with structure — it is not an embedding index.
+
+Cells below were checked against peer source (tool registries / store DDL), not README claims alone. Last verified: 2026-07-20.
+
+| Capability                     | Codemap                 | CBM                       | fallow                      | codegraph                        | codedb                           | code-graph                      |
+| ------------------------------ | ----------------------- | ------------------------- | --------------------------- | -------------------------------- | -------------------------------- | ------------------------------- |
+| **Category**                   | Queryable index         | Polyglot knowledge graph  | Quality-gate analyzer       | Fixed-tool explorer              | Fixed-tool explorer              | Visual / GraphRAG               |
+| Persistent embedded store      | ✅ SQLite               | ✅ SQLite (+ `.zst` art.) | 🟡 analysis cache (not SQL) | ✅ SQLite                        | 🟡 custom snapshot (not SQL)     | 🟡 FalkorDB or embedded lite    |
+| Ad-hoc query language          | ✅ SQL + recipes        | 🟡 Cypher + fixed tools   | ❌ fixed tools / flags      | ❌ fixed tools (explore default) | ❌ fixed MCP + query pipeline    | ❌ fixed MCP (Cypher internal)  |
+| Apply / edit from index        | ✅ recipe · rows · diff | ❌                        | 🟡 removal-oriented `fix`  | ❌                               | 🟡 fallback `edit`               | ❌                              |
+| CI formats (SARIF / badge / …) | ✅                      | ❌                        | ✅ broad (incl. PR/review)  | ❌                               | ❌                               | ❌                              |
+| Agent init / install wiring    | ✅                      | ✅                        | ✅                          | ✅                               | ✅                               | 🟡 template init                |
+| Index freshness / watch        | ✅                      | ✅ git-poll               | 🟡 re-analyze watch         | ✅                               | ✅                               | ❌ no continuous watcher        |
+| Language breadth               | 🟡 JS/TS/CSS + text     | ✅ 163 grammars           | 🟡 JS/TS/web (oxc)          | ✅ WASM tree-sitter polyglot     | ✅ Zig-native polyglot           | 🟡 few langs (JS yes, TS no)    |
+| Embeddings / semantic search   | ❌ FTS5 opt-in only     | ✅ on-device vectors      | ❌                          | ❌ FTS/structural                | ❌ trigram/word indexes          | ❌ (GraphRAG chat ≠ index emb.) |
+| Visual graph UI                | 🟡 mermaid              | ✅ 3D                     | ❌                          | ❌                               | ❌                               | ✅ 3D                           |
+| Local, no phone-home           | ✅                      | ✅                        | ✅ opt-in off               | 🟡 **default-on** telemetry      | 🟡 **default-on** (opt-out flag) | ✅                              |
+
+Legend: ✅ full · 🟡 partial · ❌ none. **CBM** = codebase-memory-mcp. **codegraph** defines eight MCP tools; default `ListTools` is `explore` only unless the allowlist is widened. Engine / agent / CI axes only — not a full quality-gate scorecard for fallow.
+
+**Differentiator:** SQL + named recipes as the query API, a general apply engine over explicit diff rows, and CI format breadth — on an embedded SQLite index with CLI / MCP / HTTP parity. Peers that win languages, embeddings, or context-packing usually do not ship that combination.
+
+## By design, not missing
+
+- **No embeddings in the box** — structural over semantic ([product tenets](/concepts/why-codemap#four-tenets-short)). Reach for a knowledge-graph peer when you need cosine search across many languages.
+- **No verdict engine as a primitive** — SARIF / annotations are output modes of recipes; `codemap apply` runs rows you provide.
+- **No mandatory graph server** — FalkorDB-style hosting is a different install story; Codemap stays local-first.
+- **JS/TS/CSS depth over polyglot breadth (v1)** — honest ceiling; see [When to skip](/concepts/when-to-skip).
+
+## When to pick which
+
+| You want…                                                              | Reach for                                                                                   |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| SQL queries, apply, and CI gates on a JS/TS/CSS tree                   | **Codemap** (`@stainless-code/codemap`)                                                     |
+| 163 languages, on-device embeddings, Cypher over a SQLite graph        | [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp)                      |
+| Deep JS/TS quality gates (dead code, dupes, security candidates) in CI | [fallow](https://github.com/fallow-rs/fallow)                                               |
+| Single-call / explore-style MCP context packing                        | [codegraph](https://github.com/colbymchenry/codegraph) (default tool: `explore`)            |
+| Zig-native MCP context engine (trigram + snapshot; edit as fallback)   | [codedb](https://github.com/justrach/codedb)                                                |
+| Interactive 3D graph + HTTP GraphRAG over a multi-lang repo            | [code-graph](https://github.com/FalkorDB/code-graph)                                        |
+| Grep semantics, LSP rename, or knip-style autofix                      | Those tools — [When to skip](/concepts/when-to-skip)                                        |
+
+## Same name, different product
+
+Other GitHub projects are also called “codemap.” They are **not** this package:
+
+- **[AZidan/codemap](https://github.com/AZidan/codemap)** — Python symbol → line-range indexer (JSON under `.codemap/`); CLI only; cheaper full-file reads, not SQL.
+- **[JordanCoin/codemap](https://github.com/JordanCoin/codemap)** — Go project-brain / tree / handoff CLI (+ MCP); often installed as Homebrew/Scoop **`codemap`**. Session priming, not a queryable structural SQLite schema.
+
+Install this one as **`@stainless-code/codemap`**. Positioning without peer names: [Why Codemap](/concepts/why-codemap).
+
+Cells re-checked against peer source on 2026-07-20. Re-verify before treating them as everlasting.

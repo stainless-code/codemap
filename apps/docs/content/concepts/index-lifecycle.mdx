@@ -1,0 +1,39 @@
+---
+title: Index lifecycle
+description: How Codemap indexes, when to full-rebuild, and how agents read freshness.
+search:
+  tags: ["concept"]
+---
+
+Default `codemap` is **incremental** — re-parse what changed, keep the rest. Agents should treat results as authoritative only when freshness looks clean.
+
+## Modes
+
+```bash
+codemap                         # incremental (git-aware when available)
+codemap --full                  # wipe + rebuild
+codemap --files src/a.ts …      # targeted paths after edits
+codemap validate --json         # per-file stale / missing / unindexed / rejected
+```
+
+Use `--full` after a schema-breaking package upgrade (forces `.codemap/index.db` rebuild), after toggling `fts5` / `--with-fts`, or when the index is clearly wrong.
+
+## Watcher
+
+`codemap mcp` and `codemap serve` embed a debounced file watcher by default (≈250ms). Standalone: `codemap watch`. Opt out: `--no-watch` or `CODEMAP_WATCH=0`. When the watcher is disabled (WSL `/mnt/*`, etc.), `codemap agents init --git-hooks` installs background incremental index on git events.
+
+Concurrent indexers coordinate via `<state-dir>/index.lock`. After a crash: `codemap unlock`. Per-file parse failures append to `<state-dir>/errors.log`.
+
+## Freshness signals
+
+Session bootstrap (`codemap context` / MCP `context`) exposes `index_freshness`:
+
+| Field           | Meaning                                              |
+| --------------- | ---------------------------------------------------- |
+| `pending_sync`  | Debounce queue or in-flight reindex                  |
+| `commit_drift`  | `HEAD` ≠ `last_indexed_commit`                       |
+| `warning`       | Single agent-readable line when something is off     |
+
+If `pending_sync`, wait briefly and retry (or call `validate`). If `commit_drift` / `warning`, run `codemap` (or rely on watch) before trusting structural queries. Snippet rows may set `stale: true` when disk drifted past indexed line ranges.
+
+State dir details: [Config](/guides/config). Env knobs: [Env](/reference/env).

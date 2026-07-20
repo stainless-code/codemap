@@ -231,19 +231,18 @@ Per [`tracer-bullets`](../../.agents/rules/tracer-bullets.md) — ship one verti
 
 ### Current state (2026-05)
 
-- **Single TS package** at repo root: `name: "@stainless-code/codemap"` in `package.json`; `src/` is the only TS source root; `bun src/index.ts` is the dev entry; published to npm as one package with one `bin: codemap`.
-- **No workspace tooling.** No `workspaces` field, no `packages/` directory, no `tsconfig.references`. `tsdown` builds a single bundle to `dist/`.
-- **Multiple consumer-facing surfaces already coexist** in this flat structure: CLI (`codemap`), MCP server (`codemap mcp`), HTTP server (`codemap serve`), watch mode (`codemap watch`). All ship as one binary; transport is a `cmd-*.ts` dispatch, not a separate package.
+- **Publishable TS package** at repo root: `name: "@stainless-code/codemap"` in `package.json`; `src/` is the only library/CLI source root; `bun src/index.ts` is the dev entry; published to npm as one package with one `bin: codemap`.
+- **Workspaces for docs only** — `workspaces: [".", "apps/*"]` with private `@stainless-code/codemap-docs`; no `packages/*`, no `tsconfig.references`. `tsdown` still builds a single CLI bundle to `dist/`.
+- **Multiple consumer-facing surfaces already coexist** in this layout: CLI (`codemap`), MCP server (`codemap mcp`), HTTP server (`codemap serve`), watch mode (`codemap watch`). All ship as one binary; transport is a `cmd-*.ts` dispatch, not a separate package.
 
 ### Why this question surfaces now
 
-Three upcoming surfaces would each ship a **second binary or second publishable artifact**:
+Two upcoming surfaces would each ship a **second binary or second publishable artifact**:
 
 1. **(d) LSP diagnostic-push server + paired VSCode extension** — `codemap-lsp` Bun/Node binary + `codemap-vscode` extension package (published to VSCode Marketplace + Open VSX, NOT npm).
 2. **(b) C.9 community plugins** — per [c9-plugin-layer Q5/Q8](./c9-plugin-layer.md#open-decisions-iterate-as-the-plan-converges), the plugin contract may want plugins as separate npm packages (e.g. `codemap-plugin-nextjs`) so framework-specific knowledge lives outside core.
-3. **Docs site (Fumadocs / similar)** — a React-based docs site rendering existing `docs/*.md` content, deployed to Vercel or similar. Fumadocs is multi-framework (Next.js / Astro / Vite-based: Tanstack Start / Waku / React Router); the canonical adapter for "read existing markdown without MDX rewrite" is **`@fumadocs/local-md`** (mirrors `fuma-nama/fumadocs/examples/next-local-md`). Fumapress (`fumapress` CLI + `@fumapress/core`) is the May-2026 zero-config Waku-based variant — preview-oriented per its tagline, not yet the production path. Adds a second `package.json` (deployable web artifact) but **does NOT itself force monorepo conversion**: the site lives as a flat `website/` dir with its own `package.json`, reading markdown from `../docs/`. Conversion only triggers if the site needs to import codemap's TS engines (live recipe runner, interactive schema explorer, WASM CLI demo).
 
-Any one alone can ship in the current flat layout. Combinations start to strain it (especially (1) + (2), or (3) with engine-import requirements).
+Either alone can ship in the current flat layout. Both together start to strain it.
 
 ### The three options
 
@@ -265,14 +264,13 @@ Any one alone can ship in the current flat layout. Combinations start to strain 
 
 **Pattern:** monorepo is dominant when a tool ships **3+ independently-publishable artifacts**. Single-package wins when there's just one (knip).
 
-For codemap, the artifact count grows from **1** (today: CLI) to:
+For codemap, the artifact count today is **CLI (+ private docs app)**. It grows when:
 
-- **2** after Fumadocs site deploys (CLI + docs site as deployable web artifact) **OR** after (d) ships (CLI + VSCode extension)
-- **3** after both Fumadocs + (d) ship (CLI + docs site + VSCode extension)
-- **4+** if (d) extracts `codemap-core` for the LSP server to import cleanly OR if the docs site needs engine imports
-- **5+** if C.9 community plugins ship as packages
+- **(d)** ships (VSCode extension + optional `codemap-lsp` bin)
+- **(d)** extracts `codemap-core` for the LSP server to import cleanly, **or** the docs site adds live engine imports (recipe runner / WASM demo)
+- C.9 community plugins ship as separate packages
 
-Inflection point is roughly between **3 and 4 artifacts** — Fumadocs by itself doesn't tip the scale, but Fumadocs + (d) does.
+Inflection point is roughly when independently publishable artifacts hit **3–4** — the markdown-only docs app alone does not tip the scale.
 
 ### When to revisit (triggers, not preferences)
 
@@ -282,13 +280,13 @@ Convert (Option 2 or 3) when **any** of these triggers fire — not preemptively
 2. **A user asks "I want to consume the engines as a library."** Triggers extraction of `codemap-core`. If the ask comes after (d) ships, extracting alongside `codemap-lsp` justifies the conversion.
 3. **A second consumer-facing distro ships** (e.g. `codemap-server` long-running daemon decoupled from CLI). Workspaces let it iterate independently.
 4. **Locked versioning across packages becomes painful** with the hand-script approach in Option 1 (e.g. CLI bumps without LSP server changes still need a changeset entry for the LSP package — annoying enough times that the workspace tooling pays for itself).
-5. **Docs site needs to import codemap source.** Markdown-only Fumadocs site (using `@fumadocs/local-md` to read `../docs/*.md`) ships as a flat `website/` dir — NOT a trigger by itself. Trigger fires only when the site adds a live recipe runner, an interactive schema explorer, a WASM CLI demo, or anything else that imports from codemap's TS source. Then workspace tooling becomes the cleanest path: extract `@stainless-code/codemap-core`, import from the website package.
+5. **Docs site needs to import codemap source.** Markdown-only Blume `apps/docs` is NOT a trigger. Trigger fires only when the site adds a live recipe runner, an interactive schema explorer, a WASM CLI demo, or anything else that imports from codemap's TS source — then extract `@stainless-code/codemap-core` and import from the docs package.
 
 Mirrors the doc's other "wait for two consumers / two asks" disciplines ([`roadmap.md` § `history` table backlog](../roadmap.md#core-substrate--platform), audit verdict thresholds).
 
 ### Default bias (revisit during plan iteration)
 
-- **Option 1** if (d) ships before any of the five triggers above. (d) alone doesn't justify conversion — the VSCode extension is separately published anyway, and the LSP binary can be a second `bin` entry in the existing `package.json`. Markdown-only Fumadocs site (flat `website/` dir) also doesn't trigger conversion. **This is the recommended starting position.**
+- **Option 1** if (d) ships before any of the five triggers above. (d) alone doesn't justify conversion — the VSCode extension is separately published anyway, and the LSP binary can be a second `bin` entry in the existing `package.json`. **This is the recommended starting position.**
 - **Option 2** (separate refactor PR before (d) impl) if a community-plugin contributor is in flight when (d) starts, or if `codemap-core` extraction is asked for explicitly (e.g. docs site needs live runners).
 - **Option 3** (convert as part of (d) impl) if Option 2's "refactor with no user-visible value" PR shape is unacceptable to reviewers.
 
@@ -297,7 +295,6 @@ Mirrors the doc's other "wait for two consumers / two asks" disciplines ([`roadm
 - **User-repo monorepo awareness** (separate concept — discovering `pnpm-workspace.yaml` in indexed projects). Tracked in [`docs/roadmap.md` Backlog](../roadmap.md#backlog) "Monorepo / workspace awareness."
 - **Splitting `templates/agents/` into a separate package.** Templates ship in the main codemap package via `files: ["templates"]`; no consumer signal for a separate package today.
 - **VSCode-extension repo split** (knip's pattern — separate repo). Out of scope; codemap's extension lives alongside core.
-- **Docs site dir-name choice (`website/` vs `apps/docs/` vs `docs-site/`).** Bias to `website/` until conversion fires — `apps/*` implies workspaces (cohort norm signal); `website/` doesn't. Rename to `apps/docs/` only when actually converting.
 
 ---
 

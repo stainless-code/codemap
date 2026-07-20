@@ -1,0 +1,56 @@
+---
+title: Config
+description: Project config for Codemap — include/exclude globs, boundaries, synthesis, and churn.
+search:
+  tags: ["guide", "config"]
+---
+
+Optional config lives at `<state-dir>/config.{ts,js,json}` (default `.codemap/config.*`). Default export: a plain object or an async factory. Unknown keys are rejected (Zod, strict).
+
+## Minimal shape
+
+```ts
+import { defineConfig } from "@stainless-code/codemap";
+
+export default defineConfig({
+  include: ["src/**/*.{ts,tsx}", "src/**/*.css"],
+  excludeDirNames: ["node_modules", ".git", "dist", "build"],
+  boundaries: [
+    {
+      name: "ui-cant-touch-server",
+      from_glob: "src/ui/**",
+      to_glob: "src/server/**",
+    },
+  ],
+  synthesis: {
+    heuristicCalls: false,
+  },
+});
+```
+
+JSON works the same (no `defineConfig`). Setting **`include` replaces** the default glob list entirely — it does not merge.
+
+## Common knobs
+
+| Field              | Role                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `root`             | Project root; usually CLI `--root` / cwd (optional in config)        |
+| `databasePath`     | SQLite path (rel. to root or absolute); default `<state-dir>/index.db` |
+| `include`          | Globs relative to project root (replaces defaults when set)          |
+| `excludeDirNames`  | Directory name segments to skip (replaces defaults when set)         |
+| `tsconfigPath`     | Alias resolution; `null` disables                                    |
+| `fts5`             | Opt-in full-text (`source_fts`); CLI `--with-fts` wins               |
+| `boundaries`       | Architecture rules → `boundary_rules` / `boundary-violations` recipe |
+| `synthesis`        | e.g. `heuristicCalls` for opt-in heuristic call edges                |
+| `churn`            | Half-life / `since` / optional precomputed `file`                    |
+| `apply`            | `autoApplyRecipes` allowlist for `codemap apply`                     |
+
+Types and helpers: [API reference](/reference/api). Library entry: [Programmatic](/guides/programmatic).
+
+## State directory
+
+Default `.codemap/`. Override with `--state-dir` or `CODEMAP_STATE_DIR`. Codemap rewrites `<state-dir>/.gitignore` to a canonical blacklist on every boot (`index.db`, WAL/SHM, …). Project-tracked sources (`recipes/`, config) stay trackable.
+
+## Project-local recipes
+
+Drop SQL into `.codemap/recipes/<id>.sql` (+ optional `<id>.md` for params/actions). Discoverable via `codemap query --recipes-json`; project ids win on collision (`shadows: true` in the catalog).

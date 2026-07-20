@@ -57,7 +57,7 @@ export type ParsedFilePayload = Pick<
  * Pluggable extractor for a set of file extensions.
  *
  * @remarks
- * Built-in adapters live in {@link ./builtin.ts}. Future optional packages can register
+ * Built-ins: {@link BUILTIN_ADAPTERS}. Future optional packages can register
  * additional adapters (or replace built-ins) once a public registration API exists.
  */
 export interface LanguageAdapter {

@@ -1,0 +1,10 @@
+# Generated docs runtime, isolated verify output, and build output
+.blume/
+.blume-verify/
+dist/
+
+# TypeDoc-generated API reference (meta.ts stays tracked)
+content/reference/api/**/*.mdx
+content/reference/api/**/*.md
+!content/reference/api/meta.ts
+!content/reference/api/index.mdx

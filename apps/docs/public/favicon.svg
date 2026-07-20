@@ -1,0 +1,9 @@
+<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile{fill:#fafafa}.frame{stroke:#71717a}.hit{fill:#1d4ed8}
+    @media(prefers-color-scheme:dark){.tile{fill:#18181b}.frame{stroke:#a1a1aa}.hit{fill:#60a5fa}}
+  </style>
+  <rect class="tile" width="32" height="32" rx="8"/>
+  <rect class="frame" x="5.5" y="5.5" width="21" height="21" rx="4.5" stroke-width="2" fill="none"/>
+  <rect class="hit" x="14.5" y="14.5" width="8" height="8" rx="1.75"/>
+</svg>

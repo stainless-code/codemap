@@ -1,0 +1,21 @@
+---
+title: When to skip
+description: Cases where Codemap is the wrong tool — use grep, LSP, or another index instead.
+search:
+  tags: ["concept"]
+---
+
+Codemap is intentionally narrow. Pick the right tool:
+
+| Need                                         | Reach for                                      | Reach for Codemap when…                                      |
+| -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| Raw text / grep semantics                    | `ripgrep` / IDE search                         | Body matches that JOIN with structure — opt-in FTS5          |
+| In-editor types / rename / hover             | `tsserver` / LSP                               | Read-side blast radius — `show` / `snippet` / `impact`       |
+| Verdict lints (severity, suppressions, autofix) | knip / jscpd / `eslint --fix`              | Predicate-as-API analysis you compose — recipes + `--format sarif`; `apply` runs **your** diff rows, it doesn’t invent fixes |
+| Semantic / embedding search                  | An embedding index                             | Structural facts only — no LLM-in-the-box                    |
+| Whole-file reading                           | Editor / `Read` tool                           | Paths + line ranges + signatures; agent still reads snippets |
+| Agent reasoning / generation                 | Your agent host                                | Codemap answers; it doesn’t decide                           |
+| Polyglot “who calls X” across many languages | Multi-language index tools                     | JS/TS/CSS-ecosystem depth is the focus                       |
+| NL Q&A over the whole repo                   | Agent host + embeddings                        | —                                                            |
+
+Positioning: [Why Codemap](/concepts/why-codemap). Named peers: [Comparison](/concepts/comparison).

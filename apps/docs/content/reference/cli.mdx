@@ -1,0 +1,103 @@
+---
+title: CLI
+description: Codemap CLI commands and flags.
+search:
+  tags: ["reference", "cli"]
+---
+
+Live help always wins: `codemap --help` and `codemap <command> --help`. Digest below mirrors the published CLI surface.
+
+## Index (default argv)
+
+```bash
+codemap
+codemap --full
+codemap --files <paths…>
+codemap --root <dir>
+codemap --config <path>
+codemap --state-dir <dir>
+codemap --with-fts
+codemap version                 # also: --version / -V
+codemap unlock                  # clear stale index.lock
+```
+
+## query
+
+```bash
+codemap query --json "<SQL>"
+codemap query --json --recipe <id> [--params k=v,…]
+codemap query --recipes-json
+codemap query --print-sql <id>
+codemap query --summary
+codemap query --changed-since <ref>
+codemap query --group-by directory|owner|package
+codemap query --save-baseline[=name]
+codemap query --baseline[=name]
+codemap query --baselines
+codemap query --drop-baseline <name>
+codemap query --format <fmt>
+codemap query --ci              # SARIF + non-zero on findings + quiet
+```
+
+N statements, one bootstrap (MCP `query_batch`):
+
+```bash
+echo '{"statements":["SELECT 1","SELECT COUNT(*) AS n FROM symbols"]}' \
+  | codemap query batch --stdin
+codemap query batch --file queries.json --summary --compact
+```
+
+Outcome aliases (pass query flags through): `dead-code`, `deprecated`, `boundaries`, `hotspots` (→ `fan-in`), `coverage-gaps`.
+
+## Lookups & graphs
+
+```bash
+codemap show <name> [--kind …] [--in <path>] [--query '…'] [--print-sql]
+codemap snippet <name> […]
+codemap impact <target> [--direction up|down|both] [--via …] [--depth N] [--in <file>]
+codemap affected [paths…] [--stdin] [--changed-since <ref>] [--json]
+codemap trace --from <a> --to <b>
+codemap explore <name>… [--depth N] [--kind …] [--budget-chars N]
+codemap node <name>
+```
+
+## Resource twins
+
+Same JSON as MCP / HTTP resources:
+
+```bash
+codemap file <path>             # → codemap://files/{path}
+codemap schema                  # → codemap://schema
+codemap symbols <name> [--in <path>]
+```
+
+## audit / apply / rename / ingest
+
+```bash
+codemap audit --base <ref> [--json] [--summary] [--format sarif] [--ci]
+codemap audit --baseline <prefix>
+codemap apply <recipe> --params … [--dry-run|--yes] [--force]
+codemap apply <recipe> --yes --until-empty [--max-passes N]
+codemap apply <recipe> --yes --commit "<msg>"
+codemap apply --rows - --yes
+codemap apply --diff-input <file> --dry-run
+codemap rename <old> <new> [--define-in <file>] [--kind …] [apply flags…]
+codemap ingest-coverage <path> [--runtime] [--json]
+codemap ingest-churn <path> [--json]
+codemap pr-comment <file|->
+```
+
+## Agents & transports
+
+```bash
+codemap agents init [--force] [--mcp] [--interactive] [--targets …] [--git-hooks]
+codemap skill
+codemap rule
+codemap mcp [--no-watch]
+codemap serve [--port N] [--host …] [--token …] [--no-watch]
+codemap watch [--debounce ms] [--quiet]
+codemap context [--compact] [--for "<intent>"] [--json]
+codemap validate [--json]
+```
+
+Guides: [CLI overview](/guides/cli-overview) · [Apply](/guides/apply) · [Audit & baselines](/guides/audit-baselines) · [Agents & MCP](/guides/agents-mcp). Env: [Env](/reference/env). Formats: [Formats](/reference/formats).

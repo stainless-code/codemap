@@ -1,0 +1,45 @@
+:root {
+  /* Zinc chrome (shared with sibling docs apps) + Codemap blue */
+  --blume-background: #fafafa;
+  --blume-foreground: #18181b;
+  --blume-muted: #f4f4f5;
+  --blume-muted-foreground: #52525b;
+  --blume-border: #e4e4e7;
+  --blume-accent: #1d4ed8;
+  --blume-accent-foreground: #ffffff;
+  --blume-success: #15803d;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: #18181b;
+  --blume-foreground: #fafafa;
+  --blume-muted: #27272a;
+  --blume-muted-foreground: #a1a1aa;
+  --blume-border: #3f3f46;
+  --blume-accent: #60a5fa;
+  --blume-accent-foreground: #18181b;
+  --blume-success: #4ade80;
+}
+
+/* Logo hover: frame brightens; brand cell snaps toward center */
+.logo-frame {
+  opacity: 0.55;
+  transition:
+    stroke-width 200ms ease,
+    opacity 200ms ease;
+}
+
+.logo-select {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+a:has(> span > .logo-svg):hover .logo-frame {
+  stroke-width: 2.35;
+  opacity: 0.85;
+}
+
+a:has(> span > .logo-svg):hover .logo-select {
+  transform: translate(-2.25px, -2.25px);
+}

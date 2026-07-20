@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" class="logo-svg" aria-hidden="true">
+  <rect
+    class="logo-frame"
+    x="3.25"
+    y="3.25"
+    width="17.5"
+    height="17.5"
+    rx="3.5"
+    stroke="currentColor"
+    stroke-width="2"
+  />
+  <rect
+    class="logo-select"
+    x="11.25"
+    y="11.25"
+    width="6.5"
+    height="6.5"
+    rx="1.5"
+    fill="var(--blume-accent, #1d4ed8)"
+  />
+</svg>

@@ -193,6 +193,47 @@ jobs:
           bun run dev --full
           bun run benchmark
 
+  docs:
+    name: 📖 Docs site
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    # Token for github-releases changelog — avoids offline changelog failures under --strict.
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          # Sitemap lastmod uses `git log` per file.
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      # Lib dist — cheap; keep for parity / future islands that resolve package entrypoints.
+      - name: Build
+        run: bun run build
+
+      - name: Generate API reference (Markdown)
+        run: bun run docs:api
+
+      # Site content graph. No --external (offline). Wrapper filters immutable
+      # changelog→maintainer-docs broken links (see apps/docs/scripts/validate.ts).
+      - name: Validate docs links
+        run: bun run docs:validate -- --strict
+
+      - name: Typecheck docs site
+        run: bun run docs:check -- --isolated
+
+      - name: Build docs site
+        run: bun run docs:build
+
+      # Post-build; skips live in apps/docs `audit` script (+ lessons).
+      - name: Audit docs site
+        run: bun run docs:audit
+
   audit:
     # `bun audit` exits 0 regardless of severity — the scan below blocks on high/critical.
     # Transitive-dep CVE visibility; advisory-API outage doesn't block.
@@ -262,6 +303,7 @@ jobs:
         test,
         build,
         check-pack,
+        docs,
         audit,
         benchmark,
       ]
@@ -277,6 +319,7 @@ jobs:
             needs.test.result != 'success' ||
             needs.build.result != 'success' ||
             needs['check-pack'].result != 'success' ||
+            needs.docs.result != 'success' ||
             needs.audit.result != 'success' ||
             needs.benchmark.result != 'success'
           )

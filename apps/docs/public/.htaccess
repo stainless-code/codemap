@@ -1,0 +1,46 @@
+# Codemap docs — Apache config for the /codemap subpath.
+# Deployed to the /codemap folder by the Deploy docs workflow (the FTP account
+# is scoped to /codemap, so this lands at /codemap/.htaccess). Do NOT list
+# .htaccess in the workflow exclude — it rides along in dist/.
+
+# Don't list directories; serve index.html for clean URLs (/codemap/guides/getting-started
+# resolves to guides/getting-started/index.html).
+Options -Indexes
+DirectoryIndex index.html
+
+# Block direct access to dotfiles (e.g. the FTP-deploy sync-state file).
+# .well-known/ stays reachable: requests target files inside it whose names
+# do not start with a dot (ACME challenge, etc.).
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# Site ships a 404.html; serve it for misses instead of Apache's default.
+ErrorDocument 404 /codemap/404.html
+
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+  # Self assets + hashed _astro bundles, local search, inline theme/banner scripts
+  # (data-attr driven, no nonce). No analytics/external CDNs — relax script-src if needed.
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data:; media-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+</IfModule>
+
+# llms.txt + raw .md/.mdx mirrors: static hosting doesn't apply Astro endpoint
+# Response headers, so declare UTF-8 + the right type here, and keep the mirrors
+# out of the index (canonical HTML pages are what should be crawled). robots.txt
+# is intentionally excluded.
+<IfModule mod_mime.c>
+  AddType text/plain .txt
+  AddType text/markdown .md .mdx
+  AddCharset UTF-8 .txt .md .mdx
+</IfModule>
+<FilesMatch "\.mdx?$">
+  Header set X-Robots-Tag "noindex"
+</FilesMatch>
+<FilesMatch "^llms(-full|-small)?\.txt$">
+  Header set X-Robots-Tag "noindex"
+</FilesMatch>

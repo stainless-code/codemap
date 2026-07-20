@@ -1,0 +1,59 @@
+---
+title: Schema overview
+description: High-level Codemap SQLite tables — files, symbols, imports, calls, and friends.
+search:
+  tags: ["concept"]
+---
+
+Prefer [recipes](/recipes) until you know the join paths. Live DDL: MCP/HTTP `codemap://schema`, or the schema section of `codemap skill`.
+
+## Core structure
+
+| Table            | Holds                                                              |
+| ---------------- | ------------------------------------------------------------------ |
+| `files`          | Every indexed path + language + line counts                        |
+| `symbols`        | Functions, classes, interfaces, types, enums, …                    |
+| `imports`        | Import statements                                                  |
+| `exports`        | Export declarations                                                |
+| `dependencies`   | Resolved file→file edges (import graph)                            |
+| `components`     | React components (PascalCase + JSX / hooks heuristic)              |
+| `calls`          | Function-scoped call edges                                         |
+| `references`     | Identifier uses                                                    |
+| `bindings`       | Use → originating symbol                                           |
+| `markers`        | TODO / FIXME / HACK / NOTE                                         |
+
+## Types & modules
+
+| Table               | Holds                                              |
+| ------------------- | -------------------------------------------------- |
+| `type_members`      | Interface / object-literal members                 |
+| `type_heritage`     | extends / implements                               |
+| `import_specifiers` | Per-specifier breakdown of imports                 |
+| `re_export_chains`  | Materialised re-export resolution                  |
+| `module_cycles`     | Files in import cycles                             |
+| `dynamic_imports`   | `import()` sites                                   |
+| `scopes`            | Lexical scope graph                                |
+
+## CSS & JSX
+
+| Table           | Holds                          |
+| --------------- | ------------------------------ |
+| `css_variables` | Custom properties / tokens     |
+| `css_classes`   | Class definitions              |
+| `css_keyframes` | `@keyframes`                   |
+| `jsx_elements` / `jsx_attributes` | JSX substrate   |
+
+## Ops & CI facts
+
+| Table              | Holds                                                         |
+| ------------------ | ------------------------------------------------------------- |
+| `test_suites`      | describe / it / test blocks                                   |
+| `file_churn`       | Git (or ingested) churn metrics                               |
+| `file_metrics`     | Per-file aggregates                                           |
+| `coverage`         | Statement coverage after `ingest-coverage`                    |
+| `boundary_rules`   | From config `boundaries`                                      |
+| `query_baselines`  | Saved query snapshots for `--baseline` / `audit`              |
+| `source_fts`       | Opt-in FTS5 over file bodies (`fts5: true` / `--with-fts`)    |
+| `meta`             | Key-value index metadata                                      |
+
+Languages: deep extraction for JS/TS/JSX/TSX/CSS; markers-only for markdown/json/yaml/sh and similar. Adapters: [Programmatic](/guides/programmatic).

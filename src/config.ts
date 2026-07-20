@@ -208,7 +208,7 @@ function formatCodemapConfigError(error: z.ZodError): string {
 
 /**
  * Fully resolved config (defaults filled, paths absolute) — stored in the
- * process-global runtime by {@link initCodemap} and read by every layer.
+ * process-global runtime after init and read for indexing / query / serve.
  */
 export interface ResolvedCodemapConfig {
   /** Absolute project root (from CLI `--root`, env, or `process.cwd()`). */
@@ -222,9 +222,9 @@ export interface ResolvedCodemapConfig {
   readonly stateDir: string;
   /** Absolute path to the SQLite database file (default `<stateDir>/index.db`). */
   readonly databasePath: string;
-  /** Glob patterns relative to `root`; either user-supplied or {@link DEFAULT_INCLUDE_PATTERNS}. */
+  /** Glob patterns relative to `root`; either user-supplied or `DEFAULT_INCLUDE_PATTERNS`. */
   readonly include: readonly string[];
-  /** Directory **names** (any segment) to skip — either user-supplied or {@link DEFAULT_EXCLUDE_DIR_NAMES}. */
+  /** Directory **names** (any segment) to skip — either user-supplied or `DEFAULT_EXCLUDE_DIR_NAMES`. */
   readonly excludeDirNames: ReadonlySet<string>;
   /** Absolute path to `tsconfig.json` for alias resolution, or `null` to disable. */
   readonly tsconfigPath: string | null;
@@ -232,7 +232,7 @@ export interface ResolvedCodemapConfig {
    * FTS5 full-text indexing toggle. `true` populates the `source_fts`
    * virtual table at index time; `false` (default) leaves it empty.
    * Resolved from `.codemap/config.ts` `fts5` plus the `--with-fts` CLI
-   * flag; CLI wins. See `docs/plans/fts5-mermaid.md`.
+   * flag; CLI wins.
    */
   readonly fts5: boolean;
   /**
@@ -240,7 +240,7 @@ export interface ResolvedCodemapConfig {
    * `recipe_recency` table on every successful recipe run and inlines
    * `last_run_at` / `run_count` on `--recipes-json` reads. `false`
    * short-circuits every write — no rows ever land. Local-only — no
-   * upload primitive. See `docs/architecture.md` § `recipe_recency`.
+   * upload primitive.
    */
   readonly recipeRecency: boolean;
   /**
