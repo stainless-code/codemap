@@ -241,7 +241,7 @@ Three upcoming surfaces would each ship a **second binary or second publishable 
 
 1. **(d) LSP diagnostic-push server + paired VSCode extension** — `codemap-lsp` Bun/Node binary + `codemap-vscode` extension package (published to VSCode Marketplace + Open VSX, NOT npm).
 2. **(b) C.9 community plugins** — per [c9-plugin-layer Q5/Q8](./c9-plugin-layer.md#open-decisions-iterate-as-the-plan-converges), the plugin contract may want plugins as separate npm packages (e.g. `codemap-plugin-nextjs`) so framework-specific knowledge lives outside core.
-3. **Docs site** — **Superseded by [`docs-site.md`](./docs-site.md)** (Blume `apps/docs` + FTP `/codemap`, workspaces `[".", "apps/*"]`). Historical note: an earlier Fumadocs / flat `website/` sketch lived here; do not revive it. Docs hosting alone still **does NOT** force `packages/*` conversion unless the site imports CLI engines (live recipe runner, etc.).
+3. **Docs site** — **Shipped** as Blume `apps/docs` + FTP `/codemap`, workspaces `[".", "apps/*"]`. Docs hosting alone still **does NOT** force `packages/*` conversion unless the site imports CLI engines (live recipe runner, etc.).
 
 Any one alone can ship in the current flat layout. Combinations start to strain it (especially (1) + (2), or (3) with engine-import requirements).
 
@@ -297,7 +297,7 @@ Mirrors the doc's other "wait for two consumers / two asks" disciplines ([`roadm
 - **User-repo monorepo awareness** (separate concept — discovering `pnpm-workspace.yaml` in indexed projects). Tracked in [`docs/roadmap.md` Backlog](../roadmap.md#backlog) "Monorepo / workspace awareness."
 - **Splitting `templates/agents/` into a separate package.** Templates ship in the main codemap package via `files: ["templates"]`; no consumer signal for a separate package today.
 - **VSCode-extension repo split** (knip's pattern — separate repo). Out of scope; codemap's extension lives alongside core.
-- **Docs site dir-name choice.** Resolved by [`docs-site.md`](./docs-site.md): `apps/docs` + `workspaces: [".", "apps/*"]`. Not a trigger for extracting `packages/*`.
+- **Docs site dir-name choice.** Shipped: `apps/docs` + `workspaces: [".", "apps/*"]`. Not a trigger for extracting `packages/*`.
 
 ---
 
