@@ -73,7 +73,7 @@
   },
   "excludePrivate": true,
   "excludeInternal": true,
-  "disableSources": false,
+  "disableSources": true,
   "sourceLinkTemplate": "https://github.com/stainless-code/codemap/blob/{gitRevision}/{path}#L{line}",
   "gitRevision": "main",
   "logLevel": "Info",

@@ -59,7 +59,7 @@
     "check:perf-baseline:update": "bun scripts/check-perf-baseline.ts --update",
     "clean": "git clean -xdf -e .env -e docs/research/scratch",
     "dev": "bun src/index.ts",
-    "docs:api": "typedoc && bun apps/docs/scripts/rewrite-api-links.ts",
+    "docs:api": "bun apps/docs/scripts/rewrite-api-links.ts --clean && typedoc && bun apps/docs/scripts/rewrite-api-links.ts",
     "docs:audit": "bun run --filter '@stainless-code/codemap-docs' audit",
     "docs:build": "bun run --filter '@stainless-code/codemap-docs' build",
     "docs:check": "bun run --filter '@stainless-code/codemap-docs' check",

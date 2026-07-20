@@ -156,6 +156,10 @@ function resolveTargetFile(
     const filePath = relative
       ? path.join(rootDir, ...relative.split("/"))
       : path.join(rootDir, "index");
+    const relativeToRoot = path.relative(rootDir, filePath);
+    if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+      return null;
+    }
     return /\.mdx?$/i.test(filePath) ? filePath : `${filePath}.mdx`;
   }
 

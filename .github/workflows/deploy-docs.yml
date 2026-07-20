@@ -67,7 +67,7 @@ jobs:
 
       # FTP account root is already /codemap — server-dir ./ is correct (not ./codemap/).
       - name: Upload to /codemap via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
