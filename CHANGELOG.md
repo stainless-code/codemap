@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.3
+
+### Patch Changes
+
+- [#202](https://github.com/stainless-code/codemap/pull/202) [`c629c55`](https://github.com/stainless-code/codemap/commit/c629c55ec2199ea4dc10e51d66c50520b954d866) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Add public docs site at https://stainless-code.com/codemap (guides, recipes, concepts, reference, and library API).
+
 ## 0.11.2
 
 ### Patch Changes
