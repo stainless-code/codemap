@@ -14,8 +14,6 @@ permissions:
   contents: write
   pull-requests: write
   id-token: write
-  # GITHUB_TOKEN tag push is rejected without this when workflows are in-tree.
-  workflows: write
 
 jobs:
   release:
