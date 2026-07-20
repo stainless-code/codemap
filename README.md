@@ -1,6 +1,6 @@
 # Codemap
 
-**Query your codebase.** Local codebase intelligence for AI agents — a SQLite index of structural metadata (symbols, imports, exports, components, dependencies, CSS tokens, markers, and more) so agents and tools answer “where / what / who” with **SQL** instead of scanning the tree.
+**Query your codebase.** Local codebase intelligence for AI agents — a SQLite index of symbols, imports, calls, and more structural metadata so agents answer “where / what / who” with **SQL** and recipes instead of scanning the tree.
 
 - **Not** grep by default — use ripgrep / your IDE for raw text. Opt-in FTS5 (`--with-fts` / `fts5: true`) when body matches need to JOIN with structure.
 - **Is** a fast, token-efficient way to navigate **structure**.

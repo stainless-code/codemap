@@ -77,6 +77,12 @@ was rejected) and the "when **not** to use it" anti-pitch — keep both.
   a `.codemap/index.db` rebuild are the trigger for `minor`; everything else
   (additive CLI, public types, docs) is `patch`.
 - **Brand one-liner** (memorable beat, not hype): "Query your codebase."
+  Home title / OG: `Codemap — Query your codebase.`
+- **Site / OG / npm description** (never lead with the brand one-liner):
+  "Local codebase intelligence for AI agents — a SQLite index of symbols,
+  imports, and calls. SQL and recipes instead of scanning the tree."
+  Same string in `blume.config.ts`, `package.json`, and the homepage Hero sub;
+  README may expand after the bold one-liner.
 - **Category label** (what it is — pair with the brand beat, then the
   mechanism): "local codebase intelligence" / "codebase intelligence tool".
   Same breath as SQLite / SQL / recipes — never as a standalone slogan.
