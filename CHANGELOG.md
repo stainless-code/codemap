@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.4
+
+### Patch Changes
+
+- [#204](https://github.com/stainless-code/codemap/pull/204) [`1359b49`](https://github.com/stainless-code/codemap/commit/1359b49f95b21ef1bd3cb8b64c649634f0c11756) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Stop repeating the brand one-liner in site, OG, and npm descriptions.
+
 ## 0.11.3
 
 ### Patch Changes
