@@ -26,5 +26,3 @@ Capped or out-of-scope-for-now — reconcile re-vets; remove lines when fixed.
 ```markdown
 - **[severity]** `file:line` — finding (deferred: out of scope | cap | blocked)
 ```
-
-- **[major]** `apps/docs/scripts/rewrite-api-links.ts` — no unit tests (deferred: Persist/Layers also ship the script without tests; add when first rewrite regression bites)
