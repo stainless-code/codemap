@@ -39,7 +39,7 @@ jobs:
       # → prepublishOnly fails → publish fails. Putting Node 24 in PATH first
       # makes node-gyp compile against ABI 137 so the test passes.
       - name: Setup Node + npm for trusted publishing
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
