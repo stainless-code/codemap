@@ -249,7 +249,7 @@ runs:
 
     - name: Upload SARIF to Code Scanning
       if: steps.gate.outputs.skip != 'true' && inputs.upload-sarif == 'true' && inputs.format == 'sarif' && always()
-      uses: github/codeql-action/upload-sarif@v3
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: ${{ inputs.working-directory }}/${{ inputs.output-path }}
         token: ${{ inputs.token != '' && inputs.token || github.token }}
