@@ -8,7 +8,7 @@
     "check": "blume check",
     "dev": "blume dev",
     "preview": "blume preview",
-    "validate": "blume validate"
+    "validate": "bun scripts/validate.ts"
   },
   "dependencies": {
     "blume": "1.1.2"

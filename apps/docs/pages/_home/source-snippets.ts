@@ -8,5 +8,5 @@ export interface CliSnippet {
 export const cliSnippet: CliSnippet = {
   id: "find-symbol-definitions",
   lang: "bash",
-  code: "codemap query --recipe find-symbol-definitions -p name=createCodemap",
+  code: "codemap query --recipe find-symbol-definitions --params name=createCodemap",
 };

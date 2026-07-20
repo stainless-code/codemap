@@ -219,7 +219,8 @@ jobs:
       - name: Generate API reference (Markdown)
         run: bun run docs:api
 
-      # Site content graph. No --external (offline).
+      # Site content graph. No --external (offline). Wrapper filters immutable
+      # changelog→maintainer-docs broken links (see apps/docs/scripts/validate.ts).
       - name: Validate docs links
         run: bun run docs:validate -- --strict
 

@@ -2,4 +2,4 @@
 "@stainless-code/codemap": patch
 ---
 
-Add public docs site at https://stainless-code.com/codemap (Blume + TypeDoc API reference).
+Add public docs site at https://stainless-code.com/codemap (guides, recipes, concepts, reference, and library API).

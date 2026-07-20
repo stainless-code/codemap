@@ -74,7 +74,7 @@ async function collectMarkdownFiles(
   return files;
 }
 
-/** Match docs-site heading ids: lowercase, spaces→`-`, strip non `[a-z0-9-]`. */
+/** Blume heading ids: lowercase, spaces→`-`, strip non `[a-z0-9-]`. */
 function slugifyHeading(text: string): string {
   return text
     .trim()
