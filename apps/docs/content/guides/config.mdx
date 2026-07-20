@@ -34,6 +34,8 @@ JSON works the same (no `defineConfig`). Setting **`include` replaces** the defa
 
 | Field              | Role                                                                 |
 | ------------------ | -------------------------------------------------------------------- |
+| `root`             | Project root; usually CLI `--root` / cwd (optional in config)        |
+| `databasePath`     | SQLite path (rel. to root or absolute); default `<state-dir>/index.db` |
 | `include`          | Globs relative to project root (replaces defaults when set)          |
 | `excludeDirNames`  | Directory name segments to skip (replaces defaults when set)         |
 | `tsconfigPath`     | Alias resolution; `null` disables                                    |

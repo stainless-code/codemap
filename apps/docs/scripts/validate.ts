@@ -29,11 +29,21 @@ if (!args.includes("--json")) {
 const result = spawnSync("blume", ["validate", ...args], {
   encoding: "utf8",
   maxBuffer: 32 * 1024 * 1024,
+  timeout: 120_000,
 });
 
 const stdout = result.stdout ?? "";
 const stderr = result.stderr ?? "";
 if (stderr) process.stderr.write(stderr);
+if (result.error) {
+  const timedOut = "code" in result.error && result.error.code === "ETIMEDOUT";
+  process.stderr.write(
+    timedOut
+      ? "[validate] blume validate timed out after 120s\n"
+      : `${result.error}\n`,
+  );
+  process.exit(1);
+}
 
 let payload: ValidatePayload;
 try {
