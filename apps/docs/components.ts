@@ -1,11 +1,10 @@
 import { defineComponents } from "blume";
 
-import Footer from "./components/blume/Footer.astro";
 import Pagination from "./components/blume/Pagination.astro";
 
 export default defineComponents({
   layout: {
-    Footer,
+    // Footer omitted from layout — homepage-only in `pages/index.astro`.
     // Theme radius (rounded-blume) instead of built-in pill corners.
     Pagination,
   },
