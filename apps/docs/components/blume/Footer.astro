@@ -14,9 +14,8 @@ interface Props {
 
 const { site, navigation, ui } = Astro.props;
 
-// `layout.Footer` is wired by RootLayout, which does not forward `logo` — pull
-// the resolved brand mark from the generated data module so the footer stays in
-// sync with the header logo.
+// RootLayout does not forward `logo` — pull from `blume:data` so the footer
+// stays in sync with the header logo.
 const logo = data.config.logo;
 const repoUrl = navigation.repoUrl;
 const year = new Date().getFullYear();
