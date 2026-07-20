@@ -1,6 +1,6 @@
 {
   "name": "@stainless-code/codemap",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Query your codebase — local codebase intelligence for AI agents",
   "keywords": [
     "agents",
