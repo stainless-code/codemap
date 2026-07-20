@@ -109,7 +109,7 @@ jobs:
         run: bash scripts/agent-eval/run-arms.sh
 
       - name: Upload comparison artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: agent-eval-comparison
           path: .agent-eval/comparison.json
