@@ -99,7 +99,7 @@
     "better-sqlite3": "12.11.1",
     "chokidar": "5.0.0",
     "lightningcss": "1.33.0",
-    "oxc-parser": "0.140.0",
+    "oxc-parser": "0.142.0",
     "oxc-resolver": "11.24.2",
     "package-manager-detector": "1.7.0",
     "tinyglobby": "0.2.17",
