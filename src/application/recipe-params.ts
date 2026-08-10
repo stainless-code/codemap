@@ -17,16 +17,16 @@ export function recipeParamValuesFromResolved(
 /**
  * One parameter value from a caller. May include JS `boolean` for
  * `type: "boolean"` params; {@link resolveRecipeParams} coerces those to
- * SQLite-safe `1` / `0` in {@link ResolvedRecipeParamValue}. `null` is
- * internal-only on the resolved list — callers may not pass `null` directly;
- * the resolver assigns it for declared optional params that the caller
- * omitted, so positional `?` placeholders stay aligned with declaration order.
+ * SQLite-safe `1` / `0` in {@link ResolvedRecipeParamValue}. Callers must
+ * not pass `null` — omit the key for optional params; the resolver assigns
+ * `null` on the resolved list so positional `?` placeholders stay aligned.
  */
-export type RecipeParamValue = string | number | boolean | null;
+export type RecipeParamValue = string | number | boolean;
 
 /**
  * Bind-ready value after {@link resolveRecipeParams} — never JS `boolean`
- * (better-sqlite3 rejects them). Assignable to `QueryBindValue`.
+ * (better-sqlite3 rejects them). `null` is resolver-only for omitted optional
+ * params. Assignable to `QueryBindValue`.
  */
 export type ResolvedRecipeParamValue = string | number | null;
 
@@ -138,11 +138,19 @@ export function resolveRecipeParams(opts: {
 
 function coerceParamValue(
   param: RecipeParam,
-  raw: RecipeParamValue,
+  raw: RecipeParamValue | null,
   recipeId: string,
 ):
   | { ok: true; value: Exclude<ResolvedRecipeParamValue, null> }
   | ResolveRecipeParamsError {
+  // Runtime guard — `RecipeParamValue` excludes null, but `provided` maps and
+  // JSON/MCP edges can still deliver it; Number(null)→0 / String(null)→"null".
+  if (raw === null) {
+    return {
+      ok: false,
+      error: `${prefix(recipeId)} --params ${param.name} must not be null (omit the key for optional params).`,
+    };
+  }
   if (param.type === "string") {
     return { ok: true, value: String(raw) };
   }

@@ -94,6 +94,17 @@ describe("resolveRecipeParams", () => {
     expect(r).toEqual({ ok: true, values: ["x", null] });
   });
 
+  it("rejects explicit null from callers (omit key instead)", () => {
+    const r = resolveRecipeParams({
+      recipeId: "example",
+      declared: [{ name: "min_coverage", type: "number", required: true }],
+      // Cast: production maps are typed without null; runtime JSON can still send it.
+      provided: { min_coverage: null as unknown as number },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("must not be null");
+  });
+
   it("rejects missing required params", () => {
     const r = resolveRecipeParams({
       recipeId: "example",
