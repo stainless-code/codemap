@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.5
+
+### Patch Changes
+
+- [#222](https://github.com/stainless-code/codemap/pull/222) [`8f45212`](https://github.com/stainless-code/codemap/commit/8f45212bd01f7a12a77069a4499def1a1f1b7374) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Fix recipes with `boolean` params failing on Node when run with defaults. Boolean params now bind as `0` / `1`, so recipes like `churn-complexity-hotspots` and `stale-imports` work again.
+
 ## 0.11.4
 
 ### Patch Changes
