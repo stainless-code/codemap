@@ -1149,7 +1149,7 @@ describe("getQueryRecipeActionsRendered — audit→apply pairs (C.6)", () => {
       in_file: "src/widget",
     });
     expect(actions?.[0]?.command).toBe(
-      "codemap apply stale-imports --params in_file=src/widget,include_type_only=false --dry-run --force",
+      "codemap apply stale-imports --params in_file=src/widget,include_type_only=0 --dry-run --force",
     );
   });
 

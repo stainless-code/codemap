@@ -80,7 +80,10 @@ import {
   getQueryRecipeSql,
 } from "./query-recipes";
 import { resolveRecipeParams } from "./recipe-params";
-import type { RecipeParamValue, RecipeParamValues } from "./recipe-params";
+import type {
+  RecipeParamValues,
+  ResolvedRecipeParamValue,
+} from "./recipe-params";
 import { tryRecordRecipeRun } from "./recipe-recency";
 import { runCodemapIndex } from "./run-index";
 import { buildShowResult, buildSnippetResult } from "./show-engine";
@@ -1357,7 +1360,7 @@ function runFormattedQuery(args: {
   recipeId: string | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
   changedFiles: Set<string> | undefined;
-  bindValues?: RecipeParamValue[] | undefined;
+  bindValues?: ResolvedRecipeParamValue[] | undefined;
   format:
     | "sarif"
     | "annotations"

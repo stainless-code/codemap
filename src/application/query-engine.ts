@@ -11,12 +11,13 @@ import type { Bucketizer, GroupByMode } from "../group-by";
 import type { CodemapDatabase } from "../sqlite-db";
 
 /**
- * SQLite bind value — the union accepted by `db.query(sql).all(...values)`.
- * Kept here at the DB boundary so `executeQuery` doesn't depend on any
- * recipe-layer type. Recipe coercion lives in `application/recipe-params.ts`
- * and produces values assignable to this union.
+ * SQLite bind value — the union accepted by `db.query(sql).all(...values)`
+ * (better-sqlite3 / bun:sqlite). Kept here at the DB boundary so
+ * `executeQuery` doesn't depend on any recipe-layer type. Recipe coercion
+ * lives in `application/recipe-params.ts` and produces values assignable to
+ * this union (`type: "boolean"` params become `0` / `1`, never JS boolean).
  */
-export type QueryBindValue = string | number | bigint | boolean | null;
+export type QueryBindValue = string | number | bigint | null;
 
 /**
  * Pure, transport-agnostic query execution. Mirrors the layering of

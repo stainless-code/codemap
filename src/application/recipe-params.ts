@@ -3,7 +3,7 @@ import type { RecipeParam } from "./recipes-loader";
 /** Map positional bind values back to param names for action command templates. */
 export function recipeParamValuesFromResolved(
   declared: RecipeParam[] | undefined,
-  values: RecipeParamValue[],
+  values: ResolvedRecipeParamValue[],
 ): RecipeParamValues {
   const out: RecipeParamValues = {};
   for (let i = 0; i < (declared ?? []).length; i++) {
@@ -15,12 +15,20 @@ export function recipeParamValuesFromResolved(
 }
 
 /**
- * One bound parameter value. `null` is internal-only — callers may not pass
- * `null` directly; the resolver assigns it for declared optional params that
- * the caller omitted, so positional `?` placeholders stay aligned with the
- * declaration order in the recipe.
+ * One parameter value from a caller. May include JS `boolean` for
+ * `type: "boolean"` params; {@link resolveRecipeParams} coerces those to
+ * SQLite-safe `1` / `0` in {@link ResolvedRecipeParamValue}. `null` is
+ * internal-only on the resolved list — callers may not pass `null` directly;
+ * the resolver assigns it for declared optional params that the caller
+ * omitted, so positional `?` placeholders stay aligned with declaration order.
  */
 export type RecipeParamValue = string | number | boolean | null;
+
+/**
+ * Bind-ready value after {@link resolveRecipeParams} — never JS `boolean`
+ * (better-sqlite3 rejects them). Assignable to `QueryBindValue`.
+ */
+export type ResolvedRecipeParamValue = string | number | null;
 
 /** Loose `key: value` map of params provided to a recipe by the caller. */
 export type RecipeParamValues = Record<string, RecipeParamValue>;
@@ -28,7 +36,7 @@ export type RecipeParamValues = Record<string, RecipeParamValue>;
 /** Successful resolution; `values` are positional in declaration order. */
 export interface ResolveRecipeParamsOk {
   ok: true;
-  values: RecipeParamValue[];
+  values: ResolvedRecipeParamValue[];
 }
 
 /** Resolution failure; `error` carries a single human-readable message. */
@@ -68,8 +76,9 @@ export function mergeParams(
 /**
  * Validate `provided` against `declared` and produce positional bind values
  * in declaration order. Strict on missing required, unknown keys, and type
- * mismatches; coerces `string | number` into the declared `number` /
- * `boolean` types where the value is unambiguous.
+ * mismatches; coerces `string | number` into the declared `number` type and
+ * `boolean` / `true`/`false` / `1`/`0` into INTEGER `1` / `0` (better-sqlite3
+ * rejects JS booleans at bind time; recipe SQL compares with `= 0` / `!= 0`).
  */
 export function resolveRecipeParams(opts: {
   recipeId: string;
@@ -97,7 +106,7 @@ export function resolveRecipeParams(opts: {
     }
   }
 
-  const values: RecipeParamValue[] = [];
+  const values: ResolvedRecipeParamValue[] = [];
   for (const param of declared) {
     const raw = provided[param.name];
     if (raw === undefined) {
@@ -132,7 +141,7 @@ function coerceParamValue(
   raw: RecipeParamValue,
   recipeId: string,
 ):
-  | { ok: true; value: Exclude<RecipeParamValue, null> }
+  | { ok: true; value: Exclude<ResolvedRecipeParamValue, null> }
   | ResolveRecipeParamsError {
   if (param.type === "string") {
     return { ok: true, value: String(raw) };
@@ -153,15 +162,16 @@ function coerceParamValue(
     }
     return { ok: true, value: n };
   }
-  if (typeof raw === "boolean") return { ok: true, value: raw };
-  // Accept numeric `1`/`0` as well as their string forms — MCP / HTTP callers
-  // hit this path because `query_recipe.params` accepts `z.number()` and the
-  // CLI / HTTP layers don't pre-coerce numeric booleans.
+  // Bind as INTEGER 0/1 — better-sqlite3 rejects JS booleans; recipe SQL
+  // already uses `= 0` / `!= 0`. Accept numeric `1`/`0` and their string
+  // forms — MCP / HTTP callers hit this path because `query_recipe.params`
+  // accepts `z.number()` and the CLI / HTTP layers don't pre-coerce.
+  if (typeof raw === "boolean") return { ok: true, value: raw ? 1 : 0 };
   if (raw === "true" || raw === "1" || raw === 1) {
-    return { ok: true, value: true };
+    return { ok: true, value: 1 };
   }
   if (raw === "false" || raw === "0" || raw === 0) {
-    return { ok: true, value: false };
+    return { ok: true, value: 0 };
   }
   return {
     ok: false,
