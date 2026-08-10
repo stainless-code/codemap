@@ -47,7 +47,7 @@ describe("resolveRecipeParams", () => {
         include_tests: "false",
       },
     });
-    expect(r).toEqual({ ok: true, values: ["function", 42, false] });
+    expect(r).toEqual({ ok: true, values: ["function", 42, 0] });
   });
 
   it("uses defaults for omitted optional params", () => {
@@ -56,7 +56,30 @@ describe("resolveRecipeParams", () => {
       declared,
       provided: { kind: "function" },
     });
-    expect(r).toEqual({ ok: true, values: ["function", 80, true] });
+    expect(r).toEqual({ ok: true, values: ["function", 80, 1] });
+  });
+
+  it("never puts JS booleans in bind values", () => {
+    const r = resolveRecipeParams({
+      recipeId: "example",
+      declared,
+      provided: {
+        kind: "function",
+        include_tests: false,
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    for (const v of r.values) {
+      expect(typeof v === "boolean").toBe(false);
+      expect(
+        typeof v === "string" ||
+          typeof v === "number" ||
+          typeof v === "bigint" ||
+          v === null,
+      ).toBe(true);
+    }
+    expect(r.values).toEqual(["function", 80, 0]);
   });
 
   it("binds omitted optional params without defaults as null", () => {
@@ -69,6 +92,17 @@ describe("resolveRecipeParams", () => {
       provided: { required: "x" },
     });
     expect(r).toEqual({ ok: true, values: ["x", null] });
+  });
+
+  it("rejects explicit null from callers (omit key instead)", () => {
+    const r = resolveRecipeParams({
+      recipeId: "example",
+      declared: [{ name: "min_coverage", type: "number", required: true }],
+      // Cast: production maps are typed without null; runtime JSON can still send it.
+      provided: { min_coverage: null as unknown as number },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("must not be null");
   });
 
   it("rejects missing required params", () => {
@@ -97,14 +131,14 @@ describe("resolveRecipeParams", () => {
       declared,
       provided: { kind: "function", include_tests: 1 },
     });
-    expect(truthy).toEqual({ ok: true, values: ["function", 80, true] });
+    expect(truthy).toEqual({ ok: true, values: ["function", 80, 1] });
 
     const falsy = resolveRecipeParams({
       recipeId: "example",
       declared,
       provided: { kind: "function", include_tests: 0 },
     });
-    expect(falsy).toEqual({ ok: true, values: ["function", 80, false] });
+    expect(falsy).toEqual({ ok: true, values: ["function", 80, 0] });
   });
 
   it("rejects malformed numbers and booleans", () => {

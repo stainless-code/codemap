@@ -3,12 +3,12 @@ import {
   getQueryRecipeSql,
 } from "../../src/application/query-recipes";
 import { resolveRecipeParams } from "../../src/application/recipe-params";
-import type { RecipeParamValue } from "../../src/application/recipe-params";
+import type { ResolvedRecipeParamValue } from "../../src/application/recipe-params";
 import type { GoldenScenario } from "./schema";
 
 export function resolveGoldenQuery(s: GoldenScenario): {
   sql: string;
-  bindValues: RecipeParamValue[];
+  bindValues: ResolvedRecipeParamValue[];
 } {
   if (s.sql !== undefined) {
     if (s.params !== undefined) {

@@ -1,4 +1,4 @@
-import type { RecipeParamValue } from "../../src/application/recipe-params";
+import type { ResolvedRecipeParamValue } from "../../src/application/recipe-params";
 import { estimateTokens, jsonCharLength } from "./metrics";
 
 /** Probe-mode token budget: prompt + payload chars, then chars/4 (plan L.4). */
@@ -12,7 +12,7 @@ export function estimateProbeTokens(
 export function mcpOnPayloadChars(
   sql: string,
   rows: unknown[],
-  bindValues: RecipeParamValue[] = [],
+  bindValues: ResolvedRecipeParamValue[] = [],
 ): number {
   return (
     Buffer.byteLength(sql, "utf-8") +

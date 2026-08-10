@@ -34,8 +34,8 @@ import {
   resolveRecipeParams,
 } from "../application/recipe-params";
 import type {
-  RecipeParamValue,
   RecipeParamValues,
+  ResolvedRecipeParamValue,
 } from "../application/recipe-params";
 import {
   enrichWithRecency,
@@ -1011,7 +1011,7 @@ function resolveRecipeBindValues(opts: {
   recipeId: string | undefined;
   params: RecipeParamValues | undefined;
   json: boolean;
-}): { values: RecipeParamValue[] } | { error: true } {
+}): { values: ResolvedRecipeParamValue[] } | { error: true } {
   if (opts.recipeId === undefined) return { values: [] };
   const resolved = resolveRecipeParams({
     recipeId: opts.recipeId,
@@ -1112,7 +1112,7 @@ function printFormattedQuery(
     format: Exclude<OutputFormat, "text" | "json">;
     recipeId: string | undefined;
     changedFiles: Set<string> | undefined;
-    bindValues: RecipeParamValue[] | undefined;
+    bindValues: ResolvedRecipeParamValue[] | undefined;
     /** `--ci`: suppress no-locatable-rows warning + exit 1 on `rows.length > 0`. */
     ci?: boolean;
     badgeStyle: BadgeStyle;
@@ -1215,7 +1215,7 @@ function runGroupedQuery(opts: {
   groupBy: GroupByMode;
   changedFiles: Set<string> | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
-  bindValues: RecipeParamValue[] | undefined;
+  bindValues: ResolvedRecipeParamValue[] | undefined;
   root: string;
 }) {
   let bucketize: Bucketizer;
@@ -1308,7 +1308,7 @@ function runSaveBaseline(opts: {
   recipeId: string | undefined;
   baselineName: string;
   changedFiles: Set<string> | undefined;
-  bindValues: RecipeParamValue[] | undefined;
+  bindValues: ResolvedRecipeParamValue[] | undefined;
 }) {
   let rows: unknown[];
   try {
@@ -1368,7 +1368,7 @@ function runBaselineDiff(opts: {
   baselineName: string;
   changedFiles: Set<string> | undefined;
   recipeActions: ReadonlyArray<unknown> | undefined;
-  bindValues: RecipeParamValue[] | undefined;
+  bindValues: ResolvedRecipeParamValue[] | undefined;
 }) {
   const result = compareQueryBaseline({
     baselineName: opts.baselineName,

@@ -153,6 +153,14 @@ jobs:
           timeout 45 node dist/index.mjs --full
           node dist/index.mjs query "SELECT COUNT(*) AS files FROM files"
 
+      # Boolean recipe params must bind as 0/1 — better-sqlite3 rejects JS booleans.
+      # Bun dogfood can mask this; empty rows are fine (bind must not throw).
+      - name: Node smoke (boolean recipe params bind)
+        run: |
+          set -euo pipefail
+          export CODEMAP_ROOT="$GITHUB_WORKSPACE/fixtures/minimal"
+          node dist/index.mjs query --json --recipe churn-complexity-hotspots
+
   check-pack:
     name: 📦 Pack validation
     needs: skip-ci

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { createCodemap } from "../../src/api";
 import { queryRows } from "../../src/application/index-engine";
-import type { RecipeParamValue } from "../../src/application/recipe-params";
+import type { ResolvedRecipeParamValue } from "../../src/application/recipe-params";
 import { resolveCodemapConfig } from "../../src/config";
 import { resolveGoldenQuery } from "../query-golden/resolve-golden-query";
 import { runGoldenSetup } from "../query-golden/run-setup";
@@ -154,7 +154,7 @@ function parseArgs(argv: string[]) {
 function runMcpOnArm(
   prompt: string,
   sql: string,
-  bindValues: RecipeParamValue[],
+  bindValues: ResolvedRecipeParamValue[],
 ): ArmRunMetrics {
   const t0 = performance.now();
   const rows = queryRows(sql, bindValues) as unknown[];

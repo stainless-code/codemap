@@ -60,10 +60,11 @@ describe("renderRecipeActionCommands", () => {
             "codemap apply stale-imports --params in_file={{in_file}},include_type_only={{include_type_only}} --dry-run --force",
         },
       ],
-      { in_file: "src/widget", include_type_only: true },
+      // Resolved boolean params are 0/1 (see resolveRecipeParams).
+      { in_file: "src/widget", include_type_only: 1 },
     );
     expect(out?.[0]?.command).toBe(
-      "codemap apply stale-imports --params in_file=src/widget,include_type_only=true --dry-run --force",
+      "codemap apply stale-imports --params in_file=src/widget,include_type_only=1 --dry-run --force",
     );
   });
 });
