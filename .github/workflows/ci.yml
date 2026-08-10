@@ -251,7 +251,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: bun audit (block on high/critical)
-        # Ignore unfixed image-size highs from Blume (no patched release yet).
+        # Blume's image-size has no patched release yet — ignore those GHSAs until one ships.
         run: |
           set +e
           # bun emits ANSI color even when piped — strip it or the severity grep misses it.
