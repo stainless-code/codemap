@@ -63,16 +63,15 @@ Releases: **[@changesets/cli](https://github.com/changesets/changesets)** — ru
 
 **Upstream** skill and rules in this repo (e.g. `codemap`) stay **generic** — placeholder SQL and triggers, no product-specific paths. Consumer projects can run **`codemap agents init`** (ships **`templates/agents`** on npm; see [docs/agents.md](../docs/agents.md)) or **copy/symlink** manually, then **edit their copy** for team aliases and queries. Customization always belongs in the **consumer** repo.
 
-Rules live under **`.agents/rules/`** as `.md` files; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink into **`.cursor/`** with `.mdc` extension (Cursor requires `.mdc` for frontmatter parsing; see [agents-first-convention.md](../.agents/rules/agents-first-convention.md)). Full rule inventory and tier system: [docs/agents.md](../docs/agents.md) and [agents-tier-system.md](../.agents/rules/agents-tier-system.md).
+Rules live under **`.agents/rules/`** as `.md` files; skills under **`.agents/skills/<name>/SKILL.md`**. Symlink rules into **`.cursor/rules/`** with `.mdc` extension (Cursor requires `.mdc` for frontmatter parsing and loads skills from `.agents/skills/` natively; see [agents-first-convention.md](../.agents/rules/agents-first-convention.md)). Full rule inventory and tier system: [docs/agents.md](../docs/agents.md) and [agents-tier-system.md](../.agents/rules/agents-tier-system.md).
 
 Example minimum symlink set:
 
 ```bash
-mkdir -p .cursor/rules .cursor/skills
+mkdir -p .cursor/rules
 for f in codemap agents-first-convention no-bypass-hooks verify-after-each-step tracer-bullets concise-reporting; do
   ln -sf "../../.agents/rules/${f}.md" ".cursor/rules/${f}.mdc"
 done
-ln -sf ../../.agents/skills/codemap .cursor/skills/codemap
 ```
 
 Thank you for helping make structural codebase queries fast and reusable for agents.

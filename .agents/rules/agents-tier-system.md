@@ -4,7 +4,6 @@ globs:
   - ".agents/rules/**"
   - ".agents/skills/**"
   - ".cursor/rules/**"
-  - ".cursor/skills/**"
 alwaysApply: false
 ---
 
@@ -20,7 +19,7 @@ for f in .agents/rules/*.md .agents/lessons.md; do
 done
 ```
 
-**When authoring:** pick tier before writing; pair fat rules with skills; symlinks per [`agents-first-convention`](./agents-first-convention.md). Default to intent-triggered skills and a thin always-on set.
+**When authoring:** pick tier before writing; pair fat rules with skills; layout per [`agents-first-convention`](./agents-first-convention.md). Default to intent-triggered skills and a thin always-on set.
 
 ## Reference
 

@@ -432,19 +432,12 @@ export function applyAgentsInitTargets(
     );
   }
 
-  const { ruleFiles: bundledRuleFiles, skillFiles: bundledSkillFiles } =
-    resolveBundledAgentMirrorPaths();
+  const { ruleFiles: bundledRuleFiles } = resolveBundledAgentMirrorPaths();
 
   for (const t of targets) {
     switch (t) {
       case "cursor": {
-        applyCursorIntegration(
-          projectRoot,
-          bundledRuleFiles,
-          bundledSkillFiles,
-          linkMode,
-          force,
-        );
+        applyCursorIntegration(projectRoot, bundledRuleFiles, linkMode, force);
         break;
       }
       case "windsurf": {
@@ -540,14 +533,11 @@ function mdToMdc(rel: string): string {
 function applyCursorIntegration(
   projectRoot: string,
   ruleRelPaths: string[],
-  skillRelPaths: string[],
   linkMode: AgentsInitLinkMode,
   force: boolean,
 ): void {
   const agentsRules = join(projectRoot, ".agents", "rules");
-  const agentsSkills = join(projectRoot, ".agents", "skills");
   const cursorRules = join(projectRoot, ".cursor", "rules");
-  const cursorSkills = join(projectRoot, ".cursor", "skills");
 
   mkdirSync(join(projectRoot, ".cursor"), { recursive: true });
 
@@ -560,23 +550,15 @@ function applyCursorIntegration(
       force,
       mdToMdc,
     );
-    symlinkFilesGranular(
-      agentsSkills,
-      cursorSkills,
-      skillRelPaths,
-      ".cursor/skills",
-      force,
-    );
     console.log(
-      `  Linked ${ruleRelPaths.length} bundled rule file(s) and ${skillRelPaths.length} bundled skill file(s) under .cursor/ → .agents/`,
+      `  Linked ${ruleRelPaths.length} bundled rule file(s) under .cursor/rules → .agents/rules (skills load from .agents/skills/ natively)`,
     );
     return;
   }
 
   copyFilesGranular(agentsRules, cursorRules, ruleRelPaths, force, mdToMdc);
-  copyFilesGranular(agentsSkills, cursorSkills, skillRelPaths, force);
   console.log(
-    "  Copied bundled rules and skills into .cursor/rules and .cursor/skills",
+    "  Copied bundled rules into .cursor/rules (skills load from .agents/skills/ natively)",
   );
 }
 

@@ -12,6 +12,7 @@ Canonical read order: [`.agents/rules/agents-first-convention.md`](.agents/rules
 | Pre-commit hooks     | [`.agents/rules/no-bypass-hooks.md`](.agents/rules/no-bypass-hooks.md)                               |
 | Verify each step     | [`.agents/rules/verify-after-each-step.md`](.agents/rules/verify-after-each-step.md)                 |
 | Authoring discipline | [`.agents/rules/authoring-discipline.md`](.agents/rules/authoring-discipline.md)                     |
+| Unslop               | [`.agents/skills/unslop/SKILL.md`](.agents/skills/unslop/SKILL.md)                                   |
 | Architecture priming | [`.agents/rules/architecture-priming.md`](.agents/rules/architecture-priming.md)                     |
 | Consumer surfaces    | [`.agents/rules/consumer-surfaces.md`](.agents/rules/consumer-surfaces.md)                           |
 | Docs governance      | [`.agents/rules/docs-governance.md`](.agents/rules/docs-governance.md)                               |

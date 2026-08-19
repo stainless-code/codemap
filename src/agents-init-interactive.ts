@@ -31,7 +31,7 @@ const INTEGRATION_OPTIONS: {
   {
     value: "cursor",
     label: "Cursor",
-    hint: ".cursor/rules + skills → .agents/",
+    hint: ".cursor/rules → .agents/rules (skills load from .agents/skills/)",
   },
   {
     value: "claude-md",
