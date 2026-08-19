@@ -22,4 +22,4 @@ User-requested **doc audits** may slim redundant markdown; preservation above ap
 - **JSDoc as types (`.mjs`, `@ts-check`):** `@typedef`, `@param`, `@returns`, inline `@type` are the type system — keep them; apply the decision test only to prose in those blocks.
 - **End-of-turn:** cut duplicate tables/narration; after doc slim → [`docs-governance`](../skills/docs-governance/SKILL.md) slimming audit.
 
-Related: [`concise-reporting`](./concise-reporting.md) · [`docs-lifecycle-sweep`](../skills/docs-lifecycle-sweep/SKILL.md).
+Related: [`concise-reporting`](./concise-reporting.md) · [`docs-lifecycle-sweep`](../skills/docs-lifecycle-sweep/SKILL.md) · [`unslop`](../skills/unslop/SKILL.md).

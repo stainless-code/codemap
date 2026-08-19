@@ -27,7 +27,7 @@ Always-on priming: [`.agents/rules/agents-tier-system.md`](../../rules/agents-ti
 1. **Decide the tier** before writing.
 2. **Tier 1 needs justification** — every turn? If file/intent scoped, demote to Tier 2 or Tier 3.
 3. **Tier 2 globs** — broadest meaningful scope; pair with skill when applicable.
-4. **Source + symlink** per [`agents-first-convention`](../../rules/agents-first-convention.md).
+4. **Layout** per [`agents-first-convention`](../../rules/agents-first-convention.md) — rules: source + `.mdc` symlink; skills: `.agents/` only.
 
 ### Adding a new skill
 

@@ -1,5 +1,5 @@
 ---
-description: When creating or moving rules/skills, always store the source file in .agents/ and symlink from .cursor/
+description: When creating or moving rules/skills, store the source in .agents/. Rules need a .cursor/rules .mdc symlink. Skills do not — Cursor reads .agents/skills/ natively.
 alwaysApply: true
 ---
 
@@ -20,24 +20,19 @@ When creating **any** new rule or skill, follow this convention:
 
 ## Skills (`SKILL.md` files)
 
-1. Create the directory and file in `.agents/skills/<name>/SKILL.md`
-2. Create a symlink in `.cursor/skills/`:
-
-   ```bash
-   ln -s ../../.agents/skills/<name> .cursor/skills/<name>
-   ```
+Create `.agents/skills/<name>/SKILL.md` only — never start in `.cursor/skills/`. Cursor loads `.agents/skills/` natively. Do **not** symlink into `.cursor/skills/` (double-registers). If `/create-skill` writes there, move the folder to `.agents/skills/` and delete the `.cursor/` copy.
 
 **Never** name bulk reference files `AGENTS.md` inside skill folders — use `FULL-GUIDE.md` or topic siblings.
 
 ## Why
 
 - `.agents/` is the **source of truth** — it is IDE-agnostic and works across different AI coding tools.
-- `.cursor/` only contains **symlinks** pointing back to `.agents/`.
+- `.cursor/rules/` contains **`.mdc` symlinks** pointing back to `.agents/rules/`. Skills are not mirrored there.
 - This keeps configuration portable and avoids duplication.
 
 ## Never
 
-- Never place original rule/skill content directly in `.cursor/rules/` or `.cursor/skills/`.
-- Never create a rule or skill without both the `.agents/` file and the `.cursor/` symlink.
+- Never place original rule content directly in `.cursor/rules/`.
+- Never create a rule without both the `.agents/` file and the `.cursor/rules/<name>.mdc` symlink. Skills need `.agents/` source only.
 
 Related: [`agents-tier-system.md`](./agents-tier-system.md) · [`AGENTS.md`](../../AGENTS.md).

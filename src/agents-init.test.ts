@@ -392,9 +392,10 @@ describe("runAgentsInit", () => {
       expect(
         readFileSync(join(dir, ".cursor", "rules", "codemap.mdc"), "utf-8"),
       ).toContain("codemap");
+      expect(existsSync(join(dir, ".cursor", "skills"))).toBe(false);
       expect(
         readFileSync(
-          join(dir, ".cursor", "skills", "codemap", "SKILL.md"),
+          join(dir, ".agents", "skills", "codemap", "SKILL.md"),
           "utf-8",
         ).length,
       ).toBeGreaterThan(100);
@@ -415,23 +416,14 @@ describe("runAgentsInit", () => {
         }),
       ).toBe(true);
       const rulesDir = join(dir, ".cursor", "rules");
-      const skillsDir = join(dir, ".cursor", "skills");
       expect(lstatSync(rulesDir).isSymbolicLink()).toBe(false);
-      expect(lstatSync(skillsDir).isSymbolicLink()).toBe(false);
       expect(lstatSync(rulesDir).isDirectory()).toBe(true);
-      expect(lstatSync(skillsDir).isDirectory()).toBe(true);
+      expect(existsSync(join(dir, ".cursor", "skills"))).toBe(false);
       for (const rel of resolveBundledAgentMirrorPaths().ruleFiles) {
         const cursorRel = rel.endsWith(".md") ? rel.slice(0, -3) + ".mdc" : rel;
         expect(
           lstatSync(
             join(dir, ".cursor", "rules", ...cursorRel.split("/")),
-          ).isSymbolicLink(),
-        ).toBe(true);
-      }
-      for (const rel of resolveBundledAgentMirrorPaths().skillFiles) {
-        expect(
-          lstatSync(
-            join(dir, ".cursor", "skills", ...rel.split("/")),
           ).isSymbolicLink(),
         ).toBe(true);
       }
