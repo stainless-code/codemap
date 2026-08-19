@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.6
+
+### Patch Changes
+
+- [#231](https://github.com/stainless-code/codemap/pull/231) [`9b31170`](https://github.com/stainless-code/codemap/commit/9b31170d20c08608e320a517cd2bb3aed8e80dcb) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Stop mirroring skills into `.cursor/skills` during `codemap agents init`. Cursor loads skills from `.agents/skills/` natively, so the extra copies double-registered.
+
 ## 0.11.5
 
 ### Patch Changes

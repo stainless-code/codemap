@@ -1,6 +1,6 @@
 {
   "name": "@stainless-code/codemap",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "description": "Local codebase intelligence for AI agents — a SQLite index of symbols, imports, and calls. SQL and recipes instead of scanning the tree.",
   "keywords": [
     "agents",
