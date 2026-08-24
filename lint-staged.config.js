@@ -60,7 +60,7 @@ function relatedTests(filenames) {
   if (tests.length === 0) {
     return "true";
   }
-  return `bun test ${tests.join(" ")}`;
+  return `bun test --isolate ${tests.join(" ")}`;
 }
 
 /** @type {import('lint-staged').Configuration} */
@@ -70,7 +70,8 @@ export default {
   // (oxfmt collapses Blume `:::` fences).
   "*.{css,json,md,mdc,mdx,html,yaml,yml}": "bun run format:check",
   "*.{ts,tsx}": [typecheckStagedFiles, relatedTests],
-  "*.test.ts": "bun test",
-  "*.test.tsx": "bun test",
-  "scripts/**/*.test.mjs": "bun test",
+  "*.test.ts": "bun test --isolate",
+  "*.test.tsx": "bun test --isolate",
+  "scripts/**/*.test.mjs": "bun test --isolate",
+  "scripts/**/*.test.ts": "bun test --isolate",
 };
