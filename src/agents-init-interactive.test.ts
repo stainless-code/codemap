@@ -15,7 +15,10 @@ describe("agents-init-interactive notes", () => {
   });
 
   it("dims note body text like @clack/prompts 1.5", () => {
-    expect(styleText("dim", "hello")).toBe(styleText("dim", "hello"));
-    expect(styleText("dim", "hello")).not.toBe("hello");
+    // Bun 1.4 `styleText` is a no-op without a TTY / when NO_COLOR is set
+    // (CI and this sandbox). Skip the stream check so we assert the dim codes.
+    const dimmed = styleText("dim", "hello", { validateStream: false });
+    expect(dimmed).toBe(styleText("dim", "hello", { validateStream: false }));
+    expect(dimmed).not.toBe("hello");
   });
 });
