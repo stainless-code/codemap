@@ -242,6 +242,23 @@ jobs:
       - name: Audit docs site
         run: bun run docs:audit
 
+  dedupe:
+    name: 🧹 Dedupe
+    needs: skip-ci
+    if: needs['skip-ci'].outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: bun dedupe --check
+        run: bun run dedupe:check
+
   audit:
     # `bun audit` exits 0 regardless of severity — the scan below blocks on high/critical.
     # Transitive-dep CVE visibility; advisory-API outage doesn't block.
@@ -314,6 +331,7 @@ jobs:
         check-pack,
         docs,
         audit,
+        dedupe,
         benchmark,
       ]
     if: always()
@@ -330,6 +348,7 @@ jobs:
             needs['check-pack'].result != 'success' ||
             needs.docs.result != 'success' ||
             needs.audit.result != 'success' ||
+            needs.dedupe.result != 'success' ||
             needs.benchmark.result != 'success'
           )
         run: exit 1

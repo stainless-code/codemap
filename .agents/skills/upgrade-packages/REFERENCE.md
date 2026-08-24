@@ -1,6 +1,10 @@
 # Reference — evidence artifact schema
 
-The `upgrade-packages` skill runs `bun run upgrade-packages:evidence` (writes `scripts/upgrade-packages/artifact.json`) and reads the JSON artifact below. The agent never touches the registry, GitHub, or GHSA directly — every citation comes from artifact fields. The script requires network access (`gh api` + `bun pm view`); release/advisory data is cached to `scripts/upgrade-packages/.cache/` (1h TTL).
+The skill runs `bun run upgrade-packages:evidence` (default `--out scripts/upgrade-packages/artifact.json`). Phase 1 of [`SKILL.md`](./SKILL.md) owns network, cache TTLs, and the never-touch-registry rule.
+
+Each outdated package gets **one** delta: the published tarball span `current → latest`. There is no per-tag GitHub release walk.
+
+Cutter caps (`tarball-delta.ts`): `PATCH_PATH_CAP` 40 paths on the second `bun pm diff`, `FILE_LIST_CAP` 80 files in the artifact, `HINT_CAP` 8 hints per bucket, `PATCH_MAX_CHARS` 8000, `RELEASE_NOTES_MAX_CHARS` 1200. A missing `*.d.ts` patch means it lost the cap, not that the API is unchanged. `source: "none"` sets `tarball: null`.
 
 ## Artifact shape
 
@@ -14,7 +18,8 @@ The `upgrade-packages` skill runs `bun run upgrade-packages:evidence` (writes `s
   "outdated": [{
     "pkg", "current", "latest",
     "bumpClass": "patch|minor|major|prerelease|no-op",
-    "coupledWith": []  // naive; agent confirms peer/dep coupling from deltas
+    "coupledWith": [],  // naive; agent confirms peer/dep coupling from deltas
+    "dev"
   }],
   "audit": {
     "bunAudit": <raw bun audit --json payload>,
@@ -29,13 +34,19 @@ The `upgrade-packages` skill runs `bun run upgrade-packages:evidence` (writes `s
   },
   "deltas": {
     "<pkg>": [{
-      "version", "date",
+      "version", "date",             // target; date from changelog hunk if present
       "breaking": [...], "deprecations": [...], "features": [...],
-      "security": [...], "peerEngine": [...],  // best-effort regex hints — read releaseNotes for the authoritative text
-      "releaseNotes": "truncated body",
-      "diffUrl": "github.com/<o>/<r>/compare/<prevTag>...<tag>",
-      "changelogUrl": "github.com/<o>/<r>/releases/tag/<tag>",
-      "source": "github-release|none",
+      "security": [...], "peerEngine": [...],  // notes + changelog/package.json hints
+      "releaseNotes": "changelog added-lines, truncated",
+      "changelogUrl": "npmjs.com/package/<pkg>/v/<target>",
+      "tarball": {
+        "from", "to",
+        "notes": [...],              // bun summary: engines, deps, install scripts, dangerous imports
+        "totals": { "files", "added", "deleted", "linesAdded", "linesRemoved", "formattingOnly" },
+        "files": [{ "path", "status", "linesAdded", "linesRemoved", "formattingOnly", "patch" }]
+        // patch only for paths that won PATCH_PATH_CAP (named keep + symbol-boosted .d.ts + extras)
+      },
+      "source": "bun-pm-diff|none",
       "error": null | "reason"
     }]
   },
@@ -52,8 +63,8 @@ The `upgrade-packages` skill runs `bun run upgrade-packages:evidence` (writes `s
 
 ## How to read it
 
-- **Verdict a package**: read `outdated[].bumpClass` + `audit.ghsa[].verdict` + `deltas[<pkg>][].breaking`/`security` + `usage[<pkg>].importedSymbols`. Cite `diffUrl` or `changelogUrl` for every claim.
-- **`features`/`breaking` arrays are hints** — when a hint is empty but the delta is minor/major, read `releaseNotes` before concluding "no changes".
-- **`error` on a delta** means the script couldn't fetch that version's release notes — usually a gh secondary rate-limit during a large multi-repo run, or a monorepo squashed release. `changelogUrl` is still provided (the repo's releases page) — **deep-dive it per-package** when `releaseNotes` is null. Only mark the bump **blocked** if the deep-dive still can't cover the range.
+- **Verdict a package**: read `outdated[].bumpClass` + `audit.ghsa[].verdict` + `tarball.notes` + `deltas[<pkg>][].breaking`/`security` + `usage[<pkg>].importedSymbols`. Cite `tarball.notes`, a kept `patch`, `changelogUrl`, or advisory `url`.
+- **`features`/`breaking` arrays are hints** — when a hint is empty but the delta is minor/major, read `releaseNotes` and kept patches before concluding "no changes".
+- **`error` on a delta** means `bun pm diff` failed for that span. `changelogUrl` is still the npm version page. Re-run evidence before marking **blocked**.
 - **`cleared-at-current`** = the GHSA advisory's fix already ships at the installed version — no bump needed, record the URL as evidence.
-- **Citations are artifact fields** — `diffUrl`, `changelogUrl`, `url`. Do not invent URLs.
+- **Citations are artifact fields** — `tarball.notes`, kept `tarball.files[].patch`, `changelogUrl`, `url`. Do not invent GitHub compare URLs.

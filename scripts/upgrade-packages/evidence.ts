@@ -1,22 +1,30 @@
 /**
- * upgrade-packages-evidence.ts
+ * evidence.ts
  *
  * Deterministic evidence gatherer for the `upgrade-packages` skill.
  * Emits a JSON artifact the AI agent reads and judges — the agent never
- * touches the registry, GitHub, or GHSA directly. Citations (diffUrl,
- * changelogUrl, advisory URL) are artifact fields, so model priors can't
- * sneak in.
+ * touches the registry, GitHub, or GHSA directly. Citations (tarball notes
+ * and kept patches, changelogUrl, advisory URL) are artifact fields, so
+ * model priors can't sneak in.
  *
  * Usage:
- *   bun run scripts/upgrade-packages-evidence.ts [--out <path>] [--only <pkg>]
- *   bun run scripts/upgrade-packages-evidence.ts --only immer   # tracer bullet
+ *   bun run upgrade-packages:evidence [--out <path>] [--only <pkg>]
+ *   bun run upgrade-packages:evidence --only immer   # tracer bullet
  *
- * Artifact schema: see `Evidence` type below.
+ * Defaults: --out scripts/upgrade-packages/artifact.json; cache colocated
+ * at scripts/upgrade-packages/.cache/ (GHSA 1h, bun pm diff 7d). Artifact
+ * schema: see `Evidence` type below.
  */
 
-// `export {}` keeps this file a Module (not a global Script) so its `main`
-// doesn't collide with other script-mode files' `main` under tsgo.
-export {};
+import { readdirSync } from "node:fs";
+
+import type { BunPmDiffJson, Delta } from "./tarball-delta";
+import {
+  buildDelta,
+  failedDelta,
+  npmVersionUrl,
+  selectPatchPaths,
+} from "./tarball-delta";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types — the artifact contract the AI agent reads
@@ -30,6 +38,7 @@ interface OutdatedPkg {
   latest: string;
   bumpClass: BumpClass;
   coupledWith: string[]; // peer/dep that forces a higher band (filled naively here)
+  dev: boolean;
 }
 
 interface AdvisoryVuln {
@@ -47,21 +56,6 @@ interface AdvisoryVuln {
     | "check-failed"; // gh/parse/cache failure — inconclusive, not a real vuln
   url: string;
   error?: string;
-}
-
-interface Delta {
-  version: string;
-  date: string | null;
-  breaking: string[];
-  deprecations: string[];
-  features: string[];
-  security: string[];
-  peerEngine: string[];
-  releaseNotes: string | null; // raw body, truncated
-  diffUrl: string | null; // github.com/<o>/<r>/compare/<prev>...<tag>
-  changelogUrl: string | null;
-  source: "github-release" | "none";
-  error: string | null;
 }
 
 interface Usage {
@@ -159,16 +153,21 @@ async function ghGate() {
 const SCRIPT_DIR = import.meta.dir;
 const CACHE_DIR = `${SCRIPT_DIR}/.cache`;
 const DEFAULT_OUT = `${SCRIPT_DIR}/artifact.json`;
-const CACHE_MAX_AGE_MS = 1000 * 60 * 60; // 1 hour
+const CACHE_MAX_AGE_MS = 1000 * 60 * 60; // 1 hour — GHSA can change
+const PMDIFF_CACHE_MS = 1000 * 60 * 60 * 24 * 7; // published tarball pair is immutable
+const DIFF_CONCURRENCY = 4;
 
 function cachePath(key: string): string {
   return `${CACHE_DIR}/${key.replace(/[^a-z0-9._-]/gi, "_")}.json`;
 }
 
-async function readCache(key: string): Promise<string | null> {
+async function readCache(
+  key: string,
+  maxAgeMs = CACHE_MAX_AGE_MS,
+): Promise<string | null> {
   const f = Bun.file(cachePath(key));
   if (!(await f.exists())) return null;
-  if (Date.now() - f.lastModified > CACHE_MAX_AGE_MS) return null;
+  if (Date.now() - f.lastModified > maxAgeMs) return null;
   return await f.text();
 }
 
@@ -229,7 +228,7 @@ function bumpClass(current: string, latest: string): BumpClass {
   return lb !== cb ? "minor" : "patch";
 }
 
-function semverInRange(version: string, range: string | null): boolean {
+export function semverInRange(version: string, range: string | null): boolean {
   if (!range) return false;
   // Naive but covers the GHSA `vulnerable_version_range` shapes we see:
   // comma- or space-separated comparators (AND), and `||` groups (OR).
@@ -243,9 +242,14 @@ function semverInRange(version: string, range: string | null): boolean {
       .filter(Boolean);
     if (clauses.length === 0) continue;
     let groupOk = true;
+    let parsed = 0;
     for (const clause of clauses) {
       const m = clause.match(/^(>=|<=|>|<|=)?\s*(\d[^-+]*)/);
-      if (!m) continue;
+      if (!m) {
+        groupOk = false;
+        break;
+      }
+      parsed += 1;
       const [, op, ver] = m;
       const c = cmpVer(version, ver);
       if (op === ">=" && !(c >= 0)) groupOk = false;
@@ -254,9 +258,24 @@ function semverInRange(version: string, range: string | null): boolean {
       if (op === "<" && !(c < 0)) groupOk = false;
       if ((!op || op === "=") && c !== 0) groupOk = false;
     }
-    if (groupOk) return true;
+    if (parsed > 0 && groupOk) return true;
   }
   return false;
+}
+
+export function ghsaVerdict(
+  inRange: boolean,
+  fixedIn: string | null,
+  targetVer: string,
+): AdvisoryVuln["verdict"] {
+  if (inRange && fixedIn && targetVer && cmpVer(fixedIn, targetVer) <= 0) {
+    return "priority-bump";
+  }
+  if (inRange && fixedIn && targetVer && cmpVer(fixedIn, targetVer) > 0) {
+    return "needs-higher-target";
+  }
+  if (!inRange) return "cleared-at-current";
+  return "unpatched";
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -274,20 +293,50 @@ const HIGH_RISK = [
   "tsdown",
 ];
 
+function workspaceManifests(): string[] {
+  const manifests = ["package.json"];
+  for (const dir of ["packages", "apps"]) {
+    try {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          manifests.push(`${dir}/${entry.name}/package.json`);
+        }
+      }
+    } catch {
+      // Directory may not exist in this repo.
+    }
+  }
+  return manifests;
+}
+
 async function parsePackageJson(): Promise<Evidence["inventory"]> {
-  const pkg = JSON.parse(await Bun.file("package.json").text());
   const direct: Evidence["inventory"]["direct"] = [];
   const classify = (v: string): "exact" | "caret" | "tilde" =>
     v.startsWith("^") ? "caret" : v.startsWith("~") ? "tilde" : "exact";
-  for (const [name, version] of Object.entries<string>(
-    pkg.dependencies ?? {},
-  )) {
-    direct.push({ name, version, range: classify(version), dev: false });
-  }
-  for (const [name, version] of Object.entries<string>(
-    pkg.devDependencies ?? {},
-  )) {
-    direct.push({ name, version, range: classify(version), dev: true });
+  const seen = new Set<string>();
+  const add = (name: string, version: string, dev: boolean) => {
+    if (version.startsWith("workspace:")) return;
+    const key = `${name}@${version}:${dev}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    direct.push({ name, version, range: classify(version), dev });
+  };
+  for (const manifest of workspaceManifests()) {
+    const raw = await Bun.file(manifest)
+      .text()
+      .catch(() => "");
+    if (!raw) continue;
+    const pkg = JSON.parse(raw);
+    for (const [name, version] of Object.entries<string>(
+      pkg.dependencies ?? {},
+    )) {
+      add(name, version, false);
+    }
+    for (const [name, version] of Object.entries<string>(
+      pkg.devDependencies ?? {},
+    )) {
+      add(name, version, true);
+    }
   }
   // Transitive duplicates: parse bun.lock for packages resolved at multiple versions
   // where one version is a direct dep (the signal the skill cares about).
@@ -320,25 +369,51 @@ async function parsePackageJson(): Promise<Evidence["inventory"]> {
   return { direct, transitiveDuplicates };
 }
 
-async function parseBunOutdated(): Promise<OutdatedPkg[]> {
-  const { stdout } = await runSoft(["bun", "outdated"]);
+export function parseOutdatedTable(stdout: string): OutdatedPkg[] {
   const out: OutdatedPkg[] = [];
-  // Table rows: | <pkg> | <current> | <update> | <latest> |
+  const seen = new Set<string>();
+  // Root table: | Package | Current | Update | Latest |
+  // Workspace table (`bun outdated --filter '*'`): extra trailing Workspace column.
+  // Display suffixes: " (dev)" / " (peer)" / " (optional)".
   for (const line of stdout.split("\n")) {
-    const m = line.match(
-      /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/,
-    );
-    if (!m) continue;
-    const [, pkg, current, , latest] = m.map((s) => s.trim());
-    if (pkg === "Package" || pkg.startsWith("---")) continue;
-    if (current === latest) continue;
+    if (!line.trim().startsWith("|")) continue;
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((s) => s.trim());
+    if (cells.length < 4) continue;
+    const [pkgRaw, current, , latest] = cells;
+    if (!pkgRaw || pkgRaw === "Package" || pkgRaw.startsWith("---")) continue;
+    if (!current || !latest || current === latest) continue;
+    const isDev = /\s*\(dev\)\s*$/.test(pkgRaw);
+    const pkg = pkgRaw.replace(/\s*\((?:dev|peer|optional)\)\s*$/, "");
+    const key = `${pkg}@${current}->${latest}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     out.push({
       pkg,
       current,
       latest,
       bumpClass: bumpClass(current, latest),
       coupledWith: [],
+      dev: isDev,
     });
+  }
+  return out;
+}
+
+async function parseBunOutdated(): Promise<OutdatedPkg[]> {
+  // `--filter '*'` covers every workspace package (root-only `bun outdated`
+  // misses per-package deps). Adds a trailing Workspace column.
+  const { ok, stdout, code } = await runSoft([
+    "bun",
+    "outdated",
+    "--filter",
+    "*",
+  ]);
+  const out = parseOutdatedTable(stdout);
+  if (!ok && out.length === 0) {
+    throw new Error(`bun outdated exited ${code} with no parseable rows`);
   }
   return out;
 }
@@ -356,6 +431,97 @@ async function runBunAudit(): Promise<unknown> {
   }
 }
 
+async function fetchGhsaList(pkg: string): Promise<unknown[]> {
+  return cachedParsed(
+    `ghsa:${pkg}`,
+    CACHE_MAX_AGE_MS,
+    () =>
+      run(
+        [
+          "gh",
+          "api",
+          "-X",
+          "GET",
+          "/advisories",
+          "-f",
+          "ecosystem=npm",
+          "-f",
+          `affects=${pkg}`,
+        ],
+        { retries: 2 },
+      ),
+    (raw) => {
+      const list = JSON.parse(raw);
+      if (!Array.isArray(list)) {
+        throw new Error(
+          `non-array response from gh api advisories: ${String(list).slice(0, 120)}`,
+        );
+      }
+      return list;
+    },
+  );
+}
+
+function advisoryFromGhsa(
+  a: {
+    ghsa_id: string;
+    cve_id?: string | null;
+    severity?: string;
+    vulnerabilities?: {
+      package?: { name?: string };
+      vulnerable_version_range?: string | null;
+      first_patched_version?: { identifier?: string } | string | null;
+    }[];
+  },
+  pkg: string,
+  installed: Map<string, string>,
+  target: Map<string, string>,
+): AdvisoryVuln {
+  const vuln =
+    a.vulnerabilities?.find((v) => v.package?.name === pkg) ??
+    a.vulnerabilities?.[0] ??
+    {};
+  const range = vuln.vulnerable_version_range ?? null;
+  const patched = vuln.first_patched_version;
+  const fixedIn =
+    typeof patched === "string" ? patched : (patched?.identifier ?? null);
+  const installedVer = installed.get(pkg) ?? "";
+  const targetVer = target.get(pkg) ?? "";
+  const inRange = installedVer ? semverInRange(installedVer, range) : false;
+  return {
+    id: a.ghsa_id,
+    cveId: a.cve_id ?? null,
+    severity: a.severity ?? "unknown",
+    vulnerableRange: range,
+    fixedIn,
+    installedInRange: inRange,
+    verdict: ghsaVerdict(inRange, fixedIn, targetVer),
+    url: `https://github.com/advisories/${a.ghsa_id}`,
+  };
+}
+
+function ghsaCheckFailed(
+  pkg: string,
+  e: unknown,
+): Evidence["audit"]["ghsa"][number] {
+  return {
+    pkg,
+    advisories: [
+      {
+        id: "error",
+        cveId: null,
+        severity: "unknown",
+        vulnerableRange: null,
+        fixedIn: null,
+        installedInRange: false,
+        verdict: "check-failed",
+        url: "",
+        error: e instanceof Error ? e.message : String(e),
+      },
+    ],
+  };
+}
+
 async function ghsaSpotCheck(
   pkgs: string[],
   installed: Map<string, string>,
@@ -364,300 +530,119 @@ async function ghsaSpotCheck(
   const out: Evidence["audit"]["ghsa"] = [];
   for (const pkg of pkgs) {
     try {
-      const cacheKey = `ghsa:${pkg}`;
-      const cached = await readCache(cacheKey);
-      const raw =
-        cached ??
-        (await run(
-          [
-            "gh",
-            "api",
-            "-X",
-            "GET",
-            "/advisories",
-            "-f",
-            "ecosystem=npm",
-            "-f",
-            `affects=${pkg}`,
-          ],
-          { retries: 2 },
-        ));
-      const list = JSON.parse(raw);
-      if (!Array.isArray(list)) {
-        throw new Error(
-          `non-array response from gh api advisories: ${String(list).slice(0, 120)}`,
-        );
-      }
-      if (!cached) await writeCache(cacheKey, JSON.stringify(list));
-      const advisories: AdvisoryVuln[] = [];
-      for (const a of list) {
-        const vuln =
-          a.vulnerabilities?.find((v: any) => v.package?.name === pkg) ??
-          a.vulnerabilities?.[0] ??
-          {};
-        const range: string | null = vuln.vulnerable_version_range ?? null;
-        const fixedIn: string | null =
-          vuln.first_patched_version?.identifier ??
-          vuln.first_patched_version ??
-          null;
-        const installedVer = installed.get(pkg) ?? "";
-        const targetVer = target.get(pkg) ?? "";
-        const inRange = installedVer
-          ? semverInRange(installedVer, range)
-          : false;
-        let verdict: AdvisoryVuln["verdict"] = "unpatched";
-        if (inRange && fixedIn && targetVer && cmpVer(fixedIn, targetVer) <= 0)
-          verdict = "priority-bump";
-        else if (
-          inRange &&
-          fixedIn &&
-          targetVer &&
-          cmpVer(fixedIn, targetVer) > 0
-        )
-          verdict = "needs-higher-target";
-        else if (!inRange) verdict = "cleared-at-current";
-        advisories.push({
-          id: a.ghsa_id,
-          cveId: a.cve_id ?? null,
-          severity: a.severity ?? "unknown",
-          vulnerableRange: range,
-          fixedIn,
-          installedInRange: inRange,
-          verdict,
-          url: `https://github.com/advisories/${a.ghsa_id}`,
-        });
-      }
-      out.push({ pkg, advisories });
-    } catch (e) {
+      const list = await fetchGhsaList(pkg);
       out.push({
         pkg,
-        advisories: [
-          {
-            id: "error",
-            cveId: null,
-            severity: "unknown",
-            vulnerableRange: null,
-            fixedIn: null,
-            installedInRange: false,
-            verdict: "check-failed",
-            url: "",
-            error: e instanceof Error ? e.message : String(e),
-          },
-        ],
+        advisories: list.map((a) =>
+          advisoryFromGhsa(
+            a as Parameters<typeof advisoryFromGhsa>[0],
+            pkg,
+            installed,
+            target,
+          ),
+        ),
       });
+    } catch (e) {
+      out.push(ghsaCheckFailed(pkg, e));
     }
   }
   return out;
 }
 
-async function getRepoSlug(
-  pkg: string,
-): Promise<{ owner: string; repo: string } | null> {
-  try {
-    const raw = stripBunHeader(
-      await run(["bun", "pm", "view", pkg, "repository", "--json"], {
-        retries: 2,
-      }),
-    );
-    const data = JSON.parse(raw);
-    const url: string = data.url ?? "";
-    // Preserve dots in repo names (e.g. mozilla/pdf.js); strip a trailing .git.
-    const m = url.match(
-      /github\.com[/:]([^/]+)\/([^/#?]+?)(?:\.git)?(?:[/?#].*)?$/,
-    );
-    return m ? { owner: m[1], repo: m[2] } : null;
-  } catch {
-    return null;
-  }
+async function cachedParsed<T>(
+  key: string,
+  maxAgeMs: number,
+  fetchText: () => Promise<string>,
+  parse: (raw: string) => T,
+): Promise<T> {
+  const cached = await readCache(key, maxAgeMs);
+  if (cached) return parse(cached);
+  const raw = await fetchText();
+  const value = parse(raw);
+  await writeCache(key, raw);
+  return value;
 }
 
-async function getVersions(pkg: string): Promise<string[]> {
-  try {
-    const raw = stripBunHeader(
-      await run(["bun", "pm", "view", pkg, "versions", "--json"], {
-        retries: 2,
-      }),
-    );
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
+function parseDiffJson(raw: string, label: string): BunPmDiffJson {
+  const body = stripBunHeader(raw);
+  const data: unknown = JSON.parse(body);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(`${label}: expected a JSON object`);
   }
+  const obj = data as Record<string, unknown>;
+  if ("files" in obj && !Array.isArray(obj.files)) {
+    throw new Error(`${label}: files must be an array`);
+  }
+  if ("notes" in obj && !Array.isArray(obj.notes)) {
+    throw new Error(`${label}: notes must be an array`);
+  }
+  return data as BunPmDiffJson;
 }
 
-/** Walk the changelog between current and target. Naive categorization of release body. */
+/** One current→target tarball span via `bun pm diff`. Stat first, then patches for keep-paths. */
 async function gatherDeltas(
   pkg: string,
   current: string,
   target: string,
+  importedSymbols: string[],
 ): Promise<Delta[]> {
-  if (isPrerelease(target) || isPrerelease(current)) {
-    return [
-      {
-        version: target,
-        date: null,
-        breaking: [],
-        deprecations: [],
-        features: [],
-        security: [],
-        peerEngine: [],
-        releaseNotes: null,
-        diffUrl: null,
-        changelogUrl: null,
-        source: "none",
-        error:
-          "prerelease/moving-target build — no per-version changelog; gate on same-major-line only",
-      },
-    ];
-  }
-  const slug = await getRepoSlug(pkg);
-  if (!slug) {
-    return [
-      {
-        version: target,
-        date: null,
-        breaking: [],
-        deprecations: [],
-        features: [],
-        security: [],
-        peerEngine: [],
-        releaseNotes: null,
-        diffUrl: null,
-        changelogUrl: null,
-        source: "none",
-        error: "no github repository found",
-      },
-    ];
-  }
-  const { owner, repo } = slug;
-  const allVersions = await getVersions(pkg);
-  const inRange = allVersions
-    .filter(
-      (v) =>
-        !isPrerelease(v) && cmpVer(v, current) > 0 && cmpVer(v, target) <= 0,
-    )
-    .sort((a, b) => cmpVer(a, b));
-
-  // Fetch the repo's release list once and map version → actual tag name.
-  // Handles v<x>, <x>, @scope/pkg@<x>, release-<date>, etc. — whatever the repo uses.
-  const releases = await fetchReleaseMap(owner, repo);
-  const tagOf = (v: string): string | null => releases.get(v)?.tagName ?? null;
-
-  const deltas: Delta[] = [];
-  let prevTag = tagOf(current) ?? `v${current}`;
-  for (const v of inRange) {
-    const rel = tagOf(v) ? releases.get(v) : null;
-    const tag = rel?.tagName ?? null;
-    const diffUrl = tag
-      ? `https://github.com/${owner}/${repo}/compare/${prevTag}...${tag}`
-      : null;
-    const body = rel?.body ?? null;
-    const date = rel?.publishedAt ?? null;
-    const source: Delta["source"] = rel ? "github-release" : "none";
-    const error = rel
-      ? null
-      : `no github release for ${pkg}@${v} (${releases.size} releases scanned — likely a gh secondary rate-limit or monorepo squashed release; deep-dive via changelogUrl)`;
-    // Always provide a deep-dive link: the specific tag release page when known,
-    // else the repo's releases page (so the model can browse tags when the script couldn't).
-    const changelogUrl = tag
-      ? `https://github.com/${owner}/${repo}/releases/tag/${tag}`
-      : `https://github.com/${owner}/${repo}/releases`;
-    deltas.push({
-      version: v,
-      date,
-      breaking: extractLines(body, /breaking|breaking change/i),
-      deprecations: extractLines(body, /deprecat|removed export/i),
-      features: extractLines(body, /^feat|feature|^add|^new/i),
-      security: extractLines(
-        body,
-        /security|cve|prototype pollution|vulnerabilit/i,
-      ),
-      peerEngine: extractLines(
-        body,
-        /peer dep|engine|requires (node|bun|react)/i,
-      ),
-      releaseNotes: body,
-      diffUrl,
-      changelogUrl,
-      source,
-      error,
-    });
-    if (tag) prevTag = tag;
-  }
-  if (deltas.length === 0) {
-    deltas.push({
-      version: target,
-      date: null,
-      breaking: [],
-      deprecations: [],
-      features: [],
-      security: [],
-      peerEngine: [],
-      releaseNotes: null,
-      diffUrl: null,
-      changelogUrl: null,
-      source: "none",
-      error: "no versions found in range",
-    });
-  }
-  return deltas;
-}
-
-/** Fetch a repo's releases (with bodies) in one paginated call. Maps version → release. */
-async function fetchReleaseMap(
-  owner: string,
-  repo: string,
-): Promise<
-  Map<
-    string,
-    { tagName: string; publishedAt: string | null; body: string | null }
-  >
-> {
-  const map = new Map<
-    string,
-    { tagName: string; publishedAt: string | null; body: string | null }
-  >();
-  const cacheKey = `releases:${owner}/${repo}`;
+  const changelogUrl = npmVersionUrl(pkg, target);
   try {
-    const cached = await readCache(cacheKey);
-    const raw =
-      cached ??
-      (await run([
-        "gh",
-        "api",
-        `repos/${owner}/${repo}/releases?per_page=100`,
-      ]));
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) {
-      // gh returns a JSON object (e.g. {"message":"secondary rate limit"}) on rate-limit — not an array.
-      throw new Error(
-        `non-array response from gh api releases: ${String(raw).slice(0, 120)}`,
+    const spec = `${pkg}@${current}`;
+    const range = `${pkg}@${current}..${target}`;
+    const stat = await cachedParsed(
+      `pmdiff-stat:${range}`,
+      PMDIFF_CACHE_MS,
+      () =>
+        run(["bun", "pm", "diff", spec, target, "--json", "--stat"], {
+          retries: 1,
+        }),
+      (raw) => parseDiffJson(raw, `bun pm diff --stat ${range}`),
+    );
+    const patchPaths = selectPatchPaths(stat.files ?? [], importedSymbols);
+    let patches: BunPmDiffJson | null = null;
+    if (patchPaths.length > 0) {
+      const patchKey = `pmdiff-patch:${range}:${Bun.hash(patchPaths.join("\0")).toString(16)}`;
+      patches = await cachedParsed(
+        patchKey,
+        PMDIFF_CACHE_MS,
+        () =>
+          run(["bun", "pm", "diff", spec, target, "--json", ...patchPaths], {
+            retries: 1,
+          }),
+        (raw) => parseDiffJson(raw, `bun pm diff patches ${range}`),
       );
     }
-    if (!cached) await writeCache(cacheKey, JSON.stringify(list));
-    for (const r of list) {
-      const m = (r.tag_name as string).match(/(\d+\.\d+\.\d+(?:-[\w.]+)?)/);
-      if (m)
-        map.set(m[1], {
-          tagName: r.tag_name,
-          publishedAt: r.published_at ?? null,
-          body: r.body ? String(r.body).slice(0, 1200) : null,
-        });
-    }
-  } catch {
-    // repo has no releases or gh failed (secondary rate-limit / not found) — empty map; caller records error per version.
+    return [buildDelta({ target, changelogUrl, stat, patches })];
+  } catch (e) {
+    return [
+      failedDelta(
+        target,
+        changelogUrl,
+        e instanceof Error ? e.message : String(e),
+      ),
+    ];
   }
-  return map;
 }
 
-function extractLines(body: string | null, re: RegExp): string[] {
-  if (!body) return [];
-  return body
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => re.test(l) && l.length > 0)
-    .slice(0, 6)
-    .map((l) => l.replace(/^[#*\-\s]+/, "").slice(0, 160));
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]!);
+    }
+  }
+  const n = Math.min(concurrency, items.length);
+  if (n === 0) return out;
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return out;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -875,27 +860,39 @@ async function main() {
   if (onlyPkg) outdated = outdated.filter((o) => o.pkg === onlyPkg);
   const target = new Map(outdated.map((o) => [o.pkg, o.latest]));
 
-  console.error("→ bun audit");
-  const bunAudit = await runBunAudit();
-
-  console.error("→ ghsa spot-check");
+  console.error("→ bun audit + ghsa");
   const ghsaPkgs = (onlyPkg ? [onlyPkg] : HIGH_RISK).filter(
     (p) => installed.has(p) || target.has(p),
   );
-  const ghsa = await ghsaSpotCheck(ghsaPkgs, installed, target);
-
-  console.error("→ deltas");
-  const deltas: Record<string, Delta[]> = {};
-  for (const o of outdated) {
-    console.error(`   ${o.pkg} ${o.current} → ${o.latest}`);
-    deltas[o.pkg] = await gatherDeltas(o.pkg, o.current, o.latest);
-  }
+  const [bunAudit, ghsa] = await Promise.all([
+    runBunAudit(),
+    ghsaSpotCheck(ghsaPkgs, installed, target),
+  ]);
 
   console.error("→ usage (batched codemap)");
   const usageMap = await gatherAllUsageWithFallback(outdated.map((o) => o.pkg));
   const usage: Record<string, Usage> = {};
-  for (const o of outdated)
-    usage[o.pkg] = usageMap.get(o.pkg) ?? (await grepUsage(o.pkg));
+  for (const o of outdated) {
+    const u = usageMap.get(o.pkg);
+    if (!u) throw new Error(`usage missing for ${o.pkg}`);
+    usage[o.pkg] = u;
+  }
+
+  console.error(`→ deltas (bun pm diff, ${DIFF_CONCURRENCY} at a time)`);
+  const deltaEntries = await mapPool(outdated, DIFF_CONCURRENCY, async (o) => {
+    console.error(`   ${o.pkg} ${o.current} → ${o.latest}`);
+    const u = usage[o.pkg];
+    const symbols = [
+      ...(u?.importedSymbols ?? []),
+      ...(u?.typeOnlySymbols ?? []),
+    ];
+    return [
+      o.pkg,
+      await gatherDeltas(o.pkg, o.current, o.latest, symbols),
+    ] as const;
+  });
+  const deltas: Record<string, Delta[]> = {};
+  for (const [pkg, list] of deltaEntries) deltas[pkg] = list;
 
   const evidence: Evidence = {
     generatedAt: new Date().toISOString(),
@@ -915,7 +912,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error("fatal:", e);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((e) => {
+    console.error("fatal:", e);
+    process.exit(1);
+  });
+}
