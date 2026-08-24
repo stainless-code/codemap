@@ -957,7 +957,7 @@ export interface SymbolRow {
   body_hash?: string | null;
 }
 
-// SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 12.x both ship
+// SQLite 3.32+ (2020+) default; bun:sqlite + better-sqlite3 13.x both ship
 // with newer SQLite. Older builds default to 999.
 const SQLITE_MAX_VARS = 32766;
 // Cap rows per batch even when col_count would allow more — keeps per-batch

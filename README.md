@@ -22,7 +22,7 @@ bun add @stainless-code/codemap
 # or: npm install @stainless-code/codemap
 ```
 
-**Engines:** Node **`^20.19.0 || >=22.12.0`** and/or Bun **`>=1.0.31`**.
+**Engines:** Node **`>=22.12.0`** and/or Bun **`>=1.0.31`**.
 
 ---
 
