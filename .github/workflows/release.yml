@@ -55,13 +55,13 @@ jobs:
       # or a real publish failure — not assumed from the runner alone.
       - name: Create Release Pull Request or Publish to npm
         id: changesets
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1
+        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
           # Runs `changeset version` then oxfmt on CHANGELOG.md so `format:check` passes (see docs/packaging.md).
-          version: bun run version
-          publish: bun run release
-          title: "chore: version packages"
-          commit: "chore: version packages"
-          createGithubReleases: true
+          version-script: bun run version
+          publish-script: bun run release
+          pr-title: "chore: version packages"
+          commit-message: "chore: version packages"
+          create-github-releases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
