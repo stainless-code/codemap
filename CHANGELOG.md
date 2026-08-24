@@ -1,5 +1,11 @@
 # @stainless-code/codemap
 
+## 0.11.7
+
+### Patch Changes
+
+- [#235](https://github.com/stainless-code/codemap/pull/235) [`edd1c36`](https://github.com/stainless-code/codemap/commit/edd1c36f6a311d14259807ce9e900ffb2ca300d4) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - Refresh runtime and toolchain dependencies. `better-sqlite3` 13 requires Node `>=22`, so published `engines.node` is now `>=22.12.0` (Node 20 dropped). `oxc-parser` 0.147 plus a heritage extractor skip for oxc's dummy recovery of invalid `interface extends`. Audit overrides pin patched `hono`, `@hono/node-server`, and `postcss`.
+
 ## 0.11.6
 
 ### Patch Changes
