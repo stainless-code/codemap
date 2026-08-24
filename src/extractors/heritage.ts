@@ -35,6 +35,22 @@ function unwrapExpression(node: any): any {
   return cur;
 }
 
+/** oxc 0.146+ recovers invalid interface `extends` as a zero-span `ThisExpression`. */
+function isRecoveredDummyExpression(expr: any, heritageNode: any): boolean {
+  if (!expr) return true;
+  const start = expr.start;
+  const end = expr.end;
+  if (typeof start !== "number" || typeof end !== "number" || start === end) {
+    return true;
+  }
+  const hs = heritageNode?.start;
+  const he = heritageNode?.end;
+  if (typeof hs === "number" && typeof he === "number") {
+    return start < hs || end > he;
+  }
+  return false;
+}
+
 function bestEffortSimpleName(node: any): string | null {
   const unwrapped = unwrapExpression(node);
   if (!unwrapped) return null;
@@ -132,10 +148,10 @@ function recordHeritageBase(
   const expr = unwrapExpression(
     heritageNode?.expression ?? heritageNode?.typeName ?? heritageNode,
   );
+  if (isRecoveredDummyExpression(expr, heritageNode)) return;
   const base = heritageBaseFromTypeRef(expr, heritageNode);
   if (!base) {
-    const simple = bestEffortSimpleName(expr);
-    if (!simple) return;
+    const simple = bestEffortSimpleName(expr) ?? "(expression)";
     pushHeritageRow(ctx, {
       child_file_path: child.file_path,
       child_name: child.name,

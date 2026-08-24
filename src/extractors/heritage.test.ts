@@ -50,11 +50,32 @@ class Dog extends Animal<string> {}
     expect(rows[0]?.type_args).toBe("string");
   });
 
-  it("records unresolved row for complex extends expression", () => {
+  it("skips invalid interface extends that oxc recovers as a dummy expression", () => {
     const src = `
 interface Weird extends (A | B) {}
 `;
-    const result = parseSync("x.ts", src);
+    const result = parseSync("x.ts", src, {
+      lang: "ts",
+      preserveParens: false,
+    });
+    const lineMap = buildLineMap(src);
+    const rows = extractHeritageFromSource("x.ts", result.program, lineMap);
+    expect(rows).toHaveLength(0);
+    expect(
+      result.errors.some((e) =>
+        e.message.includes("only extend an identifier/qualified-name"),
+      ),
+    ).toBe(true);
+  });
+
+  it("records unresolved row for a real complex class extends expression", () => {
+    const src = `
+class C extends (foo()) {}
+`;
+    const result = parseSync("x.ts", src, {
+      lang: "ts",
+      preserveParens: false,
+    });
     const lineMap = buildLineMap(src);
     const rows = extractHeritageFromSource("x.ts", result.program, lineMap);
     expect(rows).toHaveLength(1);
