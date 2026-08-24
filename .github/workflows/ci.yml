@@ -243,6 +243,7 @@ jobs:
         run: bun run docs:audit
 
   dedupe:
+    # Fails when bun.lock still has duplicate versions (`bun dedupe --check`).
     name: 🧹 Dedupe
     needs: skip-ci
     if: needs['skip-ci'].outputs.skip != 'true'

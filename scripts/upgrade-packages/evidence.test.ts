@@ -68,6 +68,18 @@ describe("parseOutdatedTable", () => {
     ]);
   });
 
+  it("keeps the same package at two current versions", () => {
+    const stdout = [
+      "| Package | Current | Update | Latest | Workspace |",
+      "| --- | --- | --- | --- | --- |",
+      "| react | 18.3.1 | 19.0.0 | 19.2.0 | @stainless-code/codemap |",
+      "| react | 19.1.0 | 19.2.0 | 19.2.0 | @stainless-code/codemap-docs |",
+    ].join("\n");
+    const rows = parseOutdatedTable(stdout);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.current)).toEqual(["18.3.1", "19.1.0"]);
+  });
+
   it("parses workspace-filter rows and strips (peer)/(optional)", () => {
     const stdout = [
       "| Package | Current | Update | Latest | Workspace |",

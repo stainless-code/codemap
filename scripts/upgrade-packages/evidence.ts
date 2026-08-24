@@ -859,6 +859,8 @@ async function main() {
   let outdated = await parseBunOutdated();
   if (onlyPkg) outdated = outdated.filter((o) => o.pkg === onlyPkg);
   const target = new Map(outdated.map((o) => [o.pkg, o.latest]));
+  // Manifest inventory is a range floor; `bun outdated` reports the resolved version.
+  for (const o of outdated) installed.set(o.pkg, o.current);
 
   console.error("→ bun audit + ghsa");
   const ghsaPkgs = (onlyPkg ? [onlyPkg] : HIGH_RISK).filter(
@@ -892,7 +894,9 @@ async function main() {
     ] as const;
   });
   const deltas: Record<string, Delta[]> = {};
-  for (const [pkg, list] of deltaEntries) deltas[pkg] = list;
+  for (const [pkg, list] of deltaEntries) {
+    deltas[pkg] = [...(deltas[pkg] ?? []), ...list];
+  }
 
   const evidence: Evidence = {
     generatedAt: new Date().toISOString(),
