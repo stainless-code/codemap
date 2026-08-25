@@ -11,6 +11,6 @@
     "validate": "bun scripts/validate.ts"
   },
   "dependencies": {
-    "blume": "1.4.2"
+    "blume": "1.5.3"
   }
 }
