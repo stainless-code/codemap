@@ -80,6 +80,7 @@ Long-running MCP / HTTP sessions dominate agent workflows; one-shot CLI keeps th
 Predicate-as-API only — enrich row shape and audit deltas; no standalone pass/fail verdict primitive ([Moat A](./roadmap.md#moats-load-bearing)).
 
 - [x] **Tiered lookup fast paths** — `show` / `name:Token` (no wildcards) route to equality index (`idx_symbols_name_covering`); substring / FTS / multi-field stay slow tier. MCP + CLI help document tiers. See [architecture.md § CLI usage](./architecture.md#cli-usage).
+- [ ] **`--changed-since` path columns + literal `import()` reachability** — `PATH_COLUMNS` in `src/git-changed.ts` is `path` / `file_path` / `from_path` / `to_path` / `resolved_path`. Recipes that emit `from_file` / `to_file` (`barrel-chains`) ignore `--changed-since` and dump the full table. Resolved literal `import()` lands in `dynamic_imports` but not `dependencies` (glossary: edges come from static `imports.resolved_path` only), so orphan / fan-in / `affected` miss `lazy(() => import("./X"))` chunks. Two slices: (1) add `from_file` / `to_file` to `PATH_COLUMNS`. (2) write resolved literal dynamic imports into `dependencies`, or document that every graph recipe must JOIN `dynamic_imports`. Effort: S + M.
 
 ### Distribution & evaluation depth
 
