@@ -104,7 +104,7 @@
     "oxc-resolver": "11.24.2",
     "package-manager-detector": "1.8.0",
     "tinyglobby": "0.2.17",
-    "zod": "4.4.3"
+    "zod": "4.5.2"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
