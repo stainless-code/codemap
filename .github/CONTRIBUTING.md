@@ -3,7 +3,7 @@
 Codemap is in **bootstrap / extraction** phase. Before large PRs, please open an issue so we can align on:
 
 - **Core vs adapter** — core should stay small; language-specific logic belongs in **adapters** (see [docs/roadmap.md](../docs/roadmap.md)).
-- **Runtimes** — **Node** `>=22.12.0` and **Bun** `>=1.0.31` (`package.json` **engines**); SQLite is **`better-sqlite3`** on Node and **`bun:sqlite`** on Bun ([docs/architecture.md](../docs/architecture.md), [docs/packaging.md § Node vs Bun](../docs/packaging.md#node-vs-bun)). Maintainers use **Bun 1.4.0** (`packageManager`).
+- **Runtimes** — **Node** `>=22.12.0` and **Bun** `>=1.0.31` (`package.json` **engines**); SQLite is **`better-sqlite3`** on Node and **`bun:sqlite`** on Bun ([docs/architecture.md](../docs/architecture.md), [docs/packaging.md § Node vs Bun](../docs/packaging.md#node-vs-bun)). Maintainers use **Bun 1.4.1** (`packageManager`).
 
 ## Dev workflow
 
