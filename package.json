@@ -140,6 +140,6 @@
     "bun": ">=1.0.31",
     "node": ">=22.12.0"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.1",
   "contributing": ".github/CONTRIBUTING.md"
 }
