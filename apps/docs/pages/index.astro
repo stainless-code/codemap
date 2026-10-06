@@ -1,5 +1,5 @@
 ---
-import PageLayout from "blume/components/layout/PageLayout.astro";
+import PageLayout from "../components/blume/PageLayout.astro";
 import data from "blume:data";
 import Batteries from "./_home/Batteries.astro";
 import FinalCta from "./_home/FinalCta.astro";
@@ -30,15 +30,11 @@ const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="1
   themeMode={config.theme.mode}
   x={config.x}
 >
-  <div
-    class="mx-auto grid max-w-[1400px] gap-16 px-6 py-20 sm:py-24 lg:gap-24 xl:gap-32"
-  >
-    <Hero />
-    <UseCases />
-    <HowItWorks />
-    <Batteries />
-    <FinalCta />
-  </div>
+  <Hero />
+  <UseCases />
+  <HowItWorks />
+  <Batteries />
+  <FinalCta />
   <script is:inline set:html={copyScript} />
   <Footer
     navigation={data.navigation}
@@ -47,3 +43,9 @@ const copyScript = `(()=>{const CHECK='<svg class="size-4" fill="none" height="1
     ui={data.ui}
   />
 </PageLayout>
+
+<style>
+  :global(header[data-blume-header]) {
+    padding-inline: max(1.5rem, calc((100vw - 72.5rem) / 2));
+  }
+</style>

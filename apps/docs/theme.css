@@ -43,3 +43,7 @@ a:has(> span > .logo-svg):hover .logo-frame {
 a:has(> span > .logo-svg):hover .logo-select {
   transform: translate(-2.25px, -2.25px);
 }
+
+.landing-gutter {
+  padding-inline: max(1.5rem, calc((100vw - 72.5rem) / 2));
+}
