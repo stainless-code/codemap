@@ -3,6 +3,10 @@ title: Apply & rename
 description: Turn recipe diff rows into on-disk edits — dry-run, fixpoint, and rename.
 search:
   tags: ["guide", "apply", "rename"]
+related:
+  - /recipes
+  - /guides/cli-overview
+  - /reference/formats
 ---
 
 You’ve got rows that say what to change — `file_path`, `line_start`, `before_pattern`, `after_pattern`. `codemap apply` validates the on-disk line still matches `before_pattern`, then writes `after_pattern`.

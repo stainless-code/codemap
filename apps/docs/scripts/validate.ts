@@ -53,13 +53,14 @@ try {
   process.exit(result.status === 0 ? 0 : 1);
 }
 
-/** Changelog → maintainer `docs/` paths only (not broken public-site links). */
 const isChangelogMaintainerLink = (d: Diagnostic): boolean =>
   d.code === "BLUME_BROKEN_LINK" &&
   typeof d.file === "string" &&
   d.file.startsWith("changelog:") &&
   typeof d.message === "string" &&
-  /(?:^|[\s/`])\.\.\/docs\/|no page resolves to \/docs\//.test(d.message);
+  /(?:^|[\s/`])\.\.\/docs\/|no page resolves to \/docs\/|no page resolves to \/codemap(?![\w/-])/.test(
+    d.message,
+  );
 
 const kept = (payload.diagnostics ?? []).filter(
   (d) => !isChangelogMaintainerLink(d),

@@ -3,6 +3,8 @@ title: Recipes
 description: Bundled query recipes — find symbols, fan-in, affected tests, and more.
 search:
   tags: ["recipe"]
+  boost: 2
+  keywords: ["recipes", "catalog", "patterns"]
 ---
 
 Hand-rolling joins across `symbols`, `calls`, and `dependencies` is slow. Recipes are named SQL patterns — `codemap query --recipe <id>` (MCP: `query_recipe`). Prefer a recipe until you know the join paths.

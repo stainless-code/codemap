@@ -278,10 +278,15 @@ jobs:
 
       - name: bun audit (block on high/critical)
         # Blume's image-size has no patched release yet — ignore those GHSAs until one ships.
+        # Blume 2.1.3 subtree is docs build-time only (no src/ or published-tarball reach):
+        # brace-expansion via typedoc minimatch + Blume epub-gen-memory ejs jake filelist minimatch,
+        # http-cache-semantics via Blume @scalar/astro, source-map-js via Blume astro unifont css-tree.
+        # Runtime-touching advisories (fast-uri, proxy-addr via MCP SDK; tinypool via oxfmt) are
+        # fixed with package.json overrides instead — never ignored.
         run: |
           set +e
           # bun emits ANSI color even when piped — strip it or the severity grep misses it.
-          NO_COLOR=1 bun audit --ignore=GHSA-w3rx-r6r6-pgpr --ignore=GHSA-5p2g-fcmc-qvqq 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > /tmp/bun-audit.log
+          NO_COLOR=1 bun audit --ignore=GHSA-w3rx-r6r6-pgpr --ignore=GHSA-5p2g-fcmc-qvqq --ignore=GHSA-qhr7-859c-m2p7 --ignore=GHSA-6j4f-fj2g-mc7p --ignore=GHSA-ch52-4w7c-c8xp --ignore=GHSA-68fv-2mgg-jv7q 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > /tmp/bun-audit.log
           cat /tmp/bun-audit.log
           if grep -E '(^|[[:space:]])(high|critical):[[:space:]]' /tmp/bun-audit.log; then
             echo "::error::high or critical vulnerabilities found — blocking"

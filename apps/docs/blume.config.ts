@@ -1,4 +1,6 @@
 import { defineConfig } from "blume";
+import { orama } from "blume/search";
+import { filesystem, githubReleases } from "blume/sources";
 
 import { CURATED_POPULAR } from "./components/curated-popular";
 
@@ -16,6 +18,16 @@ export default defineConfig({
 
   logo: { image: "/logo.svg", text: "Codemap" },
 
+  footer: {
+    links: [
+      { label: "Changelog", href: "/changelog" },
+      { label: "Website", href: "https://stainless-code.com" },
+    ],
+    socials: {
+      github: "https://github.com/stainless-code/codemap",
+    },
+  },
+
   github: {
     owner: "stainless-code",
     repo: "codemap",
@@ -23,27 +35,26 @@ export default defineConfig({
     dir: "apps/docs",
   },
 
-  lastModified: true,
+  lastModified: "git",
 
   content: {
     sources: [
-      { type: "filesystem", root: "content" },
-      {
-        type: "github-releases",
+      filesystem({ root: "content" }),
+      githubReleases({
         prefix: "changelog",
         owner: "stainless-code",
         repo: "codemap",
         limit: 100,
-      },
+      }),
     ],
   },
 
   navigation: {
     tabs: [
-      { label: "Guides", path: "/guides", icon: "book-open" },
-      { label: "Recipes", path: "/recipes", icon: "flask-conical" },
-      { label: "Concepts", path: "/concepts", icon: "lightbulb" },
-      { label: "Reference", path: "/reference", icon: "code" },
+      { label: "Guides", path: "/guides" },
+      { label: "Recipes", path: "/recipes" },
+      { label: "Concepts", path: "/concepts" },
+      { label: "Reference", path: "/reference" },
     ],
     featured: [
       { label: "Changelog", href: "/changelog", icon: "sparkles" },
@@ -69,7 +80,7 @@ export default defineConfig({
     },
   },
   search: {
-    provider: "orama",
+    provider: orama(),
     // Cmd+K empty-state + shared with 404 via CURATED_POPULAR.
     popular: CURATED_POPULAR.map(({ route, label }) => ({
       href: route,
@@ -78,16 +89,20 @@ export default defineConfig({
   },
 
   markdown: {
-    code: { icons: true },
-    codeBlocks: { theme: { light: "github-light", dark: "github-dark" } },
+    externalLinks: true,
+    code: {
+      icons: true,
+      theme: { light: "github-light", dark: "github-dark" },
+    },
   },
 
   toc: { minHeadingLevel: 2, maxHeadingLevel: 3 },
 
   export: { epub: true, pdf: true },
 
-  ai: {
+  agents: {
     llmsTxt: true,
+    agentReadability: true,
   },
 
   seo: {
@@ -99,11 +114,9 @@ export default defineConfig({
     sitemap: true,
     robots: true,
     structuredData: true,
-    agentReadability: true,
   },
 
   deployment: {
-    output: "static",
     site: "https://stainless-code.com",
     base: "/codemap",
   },

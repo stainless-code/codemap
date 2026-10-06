@@ -1,0 +1,431 @@
+---
+import IconSprite from "blume/components/layout/IconSprite.astro";
+import { createIconSprite } from "blume/components/icon-sprite.ts";
+import type {
+  BlumeBanner,
+  BlumeClientData,
+  BlumeDataConfig,
+  BlumeFavicon,
+  BlumeLogo,
+  DiscoveryHeadLinks,
+} from "blume/core/data.ts";
+import data from "blume:data";
+import { EN_UI } from "blume/core/i18n-ui.ts";
+import type { UIStrings } from "blume/core/i18n-ui.ts";
+import { NEW_TAB_HINT_ID } from "blume/core/new-tab.ts";
+import type { FontHead } from "blume/theme/fonts.ts";
+import type { LocaleSwitchOption, Navigation } from "blume/core/types.ts";
+import {
+  OG_IMAGE_HEIGHT,
+  OG_IMAGE_TYPE,
+  OG_IMAGE_WIDTH,
+} from "./og-dimensions.ts";
+import { buildStructuredData } from "./jsonld.ts";
+import { normalizeXHandle } from "./x-handle.ts";
+import Icon from "blume/components/Icon.astro";
+import { stripBase, withBase, withMountedBase } from "blume/components/islands/base-path.ts";
+import { routeSetFor } from "blume/core/locale-links.ts";
+import {
+  browserLanguageTargets,
+  LOCALE_REDIRECT_SCRIPT,
+} from "blume/components/layout/locale-redirect.ts";
+import { pageDirection, pageLocale } from "blume/components/layout/page-locale.ts";
+import { searchLocaleFor } from "blume/components/layout/search-locale.ts";
+import "blume:theme";
+import { ClientRouter } from "astro:transitions";
+import Analytics from "blume/components/layout/Analytics.astro";
+import ConsentBanner from "blume/components/layout/ConsentBanner.astro";
+import ConsentHead from "blume/components/layout/ConsentHead.astro";
+import Banner from "blume/components/layout/Banner.astro";
+import DiscoveryLinks from "blume/components/layout/DiscoveryLinks.astro";
+import Favicon from "blume/components/layout/Favicon.astro";
+import Fonts from "blume/components/layout/Fonts.astro";
+import {
+  BANNER_INIT_SCRIPT,
+  SWAP_STYLESHEET_INIT_SCRIPT,
+  THEME_INIT_SCRIPT,
+} from "blume/components/layout/head-scripts.ts";
+import Header from "./Header.astro";
+import { currentTabForRoute } from "blume/components/layout/nav-utils.ts";
+import NavTabMenu from "blume/components/layout/NavTabMenu.astro";
+import DrawerSwitchers from "blume/components/layout/DrawerSwitchers.astro";
+import SiteFooter from "blume/components/layout/SiteFooter.astro";
+import SiteMetatags from "blume/components/layout/SiteMetatags.astro";
+import WebMcp from "blume/components/layout/WebMcp.astro";
+
+interface Props {
+  site: { title: string; description?: string };
+  logo?: BlumeLogo | null;
+  favicon?: BlumeFavicon | null;
+  appleIcon?: BlumeFavicon | null;
+  banner?: BlumeBanner | null;
+  analytics?: BlumeDataConfig["analytics"];
+  navigation: Navigation;
+  page?: { title?: string; description?: string; route?: string };
+  themeMode: "system" | "light" | "dark";
+  fontCssVars?: (string | FontHead)[];
+  searchEnabled: boolean;
+  assistantEnabled?: boolean;
+  transparentHeader?: boolean;
+  siteUrl?: string | null;
+  ogEnabled?: boolean;
+  ogImage?: string | null;
+  ogImageAlt?: string;
+  ogImageSize?: { height: number; width: number };
+  canonical?: string | null;
+  structuredDataEnabled?: boolean;
+  lastModified?: string | Date | null;
+  discovery?: DiscoveryHeadLinks | null;
+  x?: { creator?: string; handle?: string };
+  noindex?: boolean;
+  locale?: string;
+  dir?: "ltr" | "rtl";
+  ui?: UIStrings;
+  localeSwitch?: LocaleSwitchOption[];
+  clientData?: BlumeClientData | null;
+}
+
+const {
+  site,
+  logo,
+  favicon,
+  appleIcon,
+  banner,
+  analytics,
+  navigation,
+  page,
+  themeMode,
+  fontCssVars,
+  searchEnabled,
+  assistantEnabled,
+  transparentHeader,
+  siteUrl,
+  ogEnabled,
+  ogImage,
+  ogImageAlt,
+  ogImageSize,
+  canonical,
+  structuredDataEnabled,
+  lastModified,
+  discovery = data.config.discovery,
+  x,
+  noindex,
+  locale: localeProp,
+  dir: dirProp,
+  ui,
+  localeSwitch,
+  clientData,
+} = Astro.props;
+
+const locale = pageLocale(data.config.i18n, localeProp, Astro.currentLocale);
+const dir = dirProp ?? pageDirection(data.config.i18n, locale);
+
+const clientDataJson = clientData
+  ? JSON.stringify(clientData).replaceAll("<", "\\u003c")
+  : null;
+
+const strings = ui ?? EN_UI;
+const consent = data.config.consent;
+const navStrings = { ...EN_UI.nav, ...strings.nav };
+const searchLocale = searchLocaleFor(data.config.i18n, locale);
+const pageTitle = page?.title ?? site.title;
+const description = page?.description ?? site.description;
+const route =
+  page?.route ??
+  stripBase(import.meta.env.BASE_URL ?? "/", Astro.url.pathname);
+const activeTab = currentTabForRoute(navigation.tabs, route, navigation.root);
+
+const markdownMirror = route === "/" ? withMountedBase("/index.md") : null;
+
+const ogSlug = route === "/" ? "index" : route.slice(1);
+const ogCardGenerated = !Astro.routePattern.includes("[");
+const basedRoute = withMountedBase(route);
+const siteBase = siteUrl ? siteUrl.replace(/\/$/u, "") : null;
+const resolvedCanonical =
+  canonical ??
+  (siteBase
+    ? `${siteBase}${basedRoute === "/" ? "/" : encodeURI(basedRoute)}`
+    : null);
+const absolutizeOgImage = (value: string): string =>
+  value.startsWith("/") && siteBase ? `${siteBase}${withBase(value)}` : value;
+const resolvedOgImage = ogImage
+  ? absolutizeOgImage(ogImage)
+  : ogEnabled && ogCardGenerated && siteBase
+    ? `${siteBase}${encodeURI(withMountedBase(`/og/${ogSlug}.png`))}`
+    : null;
+const ogGenerated = !ogImage && Boolean(resolvedOgImage);
+const twitterCard = resolvedOgImage ? "summary_large_image" : "summary";
+const xSite = normalizeXHandle(x?.handle);
+const xCreator = normalizeXHandle(x?.creator);
+
+const structuredData =
+  structuredDataEnabled === false || noindex
+    ? null
+    : buildStructuredData({
+      base: import.meta.env.BASE_URL,
+      breadcrumbs: [],
+      description,
+      identity: data.config.identity,
+      locale,
+      modified: lastModified,
+      route,
+      siteName: site.title,
+      siteUrl: siteUrl ?? null,
+      title: pageTitle,
+    });
+const structuredDataJson = structuredData
+  ? JSON.stringify(structuredData).replaceAll("<", "\\u003c")
+  : null;
+
+const bannerKey = banner?.dismissible ? banner.key : null;
+
+createIconSprite(Astro.locals);
+
+const localeTargets = browserLanguageTargets({
+  basePath: data.config.basePath,
+  i18n: data.config.i18n,
+  route,
+  routes: routeSetFor(data.routes),
+});
+const localeRedirect = localeTargets
+  ? JSON.stringify(
+      Object.fromEntries(
+        Object.entries(localeTargets).map(([code, path]) => [
+          code,
+          withMountedBase(path),
+        ])
+      )
+    )
+  : null;
+---
+
+<!doctype html>
+<html dir={dir} lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {
+      localeRedirect && (
+        <script
+          data-default={data.config.i18n?.defaultLocale}
+          data-targets={localeRedirect}
+          is:inline
+          set:html={LOCALE_REDIRECT_SCRIPT}
+        />
+      )
+    }
+    <ClientRouter />
+    <script is:inline set:html={SWAP_STYLESHEET_INIT_SCRIPT} />
+    <title>{pageTitle}</title>
+    <Favicon appleIcon={appleIcon} favicon={favicon} />
+    <Fonts cssVars={fontCssVars ?? []} />
+    {resolvedCanonical && !noindex && (
+      <link href={resolvedCanonical} rel="canonical" />
+    )}
+    {noindex && <meta content="noindex" name="robots" />}
+    {description && <meta content={description} name="description" />}
+    <meta content="website" property="og:type" />
+    <meta content={site.title} property="og:site_name" />
+    <meta content={pageTitle} property="og:title" />
+    {description && <meta content={description} property="og:description" />}
+    {resolvedCanonical && <meta content={resolvedCanonical} property="og:url" />}
+    {
+      resolvedOgImage && (
+        <>
+          <meta content={resolvedOgImage} property="og:image" />
+          {ogGenerated && (
+            <>
+              <meta content={OG_IMAGE_TYPE} property="og:image:type" />
+              <meta content={String(OG_IMAGE_WIDTH)} property="og:image:width" />
+              <meta
+                content={String(OG_IMAGE_HEIGHT)}
+                property="og:image:height"
+              />
+              <meta content={pageTitle} property="og:image:alt" />
+            </>
+          )}
+          {!ogGenerated && ogImageSize && (
+            <>
+              <meta
+                content={String(ogImageSize.width)}
+                property="og:image:width"
+              />
+              <meta
+                content={String(ogImageSize.height)}
+                property="og:image:height"
+              />
+            </>
+          )}
+          {!ogGenerated && ogImageAlt && (
+            <meta content={ogImageAlt} property="og:image:alt" />
+          )}
+          <meta content={resolvedOgImage} name="twitter:image" />
+          {ogGenerated && <meta content={pageTitle} name="twitter:image:alt" />}
+          {!ogGenerated && ogImageAlt && (
+            <meta content={ogImageAlt} name="twitter:image:alt" />
+          )}
+        </>
+      )
+    }
+    <meta content={twitterCard} name="twitter:card" />
+    <meta content={pageTitle} name="twitter:title" />
+    {description && <meta content={description} name="twitter:description" />}
+    {xSite && <meta content={xSite} name="twitter:site" />}
+    {xCreator && <meta content={xCreator} name="twitter:creator" />}
+    <SiteMetatags tags={data.config.metatags} />
+    <DiscoveryLinks discovery={discovery} markdownMirror={markdownMirror} />
+    {
+      structuredDataJson && (
+        <script
+          is:inline
+          set:html={structuredDataJson}
+          type="application/ld+json"
+        />
+      )
+    }
+    {
+      bannerKey && (
+        <script data-key={bannerKey} is:inline set:html={BANNER_INIT_SCRIPT} />
+      )
+    }
+    <script data-mode={themeMode} is:inline set:html={THEME_INIT_SCRIPT} />
+    {consent && <ConsentHead consent={consent} />}
+    <Analytics analytics={analytics} />
+  </head>
+  <body class="bg-background font-sans text-foreground antialiased">
+    <a
+      class="absolute start-[-999px] top-0 z-[100] bg-accent px-4 py-2 text-accent-foreground focus:start-0"
+      href="#blume-content">{strings.page.skipToContent}</a
+    >
+    <span hidden id={NEW_TAB_HINT_ID}>{navStrings.opensInNewTab}</span>
+    <Banner banner={banner} locale={locale} strings={strings.banner} />
+    <Header
+      assistantEnabled={assistantEnabled}
+      assistantStrings={strings.assistant}
+      hasSidebar={false}
+      locale={locale}
+      localeSwitch={localeSwitch}
+      logo={logo}
+      navStrings={navStrings}
+      navigation={navigation}
+      route={route}
+      searchEnabled={searchEnabled}
+      searchLocale={searchLocale}
+      searchStrings={strings.search}
+      site={site}
+      switcherStrings={strings.languageSwitcher}
+      transparent={transparentHeader}
+    />
+    <main id="blume-content"><slot /></main>
+    {
+      Astro.slots.has("footer") ? (
+        <slot name="footer" />
+      ) : (
+        <SiteFooter
+          footer={data.config.footer}
+          locale={locale}
+          navigation={navigation}
+          ui={strings}
+        />
+      )
+    }
+    <WebMcp />
+    {
+      consent?.kind === "native" && (
+        <ConsentBanner
+          policy={consent.options.policy}
+          strings={strings.consent}
+        />
+      )
+    }
+    {
+      navigation.tabs.length > 0 && (
+        <>
+          <aside
+            aria-label={navStrings.navigation}
+            class="fixed top-[var(--blume-drawer-top,4rem)] start-0 z-[35] h-[calc(100dvh-var(--blume-drawer-top,4rem))] w-64 max-w-[80vw] -translate-x-[105%] overflow-y-auto border-border border-e bg-background px-5 pt-4 pb-6 transition-transform rtl:translate-x-[105%] [:where([data-blume-nav-open])_&]:translate-x-0! lg:hidden"
+            data-blume-nav-drawer
+            id="blume-nav-drawer"
+          >
+            <DrawerSwitchers
+              localeSwitch={localeSwitch}
+              route={route}
+              selectors={navigation.selectors}
+              switcherStrings={strings.languageSwitcher}
+            />
+            <nav aria-label={navStrings.sections}>
+              <ul class="m-0 list-none p-0">
+                {navigation.tabs.map((tab) => (
+                  <li>
+                    {tab.items && tab.items.length > 0 ? (
+                      <NavTabMenu
+                        active={tab === activeTab}
+                        route={route}
+                        tab={tab}
+                        variant="drawer"
+                      />
+                    ) : (
+                      <a
+                        aria-current={tab === activeTab ? "page" : undefined}
+                        class="flex items-center gap-2 rounded-[0.65rem] px-2.5 py-1.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
+                        href={withMountedBase(tab.href ?? tab.path)}
+                      >
+                        {tab.icon && (
+                          <Icon class="shrink-0" name={tab.icon} size={14} />
+                        )}
+                        <span class="flex-1 truncate">{tab.label}</span>
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </aside>
+          <button
+            aria-label={navStrings.closeNavigation}
+            class="fixed inset-0 z-[30] hidden cursor-pointer border-0 bg-black/40 [:where([data-blume-nav-open])_&]:block lg:hidden"
+            data-blume-nav-toggle
+            type="button"
+          />
+        </>
+      )
+    }
+    {
+      clientDataJson && (
+        <script
+          id="blume-client-data"
+          is:inline
+          set:html={clientDataJson}
+          type="application/json"
+        />
+      )
+    }
+    <script>
+      import { syncDrawerInert } from "blume/components/layout/drawer-inert.ts";
+      import "blume/components/layout/hydration-hint.ts";
+
+      syncDrawerInert();
+    </script>
+    <script is:inline>
+      (() => {
+        if (document.documentElement.dataset.codemapLeakBound === "true") return;
+        document.documentElement.dataset.codemapLeakBound = "true";
+        const strip = () => {
+          if (document.body.hasAttribute("data-blume-code-copy")) return;
+          document
+            .querySelectorAll("[data-blume-copy], [data-blume-ask]")
+            .forEach((b) => b.remove());
+        };
+        strip();
+        document.addEventListener("astro:after-swap", strip);
+      })();
+    </script>
+    <style is:global>
+      body:not([data-blume-code-copy]) [data-blume-copy],
+      body:not([data-blume-code-copy]) [data-blume-ask] {
+        display: none;
+      }
+    </style>
+  <IconSprite />
+  </body>
+</html>
