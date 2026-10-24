@@ -71,7 +71,7 @@ ErrorDocument 404 /codemap/404.html
 </Files>
 
 <IfModule mod_headers.c>
-  <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|index\.json$)">
+  <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|^agent-readability\.json$|index\.json$)">
     Header set Access-Control-Allow-Origin "*"
   </FilesMatch>
 </IfModule>
@@ -90,6 +90,11 @@ RewriteRule ^ - [L]
 RewriteCond %{HTTP:Accept} text/markdown [NC]
 RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
 RewriteRule ^$ /codemap/index.md [L,T=text/markdown]
+
+# /codemap/index.html -> /codemap/index.md (same representation as /codemap/)
+RewriteCond %{HTTP:Accept} text/markdown [NC]
+RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
+RewriteRule ^index\.html$ /codemap/index.md [L,T=text/markdown]
 
 # /codemap/<route> -> twin .md
 RewriteCond %{HTTP:Accept} text/markdown [NC]
