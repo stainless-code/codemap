@@ -8,7 +8,9 @@ Integration-style through the **public seams** (parser entry, DB insert path, CL
 
 ```ts
 import { describe, expect, it } from "bun:test";
+
 import Database from "better-sqlite3";
+
 import { insertFile, openDb } from "../db";
 
 describe("insertFile", () => {
