@@ -96,7 +96,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.7.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "better-sqlite3": "13.0.3",
     "chokidar": "5.0.0",
     "lightningcss": "1.33.0",
@@ -104,7 +104,7 @@
     "oxc-resolver": "11.24.2",
     "package-manager-detector": "1.8.0",
     "tinyglobby": "0.2.17",
-    "zod": "4.4.3"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
@@ -128,6 +128,7 @@
   },
   "overrides": {
     "@hono/node-server": "1.19.17",
+    "body-parser": "2.4.0",
     "fast-uri": ">=3.1.8",
     "hono": ">=4.12.34",
     "nanoid": "3.3.18",
