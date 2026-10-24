@@ -49,8 +49,12 @@ ErrorDocument 404 /codemap/404.html
 # Apache ignores that file; this is what actually ships headers under /codemap.
 <IfModule mod_mime.c>
   AddType application/json .json
-  AddType application/gzip .tar.gz
 </IfModule>
+
+# Compound extension needs a filename match — AddType splits on dots.
+<FilesMatch "\.tar\.gz$">
+  ForceType application/gzip
+</FilesMatch>
 
 # Homepage Link header (RFC 8288 / RFC 9727 s3). Minimal form; keep in sync with dist/_headers.
 <IfModule mod_setenvif.c>

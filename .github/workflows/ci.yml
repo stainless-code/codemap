@@ -283,10 +283,14 @@ jobs:
         # http-cache-semantics via Blume @scalar/astro, source-map-js via Blume astro unifont css-tree.
         # Runtime-touching advisories (fast-uri, proxy-addr via MCP SDK; tinypool via oxfmt) are
         # fixed with package.json overrides instead — never ignored.
+        # Docs/release-tooling-only transitives, likewise no src/ reach — ignored, not overridden:
+        # dompurify + sharp + undici + astro's zod via Blume (static docs build),
+        # markdown-it via typedoc (API reference generation),
+        # launch-editor + shell-quote via @changesets/cli (local release tooling).
         run: |
           set +e
           # bun emits ANSI color even when piped — strip it or the severity grep misses it.
-          NO_COLOR=1 bun audit --ignore=GHSA-w3rx-r6r6-pgpr --ignore=GHSA-5p2g-fcmc-qvqq --ignore=GHSA-qhr7-859c-m2p7 --ignore=GHSA-6j4f-fj2g-mc7p --ignore=GHSA-ch52-4w7c-c8xp --ignore=GHSA-68fv-2mgg-jv7q 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > /tmp/bun-audit.log
+          NO_COLOR=1 bun audit --ignore=GHSA-w3rx-r6r6-pgpr --ignore=GHSA-5p2g-fcmc-qvqq --ignore=GHSA-qhr7-859c-m2p7 --ignore=GHSA-6j4f-fj2g-mc7p --ignore=GHSA-ch52-4w7c-c8xp --ignore=GHSA-68fv-2mgg-jv7q --ignore=GHSA-cg2g-xh64-v4q7 --ignore=GHSA-mrv2-3pqr-j5jr --ignore=GHSA-587h-7wmj-h5pm --ignore=GHSA-pqg4-j6r4-53mv --ignore=GHSA-gfr2-rv44-r23c --ignore=GHSA-r7fv-28h4-cvq7 --ignore=GHSA-wq5f-xc86-pv6w --ignore=GHSA-xjj6-f33q-929c --ignore=GHSA-mrhx-c7xc-m3w5 2>&1 | sed -E 's/\x1b\[[0-9;]*m//g' > /tmp/bun-audit.log
           cat /tmp/bun-audit.log
           if grep -E '(^|[[:space:]])(high|critical):[[:space:]]' /tmp/bun-audit.log; then
             echo "::error::high or critical vulnerabilities found — blocking"
