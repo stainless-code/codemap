@@ -73,6 +73,11 @@ ErrorDocument 404 /codemap/404.html
   ForceType 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"'
 </Files>
 
+# Serve the catalog with its advertised media type (matches Link rel=ai-catalog).
+<Files "ai-catalog.json">
+  ForceType application/ai-catalog+json
+</Files>
+
 <IfModule mod_headers.c>
   <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|^agent-readability\.json$|index\.json$)">
     Header set Access-Control-Allow-Origin "*"
