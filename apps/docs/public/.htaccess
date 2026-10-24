@@ -44,3 +44,53 @@ ErrorDocument 404 /codemap/404.html
 <FilesMatch "^llms(-full|-small)?\.txt$">
   Header set X-Robots-Tag "noindex"
 </FilesMatch>
+
+# Agent discovery (isitagentready) — Apache port of dist/_headers.
+# Apache ignores that file; this is what actually ships headers under /codemap.
+<IfModule mod_mime.c>
+  AddType application/json .json
+  AddType application/gzip .tar.gz
+</IfModule>
+
+# Homepage Link header (RFC 8288 / RFC 9727 s3). Minimal form; keep in sync with dist/_headers.
+<IfModule mod_setenvif.c>
+  SetEnvIf Request_URI "^/codemap/$" IS_CODEMAP_HOME
+  SetEnvIf Request_URI "^/codemap/index\.html$" IS_CODEMAP_HOME
+</IfModule>
+<IfModule mod_headers.c>
+  Header always set Link "</codemap/.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </codemap/.well-known/ai-catalog.json>; rel=\"ai-catalog\"; type=\"application/ai-catalog+json\", </codemap/openapi.json>; rel=\"service-desc\"; type=\"application/json\", </codemap/agent-readability.json>; rel=\"describedby\"; type=\"application/json\", </codemap/llms.txt>; rel=\"describedby\"; type=\"text/plain\", </codemap/index.md>; rel=\"alternate\"; type=\"text/markdown\"" env=IS_CODEMAP_HOME
+</IfModule>
+
+# Extensionless file needs explicit type (else text/plain fails the scan).
+<Files "api-catalog">
+  ForceType 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"'
+</Files>
+
+<IfModule mod_headers.c>
+  <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|index\.json$)">
+    Header set Access-Control-Allow-Origin "*"
+  </FilesMatch>
+</IfModule>
+
+# Pragmatic Accept: text/markdown (static-first, not strict RFC).
+# Subdir rules shadow the domain-root rewrite block, so both live here.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+RewriteCond %{REQUEST_URI} \.(css|js|mjs|map|png|jpe?g|webp|gif|svg|avif|ico|woff2?|ttf|otf|eot|xml|txt|json|pdf|mp4|webm|mp3|wav|ogg|zip)$ [NC]
+RewriteRule ^ - [L]
+RewriteCond %{REQUEST_URI} \.mdx?$ [NC]
+RewriteRule ^ - [L]
+
+# /codemap/ -> /codemap/index.md
+RewriteCond %{HTTP:Accept} text/markdown [NC]
+RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
+RewriteRule ^$ /codemap/index.md [L,T=text/markdown]
+
+# /codemap/<route> -> twin .md
+RewriteCond %{HTTP:Accept} text/markdown [NC]
+RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
+RewriteCond %{REQUEST_FILENAME} !\.md$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/codemap/$1.md -f
+RewriteRule ^(.+?)/?$ /codemap/$1.md [L,T=text/markdown]
+</IfModule>
