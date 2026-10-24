@@ -49,12 +49,8 @@ ErrorDocument 404 /codemap/404.html
 # Apache ignores that file; this is what actually ships headers under /codemap.
 <IfModule mod_mime.c>
   AddType application/json .json
+  AddType application/gzip .tar.gz
 </IfModule>
-
-# Compound extension needs a filename match — AddType splits on dots.
-<FilesMatch "\.tar\.gz$">
-  ForceType application/gzip
-</FilesMatch>
 
 # Homepage Link header (RFC 8288 / RFC 9727 s3). Minimal form; keep in sync with dist/_headers.
 <IfModule mod_setenvif.c>
@@ -62,8 +58,7 @@ ErrorDocument 404 /codemap/404.html
   SetEnvIf Request_URI "^/codemap/index\.html$" IS_CODEMAP_HOME
 </IfModule>
 <IfModule mod_headers.c>
-  # expr covers REDIRECT_ rename after internal rewrites (e.g. /codemap/index.html -> /codemap/index.md).
-  Header always set Link "</codemap/.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </codemap/.well-known/ai-catalog.json>; rel=\"ai-catalog\"; type=\"application/ai-catalog+json\", </codemap/openapi.json>; rel=\"service-desc\"; type=\"application/json\", </codemap/agent-readability.json>; rel=\"describedby\"; type=\"application/json\", </codemap/llms.txt>; rel=\"describedby\"; type=\"text/plain\", </codemap/index.md>; rel=\"alternate\"; type=\"text/markdown\"" "expr=%{ENV:IS_CODEMAP_HOME} || %{ENV:REDIRECT_IS_CODEMAP_HOME}"
+  Header always set Link "</codemap/.well-known/api-catalog>; rel=\"api-catalog\"; type=\"application/linkset+json\", </codemap/.well-known/ai-catalog.json>; rel=\"ai-catalog\"; type=\"application/ai-catalog+json\", </codemap/openapi.json>; rel=\"service-desc\"; type=\"application/json\", </codemap/agent-readability.json>; rel=\"describedby\"; type=\"application/json\", </codemap/llms.txt>; rel=\"describedby\"; type=\"text/plain\", </codemap/index.md>; rel=\"alternate\"; type=\"text/markdown\"" env=IS_CODEMAP_HOME
 </IfModule>
 
 # Extensionless file needs explicit type (else text/plain fails the scan).
@@ -72,7 +67,7 @@ ErrorDocument 404 /codemap/404.html
 </Files>
 
 <IfModule mod_headers.c>
-  <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|^agent-readability\.json$|index\.json$)">
+  <FilesMatch "(^ai-catalog\.json$|^ard\.json$|^api-catalog$|index\.json$)">
     Header set Access-Control-Allow-Origin "*"
   </FilesMatch>
 </IfModule>
@@ -89,17 +84,12 @@ RewriteRule ^ - [L]
 
 # /codemap/ -> /codemap/index.md
 RewriteCond %{HTTP:Accept} text/markdown [NC]
-RewriteCond %{HTTP:Accept} !text/markdown(?:\s*;\s*(?!q\s*=)[^;,]+)*\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
+RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
 RewriteRule ^$ /codemap/index.md [L,T=text/markdown]
-
-# /codemap/index.html -> /codemap/index.md (same representation as /codemap/)
-RewriteCond %{HTTP:Accept} text/markdown [NC]
-RewriteCond %{HTTP:Accept} !text/markdown(?:\s*;\s*(?!q\s*=)[^;,]+)*\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
-RewriteRule ^index\.html$ /codemap/index.md [L,T=text/markdown]
 
 # /codemap/<route> -> twin .md
 RewriteCond %{HTTP:Accept} text/markdown [NC]
-RewriteCond %{HTTP:Accept} !text/markdown(?:\s*;\s*(?!q\s*=)[^;,]+)*\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
+RewriteCond %{HTTP:Accept} !text/markdown\s*;\s*q\s*=\s*0(\.0*)?(\s*[;,]|\s*$) [NC]
 RewriteCond %{REQUEST_FILENAME} !\.md$ [NC]
 RewriteCond %{DOCUMENT_ROOT}/codemap/$1.md -f
 RewriteRule ^(.+?)/?$ /codemap/$1.md [L,T=text/markdown]
