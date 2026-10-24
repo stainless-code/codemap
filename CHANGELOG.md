@@ -475,7 +475,7 @@
 
   HTTP API (`codemap serve`) stays in roadmap backlog; design points
   (tool taxonomy + output shape) are reserved in `docs/architecture.md
-§ MCP wiring` so HTTP inherits them when a concrete consumer asks.
+  § MCP wiring` so HTTP inherits them when a concrete consumer asks.
 
 - [#74](https://github.com/stainless-code/codemap/pull/74) [`7889fed`](https://github.com/stainless-code/codemap/commit/7889fedfff865dc71accf35169a2d5a7b40681e2) Thanks [@SutuSebastian](https://github.com/SutuSebastian)! - `codemap audit --format <text|json|sarif>` — emit a SARIF 2.1.0 doc directly from the audit envelope, no JSON→SARIF transform step needed. One rule per delta key (`codemap.audit.files-added`, `codemap.audit.dependencies-added`, `codemap.audit.deprecated-added`); one result per `added` row; severity = `warning` (audit deltas are more actionable than per-recipe `note`). Locations auto-detected via the same `file_path` / `path` / `to_path` / `from_path` priority list that `query --format sarif` uses; line ranges (`line_start` / `line_end`) populate the SARIF `region`. Pure output-formatter addition on top of the existing audit envelope; no schema impact.
 
