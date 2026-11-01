@@ -117,3 +117,24 @@ jobs:
             **/.git*
             **/.git*/**
             **/node_modules/**
+
+      # Fail-closed deploy proof: the live changelog is built from the releases
+      # API at build time, so only a fresh deploy can contain this run's tags.
+      # No tags on HEAD (docs PR, manual dispatch): assert liveness only.
+      - name: Verify live site serves this release
+        if: steps.gate.outputs.release != 'false'
+        run: |
+          SITE="https://stainless-code.com/codemap"
+          TAGS="$(git tag --points-at HEAD)"
+          if [ -z "$TAGS" ]; then
+            curl -sSfL -o /dev/null "$SITE/"
+          else
+            for TAG in $TAGS; do
+              ATTEMPT=0
+              until curl -sSL "$SITE/changelog" | grep -qF "$TAG"; do
+                ATTEMPT=$((ATTEMPT + 1))
+                if [ "$ATTEMPT" -ge 3 ]; then exit 1; fi
+                sleep 30
+              done
+            done
+          fi
