@@ -10,8 +10,8 @@ on:
     branches: [main]
   # Async release follow-up: releases created by changesets with GITHUB_TOKEN
   # cannot trigger `release: published` downstream (GITHUB_TOKEN events spawn
-  # no new runs). workflow_run fires regardless of token, in its own run —
-  # Release stays untouched. Read from main, so this takes effect post-merge.
+  # no new runs). workflow_run fires regardless of token, in its own run,
+  # so Release stays untouched. Read from main, so this takes effect post-merge.
   workflow_run:
     workflows: [Release]
     types: [completed]
@@ -51,8 +51,8 @@ jobs:
           fetch-depth: 0
 
       # Release runs on every main push; deploy only when its head shipped
-      # a release (any tag present — every tag in these repos is a
-      # changesets release tag). Skips green — no red noise.
+      # a release (any tag present: every tag in these repos is a
+      # changesets release tag). Skips green, no red noise.
       - name: Require release tag on head
         id: gate
         if: github.event_name == 'workflow_run'
@@ -64,36 +64,44 @@ jobs:
           fi
 
       - name: Setup Bun
+        # Same gate as upload: no release, no work (still green).
+        if: steps.gate.outputs.release != 'false'
         uses: ./.github/actions/setup
 
       # Lib dist — cheap; keep for parity / future islands that resolve package entrypoints.
       - name: Build
+        if: steps.gate.outputs.release != 'false'
         run: bun run build
 
       - name: Generate API reference (Markdown)
+        if: steps.gate.outputs.release != 'false'
         run: bun run docs:api
 
       # Same gates as CI `docs` — workflow_dispatch must not FTP an unaudited tree.
       - name: Validate docs links
+        if: steps.gate.outputs.release != 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run docs:validate -- --strict
 
       - name: Typecheck docs site
+        if: steps.gate.outputs.release != 'false'
         run: bun run docs:check -- --isolated
 
       - name: Build docs site
+        if: steps.gate.outputs.release != 'false'
         env:
           # Changelog github-releases source + avoid unauthenticated API rate limits.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run docs:build
 
       - name: Audit docs site
+        if: steps.gate.outputs.release != 'false'
         run: bun run docs:audit
 
       # FTP account root is already /codemap — server-dir ./ is correct (not ./codemap/).
       - name: Upload to /codemap via FTP
-        # Gate runs on workflow_run only; skipped (empty) elsewhere — upload proceeds.
+        # Gate runs on workflow_run only; skipped (empty) elsewhere, so upload proceeds.
         if: steps.gate.outputs.release != 'false'
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
