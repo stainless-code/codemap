@@ -8,6 +8,14 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  # Async release follow-up: releases created by changesets with GITHUB_TOKEN
+  # cannot trigger `release: published` downstream (GITHUB_TOKEN events spawn
+  # no new runs). workflow_run fires regardless of token, in its own run —
+  # Release stays untouched. Read from main, so this takes effect post-merge.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -25,17 +33,35 @@ jobs:
       github.event_name == 'release' ||
       (github.event_name == 'pull_request' &&
        github.event.pull_request.merged == true &&
-       contains(github.event.pull_request.labels.*.name, 'docs'))
+       contains(github.event.pull_request.labels.*.name, 'docs')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           persist-credentials: false
+          # The release-tag gate below needs tags even on branch checkouts.
+          fetch-tags: true
           # Closed PR checkout defaults to a dead merge ref — pin the merge commit on main.
-          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          # A workflow_run checkout defaults to default-branch HEAD, so pin the run's head SHA.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           # Sitemap lastmod uses `git log` per file.
           fetch-depth: 0
+
+      # Release runs on every main push; deploy only when its head shipped
+      # a release (any tag present — every tag in these repos is a
+      # changesets release tag). Skips green — no red noise.
+      - name: Require release tag on head
+        id: gate
+        if: github.event_name == 'workflow_run'
+        run: |
+          if git tag --points-at HEAD | grep -q .; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Bun
         uses: ./.github/actions/setup
@@ -67,6 +93,8 @@ jobs:
 
       # FTP account root is already /codemap — server-dir ./ is correct (not ./codemap/).
       - name: Upload to /codemap via FTP
+        # Gate runs on workflow_run only; skipped (empty) elsewhere — upload proceeds.
+        if: steps.gate.outputs.release != 'false'
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
           server: ${{ secrets.FTP_HOST }}
